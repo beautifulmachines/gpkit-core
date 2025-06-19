@@ -30,6 +30,9 @@ jobs:
     - name: Lint with flake8
       run: |
         make lint
+    - name: Lint imports
+      run: |
+        lint-imports
     - name: Check for file changes
       run: |
         make check-clean
