@@ -23,6 +23,7 @@ from ..repr_conventions import lineagestr
 from ..small_classes import CootMatrix, FixedScalar, Numbers, SolverLog
 from ..small_scripts import appendsolwarning, initsolwarning
 from ..solution_array import SolutionArray
+from ..solutions.solution import Solution
 from .set import ConstraintSet
 
 DEFAULT_SOLVER_KWARGS = {"cvxopt": {"kktsolver": "ldl"}}
@@ -467,6 +468,14 @@ class GeometricProgram:
             "variables"
         ]  # NOTE: backwards compat.
         result["sensitivities"]["models"] = dict(m_senss)
+
+        # Create Solution object for internal use
+        self._solution = Solution(
+            cost=result["cost"],
+            variables=result["variables"],
+            sensitivities=result["sensitivities"],
+            modelstr=str(self.model) if self.model else "",
+        )
         return SolutionArray(result)
 
     def check_solution(self, cost, primal, nu, la, tol, abstol=1e-20):
