@@ -21,7 +21,10 @@ layers =
     gpkit.interactive | gpkit.breakdowns | gpkit.tools
 
     # Model eventually goes here? user-friendly interface to model and solvers
-    gpkit.model | gpkit.programs
+    gpkit.model
+
+    # mathematical optimization models
+    gpkit.programs
 
     # GP representation and solver interfaces
     gpkit.solvers | gpkit.solution_array | gpkit.solution_ensemble
