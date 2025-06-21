@@ -218,8 +218,8 @@ class SolutionOracle:
         "Plots the sweep for each posy"
         import matplotlib.pyplot as plt
 
-        from .. import GPBLU
         from ..interactive.plot_sweep import assign_axes
+        from ..util import GPBLU
 
         if not hasattr(posys, "__len__"):
             posys = [posys]
