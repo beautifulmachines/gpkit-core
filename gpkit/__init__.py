@@ -17,9 +17,6 @@ from .units import DimensionalityError, units, ureg
 from .util.docstring import parse_variables
 from .varkey import VarKey
 
-GPCOLORS = ["#59ade4", "#FA3333"]
-GPBLU, GPRED = GPCOLORS
-
 if "just built!" in settings:  # pragma: no cover
     print(
         f"""

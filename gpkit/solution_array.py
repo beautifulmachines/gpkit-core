@@ -969,8 +969,8 @@ class SolutionArray(DictOfLists):
             posys = [posys]
         import matplotlib.pyplot as plt
 
-        from . import GPBLU
         from .interactive.plot_sweep import assign_axes
+        from .util import GPBLU
 
         ((swept, x),) = self["sweepvariables"].items()
         posys, axes = assign_axes(swept, posys, axes)

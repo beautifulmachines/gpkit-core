@@ -47,13 +47,9 @@ layers =
 # goal is to evantually eliminate the ignore list below via refactoring
 ignore_imports =
     # the following import patterns exist today but should be eliminated
-    gpkit.interactive.* -> gpkit
-    gpkit.units -> gpkit
-    gpkit.solution_array -> gpkit
-    gpkit.solvers.mosek_cli -> gpkit
+    gpkit.units -> gpkit.nomials
     gpkit.nomials.math -> gpkit.constraints
     gpkit.nomials.array -> gpkit.constraints
-    gpkit.programs.* -> gpkit
     gpkit.solution_array -> gpkit.interactive.plot_sweep
     gpkit.solution_array -> gpkit.breakdowns
     gpkit.tools.autosweep -> gpkit.interactive.plot_sweep
@@ -61,6 +57,7 @@ ignore_imports =
     gpkit.constraints.* -> gpkit.globals
     gpkit.nomials.* -> gpkit.globals
     gpkit.programs.* -> gpkit.globals
+    gpkit.solvers.mosek_cli -> gpkit.globals
 
 # ---------------------------------------------------------------------------
 # Contract 2: Keep test helpers independent of production code (optional)

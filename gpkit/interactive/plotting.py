@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import plotly.graph_objects as go
 
-from .. import GPCOLORS
+from ..util import GPCOLORS
 from .plot_sweep import assign_axes
 
 

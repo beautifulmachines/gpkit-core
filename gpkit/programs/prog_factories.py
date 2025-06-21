@@ -55,7 +55,7 @@ def evaluate_linked(constants, linked):
                 adn.tag: grad for adn, grad in out.d().items() if adn.tag
             }
         except Exception as exception:  # pylint: disable=broad-except
-            from .. import settings  # pylint: disable=import-outside-toplevel
+            from ..globals import settings  # pylint: disable=import-outside-toplevel
 
             if settings.get("ad_errors_raise", None):
                 raise
