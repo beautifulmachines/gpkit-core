@@ -42,7 +42,7 @@ test = [
 Homepage = "https://www.github.com/beautifulmachines/gpkit-core"
 
 [tool.setuptools]
-packages = ["gpkit", "gpkit.tools", "gpkit.interactive", "gpkit.constraints", "gpkit.nomials", "gpkit.tests", "gpkit.solvers"]
+packages = { find = {} }
 package-data = { "gpkit" = ["env/settings"] }
 
 [tool.setuptools.dynamic]
