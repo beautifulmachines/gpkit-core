@@ -52,6 +52,10 @@ def import_tests():
 
     tests += t_keydict.TESTS
 
+    from gpkit.tests import t_util
+
+    tests += t_util.TESTS
+
     return tests
 
 
