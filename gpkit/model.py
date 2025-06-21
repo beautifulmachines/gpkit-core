@@ -11,7 +11,7 @@ from .exceptions import Infeasible, InvalidGPConstraint
 from .globals import NamedVariables
 from .nomials import Monomial
 from .tools.autosweep import autosweep_1d
-from .tools.docstring import expected_unbounded
+from .util.docstring import expected_unbounded
 
 
 class Model(CostedConstraintSet):

@@ -36,7 +36,7 @@ layers =
     gpkit.varkey : gpkit.keydict
 
     # small helpers that might evantually move or be eliminated
-    gpkit.small_classes : gpkit.small_scripts : gpkit.repr_conventions
+    gpkit.small_classes : gpkit.small_scripts : gpkit.repr_conventions : gpkit.util
 
     # Pure primitives & units (no gpkit imports allowed)
     gpkit.units | gpkit.exceptions
@@ -58,8 +58,6 @@ ignore_imports =
     gpkit.solution_array -> gpkit.breakdowns
     gpkit.tools.autosweep -> gpkit.interactive.plot_sweep
     gpkit.model -> gpkit.tools.autosweep
-    gpkit.model -> gpkit.tools.docstring
-    gpkit -> gpkit.tools.docstring
     gpkit.nomials.* -> gpkit.globals
 
     # the following import patterns make sense and require reorganizing modules

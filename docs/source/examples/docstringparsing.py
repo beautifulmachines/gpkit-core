@@ -1,7 +1,7 @@
 "Docstring parsing example"
 
 from gpkit import Model, parse_variables
-from gpkit.tools.docstring import parse_varstring
+from gpkit.util.docstring import parse_varstring
 
 
 # pylint: disable=no-member

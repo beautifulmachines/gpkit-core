@@ -13,7 +13,7 @@ from .nomials import ArrayVariable, Monomial, NomialArray, Posynomial, Signomial
 from .nomials import VectorizableVariable as Variable  # Variable the user sees
 from .nomials import VectorVariable
 from .solution_array import SolutionArray
-from .tools.docstring import parse_variables
+from .util.docstring import parse_variables
 from .units import DimensionalityError, units, ureg
 from .varkey import VarKey
 
