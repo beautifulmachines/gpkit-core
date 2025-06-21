@@ -33,7 +33,7 @@ from gpkit.exceptions import (
     UnknownInfeasible,
     UnnecessarySGP,
 )
-from gpkit.small_classes import CootMatrix
+from gpkit.util.small_classes import CootMatrix
 
 NDIGS = {"cvxopt": 5, "mosek_cli": 5, "mosek_conif": 3}
 # name: decimal places of accuracy achieved in these tests

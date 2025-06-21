@@ -1,24 +1,21 @@
 "GP and SP modeling package"
 
-__version__ = "0.1.2"
+__version__ = "0.1.3"
 
 from .build import build
-from .constraints.gp import GeometricProgram
-from .constraints.model import Model
 from .constraints.set import ConstraintSet
-from .constraints.sgp import SequentialGeometricProgram
 from .constraints.sigeq import SignomialEquality
 from .globals import NamedVariables, SignomialsEnabled, Vectorize, settings
+from .model import Model
 from .nomials import ArrayVariable, Monomial, NomialArray, Posynomial, Signomial
 from .nomials import VectorizableVariable as Variable  # Variable the user sees
 from .nomials import VectorVariable
+from .programs.gp import GeometricProgram
+from .programs.sgp import SequentialGeometricProgram
 from .solution_array import SolutionArray
-from .tools.docstring import parse_variables
 from .units import DimensionalityError, units, ureg
+from .util.docstring import parse_variables
 from .varkey import VarKey
-
-GPCOLORS = ["#59ade4", "#FA3333"]
-GPBLU, GPRED = GPCOLORS
 
 if "just built!" in settings:  # pragma: no cover
     print(

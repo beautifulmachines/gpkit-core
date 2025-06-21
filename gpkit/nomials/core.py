@@ -1,7 +1,7 @@
 "The shared non-mathematical backbone of all Nomials"
 
-from ..repr_conventions import MUL, UNICODE_EXPONENTS
-from ..small_classes import FixedScalar, Numbers
+from ..util.repr_conventions import MUL, UNICODE_EXPONENTS
+from ..util.small_classes import FixedScalar, Numbers
 from .data import NomialData
 
 

@@ -6,8 +6,8 @@ import numpy as np
 
 import gpkit
 from gpkit import Model, Variable, units
-from gpkit.small_scripts import mag
 from gpkit.tools.autosweep import autosweep_1d
+from gpkit.util.small_scripts import mag
 
 A = Variable("A", "m**2")
 w = Variable("w", "m")

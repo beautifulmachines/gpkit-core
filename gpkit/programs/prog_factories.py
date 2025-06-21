@@ -10,9 +10,9 @@ from ..exceptions import Infeasible
 from ..globals import SignomialsEnabled
 from ..keydict import KeyDict
 from ..nomials import parse_subs
-from ..small_classes import FixedScalar
-from ..small_scripts import maybe_flatten
 from ..solution_array import SolutionArray
+from ..util.small_classes import FixedScalar
+from ..util.small_scripts import maybe_flatten
 
 
 def evaluate_linked(constants, linked):
@@ -55,7 +55,7 @@ def evaluate_linked(constants, linked):
                 adn.tag: grad for adn, grad in out.d().items() if adn.tag
             }
         except Exception as exception:  # pylint: disable=broad-except
-            from .. import settings  # pylint: disable=import-outside-toplevel
+            from ..globals import settings  # pylint: disable=import-outside-toplevel
 
             if settings.get("ad_errors_raise", None):
                 raise

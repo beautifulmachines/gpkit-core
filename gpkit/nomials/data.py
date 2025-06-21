@@ -3,7 +3,7 @@
 import numpy as np
 
 from ..keydict import KeySet
-from ..repr_conventions import ReprMixin
+from ..util.repr_conventions import ReprMixin
 from ..varkey import VarKey
 
 

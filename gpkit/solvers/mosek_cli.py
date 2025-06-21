@@ -13,13 +13,13 @@ import stat
 import tempfile
 from subprocess import CalledProcessError, check_output
 
-from .. import settings
 from ..exceptions import (
     DualInfeasible,
     InvalidLicense,
     PrimalInfeasible,
     UnknownInfeasible,
 )
+from ..globals import settings
 
 
 def remove_read_only(func, path, exc):  # pragma: no cover

@@ -17,9 +17,9 @@ from gpkit import (
     VectorVariable,
 )
 from gpkit.exceptions import UnboundedGP
-from gpkit.small_scripts import mag
 from gpkit.tests.helpers import run_tests
 from gpkit.units import DimensionalityError
+from gpkit.util.small_scripts import mag
 
 # pylint: disable=invalid-name,attribute-defined-outside-init,unused-variable
 

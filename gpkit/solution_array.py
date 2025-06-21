@@ -16,9 +16,9 @@ import numpy as np
 
 from .breakdowns import Breakdowns
 from .nomials import NomialArray
-from .repr_conventions import UNICODE_EXPONENTS, lineagestr, unitstr
-from .small_classes import DictOfLists, SolverLog, Strings
-from .small_scripts import mag, try_str_without
+from .util.repr_conventions import UNICODE_EXPONENTS, lineagestr, unitstr
+from .util.small_classes import DictOfLists, SolverLog, Strings
+from .util.small_scripts import mag, try_str_without
 
 CONSTRSPLITPATTERN = re.compile(r"([^*]\*[^*])|( \+ )|( >= )|( <= )|( = )")
 
@@ -969,8 +969,8 @@ class SolutionArray(DictOfLists):
             posys = [posys]
         import matplotlib.pyplot as plt
 
-        from . import GPBLU
         from .interactive.plot_sweep import assign_axes
+        from .util import GPBLU
 
         ((swept, x),) = self["sweepvariables"].items()
         posys, axes = assign_axes(swept, posys, axes)

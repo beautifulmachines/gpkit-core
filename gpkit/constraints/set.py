@@ -7,8 +7,8 @@ from itertools import chain
 import numpy as np
 
 from ..keydict import KeyDict, KeySet
-from ..repr_conventions import ReprMixin
-from ..small_scripts import try_str_without
+from ..util.repr_conventions import ReprMixin
+from ..util.small_scripts import try_str_without
 from .single_equation import SingleEquationConstraint
 
 

@@ -11,10 +11,10 @@ from ..exceptions import (
     InvalidPosynomial,
     PrimalInfeasible,
 )
-from ..globals import SignomialsEnabled
-from ..small_classes import EMPTY_HV, HashVector, Numbers
-from ..small_scripts import mag
+from ..globals import NamedVariables, SignomialsEnabled
 from ..units import DimensionalityError
+from ..util.small_classes import EMPTY_HV, HashVector, Numbers
+from ..util.small_scripts import mag
 from ..varkey import VarKey
 from .core import Nomial
 from .map import NomialMap
@@ -394,7 +394,6 @@ class ScalarSingleEquationConstraint(SingleEquationConstraint):
                     self.vks.update(exp)
             else:
                 lr[i] = Signomial(sig)
-        from .. import NamedVariables  # pylint: disable=import-outside-toplevel
 
         self.lineage = tuple(NamedVariables.lineage)
         super().__init__(lr[0], oper, lr[1])

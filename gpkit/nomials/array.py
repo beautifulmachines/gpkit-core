@@ -13,9 +13,9 @@ from operator import eq, ge, le, xor
 import numpy as np
 
 from ..constraints import ArrayConstraint
-from ..repr_conventions import ReprMixin
-from ..small_classes import EMPTY_HV, HashVector
-from ..small_scripts import try_str_without
+from ..util.repr_conventions import ReprMixin
+from ..util.small_classes import EMPTY_HV, HashVector
+from ..util.small_scripts import try_str_without
 from .map import NomialMap
 
 

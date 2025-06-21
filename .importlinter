@@ -21,6 +21,10 @@ layers =
     gpkit.interactive | gpkit.breakdowns | gpkit.tools
 
     # Model eventually goes here? user-friendly interface to model and solvers
+    gpkit.model
+
+    # mathematical optimization models
+    gpkit.programs
 
     # GP representation and solver interfaces
     gpkit.solvers | gpkit.solution_array | gpkit.solution_ensemble
@@ -35,7 +39,7 @@ layers =
     gpkit.varkey : gpkit.keydict
 
     # small helpers that might evantually move or be eliminated
-    gpkit.small_classes : gpkit.small_scripts : gpkit.repr_conventions
+    gpkit.util
 
     # Pure primitives & units (no gpkit imports allowed)
     gpkit.units | gpkit.exceptions
@@ -43,26 +47,17 @@ layers =
 # goal is to evantually eliminate the ignore list below via refactoring
 ignore_imports =
     # the following import patterns exist today but should be eliminated
-    gpkit.interactive.* -> gpkit
-    gpkit.units -> gpkit
-    gpkit.solution_array -> gpkit
-    gpkit.solvers.mosek_cli -> gpkit
-    gpkit.constraints.* -> gpkit
-    gpkit.constraints.* -> gpkit.globals
-    gpkit.constraints.model -> gpkit.tools.autosweep
-    gpkit.nomials.math -> gpkit
+    gpkit.units -> gpkit.nomials
     gpkit.nomials.math -> gpkit.constraints
     gpkit.nomials.array -> gpkit.constraints
-    gpkit.constraints.gp -> gpkit.solvers.*
     gpkit.solution_array -> gpkit.interactive.plot_sweep
     gpkit.solution_array -> gpkit.breakdowns
     gpkit.tools.autosweep -> gpkit.interactive.plot_sweep
-    gpkit.constraints.model -> gpkit.tools.docstring
+    gpkit.model -> gpkit.tools.autosweep
+    gpkit.constraints.* -> gpkit.globals
     gpkit.nomials.* -> gpkit.globals
-
-    # the following import patterns make sense and require reorganizing modules
-    gpkit.constraints.gp -> gpkit.solution_array
-    gpkit.constraints.prog_factories -> gpkit.solution_array
+    gpkit.programs.* -> gpkit.globals
+    gpkit.solvers.mosek_cli -> gpkit.globals
 
 # ---------------------------------------------------------------------------
 # Contract 2: Keep test helpers independent of production code (optional)

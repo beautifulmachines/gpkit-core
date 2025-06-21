@@ -1,7 +1,7 @@
 "Tests broadcast_sub function for returned-dictionary substitutions"
 
 from gpkit import ConstraintSet, Model, Variable, Vectorize
-from gpkit.small_scripts import broadcast_substitution
+from gpkit.util.small_scripts import broadcast_substitution
 
 
 class Pie(Model):

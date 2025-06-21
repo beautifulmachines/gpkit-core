@@ -6,7 +6,7 @@ Euler-Bernoulli beam equations for a constant distributed load
 import numpy as np
 
 from gpkit import Model, parse_variables, ureg
-from gpkit.small_scripts import mag
+from gpkit.util.small_scripts import mag
 
 eps = 2e-4  # has to be quite large for consistent cvxopt printouts;
 #  normally you'd set this to something more like 1e-20

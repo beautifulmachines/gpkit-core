@@ -5,8 +5,8 @@ from collections import defaultdict
 import numpy as np
 
 from .. import units
-from ..small_classes import EMPTY_HV, HashVector, Strings
 from ..units import DimensionalityError, qty
+from ..util.small_classes import EMPTY_HV, HashVector, Strings
 from .substitution import parse_subs
 
 DIMLESS_QUANTITY = qty("dimensionless")

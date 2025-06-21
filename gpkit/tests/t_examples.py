@@ -15,9 +15,9 @@ from gpkit.exceptions import (
     UnboundedGP,
     UnknownInfeasible,
 )
-from gpkit.small_classes import Quantity
-from gpkit.small_scripts import mag
 from gpkit.tests.helpers import generate_example_tests
+from gpkit.util.small_classes import Quantity
+from gpkit.util.small_scripts import mag
 
 
 def assert_logtol(first, second, logtol=1e-6):

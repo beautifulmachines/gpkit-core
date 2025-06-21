@@ -26,7 +26,7 @@ class GPkitUnits:
 
     def __call__(self, unity):
         "Returns a unit Monomial, caching the result for future retrievals"
-        from . import Monomial  # pylint: disable=import-outside-toplevel
+        from .nomials import Monomial  # pylint: disable=import-outside-toplevel
 
         if unity not in self.monomial_cache:
             self.monomial_cache[unity] = Monomial(qty(unity))

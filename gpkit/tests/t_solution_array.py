@@ -6,8 +6,8 @@ import numpy as np
 
 import gpkit
 from gpkit import Model, SignomialsEnabled, Variable, VectorVariable
-from gpkit.small_classes import Quantity, Strings
 from gpkit.solution_array import var_table
+from gpkit.util.small_classes import Quantity, Strings
 from gpkit.varkey import VarKey
 
 

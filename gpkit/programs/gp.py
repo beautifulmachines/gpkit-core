@@ -8,6 +8,7 @@ from time import time
 
 import numpy as np
 
+from ..constraints.set import ConstraintSet
 from ..exceptions import (
     DualInfeasible,
     Infeasible,
@@ -19,11 +20,10 @@ from ..exceptions import (
 )
 from ..keydict import KeyDict
 from ..nomials.map import NomialMap
-from ..repr_conventions import lineagestr
-from ..small_classes import CootMatrix, FixedScalar, Numbers, SolverLog
-from ..small_scripts import appendsolwarning, initsolwarning
 from ..solution_array import SolutionArray
-from .set import ConstraintSet
+from ..util.repr_conventions import lineagestr
+from ..util.small_classes import CootMatrix, FixedScalar, Numbers, SolverLog
+from ..util.small_scripts import appendsolwarning, initsolwarning
 
 DEFAULT_SOLVER_KWARGS = {"cvxopt": {"kktsolver": "ldl"}}
 SOLUTION_TOL = {"cvxopt": 1e-3, "mosek_cli": 1e-4, "mosek_conif": 1e-3}
@@ -41,7 +41,7 @@ class MonoEqualityIndexes:
 def _get_solver(solver, kwargs):
     """Get the solverfn and solvername associated with solver"""
     if solver is None:
-        from .. import settings
+        from ..globals import settings
 
         try:
             solver = settings["default_solver"]

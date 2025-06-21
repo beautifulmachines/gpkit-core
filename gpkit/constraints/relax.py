@@ -1,10 +1,10 @@
 # pylint: disable=consider-using-f-string
 """Models for assessing primal feasibility"""
 
-from .. import NamedVariables, SignomialsEnabled
+from ..globals import NamedVariables, SignomialsEnabled
 from ..keydict import KeyDict
 from ..nomials import NomialArray, Variable, VectorVariable, parse_subs
-from ..small_scripts import appendsolwarning, initsolwarning, mag
+from ..util.small_scripts import appendsolwarning, initsolwarning, mag
 from .set import ConstraintSet
 
 

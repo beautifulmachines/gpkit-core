@@ -4,8 +4,8 @@ from collections import defaultdict
 
 import numpy as np
 
-from .. import Variable
-from ..small_scripts import appendsolwarning, initsolwarning
+from ..nomials import Variable
+from ..util.small_scripts import appendsolwarning, initsolwarning
 from .set import ConstraintSet
 
 

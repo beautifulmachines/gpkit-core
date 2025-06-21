@@ -40,10 +40,6 @@ def import_tests():
 
     tests += t_solution_array.TESTS
 
-    from gpkit.tests import t_small
-
-    tests += t_small.TESTS
-
     from gpkit.tests import t_examples
 
     tests += t_examples.TESTS
@@ -51,6 +47,10 @@ def import_tests():
     from gpkit.tests import t_keydict
 
     tests += t_keydict.TESTS
+
+    from gpkit.tests import t_util
+
+    tests += t_util.TESTS
 
     return tests
 

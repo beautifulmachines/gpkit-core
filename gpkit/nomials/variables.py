@@ -5,8 +5,8 @@ from collections.abc import Iterable
 import numpy as np
 
 from ..globals import NamedVariables, Vectorize
-from ..small_classes import HashVector, Numbers, Strings
-from ..small_scripts import is_sweepvar, veclinkedfn
+from ..util.small_classes import HashVector, Numbers, Strings
+from ..util.small_scripts import is_sweepvar, veclinkedfn
 from ..varkey import VarKey
 from .array import NomialArray
 from .data import NomialData
