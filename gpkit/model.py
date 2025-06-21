@@ -2,16 +2,16 @@
 
 import numpy as np
 
-from ..exceptions import Infeasible, InvalidGPConstraint
-from ..globals import NamedVariables
-from ..nomials import Monomial
-from ..tools.autosweep import autosweep_1d
-from ..tools.docstring import expected_unbounded
-from .costed import CostedConstraintSet
-from .gp import GeometricProgram
-from .prog_factories import progify, solvify
-from .set import add_meq_bounds
-from .sgp import SequentialGeometricProgram
+from .constraints.costed import CostedConstraintSet
+from .constraints.gp import GeometricProgram
+from .constraints.prog_factories import progify, solvify
+from .constraints.set import add_meq_bounds
+from .constraints.sgp import SequentialGeometricProgram
+from .exceptions import Infeasible, InvalidGPConstraint
+from .globals import NamedVariables
+from .nomials import Monomial
+from .tools.autosweep import autosweep_1d
+from .tools.docstring import expected_unbounded
 
 
 class Model(CostedConstraintSet):
@@ -173,8 +173,8 @@ class Model(CostedConstraintSet):
     # pylint: disable=import-outside-toplevel
     def debug(self, solver=None, verbosity=1, **solveargs):
         "Attempts to diagnose infeasible models."
-        from .bounded import Bounded
-        from .relax import ConstantsRelaxed, ConstraintsRelaxed
+        from .constraints.bounded import Bounded
+        from .constraints.relax import ConstantsRelaxed, ConstraintsRelaxed
 
         sol = None
         solveargs["solver"] = solver
