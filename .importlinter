@@ -21,6 +21,7 @@ layers =
     gpkit.interactive | gpkit.breakdowns | gpkit.tools
 
     # Model eventually goes here? user-friendly interface to model and solvers
+    gpkit.model
 
     # GP representation and solver interfaces
     gpkit.solvers | gpkit.solution_array | gpkit.solution_ensemble
@@ -49,7 +50,6 @@ ignore_imports =
     gpkit.solvers.mosek_cli -> gpkit
     gpkit.constraints.* -> gpkit
     gpkit.constraints.* -> gpkit.globals
-    gpkit.constraints.model -> gpkit.tools.autosweep
     gpkit.nomials.math -> gpkit
     gpkit.nomials.math -> gpkit.constraints
     gpkit.nomials.array -> gpkit.constraints
@@ -57,7 +57,9 @@ ignore_imports =
     gpkit.solution_array -> gpkit.interactive.plot_sweep
     gpkit.solution_array -> gpkit.breakdowns
     gpkit.tools.autosweep -> gpkit.interactive.plot_sweep
-    gpkit.constraints.model -> gpkit.tools.docstring
+    gpkit.model -> gpkit.tools.autosweep
+    gpkit.model -> gpkit.tools.docstring
+    gpkit -> gpkit.tools.docstring
     gpkit.nomials.* -> gpkit.globals
 
     # the following import patterns make sense and require reorganizing modules
