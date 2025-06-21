@@ -2,8 +2,8 @@
 
 from operator import eq, ge, le
 
-from ..repr_conventions import UNICODE_EXPONENTS, ReprMixin
-from ..small_scripts import try_str_without
+from ..util.repr_conventions import UNICODE_EXPONENTS, ReprMixin
+from ..util.small_scripts import try_str_without
 
 
 class SingleEquationConstraint(ReprMixin):

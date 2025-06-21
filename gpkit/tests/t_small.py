@@ -3,8 +3,8 @@
 import unittest
 
 import gpkit
-from gpkit.repr_conventions import unitstr
-from gpkit.small_classes import HashVector
+from gpkit.util.repr_conventions import unitstr
+from gpkit.util.small_classes import HashVector
 
 
 class TestHashVector(unittest.TestCase):

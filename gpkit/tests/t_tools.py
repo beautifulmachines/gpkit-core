@@ -6,9 +6,9 @@ import numpy as np
 from numpy import log
 
 from gpkit import Model, Variable, VectorVariable
-from gpkit.small_scripts import mag
 from gpkit.tools.autosweep import BinarySweepTree
 from gpkit.tools.tools import te_exp_minus1, te_secant, te_tangent
+from gpkit.util.small_scripts import mag
 
 
 def assert_logtol(first, second, logtol=1e-6):

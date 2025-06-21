@@ -16,7 +16,7 @@ from ..exceptions import (
 from ..globals import NamedVariables
 from ..keydict import KeyDict
 from ..nomials import Posynomial, PosynomialInequality, Variable
-from ..small_scripts import appendsolwarning, initsolwarning
+from ..util.small_scripts import appendsolwarning, initsolwarning
 from .gp import GeometricProgram
 
 EPS = 1e-6  # 1 +/- this is used in a few relative differences

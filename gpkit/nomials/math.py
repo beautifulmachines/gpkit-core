@@ -12,9 +12,9 @@ from ..exceptions import (
     PrimalInfeasible,
 )
 from ..globals import NamedVariables, SignomialsEnabled
-from ..small_classes import EMPTY_HV, HashVector, Numbers
-from ..small_scripts import mag
 from ..units import DimensionalityError
+from ..util.small_classes import EMPTY_HV, HashVector, Numbers
+from ..util.small_scripts import mag
 from ..varkey import VarKey
 from .core import Nomial
 from .map import NomialMap

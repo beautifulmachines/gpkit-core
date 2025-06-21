@@ -2,8 +2,8 @@
 
 import numpy as np
 
-from ..repr_conventions import lineagestr
-from ..small_scripts import maybe_flatten
+from ..util.repr_conventions import lineagestr
+from ..util.small_scripts import maybe_flatten
 from .set import ConstraintSet
 
 

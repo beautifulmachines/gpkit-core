@@ -4,7 +4,7 @@
 from ..globals import NamedVariables, SignomialsEnabled
 from ..keydict import KeyDict
 from ..nomials import NomialArray, Variable, VectorVariable, parse_subs
-from ..small_scripts import appendsolwarning, initsolwarning, mag
+from ..util.small_scripts import appendsolwarning, initsolwarning, mag
 from .set import ConstraintSet
 
 

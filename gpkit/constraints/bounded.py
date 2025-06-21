@@ -5,7 +5,7 @@ from collections import defaultdict
 import numpy as np
 
 from ..nomials import Variable
-from ..small_scripts import appendsolwarning, initsolwarning
+from ..util.small_scripts import appendsolwarning, initsolwarning
 from .set import ConstraintSet
 
 

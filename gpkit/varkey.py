@@ -1,8 +1,8 @@
 """Defines the VarKey class"""
 
-from .repr_conventions import ReprMixin
-from .small_classes import Count
 from .units import qty
+from .util.repr_conventions import ReprMixin
+from .util.small_classes import Count
 
 
 class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes

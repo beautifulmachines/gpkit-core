@@ -11,11 +11,11 @@ import plotly.graph_objects as go
 
 from gpkit.nomials import Monomial, Posynomial
 from gpkit.nomials.map import NomialMap
-from gpkit.repr_conventions import lineagestr
-from gpkit.repr_conventions import unitstr as get_unitstr
-from gpkit.small_classes import FixedScalar, HashVector
-from gpkit.small_scripts import mag, try_str_without
 from gpkit.units import DimensionalityError
+from gpkit.util.repr_conventions import lineagestr
+from gpkit.util.repr_conventions import unitstr as get_unitstr
+from gpkit.util.small_classes import FixedScalar, HashVector
+from gpkit.util.small_scripts import mag, try_str_without
 from gpkit.varkey import VarKey
 
 Tree = namedtuple("Tree", ["key", "value", "branches"])

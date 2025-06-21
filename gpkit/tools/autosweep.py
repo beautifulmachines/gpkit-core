@@ -6,9 +6,9 @@ from time import time
 import numpy as np
 
 from ..exceptions import InvalidGPConstraint
-from ..small_classes import Count
-from ..small_scripts import mag
 from ..solution_array import SolutionArray
+from ..util.small_classes import Count
+from ..util.small_scripts import mag
 
 
 class BinarySweepTree:  # pylint: disable=too-many-instance-attributes

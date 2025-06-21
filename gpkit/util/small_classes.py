@@ -6,7 +6,7 @@ from operator import xor
 import numpy as np
 from scipy.sparse import csr_matrix
 
-from .units import Quantity
+from ..units import Quantity
 
 Strings = (str,)
 Numbers = (int, float, np.number, Quantity)

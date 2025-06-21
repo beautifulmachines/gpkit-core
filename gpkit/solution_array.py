@@ -16,9 +16,9 @@ import numpy as np
 
 from .breakdowns import Breakdowns
 from .nomials import NomialArray
-from .repr_conventions import UNICODE_EXPONENTS, lineagestr, unitstr
-from .small_classes import DictOfLists, SolverLog, Strings
-from .small_scripts import mag, try_str_without
+from .util.repr_conventions import UNICODE_EXPONENTS, lineagestr, unitstr
+from .util.small_classes import DictOfLists, SolverLog, Strings
+from .util.small_scripts import mag, try_str_without
 
 CONSTRSPLITPATTERN = re.compile(r"([^*]\*[^*])|( \+ )|( >= )|( <= )|( = )")
 

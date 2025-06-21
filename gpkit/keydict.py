@@ -5,8 +5,8 @@ from collections.abc import Hashable
 
 import numpy as np
 
-from .small_classes import FixedScalar, Numbers, Quantity
-from .small_scripts import is_sweepvar, isnan, veclinkedfn
+from .util.small_classes import FixedScalar, Numbers, Quantity
+from .util.small_scripts import is_sweepvar, isnan, veclinkedfn
 
 DIMLESS_QUANTITY = Quantity(1, "dimensionless")
 INT_DTYPE = np.dtype(int)
