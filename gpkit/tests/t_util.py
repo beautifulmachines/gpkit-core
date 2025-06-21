@@ -4,7 +4,7 @@ import unittest
 
 import numpy as np
 
-from gpkit import Model, NomialArray, Variable, VectorVariable, parse_variables
+from gpkit import Model, NomialArray, Variable, parse_variables
 
 
 class OnlyVectorParse(Model):
