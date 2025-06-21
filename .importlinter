@@ -39,7 +39,7 @@ layers =
     gpkit.varkey : gpkit.keydict
 
     # small helpers that might evantually move or be eliminated
-    gpkit.small_classes : gpkit.small_scripts : gpkit.repr_conventions : gpkit.util
+    gpkit.util
 
     # Pure primitives & units (no gpkit imports allowed)
     gpkit.units | gpkit.exceptions
