@@ -13,8 +13,8 @@ from .nomials import ArrayVariable, Monomial, NomialArray, Posynomial, Signomial
 from .nomials import VectorizableVariable as Variable  # Variable the user sees
 from .nomials import VectorVariable
 from .solution_array import SolutionArray
-from .util.docstring import parse_variables
 from .units import DimensionalityError, units, ureg
+from .util.docstring import parse_variables
 from .varkey import VarKey
 
 GPCOLORS = ["#59ade4", "#FA3333"]
