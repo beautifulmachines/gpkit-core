@@ -11,7 +11,7 @@ from ..exceptions import (
     InvalidPosynomial,
     PrimalInfeasible,
 )
-from ..globals import SignomialsEnabled, NamedVariables
+from ..globals import NamedVariables, SignomialsEnabled
 from ..small_classes import EMPTY_HV, HashVector, Numbers
 from ..small_scripts import mag
 from ..units import DimensionalityError
