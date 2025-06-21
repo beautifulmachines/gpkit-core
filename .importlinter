@@ -48,17 +48,16 @@ ignore_imports =
     gpkit.units -> gpkit
     gpkit.solution_array -> gpkit
     gpkit.solvers.mosek_cli -> gpkit
-    gpkit.constraints.* -> gpkit
-    gpkit.nomials.math -> gpkit
     gpkit.nomials.math -> gpkit.constraints
     gpkit.nomials.array -> gpkit.constraints
     gpkit.programs.* -> gpkit
-    gpkit.programs.* -> gpkit.globals
     gpkit.solution_array -> gpkit.interactive.plot_sweep
     gpkit.solution_array -> gpkit.breakdowns
     gpkit.tools.autosweep -> gpkit.interactive.plot_sweep
     gpkit.model -> gpkit.tools.autosweep
+    gpkit.constraints.* -> gpkit.globals
     gpkit.nomials.* -> gpkit.globals
+    gpkit.programs.* -> gpkit.globals
 
 # ---------------------------------------------------------------------------
 # Contract 2: Keep test helpers independent of production code (optional)

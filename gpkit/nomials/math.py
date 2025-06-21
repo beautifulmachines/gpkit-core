@@ -394,7 +394,7 @@ class ScalarSingleEquationConstraint(SingleEquationConstraint):
                     self.vks.update(exp)
             else:
                 lr[i] = Signomial(sig)
-        from .. import NamedVariables  # pylint: disable=import-outside-toplevel
+        from ..globals import NamedVariables  # pylint: disable=import-outside-toplevel
 
         self.lineage = tuple(NamedVariables.lineage)
         super().__init__(lr[0], oper, lr[1])
