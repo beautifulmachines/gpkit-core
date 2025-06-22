@@ -1,5 +1,6 @@
 """Miscellaneous small classes"""
 
+from collections.abc import MutableMapping
 from functools import reduce
 from operator import xor
 
@@ -127,7 +128,7 @@ class DictOfLists(dict):
 def _enlist_dict(d_in, d_out):
     "Recursively copies d_in into d_out, placing non-dict items into lists."
     for k, v in d_in.items():
-        if isinstance(v, dict):
+        if isinstance(v, MutableMapping):
             d_out[k] = _enlist_dict(v, v.__class__())
         else:
             d_out[k] = [v]
@@ -138,7 +139,7 @@ def _enlist_dict(d_in, d_out):
 def _append_dict(d_in, d_out):
     "Recursively travels dict d_out and appends items found in d_in."
     for k, v in d_in.items():
-        if isinstance(v, dict):
+        if isinstance(v, MutableMapping):
             d_out[k] = _append_dict(v, d_out[k])
         else:
             try:
@@ -153,7 +154,7 @@ def _append_dict(d_in, d_out):
 def _index_dict(idx, d_in, d_out):
     "Recursively travels dict d_in, placing items at idx into dict d_out."
     for k, v in d_in.items():
-        if isinstance(v, dict):
+        if isinstance(v, MutableMapping):
             d_out[k] = _index_dict(idx, v, v.__class__())
         else:
             try:
@@ -166,7 +167,7 @@ def _index_dict(idx, d_in, d_out):
 def _enray(d_in, d_out):
     "Recursively turns lists into numpy arrays."
     for k, v in d_in.items():
-        if isinstance(v, dict):
+        if isinstance(v, MutableMapping):
             d_out[k] = _enray(v, v.__class__())
         else:
             if len(v) == 1:

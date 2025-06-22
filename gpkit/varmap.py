@@ -24,6 +24,7 @@ class VarMap(MutableMapping):
             if len(vks) == 1:
                 return self._data[next(iter(vks))]
             raise KeyError(f"Multiple VarKeys for name '{key}': {vks}")
+        key = key.key  # works for both Variables and VarKeys
         return self._data[key]
 
     def __setitem__(self, key, value):
