@@ -8,6 +8,8 @@ import gpkit
 from gpkit import Variable, VectorVariable
 from gpkit.keydict import KeyDict
 from gpkit.tests.helpers import run_tests
+from gpkit.varkey import VarKey
+from gpkit.varmap import VarMap
 
 
 class TestKeyDict(unittest.TestCase):
@@ -70,7 +72,62 @@ class TestKeyDict(unittest.TestCase):
             kd[v[0]] = gpkit.units("inch")
 
 
-TESTS = [TestKeyDict]
+class TestVarMap(unittest.TestCase):
+
+    def setUp(self):
+        self.x = VarKey("x")
+        self.y = VarKey("y")
+        self.vm = VarMap()
+
+    def test_set_and_get(self):
+        self.vm[self.x] = 1
+        self.vm[self.y] = 2
+        self.assertEqual(self.vm[self.x], 1)
+        self.assertEqual(self.vm[self.y], 2)
+        # get by string -- TBD if this should be allowed
+        self.assertEqual(self.vm["x"], 1)
+        self.assertEqual(self.vm["y"], 2)
+
+    def test_by_name(self):
+        x2 = VarKey(name="x", units="ft")
+        self.vm[self.x] = 1
+        self.vm[x2] = 3
+        vks = self.vm.by_name("x")
+        self.assertIn(self.x, vks)
+        self.assertIn(x2, vks)
+        self.assertEqual(len(vks), 2)
+
+    def test_multiple_varkeys_same_name(self):
+        self.vm[self.x] = 1
+        self.vm[VarKey(name="x", units="ft")] = 3
+        with self.assertRaises(KeyError):
+            _ = self.vm["x"]  # Ambiguous
+
+    def test_delitem(self):
+        self.vm[self.x] = 1
+        del self.vm[self.x]
+        self.assertNotIn(self.x, self.vm)
+        self.assertNotIn("x", self.vm)
+        # Add two, delete one
+        x2 = VarKey(name="x", units="ft")
+        self.vm[self.x] = 1
+        self.vm[x2] = 2
+        del self.vm[self.x]
+        self.assertIn(x2, self.vm)
+        self.assertIn("x", self.vm)
+        # now delete the second
+        del self.vm[x2]
+        self.assertNotIn("x", self.vm)
+
+    def test_contains(self):
+        self.vm[self.x] = 1
+        self.assertIn(self.x, self.vm)
+        self.assertIn("x", self.vm)
+        self.assertNotIn(self.y, self.vm)
+        self.assertNotIn("y", self.vm)
+
+
+TESTS = [TestKeyDict, TestVarMap]
 
 
 if __name__ == "__main__":  # pragma: no cover
