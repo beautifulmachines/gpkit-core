@@ -23,6 +23,12 @@ def _set_nested_item(nested, index, val):
     nested[index[-1]] = val
 
 
+def _nested_lookup(nested_keys, val_dict):
+    if isinstance(nested_keys, list):
+        return [_nested_lookup(row, val_dict) for row in nested_keys]
+    return val_dict[nested_keys]
+
+
 def is_veckey(key):
     if getattr(key, "shape", None) and not getattr(key, "idx", None):
         # it has a shape but no index
@@ -47,35 +53,42 @@ class VarMap(MutableMapping):
         self.update(*args, **kwargs)
 
     def __getitem__(self, key):
-        if isinstance(key, str):
-            vks = self._by_name.get(key, set())
-            if not vks:
-                raise KeyError(key)
-            if len(vks) == 1:
-                return self._data[next(iter(vks))]
-            raise KeyError(f"Multiple VarKeys for name '{key}': {vks}")
-        key = key.key  # works for both Variables and VarKeys
-        if is_veckey(key):
-            return self._by_vec[key]
-        return self._data[key]
+        key = getattr(key, "key", None) or key  # handles Variable case
+        try:
+            return self._data[key]  # single varkey case
+        except KeyError as kerr:
+            if is_veckey(key):  # vector case
+                return _nested_lookup(self._by_vec[key], self._data)
+            if isinstance(key, str):  # by name lookup
+                vks = self._by_name.get(key, set())
+                if not vks:
+                    raise KeyError(key) from kerr
+                if len(vks) == 1:
+                    vk, = vks
+                    return self._data[vk]
+                raise KeyError(f"Multiple VarKeys for name '{key}': {vks}")
+            raise kerr
 
     def __setitem__(self, key, value):
         if not hasattr(key, "name"):
             raise TypeError("VarMap keys must be VarKey instances")
+        if is_veckey(key):
+            raise NotImplementedError
         self._data[key] = value
-        name = key.name
+        idx = getattr(key, "idx", None)
+        name = key.name if not idx else key.veckey.name
         if name not in self._by_name:
             self._by_name[name] = set()
-        self._by_name[name].add(key)
+        self._by_name[name].add(key if not idx else key.veckey)
         # handle vector element case
-        idx = getattr(key, "idx", None)
         if idx:
-            veckey = key.veckey
-            if veckey not in self._by_vec:
-                self._by_vec[veckey] = np.full(veckey.shape, np.nan)
-            self._by_vec[veckey][idx] = value
+            if key.veckey not in self._by_vec:
+                self._by_vec[key.veckey] = _make_nested_list(key.shape)
+            _set_nested_item(self._by_vec[key.veckey], idx, key)
 
     def __delitem__(self, key):
+        if is_veckey(key):
+            raise NotImplementedError
         name = key.name
         del self._data[key]
         self._by_name[name].discard(key)
@@ -86,11 +99,8 @@ class VarMap(MutableMapping):
         idx = getattr(key, "idx", None)
         if idx:
             veckey = key.veckey
-            self._by_vec[veckey][idx] = np.nan
-        # handle full veckey case
-        if is_veckey(key):
-            del self._by_vec[key]
-
+            self._by_vec[veckey][idx] = None
+    
     def __iter__(self):
         return iter(self._data)
 

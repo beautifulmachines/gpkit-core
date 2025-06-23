@@ -126,6 +126,16 @@ class TestVarMap(unittest.TestCase):
         self.assertNotIn(self.y, self.vm)
         self.assertNotIn("y", self.vm)
 
+    def test_vector(self):
+        x = VectorVariable(3, "x", "ft")
+        vks = [v.key for v in x]
+        vals = [4, 5, 6]
+        for vk, val in zip(vks, vals):
+            self.vm[vk] = val
+        for vk, expected in zip(vks, vals):
+            self.assertEqual(self.vm[vk], expected)
+        self.assertEqual(self.vm[x], [4, 5, 6])
+
 
 class TestNestedList(unittest.TestCase):
 
