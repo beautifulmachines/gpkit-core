@@ -5,6 +5,24 @@ from collections.abc import MutableMapping
 import numpy as np
 
 
+def _make_nested_list(shape, fill=None):
+    if not shape:
+        return fill
+    return [_make_nested_list(shape[1:], fill) for _ in range(shape[0])]
+
+
+def _get_nested_item(nested, index):
+    for dim in index:
+        nested = nested[dim]
+    return nested
+
+
+def _set_nested_item(nested, index, val):
+    for dim in index[:-1]:
+        nested = nested[dim]
+    nested[index[-1]] = val
+
+
 def is_veckey(key):
     if getattr(key, "shape", None) and not getattr(key, "idx", None):
         # it has a shape but no index
