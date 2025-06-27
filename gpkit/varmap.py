@@ -29,6 +29,16 @@ def _nested_lookup(nested_keys, val_dict):
     return val_dict[nested_keys]
 
 
+def _nested_set(nested):
+    "get a flat set of all items in nested list structure"
+    if isinstance(nested, list):
+        result = set()
+        for item in nested:
+            result.update(_nested_set(item))
+        return result
+    return {nested}
+
+
 def is_veckey(key):
     if getattr(key, "shape", None) and not getattr(key, "idx", None):
         # it has a shape but no index
@@ -104,7 +114,7 @@ class VarMap(MutableMapping):
     def _primary_keys(self):
         ks = set(self._data)
         for vk, vks in self._by_vec.items():
-            ks -= set(vks)  # todo handle nested lists case
+            ks -= _nested_set(vks)
             ks.add(vk)
         return ks
 
@@ -120,9 +130,9 @@ class VarMap(MutableMapping):
     def __contains__(self, key):
         if isinstance(key, str):
             return key in self._by_name and bool(self._by_name[key])
-        # key = getattr(key, "key", key)  # handle Variable case
-        # if key in self._by_vec:
-        #     return True
+        key = getattr(key, "key", key)  # handle Variable case
+        if key in self._by_vec:
+            return True
         return key in self._data
 
     def update(self, *args, **kwargs):
