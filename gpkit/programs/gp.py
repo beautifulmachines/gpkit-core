@@ -24,6 +24,7 @@ from ..solution_array import SolutionArray
 from ..util.repr_conventions import lineagestr
 from ..util.small_classes import CootMatrix, FixedScalar, Numbers, SolverLog
 from ..util.small_scripts import appendsolwarning, initsolwarning
+from ..varmap import VarMap
 
 DEFAULT_SOLVER_KWARGS = {"cvxopt": {"kktsolver": "ldl"}}
 SOLUTION_TOL = {"cvxopt": 1e-3, "mosek_cli": 1e-4, "mosek_conif": 1e-3}
@@ -389,7 +390,7 @@ class GeometricProgram:
         primal = solver_out["primal"]
         if len(self.varlocs) != len(primal):
             raise RuntimeWarning("The primal solution was not returned.")
-        result["freevariables"] = KeyDict(zip(self.varlocs, np.exp(primal)))
+        result["freevariables"] = VarMap(zip(self.varlocs, np.exp(primal)))
         result["constants"] = KeyDict(self.substitutions)
         result["variables"] = KeyDict(result["freevariables"])
         result["variables"].update(result["constants"])

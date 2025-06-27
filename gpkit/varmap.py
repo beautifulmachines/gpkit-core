@@ -64,7 +64,7 @@ class VarMap(MutableMapping):
                 if not vks:
                     raise KeyError(key) from kerr
                 if len(vks) == 1:
-                    vk, = vks
+                    (vk,) = vks
                     return self._data[vk]
                 raise KeyError(f"Multiple VarKeys for name '{key}': {vks}")
             raise kerr
@@ -100,9 +100,17 @@ class VarMap(MutableMapping):
         if idx:
             veckey = key.veckey
             self._by_vec[veckey][idx] = None
-    
+
+    def _primary_keys(self):
+        ks = set(self._data)
+        for vk, vks in self._by_vec.items():
+            ks -= set(vks)  # todo handle nested lists case
+            ks.add(vk)
+        return ks
+
     def __iter__(self):
         return iter(self._data)
+        # return iter(self._primary_keys())
 
     def __len__(self):
         return len(self._data)
@@ -110,6 +118,9 @@ class VarMap(MutableMapping):
     def __contains__(self, key):
         if isinstance(key, str):
             return key in self._by_name and bool(self._by_name[key])
+        # key = getattr(key, "key", key)  # handle Variable case
+        # if key in self._by_vec:
+        #     return True
         return key in self._data
 
     def update(self, *args, **kwargs):
