@@ -2,8 +2,6 @@
 
 from collections.abc import MutableMapping
 
-import numpy as np
-
 
 def _make_nested_list(shape, fill=None):
     if not shape:
