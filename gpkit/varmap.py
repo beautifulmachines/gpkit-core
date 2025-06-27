@@ -108,9 +108,11 @@ class VarMap(MutableMapping):
             ks.add(vk)
         return ks
 
+    def primary_items(self):
+        return ((k, self[k]) for k in self._primary_keys())
+
     def __iter__(self):
         return iter(self._data)
-        # return iter(self._primary_keys())
 
     def __len__(self):
         return len(self._data)

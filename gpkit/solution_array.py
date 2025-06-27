@@ -1036,7 +1036,8 @@ def var_table(
     if not data:
         return []
     decorated, models = [], set()
-    for i, (k, v) in enumerate(data.items()):
+    dataitems = getattr(data, "primary_items", data.items)
+    for i, (k, v) in enumerate(dataitems()):
         if np.isnan(v).all() or np.nanmax(np.abs(v)) <= minval:
             continue  # no values below minval
         if minval and hidebelowminval and getattr(v, "shape", None):
@@ -1047,7 +1048,7 @@ def var_table(
         else:  # sort should match that in msenss_table above
             msenss = -round(np.mean(sortmodelsbysenss.get(model, 0)), 4)
         models.add(model)
-        b = bool(getattr(v, "shape", None))
+        b = bool(getattr(k, "shape", None) or getattr(v, "shape", None))
         s = k.str_without(("lineage", "vec"))
         if not sortbyvals:
             decorated.append((msenss, model, b, (varfmt % s), i, k, v))
@@ -1086,6 +1087,7 @@ def var_table(
         if not isvector:
             valstr = valfmt % val
         else:
+            val = np.array(val)
             last_dim_index = len(val.shape) - 1
             horiz_dim, ncols = last_dim_index, 1  # starting values
             for dim_idx, dim_size in enumerate(val.shape):
