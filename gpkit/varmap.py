@@ -141,8 +141,8 @@ class VarMap(MutableMapping):
             return True
         return key in self._data
 
-    def update(self, dict_like):
-        for k, v in dict_like.items():
+    def update(self, *args, **kwargs):  # pylint: disable=arguments-differ
+        for k, v in dict(*args, **kwargs).items():
             self[k] = v
 
     def by_name(self, name):
