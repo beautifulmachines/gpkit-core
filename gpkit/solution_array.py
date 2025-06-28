@@ -16,6 +16,7 @@ import numpy as np
 
 from .breakdowns import Breakdowns
 from .nomials import NomialArray
+from .units import Quantity
 from .util.repr_conventions import UNICODE_EXPONENTS, lineagestr, unitstr
 from .util.small_classes import DictOfLists, SolverLog, Strings
 from .util.small_scripts import mag, try_str_without
@@ -434,16 +435,15 @@ class SolutionArray(DictOfLists):
         "Returns the set of contained varkeys whose names are not unique"
         if self._name_collision_varkeys is None:
             self._name_collision_varkeys = {}
-            self["variables"].update_keymap()
-            keymap = self["variables"].keymap
+            keymap = self["variables"]
             name_collisions = defaultdict(set)
             for key in keymap:
                 if hasattr(key, "key"):
-                    if len(keymap[key.name]) == 1:  # very unique
+                    if len(keymap.keys_by_name(key.name)) == 1:  # unique
                         self._name_collision_varkeys[key] = 0
                     else:
                         shortname = key.str_without(["lineage", "vec"])
-                        if len(keymap[shortname]) > 1:
+                        if len(keymap.keys_by_name(shortname)) > 1:
                             name_collisions[shortname].add(key)
             for varkeys in name_collisions.values():
                 min_namespaced = defaultdict(set)
@@ -827,7 +827,8 @@ class SolutionArray(DictOfLists):
     def subinto(self, posy):
         "Returns NomialArray of each solution substituted into posy."
         if posy in self["variables"]:
-            return self["variables"](posy)
+            (clean_key, val) = self["variables"].item(posy)
+            return Quantity(val, clean_key.units or "dimensionless")
 
         if not hasattr(posy, "sub"):
             raise ValueError(f"no variable '{posy}' found in the solution")
@@ -842,9 +843,9 @@ class SolutionArray(DictOfLists):
     def _parse_showvars(self, showvars):
         showvars_out = set()
         for k in showvars:
-            k, _ = self["variables"].parse_and_index(k)
-            keys = self["variables"].keymap[k]
-            showvars_out.update(keys)
+            key, _ = self["variables"].item(k)
+            key = getattr(key, "veckey", None) or key
+            showvars_out.add(key)
         return showvars_out
 
     def summary(self, showvars=(), **kwargs):

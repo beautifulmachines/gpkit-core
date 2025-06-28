@@ -36,7 +36,7 @@ class TestSolutionArray(unittest.TestCase):
         sol = prob.solve(verbosity=0)
         solx = sol(x)
         self.assertEqual(type(solx), Quantity)
-        self.assertEqual(type(sol["variables"][x]), np.ndarray)
+        self.assertEqual(type(solx.magnitude), np.ndarray)
         self.assertEqual(solx.shape, (n,))
         for i in range(n):
             self.assertAlmostEqual(solx[i], 2.5, places=4)

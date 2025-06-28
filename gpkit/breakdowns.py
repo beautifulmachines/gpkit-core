@@ -948,7 +948,7 @@ def get_valstr(key, solution, into="%s"):
     except (ValueError, TypeError):
         try:
             value = sum(solution(subkey) for subkey in key)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, KeyError):
             return " "
     if isinstance(value, FixedScalar):
         value = value.value

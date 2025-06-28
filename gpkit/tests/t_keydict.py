@@ -89,11 +89,11 @@ class TestVarMap(unittest.TestCase):
         self.assertEqual(self.vm["x"], 1)
         self.assertEqual(self.vm["y"], 2)
 
-    def test_by_name(self):
+    def test_keys_by_name(self):
         x2 = VarKey(name="x", units="ft")
         self.vm[self.x] = 1
         self.vm[x2] = 3
-        vks = self.vm.by_name("x")
+        vks = self.vm.keys_by_name("x")
         self.assertIn(self.x, vks)
         self.assertIn(x2, vks)
         self.assertEqual(len(vks), 2)

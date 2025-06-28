@@ -86,7 +86,6 @@ class VarMap(MutableMapping):
                 raise KeyError(msg) from kerr
             raise kerr
 
-
     def __setitem__(self, key, value):
         if not hasattr(key, "name"):
             raise TypeError("VarMap keys must be VarKey instances")
@@ -151,6 +150,6 @@ class VarMap(MutableMapping):
         for k, v in dict(*args, **kwargs).items():
             self[k] = v
 
-    def by_name(self, name):
+    def keys_by_name(self, name):
         """Return all VarKeys for a given name string."""
         return set(self._by_name.get(name, set()))

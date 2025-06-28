@@ -392,7 +392,7 @@ class GeometricProgram:
             raise RuntimeWarning("The primal solution was not returned.")
         result["freevariables"] = VarMap(zip(self.varlocs, np.exp(primal)))
         result["constants"] = VarMap(self.substitutions)
-        result["variables"] = KeyDict(result["freevariables"])
+        result["variables"] = VarMap(result["freevariables"])
         result["variables"].update(result["constants"])
         result["soltime"] = solver_out["soltime"]
 
