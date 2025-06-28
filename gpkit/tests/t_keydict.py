@@ -136,6 +136,7 @@ class TestVarMap(unittest.TestCase):
         for vk, expected in zip(vks, vals):
             self.assertEqual(self.vm[vk], expected)
         self.assertEqual(self.vm[x], [4, 5, 6])
+        self.assertEqual(self.vm["x"], [4, 5, 6])
 
     def test_vector_delitem(self):
         x = VectorVariable(3, "x", "ft")

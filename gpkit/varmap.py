@@ -81,7 +81,7 @@ class VarMap(MutableMapping):
                     raise KeyError(key) from kerr
                 if len(vks) == 1:
                     (vk,) = vks
-                    return (vk, self._data[vk])
+                    return self.item(vk)
                 msg = f"Multiple VarKeys for name '{key}': {vks}"
                 raise KeyError(msg) from kerr
             raise kerr
