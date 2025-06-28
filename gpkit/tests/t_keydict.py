@@ -136,6 +136,22 @@ class TestVarMap(unittest.TestCase):
             self.assertEqual(self.vm[vk], expected)
         self.assertEqual(self.vm[x], [4, 5, 6])
 
+    def test_vector_delitem(self):
+        x = VectorVariable(3, "x", "ft")
+        self.vm[x[0].key] = 1
+        self.vm[x[1].key] = 2
+        self.vm[x[2].key] = 3
+        y = Variable("y", "kg")
+        self.vm[y.key] = 5
+        self.assertEqual(self.vm[x], [1, 2, 3])
+        del self.vm[x[1].key]
+        self.assertEqual(self.vm[x], [1, None, 3])
+        del self.vm[x[0].key]
+        self.assertEqual(self.vm[x], [None, None, 3])
+        del self.vm[x[2].key]
+        self.assertNotIn(x, self.vm)
+        self.assertIn(y, self.vm)
+
 
 class TestNestedList(unittest.TestCase):
 
