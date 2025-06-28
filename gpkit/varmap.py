@@ -22,6 +22,8 @@ def _set_nested_item(nested, index, val):
 
 
 def _nested_lookup(nested_keys, val_dict):
+    if nested_keys is None:
+        return nested_keys
     if isinstance(nested_keys, list):
         return [_nested_lookup(row, val_dict) for row in nested_keys]
     return val_dict[nested_keys]
@@ -107,7 +109,9 @@ class VarMap(MutableMapping):
         idx = getattr(key, "idx", None)
         if idx:
             veckey = key.veckey
-            self._by_vec[veckey][idx] = None
+            _set_nested_item(self._by_vec[veckey], idx, None)
+            if _nested_set(self._by_vec[veckey]) == set((None,)):
+                del self._by_vec[veckey]
 
     def _primary_keys(self):
         ks = set(self._data)

@@ -1038,6 +1038,9 @@ def var_table(
     decorated, models = [], set()
     dataitems = getattr(data, "primary_items", data.items)
     for i, (k, v) in enumerate(dataitems()):
+        if isinstance(v, np.ndarray):
+            # sweeps could insert additional dimension
+            v = np.array([np.array(r) for r in v]).T
         if np.isnan(v).all() or np.nanmax(np.abs(v)) <= minval:
             continue  # no values below minval
         if minval and hidebelowminval and getattr(v, "shape", None):
