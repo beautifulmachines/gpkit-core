@@ -40,6 +40,7 @@ def _nested_set(nested):
 
 
 def is_veckey(key):
+    "return True iff this key corresponds to a VectorVariable"
     if getattr(key, "shape", None) and not getattr(key, "idx", None):
         # it has a shape but no index
         return True
@@ -76,7 +77,8 @@ class VarMap(MutableMapping):
                 if len(vks) == 1:
                     (vk,) = vks
                     return self._data[vk]
-                raise KeyError(f"Multiple VarKeys for name '{key}': {vks}")
+                msg = f"Multiple VarKeys for name '{key}': {vks}"
+                raise KeyError(msg) from kerr
             raise kerr
 
     def __setitem__(self, key, value):
@@ -114,6 +116,7 @@ class VarMap(MutableMapping):
                 del self._by_vec[veckey]
 
     def _primary_keys(self):
+        "keys; uses veckeys instead of individual element keys where applicable"
         ks = set(self._data)
         for vk, vks in self._by_vec.items():
             ks -= _nested_set(vks)
@@ -121,6 +124,7 @@ class VarMap(MutableMapping):
         return ks
 
     def primary_items(self):
+        "like items, but using veckeys and ignoring element keys/items"
         return ((k, self[k]) for k in self._primary_keys())
 
     def __iter__(self):

@@ -73,6 +73,7 @@ class TestKeyDict(unittest.TestCase):
 
 
 class TestVarMap(unittest.TestCase):
+    "TestCase for the VarMap class"
 
     def setUp(self):
         self.x = VarKey("x")
@@ -154,6 +155,7 @@ class TestVarMap(unittest.TestCase):
 
 
 class TestNestedList(unittest.TestCase):
+    "TestCase for nested list private methods in varmap.py"
 
     def test_make(self):
         x = _make_nested_list((2, 3))
