@@ -2,6 +2,8 @@
 
 from collections.abc import MutableMapping
 
+from .units import Quantity
+
 
 def _make_nested_list(shape, fill=None):
     if not shape:
@@ -153,3 +155,8 @@ class VarMap(MutableMapping):
     def keys_by_name(self, name):
         """Return all VarKeys for a given name string."""
         return set(self._by_name.get(name, set()))
+
+    def quantity(self, key):
+        "Return a quantity corresponding to self[key]"
+        clean_key, val = self.item(key)
+        return Quantity(val, clean_key.units or "dimensionless")
