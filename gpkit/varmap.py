@@ -64,22 +64,28 @@ class VarMap(MutableMapping):
         self.update(dict(*args, **kwargs))
 
     def __getitem__(self, key):
+        _, val = self.item(key)
+        return val
+
+    def item(self, key):
+        "get the (varkey, value) pair associated with a (str or key)"
         key = getattr(key, "key", None) or key  # handles Variable case
         try:
-            return self._data[key]  # single varkey case
+            return (key, self._data[key])  # single varkey case
         except KeyError as kerr:
             if is_veckey(key):  # vector case
-                return _nested_lookup(self._by_vec[key], self._data)
+                return (key, _nested_lookup(self._by_vec[key], self._data))
             if isinstance(key, str):  # by name lookup
                 vks = self._by_name.get(key, set())
                 if not vks:
                     raise KeyError(key) from kerr
                 if len(vks) == 1:
                     (vk,) = vks
-                    return self._data[vk]
+                    return (vk, self._data[vk])
                 msg = f"Multiple VarKeys for name '{key}': {vks}"
                 raise KeyError(msg) from kerr
             raise kerr
+
 
     def __setitem__(self, key, value):
         if not hasattr(key, "name"):
