@@ -146,10 +146,11 @@ class TestVarMap(unittest.TestCase):
         y = Variable("y", "kg")
         self.vm[y.key] = 5
         self.assertEqual(self.vm[x], [1, 2, 3])
+        nan = float("nan")
         del self.vm[x[1].key]
-        self.assertEqual(self.vm[x], [1, None, 3])
+        np.testing.assert_equal(self.vm[x], [1, nan, 3])
         del self.vm[x[0].key]
-        self.assertEqual(self.vm[x], [None, None, 3])
+        np.testing.assert_equal(self.vm[x], [nan, nan, 3])
         del self.vm[x[2].key]
         self.assertNotIn(x, self.vm)
         self.assertIn(y, self.vm)

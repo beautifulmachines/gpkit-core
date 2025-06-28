@@ -23,7 +23,7 @@ def _set_nested_item(nested, index, val):
 
 def _nested_lookup(nested_keys, val_dict):
     if nested_keys is None:
-        return nested_keys
+        return float("nan")
     if isinstance(nested_keys, list):
         return [_nested_lookup(row, val_dict) for row in nested_keys]
     return val_dict[nested_keys]

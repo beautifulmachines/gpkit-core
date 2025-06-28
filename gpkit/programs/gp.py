@@ -18,7 +18,6 @@ from ..exceptions import (
     UnboundedGP,
     UnknownInfeasible,
 )
-from ..keydict import KeyDict
 from ..nomials.map import NomialMap
 from ..solution_array import SolutionArray
 from ..util.repr_conventions import lineagestr
@@ -397,7 +396,7 @@ class GeometricProgram:
         result["soltime"] = solver_out["soltime"]
 
         if self.integersolve:
-            result["choicevariables"] = KeyDict(
+            result["choicevariables"] = VarMap(
                 {
                     k: v
                     for k, v in result["freevariables"].items()
@@ -462,8 +461,8 @@ class GeometricProgram:
             m_senss[lineagestr(vk)] += abs(senss)
 
         result["sensitivities"]["cost"] = cost_senss
-        result["sensitivities"]["variables"] = KeyDict(gpv_ss)
-        result["sensitivities"]["variablerisk"] = KeyDict(absv_ss)
+        result["sensitivities"]["variables"] = VarMap(gpv_ss)
+        result["sensitivities"]["variablerisk"] = VarMap(absv_ss)
         result["sensitivities"]["constants"] = result["sensitivities"][
             "variables"
         ]  # NOTE: backwards compat.
