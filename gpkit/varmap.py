@@ -61,7 +61,7 @@ class VarMap(MutableMapping):
         self._data = {}
         self._by_name = {}
         self._by_vec = {}
-        self.update(*args, **kwargs)
+        self.update(dict(*args, **kwargs))
 
     def __getitem__(self, key):
         key = getattr(key, "key", None) or key  # handles Variable case
@@ -141,8 +141,8 @@ class VarMap(MutableMapping):
             return True
         return key in self._data
 
-    def update(self, *args, **kwargs):
-        for k, v in dict(*args, **kwargs).items():
+    def update(self, dict_like):
+        for k, v in dict_like.items():
             self[k] = v
 
     def by_name(self, name):
