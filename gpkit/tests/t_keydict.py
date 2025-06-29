@@ -167,6 +167,14 @@ class TestVarMap(unittest.TestCase):
         self.assertEqual(self.vm["y"], 6)
         self.assertEqual(self.vm[self.y], 6)
 
+    def test_variable_setitem(self):
+        x = Variable("x")
+        self.vm[x] = 6
+        self.assertIn(x, self.vm)
+        self.assertIn(x.key, self.vm)
+        self.assertEqual(self.vm[x], 6)
+        self.assertEqual(self.vm[x.key], 6)
+
 
 class TestNestedList(unittest.TestCase):
     "TestCase for nested list private methods in varmap.py"

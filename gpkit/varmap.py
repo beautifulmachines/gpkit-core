@@ -85,13 +85,14 @@ class VarMap(MutableMapping):
     def _key_from_name(self, name):
         vks = self.keys_by_name(name)
         if not vks:
-            raise KeyError(f"unrecognized key {key}")
+            raise KeyError(f"unrecognized key {name}")
         if len(vks) == 1:
             (vk,) = vks
             return vk
         raise KeyError(f"Multiple VarKeys for name '{name}': {vks}")
 
     def __setitem__(self, key, value):
+        key = getattr(key, "key", None) or key  # handles Variable case
         if is_veckey(key):
             raise NotImplementedError
         if isinstance(key, str):
