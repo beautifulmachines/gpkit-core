@@ -155,6 +155,18 @@ class TestVarMap(unittest.TestCase):
         self.assertNotIn(x, self.vm)
         self.assertIn(y, self.vm)
 
+    def test_register_keys(self):
+        self.vm[self.x] = 1
+        self.vm.register_keys({self.y})
+        self.assertIn("y", self.vm)
+        with self.assertRaises(KeyError):
+            _ = self.vm[self.y]
+        with self.assertRaises(KeyError):
+            _ = self.vm["y"]
+        self.vm["y"] = 6
+        self.assertEqual(self.vm["y"], 6)
+        self.assertEqual(self.vm[self.y], 6)
+
 
 class TestNestedList(unittest.TestCase):
     "TestCase for nested list private methods in varmap.py"
