@@ -14,9 +14,9 @@ from ..exceptions import (
     UnnecessarySGP,
 )
 from ..globals import NamedVariables
-from ..keydict import KeyDict
 from ..nomials import Posynomial, PosynomialInequality, Variable
 from ..util.small_scripts import appendsolwarning, initsolwarning
+from ..varmap import VarMap
 from .gp import GeometricProgram
 
 EPS = 1e-6  # 1 +/- this is used in a few relative differences
@@ -79,8 +79,8 @@ class SequentialGeometricProgram:
         cost *= self.slack**pccp_penalty
         self.approxconstraints = []
         self.sgpvks = set()
-        x0 = KeyDict(substitutions)
-        x0.vks = model.vks  # for string access and so forth
+        x0 = VarMap(substitutions)
+        x0.register_keys(model.vks)  # for string access and so forth
         for cs in model.flat():
             try:
                 if not hasattr(cs, "as_hmapslt1"):
@@ -313,8 +313,8 @@ solutions and can be solved with 'Model.solve()'."""
         if not x0:
             return self._gp  # return last generated
         if not cleanx0:
-            cleanedx0 = KeyDict()
-            cleanedx0.vks = self._gp.x0.vks
+            cleanedx0 = VarMap()
+            cleanedx0._by_name = dict(self._gp.x0._by_name)
             cleanedx0.update(x0)
             x0 = cleanedx0
         self._gp.x0.update({vk: x0[vk] for vk in self.sgpvks if vk in x0})
