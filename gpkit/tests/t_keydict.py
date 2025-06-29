@@ -4,8 +4,7 @@ import unittest
 
 import numpy as np
 
-import gpkit
-from gpkit import Variable, VectorVariable
+from gpkit import Variable, VectorVariable, ureg
 from gpkit.keydict import KeyDict
 from gpkit.tests.helpers import run_tests
 from gpkit.varkey import VarKey
@@ -68,8 +67,6 @@ class TestKeyDict(unittest.TestCase):
         self.assertTrue(all(kd[v] == np.array([6, 3, 4])))
         v = VectorVariable(3, "v", "m")
         kd[v] = np.array([2, 3, 4])
-        if gpkit.units:
-            kd[v[0]] = gpkit.units("inch")
 
 
 class TestVarMap(unittest.TestCase):
@@ -174,6 +171,15 @@ class TestVarMap(unittest.TestCase):
         self.assertIn(x.key, self.vm)
         self.assertEqual(self.vm[x], 6)
         self.assertEqual(self.vm[x.key], 6)
+
+    def test_setitem_unit(self):
+        x = Variable("h", "inch")
+        self.vm[x] = 8.0
+        self.assertEqual(self.vm[x], 8.0)
+        self.assertEqual(str(self.vm.quantity(x)), "8.0 inch")
+        self.vm[x] = 6 * ureg.ft
+        self.assertEqual(self.vm[x], 72)
+        self.assertEqual(str(self.vm.quantity(x)), "72.0 inch")
 
 
 class TestNestedList(unittest.TestCase):

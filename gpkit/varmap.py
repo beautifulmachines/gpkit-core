@@ -98,6 +98,8 @@ class VarMap(MutableMapping):
         if isinstance(key, str):
             key = self._key_from_name(key)
         self._register_key(key)
+        if isinstance(value, Quantity):
+            value = value.to(key.units).magnitude
         self._data[key] = value
 
     def _register_key(self, key):
