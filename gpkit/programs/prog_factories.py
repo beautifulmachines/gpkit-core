@@ -8,17 +8,17 @@ from adce import adnumber
 
 from ..exceptions import Infeasible
 from ..globals import SignomialsEnabled
-from ..keydict import KeyDict
 from ..nomials import parse_subs
 from ..solution_array import SolutionArray
 from ..util.small_classes import FixedScalar
 from ..util.small_scripts import maybe_flatten
+from ..varmap import VarMap
 
 
 def evaluate_linked(constants, linked):
     # pylint: disable=too-many-branches
     "Evaluates the values and gradients of linked variables."
-    kdc = KeyDict({k: adnumber(maybe_flatten(v), k) for k, v in constants.items()})
+    kdc = VarMap({k: adnumber(maybe_flatten(v), k) for k, v in constants.items()})
     kdc_plain = None
     array_calulated = {}
     for key in constants:  # remove gradients from constants
@@ -60,7 +60,7 @@ def evaluate_linked(constants, linked):
             if settings.get("ad_errors_raise", None):
                 raise
             if kdc_plain is None:
-                kdc_plain = KeyDict(constants)
+                kdc_plain = VarMap(constants)
             constants[v] = f(kdc_plain)
             v.descr.pop("gradients", None)
             print(
@@ -244,8 +244,8 @@ def run_sweep(
     if verbosity == 1:
         print()
 
-    solution["sweepvariables"] = KeyDict()
-    ksweep = KeyDict(sweep)
+    solution["sweepvariables"] = VarMap()
+    ksweep = VarMap(sweep)
     for var, val in list(solution["constants"].items()):
         if var in ksweep:
             solution["sweepvariables"][var] = val

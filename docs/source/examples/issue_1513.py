@@ -32,7 +32,7 @@ class Fleet2(Model):
         x = Variable("x")
 
         def myfun(c):
-            return [c[x] - 1, np.ones(x.shape)]
+            return [np.array(c[x]) - 1, np.ones(x.shape)]
 
         with Vectorize(2):
             y = Variable("y", myfun)
@@ -100,7 +100,7 @@ m = Cake()
 m.substitutions.update(
     {
         "y": ("sweep", [1, 2, 3]),
-        "z": lambda v: v("y") ** 2,
+        "z": lambda v: np.array(v["y"]) ** 2,
     }
 )
 sol = m.solve(verbosity=0)

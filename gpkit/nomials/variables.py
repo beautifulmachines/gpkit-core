@@ -1,6 +1,6 @@
 "Implement Variable and ArrayVariable classes"
 
-from collections.abc import Iterable
+from collections.abc import Iterable, MutableMapping
 
 import numpy as np
 
@@ -87,7 +87,7 @@ class Variable(Monomial):
         """
         if len(args) == 1 and "val" not in kwargs:
             (arg,) = args
-            if not isinstance(arg, dict):
+            if not isinstance(arg, MutableMapping):
                 args = [{self: arg}]
         return Monomial.sub(self, *args, **kwargs)
 

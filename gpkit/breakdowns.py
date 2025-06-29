@@ -59,9 +59,8 @@ def get_model_breakdown(solution):
         if " at 0x" in constrstr:  # don't print memory addresses
             constrstr = constrstr[: constrstr.find(" at 0x")] + ">"
         subbd[constrstr] = {"|sensitivity|": senss}
-    for vk in solution["sensitivities"][
-        "variables"
-    ].keymap:  # could this be done away with for backwards compatibility?
+    for vk in solution["sensitivities"]["variables"]:
+        # could this be done away with for backwards compatibility?
         if not isinstance(vk, VarKey) or (vk.shape and not vk.index):
             continue
         senss = abs(solution["sensitivities"]["variables"][vk])
@@ -948,7 +947,7 @@ def get_valstr(key, solution, into="%s"):
     except (ValueError, TypeError):
         try:
             value = sum(solution(subkey) for subkey in key)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, KeyError):
             return " "
     if isinstance(value, FixedScalar):
         value = value.value
