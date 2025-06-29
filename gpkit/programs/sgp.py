@@ -314,7 +314,7 @@ solutions and can be solved with 'Model.solve()'."""
             return self._gp  # return last generated
         if not cleanx0:
             cleanedx0 = VarMap()
-            cleanedx0._by_name = dict(self._gp.x0._by_name)
+            cleanedx0.register_keys(self._gp.varkeys)
             cleanedx0.update(x0)
             x0 = cleanedx0
         self._gp.x0.update({vk: x0[vk] for vk in self.sgpvks if vk in x0})
