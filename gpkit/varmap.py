@@ -55,8 +55,8 @@ class VarMap(MutableMapping):
 
     Maintains:
       - _data: dict mapping VarKey to value
-      - _by_name: dict mapping str (VarKey.name) to list of VarKeys
-      - _by_vec: dict mapping veckey to values stored in np array
+      - _by_name: dict mapping str (VarKey.name) to set of VarKeys
+      - _by_vec: dict mapping veckey to keys stored in nested list structure
     """
 
     def __init__(self, *args, **kwargs):
