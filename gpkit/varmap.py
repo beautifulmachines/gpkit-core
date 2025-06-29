@@ -89,21 +89,29 @@ class VarMap(MutableMapping):
             raise kerr
 
     def __setitem__(self, key, value):
-        if not hasattr(key, "name"):
-            raise TypeError("VarMap keys must be VarKey instances")
         if is_veckey(key):
             raise NotImplementedError
+        self._register_key(key)
         self._data[key] = value
+
+    def _register_key(self, key):
+        "adds the key to _by_name and, if applicable, _by_vec"
+        if not hasattr(key, "name"):
+            raise TypeError("VarMap keys must be VarKey instances")
         idx = getattr(key, "idx", None)
         name = key.name if not idx else key.veckey.name
         if name not in self._by_name:
             self._by_name[name] = set()
         self._by_name[name].add(key if not idx else key.veckey)
-        # handle vector element case
         if idx:
             if key.veckey not in self._by_vec:
                 self._by_vec[key.veckey] = _make_nested_list(key.shape)
             _set_nested_item(self._by_vec[key.veckey], idx, key)
+
+    def register_keys(self, keys):
+        "register a set of keys to this mapping, without values yet"
+        for key in keys:
+            self._register_key(key)
 
     def __delitem__(self, key):
         if is_veckey(key):
