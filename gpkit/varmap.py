@@ -78,19 +78,24 @@ class VarMap(MutableMapping):
             if is_veckey(key):  # vector case
                 return (key, _nested_lookup(self._by_vec[key], self._data))
             if isinstance(key, str):  # by name lookup
-                vks = self._by_name.get(key, set())
-                if not vks:
-                    raise KeyError(key) from kerr
-                if len(vks) == 1:
-                    (vk,) = vks
-                    return self.item(vk)
-                msg = f"Multiple VarKeys for name '{key}': {vks}"
-                raise KeyError(msg) from kerr
+                vk = self._key_from_name(key)
+                return self.item(vk)
             raise kerr
+
+    def _key_from_name(self, name):
+        vks = self.keys_by_name(name)
+        if not vks:
+            raise KeyError(f"unrecognized key {key}")
+        if len(vks) == 1:
+            (vk,) = vks
+            return vk
+        raise KeyError(f"Multiple VarKeys for name '{name}': {vks}")
 
     def __setitem__(self, key, value):
         if is_veckey(key):
             raise NotImplementedError
+        if isinstance(key, str):
+            key = self._key_from_name(key)
         self._register_key(key)
         self._data[key] = value
 
