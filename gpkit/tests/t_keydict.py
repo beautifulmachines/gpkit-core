@@ -5,68 +5,9 @@ import unittest
 import numpy as np
 
 from gpkit import Variable, VectorVariable, ureg
-from gpkit.keydict import KeyDict
 from gpkit.tests.helpers import run_tests
 from gpkit.varkey import VarKey
 from gpkit.varmap import VarMap, _get_nested_item, _make_nested_list, _set_nested_item
-
-
-class TestKeyDict(unittest.TestCase):
-    """TestCase for the KeyDict class"""
-
-    def test_nonnumeric(self):
-        x = VectorVariable(2, "x")
-        kd = KeyDict()
-        kd[x[1]] = "2"
-        self.assertTrue(np.isnan(kd[x[0]]))
-        self.assertEqual(kd[x[1]], "2")
-        self.assertNotIn(x[0], kd)
-        self.assertIn(x[1], kd)
-
-    def test_setattr(self):
-        kd = KeyDict()
-        x = Variable("x", lineage=(("test", 0),))
-        kd[x] = 1
-        self.assertIn(x, kd)
-        self.assertEqual(set(kd), set([x.key]))
-
-    def test_getattr(self):
-        kd = KeyDict()
-        x = Variable("x", lineage=[("Motor", 0)])
-        kd[x] = 52
-        self.assertEqual(kd[x], 52)
-        self.assertEqual(kd[x.key], 52)
-        self.assertEqual(kd["x"], 52)
-        self.assertEqual(kd["Motor.x"], 52)
-        self.assertNotIn("x.Someothermodelname", kd)
-
-    def test_failed_getattr(self):
-        kd = KeyDict()
-        with self.assertRaises(KeyError):
-            _ = kd["waldo"]
-            # issue 893: failed __getitem__ caused state change
-        self.assertNotIn("waldo", kd)
-        waldo = Variable("waldo")
-        kd.update({waldo: 5})
-        res = kd["waldo"]
-        self.assertEqual(res, 5)
-        self.assertIn("waldo", kd)
-
-    def test_vector(self):
-        v = VectorVariable(3, "v")
-        kd = KeyDict()
-        kd[v] = np.array([2, 3, 4])
-        self.assertTrue(all(kd[v] == kd[v.key]))  # pylint:disable=no-member
-        self.assertTrue(all(kd["v"] == np.array([2, 3, 4])))
-        self.assertEqual(v[0].key.idx, (0,))
-        self.assertEqual(kd[v][0], kd[v[0]])
-        self.assertEqual(kd[v][0], 2)
-        kd[v[0]] = 6
-        self.assertEqual(kd[v][0], kd[v[0]])
-        self.assertEqual(kd[v][0], 6)
-        self.assertTrue(all(kd[v] == np.array([6, 3, 4])))
-        v = VectorVariable(3, "v", "m")
-        kd[v] = np.array([2, 3, 4])
 
 
 class TestVarMap(unittest.TestCase):
@@ -77,6 +18,15 @@ class TestVarMap(unittest.TestCase):
         self.y = VarKey("y")
         self.vm = VarMap()
 
+    def test_nonnumeric(self):
+        x = VectorVariable(2, "x")
+        vm = VarMap()
+        vm[x[1]] = "2"
+        self.assertTrue(np.isnan(vm[x][0]))
+        self.assertEqual(vm[x[1]], "2")
+        self.assertNotIn(x[0], vm)
+        self.assertIn(x[1], vm)
+
     def test_set_and_get(self):
         self.vm[self.x] = 1
         self.vm[self.y] = 2
@@ -85,6 +35,26 @@ class TestVarMap(unittest.TestCase):
         # get by string -- TBD if this should be allowed
         self.assertEqual(self.vm["x"], 1)
         self.assertEqual(self.vm["y"], 2)
+
+    def test_getitem(self):
+        x = Variable("x", lineage=[("Motor", 0)])
+        self.vm[x] = 52
+        self.assertEqual(self.vm[x], 52)
+        self.assertEqual(self.vm[x.key], 52)
+        self.assertEqual(self.vm["x"], 52)
+        # self.assertEqual(self.vm["Motor.x"], 52)
+        self.assertNotIn("x.Someothermodelname", self.vm)
+
+    def test_failed_getitem(self):
+        with self.assertRaises(KeyError):
+            _ = self.vm["waldo"]
+            # issue 893: failed __getitem__ caused state change
+        self.assertNotIn("waldo", self.vm)
+        waldo = Variable("waldo")
+        self.vm.update({waldo: 5})
+        res = self.vm["waldo"]
+        self.assertEqual(res, 5)
+        self.assertIn("waldo", self.vm)
 
     def test_keys_by_name(self):
         x2 = VarKey(name="x", units="ft")
@@ -135,6 +105,17 @@ class TestVarMap(unittest.TestCase):
         self.assertEqual(self.vm[x], [4, 5, 6])
         self.assertEqual(self.vm["x"], [4, 5, 6])
 
+    def test_vector_original(self):
+        v = VectorVariable(3, "v")
+        with self.assertRaises(NotImplementedError):
+            # can't set by vector if keys not known
+            self.vm[v] = np.array([2, 3, 4])
+        self.assertEqual(v[0].key.idx, (0,))
+        self.vm[v[0]] = 6
+        self.assertEqual(self.vm[v][0], self.vm[v[0]])
+        self.assertEqual(self.vm[v][0], 6)
+        self.assertTrue(np.isnan(self.vm[v][1]))
+
     def test_vector_delitem(self):
         x = VectorVariable(3, "x", "ft")
         self.vm[x[0].key] = 1
@@ -164,7 +145,7 @@ class TestVarMap(unittest.TestCase):
         self.assertEqual(self.vm["y"], 6)
         self.assertEqual(self.vm[self.y], 6)
 
-    def test_variable_setitem(self):
+    def test_setitem_variable(self):
         x = Variable("x")
         self.vm[x] = 6
         self.assertIn(x, self.vm)
@@ -180,6 +161,12 @@ class TestVarMap(unittest.TestCase):
         self.vm[x] = 6 * ureg.ft
         self.assertEqual(self.vm[x], 72)
         self.assertEqual(str(self.vm.quantity(x)), "72.0 inch")
+
+    def test_setitem_lineage(self):
+        x = Variable("x", lineage=(("test", 0),))
+        self.vm[x] = 1
+        self.assertIn(x, self.vm)
+        self.assertEqual(set(self.vm), set([x.key]))
 
 
 class TestNestedList(unittest.TestCase):
@@ -214,7 +201,7 @@ class TestNestedList(unittest.TestCase):
         self.assertEqual(_get_nested_item(x, (3,)), None)
 
 
-TESTS = [TestKeyDict, TestVarMap, TestNestedList]
+TESTS = [TestVarMap, TestNestedList]
 
 
 if __name__ == "__main__":  # pragma: no cover
