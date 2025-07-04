@@ -20,18 +20,11 @@ def parse_subs(varkeys, substitutions, clean=False):
         if not hasattr(varkeys, "keymap"):
             varkeys = KeySet(varkeys)
         varkeys.update_keymap()
-        if hasattr(substitutions, "keymap"):
-            for var in varkeys.keymap:
-                if dict.__contains__(substitutions, var):
-                    sub = dict.__getitem__(substitutions, var)
-                    keys = varkeys.keymap[var]
-                    append_sub(sub, keys, constants, sweep, linkedsweep)
-        else:
-            for var in substitutions:
-                key = getattr(var, "key", var)
-                if key in varkeys.keymap:
-                    sub, keys = substitutions[var], varkeys.keymap[key]
-                    append_sub(sub, keys, constants, sweep, linkedsweep)
+        for var in substitutions:
+            key = getattr(var, "key", var)
+            if key in varkeys.keymap:
+                sub, keys = substitutions[var], varkeys.keymap[key]
+                append_sub(sub, keys, constants, sweep, linkedsweep)
     return constants, sweep, linkedsweep
 
 
