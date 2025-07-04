@@ -4,8 +4,8 @@ import pickle
 
 import numpy as np
 
-from gpkit.keydict import KeyDict
 from gpkit.varkey import VarKey
+from gpkit.varmap import VarMap
 
 
 def varsort(diff):
@@ -147,8 +147,8 @@ class SolutionEnsemble:
         solution.pop("freevariables", None)
         solution["sensitivities"].pop("constants", None)
         for subd, value in solution.items():
-            if isinstance(value, KeyDict):
-                solution[subd] = KeyDict()
+            if isinstance(value, VarMap):
+                solution[subd] = VarMap()
                 for oldkey, val in value.items():
                     solution[subd][self[oldkey]] = val
         for subd, value in solution["sensitivities"].items():
@@ -164,8 +164,8 @@ class SolutionEnsemble:
                     elif hasattr(val, "shape"):
                         val = np.array(val, dtype=np.float16)
                     solution["sensitivities"][subd][cstrs[str(oldkey)]] = val
-            elif isinstance(value, KeyDict):
-                solution["sensitivities"][subd] = KeyDict()
+            elif isinstance(value, VarMap):
+                solution["sensitivities"][subd] = VarMap()
                 for oldkey, val in value.items():
                     if np.abs(val).max() < 1e-2:
                         if hasattr(val, "shape"):
