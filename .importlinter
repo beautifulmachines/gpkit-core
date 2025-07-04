@@ -27,7 +27,7 @@ layers =
     gpkit.programs
 
     # GP representation and solver interfaces
-    gpkit.solvers | gpkit.solution_array | gpkit.solution_ensemble
+    gpkit.solvers | gpkit.solution_array
 
     # Modelling primitives + indexing
     gpkit.constraints
@@ -36,7 +36,7 @@ layers =
     gpkit.nomials
 
     # Variables and hashing
-    gpkit.varkey : gpkit.keydict
+    gpkit.varkey : gpkit.keydict : gpkit.varmap
 
     # small helpers that might evantually move or be eliminated
     gpkit.util
