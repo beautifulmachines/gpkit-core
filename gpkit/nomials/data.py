@@ -2,7 +2,6 @@
 
 import numpy as np
 
-from ..keydict import KeySet
 from ..util.repr_conventions import ReprMixin
 from ..varkey import VarKey
 
@@ -56,12 +55,6 @@ class NomialData(ReprMixin):
         for exp in self.hmap:
             vks.update(exp)
         return vks
-
-    # pylint: disable=fixme
-    @property  # TODO: remove this
-    def varkeys(self):
-        "KeySet of a NomialData's varkeys, created as necessary."
-        return KeySet(self.vks)
 
     def __eq__(self, other):
         "Equality test"

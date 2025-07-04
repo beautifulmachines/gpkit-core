@@ -13,6 +13,7 @@ from gpkit import (
     Signomial,
     SignomialsEnabled,
     Variable,
+    VarKey,
     VectorVariable,
 )
 from gpkit.exceptions import InvalidPosynomial
@@ -26,28 +27,27 @@ class TestMonomial(unittest.TestCase):
         "Test multiple ways to create a Monomial"
         m = Monomial({"x": 2, "y": -1}, 5)
         m2 = Monomial({"x": 2, "y": -1}, 5)
-        (x,) = m.varkeys["x"]
-        (y,) = m.varkeys["y"]
+        x, y = VarKey("x"), VarKey("y")
         self.assertEqual(m.exp, {x: 2, y: -1})
         self.assertEqual(m.c, 5)
         self.assertEqual(m, m2)
 
         # default c and a
         v = Variable("x")
-        (x,) = v.varkeys["x"]
+        x = v.key
         self.assertEqual(v.exp, {x: 1})
         self.assertEqual(v.c, 1)
 
         # single (string) var with non-default c
         v = 0.1 * Variable("tau")
-        (tau,) = v.varkeys["tau"]  # pylint: disable=no-member
+        tau = VarKey("tau")
         self.assertEqual(v.exp, {tau: 1})  # pylint: disable=no-member
         self.assertEqual(v.c, 0.1)  # pylint: disable=no-member
 
         # variable names not compatible with python namespaces
         crazy_varstr = "what the !!!/$**?"
         m = Monomial({"x": 1, crazy_varstr: 0.5}, 25)
-        (crazy_varkey,) = m.varkeys[crazy_varstr]
+        crazy_varkey = VarKey(crazy_varstr)
         self.assertTrue(crazy_varkey in m.exp)
 
         # non-positive c raises
@@ -305,10 +305,7 @@ class TestPosynomial(unittest.TestCase):
         hmap = NomialMap({exp1: 0.5, exp2: 1})
         hmap.units_of_product(None)
         p = Posynomial(hmap)
-        (m,) = p.varkeys["m"]
-        (g,) = p.varkeys["g"]
-        (h,) = p.varkeys["h"]
-        (v,) = p.varkeys["v"]
+        (m, g, h, v) = (VarKey(s) for s in ("m", "g", "h", "v"))
         self.assertTrue(all(isinstance(x, float) for x in p.cs))
         self.assertEqual(len(p.exps), 2)
         self.assertEqual(set(p.vks), set([m, g, h, v]))
