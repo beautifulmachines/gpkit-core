@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from gpkit import Variable, VectorVariable
-from gpkit.varset import VarSet
+from gpkit.varmap import VarSet
 
 
 # ---------- helpers ----------------------------------------------------------
@@ -25,13 +25,13 @@ def test_empty_initialisation():
 def test_add_and_membership(scalar_and_vector):
     x, _ = scalar_and_vector
     vs = VarSet()
-    vs.add(x)
+    vs.add(x.key)
     assert len(vs) == 1
     assert x.key in vs
     # membership by canonical name
     assert "x" in vs
     # keys_by_name should return a set *containing* x
-    assert vs.keys_by_name("x") == {x}
+    assert vs.keys_by_name("x") == {x.key}
 
 
 # ---------- vector handling --------------------------------------------------
@@ -39,7 +39,7 @@ def test_register_vector(scalar_and_vector):
     _, X = scalar_and_vector
     vs = VarSet()
     # update with vector elements (scalar VarKeys)
-    vs.update([xx for xx in X])
+    vs.update([xx.key for xx in X])
 
     # expect: all three element keys registered
     assert len(vs) == 3
@@ -47,23 +47,25 @@ def test_register_vector(scalar_and_vector):
         assert xx.key in vs
     # name look-up should return parent
     nameset = vs.keys_by_name("X")
-    assert nameset == {X}
+    assert nameset == {X.key}
 
     # _by_vec mapping: parent key should yield an ndarray of element keys
-    arr = vs._by_vec[X]  # private but worth sanity-checking
+    arr = vs._by_vec[X.key]  # private but worth sanity-checking
     assert isinstance(arr, np.ndarray)
     assert arr.shape == (3,)
-    assert (arr == np.array([X[0], X[1], X[2]], dtype=object)).all()
+    for a, b in zip(arr, X):
+        assert a == b.key
 
 
 # ---------- mutating behaviour ----------------------------------------------
 def test_discard_and_len(scalar_and_vector):
     x, X = scalar_and_vector
-    vs = VarSet([x, X[0], X[1]])  # create with an iterable
+    vs = VarSet([x.key, X[0].key, X[1].key])  # create with an iterable
     assert len(vs) == 3
-    vs.discard(X[0])
+    vs.discard(X[0].key)
     assert len(vs) == 2
     assert X[0] not in vs
+    assert X[0].key not in vs
     # discarding a key that isn’t present should be silent
-    vs.discard(X[2])
+    vs.discard(X[2].key)
     assert len(vs) == 2
