@@ -5,25 +5,9 @@ from collections.abc import Hashable
 
 import numpy as np
 
-from .util.small_classes import FixedScalar, Quantity
 from .util.small_scripts import is_sweepvar, isnan
 
-DIMLESS_QUANTITY = Quantity(1, "dimensionless")
 INT_DTYPE = np.dtype(int)
-
-
-def clean_value(key, value):
-    """Gets the value of variable-less monomials, so that
-    `x.sub({x: gpkit.units.m})` and `x.sub({x: gpkit.ureg.m})` are equivalent.
-
-    Also converts any quantities to the key's units, because quantities
-    can't/shouldn't be stored as elements of numpy arrays.
-    """
-    if isinstance(value, FixedScalar):
-        value = value.value
-    if isinstance(value, Quantity):
-        value = value.to(key.units or "dimensionless").magnitude
-    return value
 
 
 class KeyMap:
