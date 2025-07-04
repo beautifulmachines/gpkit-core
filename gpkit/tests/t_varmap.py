@@ -7,7 +7,7 @@ import numpy as np
 from gpkit import Variable, VectorVariable, ureg
 from gpkit.tests.helpers import run_tests
 from gpkit.varkey import VarKey
-from gpkit.varmap import VarMap, _get_nested_item, _make_nested_list, _set_nested_item
+from gpkit.varmap import VarMap
 
 
 class TestVarMap(unittest.TestCase):
@@ -169,39 +169,7 @@ class TestVarMap(unittest.TestCase):
         self.assertEqual(set(self.vm), set([x.key]))
 
 
-class TestNestedList(unittest.TestCase):
-    "TestCase for nested list private methods in varmap.py"
-
-    def test_make(self):
-        x = _make_nested_list((2, 3))
-        expected = [[None] * 3, [None] * 3]
-        self.assertEqual(x, expected)
-
-    def test_set_item(self):
-        x = _make_nested_list((3, 2))
-        _set_nested_item(x, (1, 0), 5)
-        expected = [[None] * 2, [5, None], [None] * 2]
-        self.assertEqual(x, expected)
-
-    def test_get_item(self):
-        x = [[2, 3], [4, 8], [1, 9]]
-        self.assertEqual(_get_nested_item(x, (1, 1)), 8)
-        self.assertEqual(_get_nested_item(x, (2, 1)), 9)
-        self.assertEqual(_get_nested_item(x, (1, 0)), 4)
-
-    def test_single_dim(self):
-        x = _make_nested_list((4,))
-        self.assertEqual(x, [None] * 4)
-        _set_nested_item(x, (1,), 4)
-        _set_nested_item(x, (2,), 3)
-        self.assertEqual(x, [None, 4, 3, None])
-        self.assertEqual(_get_nested_item(x, (0,)), None)
-        self.assertEqual(_get_nested_item(x, (1,)), 4)
-        self.assertEqual(_get_nested_item(x, (2,)), 3)
-        self.assertEqual(_get_nested_item(x, (3,)), None)
-
-
-TESTS = [TestVarMap, TestNestedList]
+TESTS = [TestVarMap]
 
 
 if __name__ == "__main__":  # pragma: no cover

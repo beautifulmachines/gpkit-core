@@ -8,40 +8,12 @@ from .units import Quantity
 from .util.small_scripts import is_sweepvar, veclinkedfn
 
 
-def _make_nested_list(shape, fill=None):
-    if not shape:
-        return fill
-    return [_make_nested_list(shape[1:], fill) for _ in range(shape[0])]
-
-
-def _get_nested_item(nested, index):
-    for dim in index:
-        nested = nested[dim]
-    return nested
-
-
-def _set_nested_item(nested, index, val):
-    for dim in index[:-1]:
-        nested = nested[dim]
-    nested[index[-1]] = val
-
-
 def _nested_lookup(nested_keys, val_dict):
     if nested_keys is None:
         return float("nan")
-    if isinstance(nested_keys, list):
+    if isinstance(nested_keys, np.ndarray):
         return [_nested_lookup(row, val_dict) for row in nested_keys]
     return val_dict[nested_keys]
-
-
-def _nested_set(nested):
-    "get a flat set of all items in nested list structure"
-    if isinstance(nested, list):
-        result = set()
-        for item in nested:
-            result.update(_nested_set(item))
-        return result
-    return {nested}
 
 
 def is_veckey(key):
@@ -116,7 +88,7 @@ class VarMap(MutableMapping):
                     it.iternext()
                     value[i] = veclinkedfn(key.vecfn, i)
             # to setitem via a veckey, the keys must already be registered.
-            vks = _nested_set(self._by_vec[key])
+            vks = set(self._by_vec[key].flat)
             if np.prod(key.shape) != len(vks):
                 raise ValueError(
                     f"{key} shape is {key.shape}, but _by_vec[{key}] only has "
@@ -127,7 +99,7 @@ class VarMap(MutableMapping):
                 return
             if np.shape(value) == key.shape:
                 for vk in vks:
-                    self[vk] = _get_nested_item(value, vk.idx)
+                    self[vk] = np.array(value)[vk.idx]
                 return
             raise NotImplementedError
         self._register_key(key)
@@ -144,8 +116,8 @@ class VarMap(MutableMapping):
         self._by_name[name].add(key if not idx else key.veckey)
         if idx:
             if key.veckey not in self._by_vec:
-                self._by_vec[key.veckey] = _make_nested_list(key.shape)
-            _set_nested_item(self._by_vec[key.veckey], idx, key)
+                self._by_vec[key.veckey] = np.empty(key.shape, dtype=object)
+            self._by_vec[key.veckey][idx] = key
 
     def register_keys(self, keys):
         "register a set of keys to this mapping, without values yet"
@@ -168,15 +140,15 @@ class VarMap(MutableMapping):
         idx = getattr(key, "idx", None)
         if idx:
             veckey = key.veckey
-            _set_nested_item(self._by_vec[veckey], idx, None)
-            if _nested_set(self._by_vec[veckey]) == set((None,)):
+            self._by_vec[veckey][idx] = None
+            if not self._by_vec[veckey].any():
                 del self._by_vec[veckey]
 
     def _primary_keys(self):
         "keys; uses veckeys instead of individual element keys where applicable"
         ks = set(self._data)
         for vk, vks in self._by_vec.items():
-            ks -= _nested_set(vks)
+            ks -= set(vks.flat)
             ks.add(vk)
         return ks
 
