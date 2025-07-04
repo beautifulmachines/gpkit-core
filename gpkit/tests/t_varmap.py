@@ -18,15 +18,6 @@ class TestVarMap(unittest.TestCase):
         self.y = VarKey("y")
         self.vm = VarMap()
 
-    def test_nonnumeric(self):
-        x = VectorVariable(2, "x")
-        vm = VarMap()
-        vm[x[1]] = "2"
-        self.assertTrue(np.isnan(vm[x][0]))
-        self.assertEqual(vm[x[1]], "2")
-        self.assertNotIn(x[0], vm)
-        self.assertIn(x[1], vm)
-
     def test_set_and_get(self):
         self.vm[self.x] = 1
         self.vm[self.y] = 2
@@ -36,6 +27,13 @@ class TestVarMap(unittest.TestCase):
         self.assertEqual(self.vm["x"], 1)
         self.assertEqual(self.vm["y"], 2)
 
+    def test_contains(self):
+        self.vm[self.x] = 1
+        self.assertIn(self.x, self.vm)
+        self.assertIn("x", self.vm)
+        self.assertNotIn(self.y, self.vm)
+        self.assertNotIn("y", self.vm)
+
     def test_getitem(self):
         x = Variable("x", lineage=[("Motor", 0)])
         self.vm[x] = 52
@@ -43,17 +41,15 @@ class TestVarMap(unittest.TestCase):
         self.assertEqual(self.vm[x.key], 52)
         self.assertEqual(self.vm["x"], 52)
         # self.assertEqual(self.vm["Motor.x"], 52)
-        self.assertNotIn("x.Someothermodelname", self.vm)
+        self.assertNotIn("Someothermodelname.x", self.vm)
 
     def test_failed_getitem(self):
         with self.assertRaises(KeyError):
             _ = self.vm["waldo"]
             # issue 893: failed __getitem__ caused state change
         self.assertNotIn("waldo", self.vm)
-        waldo = Variable("waldo")
-        self.vm.update({waldo: 5})
-        res = self.vm["waldo"]
-        self.assertEqual(res, 5)
+        self.vm.update({Variable("waldo"): 5})
+        self.assertEqual(self.vm["waldo"], 5)
         self.assertIn("waldo", self.vm)
 
     def test_keys_by_name(self):
@@ -87,13 +83,6 @@ class TestVarMap(unittest.TestCase):
         del self.vm[x2]
         self.assertNotIn("x", self.vm)
 
-    def test_contains(self):
-        self.vm[self.x] = 1
-        self.assertIn(self.x, self.vm)
-        self.assertIn("x", self.vm)
-        self.assertNotIn(self.y, self.vm)
-        self.assertNotIn("y", self.vm)
-
     def test_vector(self):
         x = VectorVariable(3, "x", "ft")
         vks = [v.key for v in x]
@@ -105,16 +94,19 @@ class TestVarMap(unittest.TestCase):
         self.assertEqual(self.vm[x], [4, 5, 6])
         self.assertEqual(self.vm["x"], [4, 5, 6])
 
-    def test_vector_original(self):
+    def test_vector_partial(self):
         v = VectorVariable(3, "v")
         with self.assertRaises(NotImplementedError):
             # can't set by vector if keys not known
             self.vm[v] = np.array([2, 3, 4])
-        self.assertEqual(v[0].key.idx, (0,))
+        self.assertEqual(v[0].key.idx, (0,))  # legacy; belongs elsewhere
         self.vm[v[0]] = 6
         self.assertEqual(self.vm[v][0], self.vm[v[0]])
         self.assertEqual(self.vm[v][0], 6)
         self.assertTrue(np.isnan(self.vm[v][1]))
+        del self.vm[v[0]]
+        with self.assertRaises(KeyError):
+            _ = self.vm[v]
 
     def test_vector_delitem(self):
         x = VectorVariable(3, "x", "ft")
@@ -161,6 +153,14 @@ class TestVarMap(unittest.TestCase):
         self.vm[x] = 6 * ureg.ft
         self.assertEqual(self.vm[x], 72)
         self.assertEqual(str(self.vm.quantity(x)), "72.0 inch")
+
+    def test_nonnumeric(self):
+        x = VectorVariable(2, "x")
+        self.vm[x[1]] = "2"
+        self.assertTrue(np.isnan(self.vm[x][0]))
+        self.assertEqual(self.vm[x[1]], "2")
+        self.assertNotIn(x[0], self.vm)
+        self.assertIn(x[1], self.vm)
 
     def test_setitem_lineage(self):
         x = Variable("x", lineage=(("test", 0),))
