@@ -24,6 +24,44 @@ def is_veckey(key):
     return False
 
 
+class VarSet(set):
+    """
+    A lightweight *set* of :class:`gpkit.VarKey` objects with constant-time
+    look-ups by **canonical name** or **vector parent (veckey)**.
+
+    Unlike :class:`~gpkit.VAR.VarMap`, *VarSet stores no values — it is
+    purely a membership container plus two derived indices:
+
+    Attributes
+    ----------
+    _by_name : dict[str, set[VarKey]]
+        Maps each canonical name string (``VarKey.name``) to the set of
+        keys sharing that name. Maps to veckey, not elements, for vectors.
+    _by_vec : dict[VarKey, numpy.ndarray]
+        Maps a vector parent key (veckey) to an ``ndarray(dtype=object)``
+        whose element at index *i* is the scalar key representing
+        ``veckey[i]``.  Positions for which no element key has been
+        registered contain ``None``.
+
+    Invariants
+    ----------
+    * Every key in the VarSet appears exactly **once** in the underlying
+      Python set and once in either index.
+    * The indices are **derivative**—mutating the container via
+      :py:meth:`add`, :py:meth:`update`, or :py:meth:`discard` keeps
+      ``_by_name`` and ``_by_vec`` in sync automatically.
+    * ``len(varset)`` equals the number of scalar VarKey instances
+      currently registered (any parent veckeys are not included)
+
+    See Also
+    --------
+    VarMap
+        Mapping from VarKey → value that contains a VarSet internally.
+    """
+
+    pass
+
+
 class VarMap(MutableMapping):
     """A simple mapping from VarKey to value, with lookup by canonical
     name string or veckey
