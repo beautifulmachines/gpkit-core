@@ -18,12 +18,12 @@ from ..exceptions import (
     UnboundedGP,
     UnknownInfeasible,
 )
-from ..keydict import KeyDict
 from ..nomials.map import NomialMap
 from ..solution_array import SolutionArray
 from ..util.repr_conventions import lineagestr
 from ..util.small_classes import CootMatrix, FixedScalar, Numbers, SolverLog
 from ..util.small_scripts import appendsolwarning, initsolwarning
+from ..varmap import VarMap
 
 DEFAULT_SOLVER_KWARGS = {"cvxopt": {"kktsolver": "ldl"}}
 SOLUTION_TOL = {"cvxopt": 1e-3, "mosek_cli": 1e-4, "mosek_conif": 1e-3}
@@ -389,14 +389,14 @@ class GeometricProgram:
         primal = solver_out["primal"]
         if len(self.varlocs) != len(primal):
             raise RuntimeWarning("The primal solution was not returned.")
-        result["freevariables"] = KeyDict(zip(self.varlocs, np.exp(primal)))
-        result["constants"] = KeyDict(self.substitutions)
-        result["variables"] = KeyDict(result["freevariables"])
+        result["freevariables"] = VarMap(zip(self.varlocs, np.exp(primal)))
+        result["constants"] = VarMap(self.substitutions)
+        result["variables"] = VarMap(result["freevariables"])
         result["variables"].update(result["constants"])
         result["soltime"] = solver_out["soltime"]
 
         if self.integersolve:
-            result["choicevariables"] = KeyDict(
+            result["choicevariables"] = VarMap(
                 {
                     k: v
                     for k, v in result["freevariables"].items()
@@ -461,8 +461,8 @@ class GeometricProgram:
             m_senss[lineagestr(vk)] += abs(senss)
 
         result["sensitivities"]["cost"] = cost_senss
-        result["sensitivities"]["variables"] = KeyDict(gpv_ss)
-        result["sensitivities"]["variablerisk"] = KeyDict(absv_ss)
+        result["sensitivities"]["variables"] = VarMap(gpv_ss)
+        result["sensitivities"]["variablerisk"] = VarMap(absv_ss)
         result["sensitivities"]["constants"] = result["sensitivities"][
             "variables"
         ]  # NOTE: backwards compat.

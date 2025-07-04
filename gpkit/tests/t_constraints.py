@@ -177,7 +177,7 @@ class TestConstraint(unittest.TestCase):
         m = Model(z, [x == z, x >= y], {x: 1, y: 1.0001})
         self.assertRaises(PrimalInfeasible, m.solve, verbosity=0)
         PosynomialInequality.feastol = 1e-3
-        self.assertEqual(m.substitutions("x"), m.solve(verbosity=0)("x"))
+        self.assertEqual(m.substitutions["x"], m.solve(verbosity=0)("x"))
 
 
 class TestCostedConstraint(unittest.TestCase):

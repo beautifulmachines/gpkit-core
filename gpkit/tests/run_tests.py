@@ -44,9 +44,9 @@ def import_tests():
 
     tests += t_examples.TESTS
 
-    from gpkit.tests import t_keydict
+    from gpkit.tests import t_varmap
 
-    tests += t_keydict.TESTS
+    tests += t_varmap.TESTS
 
     from gpkit.tests import t_util
 

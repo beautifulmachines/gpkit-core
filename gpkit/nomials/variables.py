@@ -1,6 +1,6 @@
 "Implement Variable and ArrayVariable classes"
 
-from collections.abc import Iterable
+from collections.abc import Iterable, MutableMapping
 
 import numpy as np
 
@@ -87,7 +87,7 @@ class Variable(Monomial):
         """
         if len(args) == 1 and "val" not in kwargs:
             (arg,) = args
-            if not isinstance(arg, dict):
+            if not isinstance(arg, MutableMapping):
                 args = [{self: arg}]
         return Monomial.sub(self, *args, **kwargs)
 
@@ -149,7 +149,7 @@ class ArrayVariable(NomialArray):  # pylint: disable=too-many-locals
             if not hasattr(values, "__call__"):
                 if Vectorize.vectorization:
                     if not hasattr(values, "shape"):
-                        values = np.full(shape, values, "f")
+                        values = np.full(shape, values, np.float64)
                     else:
                         values = np.broadcast_to(values, reversed(shape)).T
                 elif not hasattr(values, "shape"):
