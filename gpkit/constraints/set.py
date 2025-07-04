@@ -6,9 +6,10 @@ from itertools import chain
 
 import numpy as np
 
-from ..keydict import KeyDict, KeySet
+from ..keydict import KeySet
 from ..util.repr_conventions import ReprMixin
 from ..util.small_scripts import try_str_without
+from ..varmap import VarMap
 from .single_equation import SingleEquationConstraint
 
 
@@ -89,10 +90,10 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
             constraints = [constraints]  # put it one level down
         list.__init__(self, constraints)
         self.vks = set(self.unique_varkeys)
-        self.substitutions = KeyDict(
+        self.substitutions = VarMap(
             {k: k.value for k in self.unique_varkeys if "value" in k.descr}
         )
-        self.substitutions.vks = self.vks
+        self.substitutions.register_keys(self.vks)
         self.bounded, self.meq_bounded = set(), defaultdict(set)
         for i, constraint in enumerate(self):
             if hasattr(constraint, "vks"):
@@ -115,10 +116,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
             self.substitutions.update(substitutions)
         for key in self.vks:
             if key not in self.substitutions:
-                if key.veckey is None or key.veckey not in self.substitutions:
-                    continue
-                if np.isnan(self.substitutions[key.veckey][key.idx]):
-                    continue
+                continue
             self.bounded.add((key, "upper"))
             self.bounded.add((key, "lower"))
             if key.value is not None and not key.constant:
@@ -130,6 +128,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
     def _update(self, constraint):
         "Update parameters with a given constraint"
         self.vks.update(constraint.vks)
+        self.substitutions.register_keys(constraint.vks)
         if hasattr(constraint, "substitutions"):
             self.substitutions.update(constraint.substitutions)
         else:

@@ -149,7 +149,7 @@ class TestModelSubs(unittest.TestCase):
         xv = VectorVariable(2, "x", [1, 1], lineage=[("vec", 0)])
         m = Model(x, [x >= x_, x_ == xv.prod()])
         m.solve(verbosity=0)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(KeyError):
             _ = m.substitutions["x"]
         with self.assertRaises(KeyError):
             _ = m.substitutions["y"]
@@ -231,7 +231,8 @@ class TestModelSubs(unittest.TestCase):
         m = Model(x, [x >= y.prod()])
         m.substitutions.update({y: ("sweep", [[2, 3, 9], [5, 7, 11]])})
         self.assertRaises(ValueError, m.solve, verbosity=0)
-        m.substitutions.update({y: [2, ("sweep", [3, 5])]})
+        m = Model(x, [x >= y.prod()])
+        m.substitutions.update({y[0]: 2, y[1]: ("sweep", [3, 5])})
         a = m.solve(verbosity=0)["cost"]
         b = [6, 10]
         self.assertTrue(all(abs(a - b) / (a + b) < 1e-7))

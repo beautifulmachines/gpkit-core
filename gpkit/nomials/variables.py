@@ -149,7 +149,7 @@ class ArrayVariable(NomialArray):  # pylint: disable=too-many-locals
             if not hasattr(values, "__call__"):
                 if Vectorize.vectorization:
                     if not hasattr(values, "shape"):
-                        values = np.full(shape, values, "f")
+                        values = np.full(shape, values, np.float64)
                     else:
                         values = np.broadcast_to(values, reversed(shape)).T
                 elif not hasattr(values, "shape"):

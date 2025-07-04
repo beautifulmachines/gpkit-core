@@ -55,6 +55,8 @@ def append_sub(sub, keys, constants, sweep, linkedsweep):
                     sub = np.array(sub, dtype=object)
             if key.shape == sub.shape:
                 value = sub[key.idx]
+                if sweepsub and np.prod(key.shape) != len(keys):
+                    value = sub  # handle coincidental length match case
                 sweepel, sweepval = splitsweep(value)
                 if sweepel:  # if only an element is swept
                     value = sweepval

@@ -2,7 +2,10 @@
 
 from collections.abc import MutableMapping
 
+import numpy as np
+
 from .units import Quantity
+from .util.small_scripts import is_sweepvar, veclinkedfn
 
 
 def _make_nested_list(shape, fill=None):
@@ -93,13 +96,41 @@ class VarMap(MutableMapping):
 
     def __setitem__(self, key, value):
         key = getattr(key, "key", None) or key  # handles Variable case
-        if is_veckey(key):
-            raise NotImplementedError
         if isinstance(key, str):
             key = self._key_from_name(key)
-        self._register_key(key)
         if isinstance(value, Quantity):
             value = value.to(key.units).magnitude
+        if is_veckey(key):
+            if key not in self._by_vec:
+                raise NotImplementedError
+            if is_sweepvar(value):
+                self._data[key] = value
+                return
+            if hasattr(value, "__call__"):  # a linked vector-function
+                # this case temporarily borrowed from keymap, should refactor
+                key.vecfn = value
+                value = np.empty(key.shape, dtype="object")
+                it = np.nditer(value, flags=["multi_index", "refs_ok"])
+                while not it.finished:
+                    i = it.multi_index
+                    it.iternext()
+                    value[i] = veclinkedfn(key.vecfn, i)
+            # to setitem via a veckey, the keys must already be registered.
+            vks = _nested_set(self._by_vec[key])
+            if np.prod(key.shape) != len(vks):
+                raise ValueError(
+                    f"{key} shape is {key.shape}, but _by_vec[{key}] only has "
+                    f" {len(vks)} registered keys."
+                )  # now we know all vks are present
+            if not np.shape(value):
+                self.update({vk: value for vk in vks})
+                return
+            if np.shape(value) == key.shape:
+                for vk in vks:
+                    self[vk] = _get_nested_item(value, vk.idx)
+                return
+            raise NotImplementedError
+        self._register_key(key)
         self._data[key] = value
 
     def _register_key(self, key):
@@ -122,8 +153,11 @@ class VarMap(MutableMapping):
             self._register_key(key)
 
     def __delitem__(self, key):
+        key = getattr(key, "key", None) or key  # handles Variable case
         if is_veckey(key):
             raise NotImplementedError
+        if isinstance(key, str):
+            key = self._key_from_name(key)
         name = key.name
         del self._data[key]
         self._by_name[name].discard(key)
