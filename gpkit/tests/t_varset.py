@@ -40,7 +40,7 @@ def test_keys():
     vv = VectorVariable(3, "x")
     vs = VarSet({x.key, y.key})
     vs.add(vv[1].key)
-    assert vs.keys("x") == {x.key, vv[0].key}
+    assert vs.keys("x") == {x.key, vv[1].key}
     assert vs.keys(x) == {x.key}
     assert vs.keys(vv) == {vv[1].key}  # because it's the only one we added
     assert vs.keys(vv[0]) == set()

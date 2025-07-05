@@ -93,10 +93,12 @@ class VarSet(set):
 
     def keys(self, key):
         "set of all keys in self that the input key refers to"
+        key = getattr(key, "key", None) or key  # Variable case
         out = {key} if super().__contains__(key) else set()
-        for k in self.by_name(key):
+        for k in self.by_name(key).union((key,) if is_veckey(key) else ()):
             if is_veckey(k):
                 out.update(self.by_vec(k).flat)
+                out.discard(None)  # present if vec elements missing
             else:
                 out.add(k)
         return out
