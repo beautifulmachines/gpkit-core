@@ -4,8 +4,8 @@ import warnings as pywarnings
 
 import numpy as np
 
-from ..keydict import KeySet
 from ..util.small_scripts import splitsweep
+from ..varmap import VarSet
 
 
 def parse_subs(varkeys, substitutions, clean=False):
@@ -17,13 +17,12 @@ def parse_subs(varkeys, substitutions, clean=False):
                 sub = dict.__getitem__(substitutions, var)
                 append_sub(sub, [var], constants, sweep, linkedsweep)
     else:
-        if not hasattr(varkeys, "keymap"):
-            varkeys = KeySet(varkeys)
-        varkeys.update_keymap()
+        if not isinstance(varkeys, VarSet):
+            varkeys = VarSet(varkeys)
         for var in substitutions:
             key = getattr(var, "key", var)
-            if key in varkeys.keymap:
-                sub, keys = substitutions[var], varkeys.keymap[key]
+            if key in varkeys:
+                sub, keys = substitutions[var], varkeys.keys(key)
                 append_sub(sub, keys, constants, sweep, linkedsweep)
     return constants, sweep, linkedsweep
 

@@ -838,7 +838,7 @@ class TestModelNoSolve(unittest.TestCase):
         self.assertIn(w.subA["m"].key, m_vbn_keys)
         self.assertIn(w.subB["m"].key, m_vbn_keys)
         # dig a level deeper, into the keymap
-        self.assertEqual(len(w.varkeys.keymap["m"]), 2)
+        self.assertEqual(len(w.varkeys.keys("m")), 2)
 
 
 TESTS = [TestModelSolverSpecific, TestModelNoSolve]
