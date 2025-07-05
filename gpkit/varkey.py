@@ -39,6 +39,7 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
         self.key = self
         fullstr = self.str_without({"hiddenlineage", "modelnums", "vec"})
         self.eqstr = fullstr + str(self.lineage) + self.unitrepr
+        self.eqstr += str(self.shape)  # hotfix for issue 52
         self.hashvalue = hash(self.eqstr)
         self.keys = set((self.name, fullstr))
 
