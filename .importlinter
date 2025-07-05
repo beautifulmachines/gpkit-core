@@ -36,7 +36,7 @@ layers =
     gpkit.nomials
 
     # Variables and hashing
-    gpkit.varkey : gpkit.keydict : gpkit.varmap
+    gpkit.varkey : gpkit.varmap
 
     # small helpers that might evantually move or be eliminated
     gpkit.util
