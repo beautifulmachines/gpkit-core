@@ -69,6 +69,20 @@ class VarSet(set):
         self._register_key(key)
         super().add(key)
 
+    def discard(self, key):
+        name = key.name
+        self._by_name[name].discard(key)
+        if not self._by_name[name]:
+            del self._by_name[name]
+        # handle vector element case
+        idx = getattr(key, "idx", None)
+        if idx:
+            veckey = key.veckey
+            self._by_vec[veckey][idx] = None
+            if not self._by_vec[veckey].any():
+                del self._by_vec[veckey]
+        super().discard(key)
+
     def by_name(self, name):
         """Return all VarKeys for a given name string."""
         return set(self._by_name.get(name, set()))
@@ -76,6 +90,14 @@ class VarSet(set):
     def update(self, keys):
         for k in keys:
             self.add(k)
+
+    def primary_keys(self):
+        "set(self) but with veckeys and no individual vector element keys"
+        ks = set(self)
+        for vk, vks in self._by_vec.items():
+            ks -= set(vks.flat)
+            ks.add(vk)
+        return ks
 
     def _register_key(self, key):
         "adds the key to _by_name and, if applicable, _by_vec"
@@ -92,7 +114,7 @@ class VarSet(set):
             self._by_vec[key.veckey][idx] = key
 
     def __contains__(self, key):
-        return super().__contains__(key) or key in self._by_name
+        return super().__contains__(key) or key in self._by_name or key in self._by_vec
 
 
 class VarMap(MutableMapping):
@@ -107,8 +129,7 @@ class VarMap(MutableMapping):
 
     def __init__(self, *args, **kwargs):
         self._data = {}
-        self._by_name = {}
-        self._by_vec = {}
+        self._varset = VarSet()
         self.update(dict(*args, **kwargs))
 
     def __getitem__(self, key):
@@ -122,14 +143,19 @@ class VarMap(MutableMapping):
             return (key, self._data[key])  # single varkey case
         except KeyError as kerr:
             if is_veckey(key):  # vector case
-                return (key, _nested_lookup(self._by_vec[key], self._data))
+                return (key, _nested_lookup(self._varset._by_vec[key], self._data))
             if isinstance(key, str):  # by name lookup
                 vk = self._key_from_name(key)
                 return self.item(vk)
             raise kerr
 
+    @property
+    def varset(self):
+        "read-only access"
+        return self._varset
+
     def _key_from_name(self, name):
-        vks = self.keys_by_name(name)
+        vks = self._varset.by_name(name)
         if not vks:
             raise KeyError(f"unrecognized key {name}")
         if len(vks) == 1:
@@ -144,7 +170,7 @@ class VarMap(MutableMapping):
         if isinstance(value, Quantity):
             value = value.to(key.units).magnitude
         if is_veckey(key):
-            if key not in self._by_vec:
+            if key not in self._varset._by_vec:
                 raise NotImplementedError
             if is_sweepvar(value):
                 self._data[key] = value
@@ -159,7 +185,7 @@ class VarMap(MutableMapping):
                     it.iternext()
                     value[i] = veclinkedfn(key.vecfn, i)
             # to setitem via a veckey, the keys must already be registered.
-            vks = set(self._by_vec[key].flat)
+            vks = set(self.varset._by_vec[key].flat)
             if np.prod(key.shape) != len(vks):
                 raise ValueError(
                     f"{key} shape is {key.shape}, but _by_vec[{key}] only has "
@@ -173,27 +199,12 @@ class VarMap(MutableMapping):
                     self[vk] = np.array(value)[vk.idx]
                 return
             raise NotImplementedError
-        self._register_key(key)
+        self._varset.add(key)
         self._data[key] = value
-
-    def _register_key(self, key):
-        "adds the key to _by_name and, if applicable, _by_vec"
-        if not hasattr(key, "name"):
-            raise TypeError("VarMap keys must be VarKey instances")
-        idx = getattr(key, "idx", None)
-        name = key.name if not idx else key.veckey.name
-        if name not in self._by_name:
-            self._by_name[name] = set()
-        self._by_name[name].add(key if not idx else key.veckey)
-        if idx:
-            if key.veckey not in self._by_vec:
-                self._by_vec[key.veckey] = np.empty(key.shape, dtype=object)
-            self._by_vec[key.veckey][idx] = key
 
     def register_keys(self, keys):
         "register a set of keys to this mapping, without values yet"
-        for key in keys:
-            self._register_key(key)
+        self._varset.update(keys)
 
     def __delitem__(self, key):
         key = getattr(key, "key", None) or key  # handles Variable case
@@ -201,31 +212,12 @@ class VarMap(MutableMapping):
             raise NotImplementedError
         if isinstance(key, str):
             key = self._key_from_name(key)
-        name = key.name
         del self._data[key]
-        self._by_name[name].discard(key)
-        # if _by_name[name] refers to no other vks, remove it
-        if not self._by_name[name]:
-            del self._by_name[name]
-        # handle vector element case
-        idx = getattr(key, "idx", None)
-        if idx:
-            veckey = key.veckey
-            self._by_vec[veckey][idx] = None
-            if not self._by_vec[veckey].any():
-                del self._by_vec[veckey]
-
-    def _primary_keys(self):
-        "keys; uses veckeys instead of individual element keys where applicable"
-        ks = set(self._data)
-        for vk, vks in self._by_vec.items():
-            ks -= set(vks.flat)
-            ks.add(vk)
-        return ks
+        self._varset.discard(key)
 
     def primary_items(self):
         "like items, but using veckeys and ignoring element keys/items"
-        return ((k, self[k]) for k in self._primary_keys())
+        return ((k, self[k]) for k in self._varset.primary_keys())
 
     def __iter__(self):
         return iter(self._data)
@@ -235,9 +227,10 @@ class VarMap(MutableMapping):
 
     def __contains__(self, key):
         if isinstance(key, str):
-            return key in self._by_name and bool(self._by_name[key])
+            return key in self._varset._by_name and bool(self._varset._by_name[key])
         key = getattr(key, "key", key)  # handle Variable case
-        if key in self._by_vec:
+        # return key in self._varset
+        if key in self._varset._by_vec:
             return True
         return key in self._data
 
@@ -245,9 +238,9 @@ class VarMap(MutableMapping):
         for k, v in dict(*args, **kwargs).items():
             self[k] = v
 
-    def keys_by_name(self, name):
-        """Return all VarKeys for a given name string."""
-        return set(self._by_name.get(name, set()))
+    # def keys_by_name(self, name):
+    #     """Return all VarKeys for a given name string."""
+    #     return set(self._by_name.get(name, set()))
 
     def quantity(self, key):
         "Return a quantity corresponding to self[key]"

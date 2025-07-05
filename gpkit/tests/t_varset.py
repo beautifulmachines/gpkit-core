@@ -69,3 +69,12 @@ def test_discard_and_len(scalar_and_vector):
     # discarding a key that isn’t present should be silent
     vs.discard(X[2].key)
     assert len(vs) == 2
+
+
+def test_varkeys_only():
+    x = Variable("x")
+    vs = VarSet()
+    with pytest.raises(TypeError):
+        vs.add(x)
+    with pytest.raises(TypeError):
+        vs.add("x")

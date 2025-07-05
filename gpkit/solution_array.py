@@ -435,15 +435,15 @@ class SolutionArray(DictOfLists):
         "Returns the set of contained varkeys whose names are not unique"
         if self._name_collision_varkeys is None:
             self._name_collision_varkeys = {}
-            keymap = self["variables"]
+            varset = self["variables"].varset
             name_collisions = defaultdict(set)
-            for key in keymap:
+            for key in varset:
                 if hasattr(key, "key"):
-                    if len(keymap.keys_by_name(key.name)) == 1:  # unique
+                    if len(varset.by_name(key.name)) == 1:  # unique
                         self._name_collision_varkeys[key] = 0
                     else:
                         shortname = key.str_without(["lineage", "vec"])
-                        if len(keymap.keys_by_name(shortname)) > 1:
+                        if len(varset.by_name(shortname)) > 1:
                             name_collisions[shortname].add(key)
             for varkeys in name_collisions.values():
                 min_namespaced = defaultdict(set)
