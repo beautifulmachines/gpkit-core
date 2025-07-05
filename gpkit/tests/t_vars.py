@@ -154,6 +154,19 @@ class TestVarKey(unittest.TestCase):
         for vk in (VarKey(), x, VarKey(**x.descr), VarKey(units="m")):
             self.assertTrue("units" in vk.descr)
 
+    def test_hash_vector(self):
+        """Make sure different vector keys don't have hash collisions"""
+        t = VarKey("t")
+        vec2 = VarKey("t", shape=(2,))
+        vec3 = VarKey("t", shape=(3,))
+        el2 = VarKey("t", shape=(2,), idx=(1,))
+        el3 = VarKey("t", shape=(3,), idx=(1,))
+        self.assertNotEqual(hash(t), hash(vec3))
+        self.assertNotEqual(hash(vec2), hash(vec3))
+        self.assertNotEqual(hash(el3), hash(vec3))
+        self.assertNotEqual(hash(el3), hash(el2))
+        self.assertNotEqual(hash(t), hash(el2))
+
 
 class TestVariable(unittest.TestCase):
     """TestCase for the Variable class"""
