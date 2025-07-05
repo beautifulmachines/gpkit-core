@@ -1,29 +1,22 @@
+"""Unit tests for the VarSet class"""
+
 import numpy as np
-import pytest
+import pytest  # pylint: disable=import-error
 
 from gpkit import Variable, VectorVariable
 from gpkit.varmap import VarSet
-
-
-# ---------- helpers ----------------------------------------------------------
-@pytest.fixture
-def scalar_and_vector():
-    """Return a scalar VarKey 'x' and a 3-element vector VarKey 'X'."""
-    x = Variable("x")
-    X = VectorVariable(3, "X")
-    return x, X
 
 
 # ---------- basic container behaviour ---------------------------------------
 def test_empty_initialisation():
     vs = VarSet()
     assert len(vs) == 0
-    assert list(vs) == []
+    assert not list(vs)
     assert "x" not in vs
 
 
-def test_add_and_membership(scalar_and_vector):
-    x, _ = scalar_and_vector
+def test_add_and_membership():
+    x = Variable("x")
     vs = VarSet()
     vs.add(x.key)
     assert len(vs) == 1
@@ -48,39 +41,41 @@ def test_keys():
 
 
 # ---------- vector handling --------------------------------------------------
-def test_register_vector(scalar_and_vector):
-    _, X = scalar_and_vector
+def test_register_vector():
+    x = Variable("x")
+    vecx = VectorVariable(3, "X")
     vs = VarSet()
     # update with vector elements (scalar VarKeys)
-    vs.update([xx.key for xx in X])
+    vs.update([xx.key for xx in vecx])
 
     # expect: all three element keys registered
     assert len(vs) == 3
-    for xx in X:
+    for xx in vecx:
         assert xx.key in vs
     # name look-up should return parent
     nameset = vs.by_name("X")
-    assert nameset == {X.key}
+    assert nameset == {vecx.key}
 
-    # _by_vec mapping: parent key should yield an ndarray of element keys
-    arr = vs._by_vec[X.key]  # private but worth sanity-checking
+    # by_vec mapping: parent key should yield an ndarray of element keys
+    arr = vs.by_vec(vecx.key)
     assert isinstance(arr, np.ndarray)
     assert arr.shape == (3,)
-    for a, b in zip(arr, X):
+    for a, b in zip(arr, vecx):
         assert a == b.key
 
 
 # ---------- mutating behaviour ----------------------------------------------
-def test_discard_and_len(scalar_and_vector):
-    x, X = scalar_and_vector
-    vs = VarSet([x.key, X[0].key, X[1].key])  # create with an iterable
+def test_discard_and_len():
+    x = Variable("x")
+    vecx = VectorVariable(3, "X")
+    vs = VarSet([x.key, vecx[0].key, vecx[1].key])  # create with an iterable
     assert len(vs) == 3
-    vs.discard(X[0].key)
+    vs.discard(vecx[0].key)
     assert len(vs) == 2
-    assert X[0] not in vs
-    assert X[0].key not in vs
+    assert vecx[0] not in vs
+    assert vecx[0].key not in vs
     # discarding a key that isn’t present should be silent
-    vs.discard(X[2].key)
+    vs.discard(vecx[2].key)
     assert len(vs) == 2
 
 
