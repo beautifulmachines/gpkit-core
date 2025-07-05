@@ -30,8 +30,8 @@ def test_add_and_membership(scalar_and_vector):
     assert x.key in vs
     # membership by canonical name
     assert "x" in vs
-    # keys_by_name should return a set *containing* x
-    assert vs.keys_by_name("x") == {x.key}
+    # by_name should return a set *containing* x
+    assert vs.by_name("x") == {x.key}
 
 
 # ---------- vector handling --------------------------------------------------
@@ -46,7 +46,7 @@ def test_register_vector(scalar_and_vector):
     for xx in X:
         assert xx.key in vs
     # name look-up should return parent
-    nameset = vs.keys_by_name("X")
+    nameset = vs.by_name("X")
     assert nameset == {X.key}
 
     # _by_vec mapping: parent key should yield an ndarray of element keys

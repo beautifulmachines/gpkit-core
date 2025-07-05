@@ -69,6 +69,10 @@ class VarSet(set):
         self._register_key(key)
         super().add(key)
 
+    def by_name(self, name):
+        """Return all VarKeys for a given name string."""
+        return set(self._by_name.get(name, set()))
+
     def update(self, keys):
         for k in keys:
             self.add(k)
@@ -76,20 +80,16 @@ class VarSet(set):
     def _register_key(self, key):
         "adds the key to _by_name and, if applicable, _by_vec"
         if not hasattr(key, "name"):
-            raise TypeError("VarMap keys must be VarKey instances")
-        idx = getattr(key, "idx", None)
-        name = key.name if not idx else key.veckey.name
+            raise TypeError("VarSet keys must be VarKey instances")
+        name = key.name
         if name not in self._by_name:
             self._by_name[name] = set()
+        idx = getattr(key, "idx", None)
         self._by_name[name].add(key if not idx else key.veckey)
         if idx:
             if key.veckey not in self._by_vec:
                 self._by_vec[key.veckey] = np.empty(key.shape, dtype=object)
             self._by_vec[key.veckey][idx] = key
-
-    def keys_by_name(self, name):
-        """Return all VarKeys for a given name string."""
-        return set(self._by_name.get(name, set()))
 
     def __contains__(self, key):
         return super().__contains__(key) or key in self._by_name
