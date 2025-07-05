@@ -91,6 +91,16 @@ class VarSet(set):
         "Return np.array of keys for a given veckey"
         return np.array(self._by_vec.get(veckey, ()))
 
+    def keys(self, key):
+        "set of all keys in self that the input key refers to"
+        out = {key} if super().__contains__(key) else set()
+        for k in self.by_name(key):
+            if is_veckey(k):
+                out.update(self.by_vec(k).flat)
+            else:
+                out.add(k)
+        return out
+
     def update(self, keys):
         for k in keys:
             self.add(k)

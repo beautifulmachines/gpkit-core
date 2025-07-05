@@ -34,6 +34,19 @@ def test_add_and_membership(scalar_and_vector):
     assert vs.by_name("x") == {x.key}
 
 
+def test_keys():
+    x = Variable("x")
+    y = Variable("y")
+    vv = VectorVariable(3, "x")
+    vs = VarSet({x.key, y.key})
+    vs.add(vv[1].key)
+    assert vs.keys("x") == {x.key, vv[0].key}
+    assert vs.keys(x) == {x.key}
+    assert vs.keys(vv) == {vv[1].key}  # because it's the only one we added
+    assert vs.keys(vv[0]) == set()
+    assert vs.keys("y") == {y.key}
+
+
 # ---------- vector handling --------------------------------------------------
 def test_register_vector(scalar_and_vector):
     _, X = scalar_and_vector
