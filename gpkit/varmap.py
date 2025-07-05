@@ -114,7 +114,9 @@ class VarSet(set):
             self._by_vec[key.veckey][idx] = key
 
     def __contains__(self, key):
-        return super().__contains__(key) or key in self._by_name or key in self._by_vec
+        if super().__contains__(key):
+            return True
+        return key in self._by_name or key in self._by_vec
 
 
 class VarMap(MutableMapping):
@@ -226,21 +228,14 @@ class VarMap(MutableMapping):
         return len(self._data)
 
     def __contains__(self, key):
-        if isinstance(key, str):
-            return key in self._varset._by_name
         key = getattr(key, "key", key)  # handle Variable case
-        # return key in self._varset
-        if key in self._varset._by_vec:
-            return True
+        if isinstance(key, str) or is_veckey(key):
+            return key in self.varset
         return key in self._data
 
     def update(self, *args, **kwargs):  # pylint: disable=arguments-differ
         for k, v in dict(*args, **kwargs).items():
             self[k] = v
-
-    # def keys_by_name(self, name):
-    #     """Return all VarKeys for a given name string."""
-    #     return set(self._by_name.get(name, set()))
 
     def quantity(self, key):
         "Return a quantity corresponding to self[key]"
