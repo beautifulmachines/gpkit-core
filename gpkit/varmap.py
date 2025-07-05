@@ -227,7 +227,7 @@ class VarMap(MutableMapping):
 
     def __contains__(self, key):
         if isinstance(key, str):
-            return key in self._varset._by_name and bool(self._varset._by_name[key])
+            return key in self._varset._by_name
         key = getattr(key, "key", key)  # handle Variable case
         # return key in self._varset
         if key in self._varset._by_vec:
