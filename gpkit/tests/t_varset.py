@@ -42,7 +42,6 @@ def test_keys():
 
 # ---------- vector handling --------------------------------------------------
 def test_register_vector():
-    x = Variable("x")
     vecx = VectorVariable(3, "X")
     vs = VarSet()
     # update with vector elements (scalar VarKeys)
