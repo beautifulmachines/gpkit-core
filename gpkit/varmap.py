@@ -170,6 +170,7 @@ class VarMap(MutableMapping):
 
     @property
     def varset(self):
+        "public access to this VarMap's varset. may remove eventually."
         return self._varset
 
     def _key_from_name(self, name):
