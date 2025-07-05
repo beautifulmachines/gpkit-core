@@ -87,6 +87,10 @@ class VarSet(set):
         """Return all VarKeys for a given name string."""
         return set(self._by_name.get(name, set()))
 
+    def by_vec(self, veckey):
+        "Return np.array of keys for a given veckey"
+        return np.array(self._by_vec.get(veckey, ()))
+
     def update(self, keys):
         for k in keys:
             self.add(k)
@@ -144,16 +148,16 @@ class VarMap(MutableMapping):
         try:
             return (key, self._data[key])  # single varkey case
         except KeyError as kerr:
-            if is_veckey(key):  # vector case
-                return (key, _nested_lookup(self._varset._by_vec[key], self._data))
             if isinstance(key, str):  # by name lookup
                 vk = self._key_from_name(key)
                 return self.item(vk)
+            key_arr = self._varset.by_vec(key)
+            if key_arr.any():
+                return (key, _nested_lookup(key_arr, self._data))
             raise kerr
 
     @property
     def varset(self):
-        "read-only access"
         return self._varset
 
     def _key_from_name(self, name):
