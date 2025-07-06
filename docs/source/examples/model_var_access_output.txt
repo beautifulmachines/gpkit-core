@@ -1,3 +1,3 @@
 Getting the only var 'E': PowerSystem.Battery.E [MJ]
 The top-level var 'm': PowerSystem.m [lb]
-All the variables 'm': {PowerSystem.Battery.m, PowerSystem.m, PowerSystem.Motor.m}
+All varkeys 'm': [PowerSystem.Battery.m, PowerSystem.Motor.m, PowerSystem.m]
