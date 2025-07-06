@@ -1036,7 +1036,7 @@ def var_table(
     if not data:
         return []
     decorated, models = [], set()
-    dataitems = getattr(data, "primary_items", data.items)
+    dataitems = getattr(data, "vector_parent_items", data.items)
     for i, (k, v) in enumerate(dataitems()):
         if isinstance(v, np.ndarray):
             # sweeps could insert additional dimension

@@ -109,7 +109,7 @@ class VarSet(set):
         for k in keys:
             self.add(k)
 
-    def primary_keys(self):
+    def vector_parent_keys(self):
         "set(self) but with veckeys and no individual vector element keys"
         ks = set(self)
         for vk, vks in self._by_vec.items():
@@ -236,9 +236,9 @@ class VarMap(MutableMapping):
         del self._data[key]
         self._varset.discard(key)
 
-    def primary_items(self):
+    def vector_parent_items(self):
         "like items, but using veckeys and ignoring element keys/items"
-        return ((k, self[k]) for k in self._varset.primary_keys())
+        return ((k, self[k]) for k in self._varset.vector_parent_keys())
 
     def __iter__(self):
         return iter(self._data)
