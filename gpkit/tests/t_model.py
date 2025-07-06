@@ -834,7 +834,7 @@ class TestModelNoSolve(unittest.TestCase):
         self.assertIn(w.subA["m"].key, w.varkeys)
         self.assertIn(w.subB["m"].key, w.varkeys)
         # keys of w.variables_byname("m") should match m.varkeys
-        m_vbn_keys = [v for v in w.varkeys.by_name("m")]
+        m_vbn_keys = w.varkeys.by_name("m")
         self.assertIn(w.subA["m"].key, m_vbn_keys)
         self.assertIn(w.subB["m"].key, m_vbn_keys)
         # dig a level deeper, into the keymap
