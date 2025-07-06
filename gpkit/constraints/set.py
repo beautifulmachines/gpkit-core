@@ -6,6 +6,7 @@ from itertools import chain
 
 import numpy as np
 
+from ..nomials import NomialArray, Variable
 from ..util.repr_conventions import ReprMixin
 from ..util.small_scripts import try_str_without
 from ..varmap import VarMap, VarSet
@@ -143,7 +144,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
             key = self.idxlookup[key]
         if isinstance(key, int):
             return list.__getitem__(self, key)
-        return self._choosevar(key, self.variables_byname(key))
+        return self._choosevar(key, self.varkeys.keys(key))
 
     def _choosevar(self, key, variables):
         if not variables:
@@ -152,27 +153,17 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         veckey = firstvar.key.veckey
         if veckey is None or any(v.key.veckey != veckey for v in othervars):
             if not othervars:
-                return firstvar
+                return Variable(firstvar)
             raise ValueError(
                 f"multiple variables are called '{key}'; show them"
-                f" with `.variables_byname('{key}')`"
+                f" with `.varkeys.keys({key})`"
             )
-        # pylint: disable=import-outside-toplevel
-        from ..nomials import NomialArray  # all one vector!
 
         arr = NomialArray(np.full(veckey.shape, np.nan, dtype="object"))
         for v in variables:
-            arr[v.key.idx] = v
+            arr[v.key.idx] = Variable(v)
         arr.key = veckey
         return arr
-
-    def variables_byname(self, key):
-        "Get all variables with a given name"
-        from ..nomials import Variable  # pylint: disable=import-outside-toplevel
-
-        return sorted(
-            [Variable(k) for k in self.varkeys.keys(key)], key=_sort_by_name_and_idx
-        )
 
     @property
     def varkeys(self):
