@@ -33,15 +33,6 @@ def appendsolwarning(msg, data, result, category="uncategorized"):
     result["warnings"][category].append((msg, data))
 
 
-@np.vectorize
-def isnan(element):
-    "Determine if something of arbitrary type is a numpy nan."
-    try:
-        return np.isnan(element)
-    except TypeError:
-        return False
-
-
 def maybe_flatten(value):
     "Extract values from 0-d numpy arrays, if necessary"
     if hasattr(value, "size") and value.size == 1:
