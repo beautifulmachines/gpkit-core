@@ -2,13 +2,6 @@
 
 from collections.abc import Iterable
 
-import numpy as np
-
-
-def broadcast_substitution(key, array):
-    "Broadcasts input into the shape of a given key"
-    return np.broadcast_to(array, reversed(key.key.shape)).T
-
 
 def veclinkedfn(linkedfn, i):
     "Generate an indexed linking function."

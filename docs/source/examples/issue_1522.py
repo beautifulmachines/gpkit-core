@@ -1,7 +1,13 @@
 "Tests broadcast_sub function for returned-dictionary substitutions"
 
+import numpy as np
+
 from gpkit import ConstraintSet, Model, Variable, Vectorize
-from gpkit.util.small_scripts import broadcast_substitution
+
+
+def broadcast_substitution(key, array):
+    "Broadcasts input into the shape of a given key"
+    return np.broadcast_to(array, reversed(key.key.shape)).T
 
 
 class Pie(Model):
