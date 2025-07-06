@@ -29,7 +29,7 @@ class VarSet(set):
     A lightweight *set* of :class:`gpkit.VarKey` objects with constant-time
     look-ups by **canonical name** or **vector parent (veckey)**.
 
-    Unlike :class:`~gpkit.VAR.VarMap`, *VarSet stores no values — it is
+    Unlike :class:`~gpkit.varmap.VarMap`, *VarSet stores no values — it is
     purely a membership container plus two derived indices:
 
     Attributes
@@ -76,7 +76,7 @@ class VarSet(set):
             del self._by_name[name]
         # handle vector element case
         idx = getattr(key, "idx", None)
-        if idx:
+        if idx is not None:
             veckey = key.veckey
             self._by_vec[veckey][idx] = None
             if not self._by_vec[veckey].any():
@@ -124,7 +124,7 @@ class VarSet(set):
             self._by_name[name] = set()
         idx = getattr(key, "idx", None)
         self._by_name[name].add(key if not idx else key.veckey)
-        if idx:
+        if idx is not None:
             if key.veckey not in self._by_vec:
                 self._by_vec[key.veckey] = np.empty(key.shape, dtype=object)
             self._by_vec[key.veckey][idx] = key
