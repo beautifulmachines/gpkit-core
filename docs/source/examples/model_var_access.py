@@ -69,4 +69,5 @@ class PowerSystem(Model):
 PS = PowerSystem()
 print(f"Getting the only var 'E': {PS['E']}")
 print(f"The top-level var 'm': {PS.m}")
-print(f"All the variables 'm': {PS.variables_byname('m')}")
+vbn = PS.varkeys.by_name("m")
+print(f"All varkeys 'm': {sorted(vbn, key=lambda k: k.str_without())}")

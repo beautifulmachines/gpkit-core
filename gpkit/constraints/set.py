@@ -6,10 +6,10 @@ from itertools import chain
 
 import numpy as np
 
-from ..keydict import KeySet
+from ..nomials import NomialArray, Variable
 from ..util.repr_conventions import ReprMixin
 from ..util.small_scripts import try_str_without
-from ..varmap import VarMap
+from ..varmap import VarMap, VarSet
 from .single_equation import SingleEquationConstraint
 
 
@@ -29,11 +29,6 @@ def add_meq_bounds(bounded, meq_bounded):  # TODO: collapse with GP version?
                     bounded.add(bound)
                     still_alive = True
                     break
-
-
-def _sort_by_name_and_idx(var):
-    "return tuple for Variable sorting"
-    return (var.key.str_without(["units", "idx"]), var.key.idx or ())
 
 
 def _sort_constraints(item):
@@ -144,7 +139,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
             key = self.idxlookup[key]
         if isinstance(key, int):
             return list.__getitem__(self, key)
-        return self._choosevar(key, self.variables_byname(key))
+        return self._choosevar(key, self.varkeys.keys(key))
 
     def _choosevar(self, key, variables):
         if not variables:
@@ -153,33 +148,23 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         veckey = firstvar.key.veckey
         if veckey is None or any(v.key.veckey != veckey for v in othervars):
             if not othervars:
-                return firstvar
+                return Variable(firstvar)
             raise ValueError(
                 f"multiple variables are called '{key}'; show them"
-                f" with `.variables_byname('{key}')`"
+                f" with `.varkeys.keys({key})`"
             )
-        # pylint: disable=import-outside-toplevel
-        from ..nomials import NomialArray  # all one vector!
 
         arr = NomialArray(np.full(veckey.shape, np.nan, dtype="object"))
         for v in variables:
-            arr[v.key.idx] = v
+            arr[v.key.idx] = Variable(v)
         arr.key = veckey
         return arr
-
-    def variables_byname(self, key):
-        "Get all variables with a given name"
-        from ..nomials import Variable  # pylint: disable=import-outside-toplevel
-
-        return sorted(
-            [Variable(k) for k in self.varkeys[key]], key=_sort_by_name_and_idx
-        )
 
     @property
     def varkeys(self):
         "The NomialData's varkeys, created when necessary for a substitution."
         if self._varkeys is None:
-            self._varkeys = KeySet(self.vks)
+            self._varkeys = VarSet(self.vks)
         return self._varkeys
 
     def constrained_varkeys(self):
@@ -240,16 +225,18 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
             for key in self.varkeys:
                 if hasattr(key, "key"):
                     if key.veckey and all(
-                        k.veckey == key.veckey for k in self.varkeys[key.name]
+                        k.veckey == key.veckey for k in self.varkeys.keys(key.name)
                     ):
                         self._name_collision_varkeys[key] = 0
                         self._name_collision_varkeys[key.veckey] = 0
-                    elif len(self.varkeys[key.name]) == 1:
+                    elif len(self.varkeys.keys(key.name)) == 1:
                         self._name_collision_varkeys[key] = 0
                     else:
                         shortname = key.str_without(["lineage", "vec"])
-                        if len(self.varkeys[shortname]) > 1:
+                        if len(self.varkeys.keys(shortname)) > 1:
                             name_collisions[shortname].add(key)
+                else:
+                    raise ValueError(f"unexpected key {key} has no key attribute")
             for varkeys in name_collisions.values():
                 min_namespaced = defaultdict(set)
                 for vk in varkeys:

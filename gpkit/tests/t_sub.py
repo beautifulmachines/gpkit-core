@@ -155,8 +155,8 @@ class TestModelSubs(unittest.TestCase):
             _ = m.substitutions["y"]
         with self.assertRaises(ValueError):
             _ = m["x"]
-        self.assertIn(x, m.variables_byname("x"))
-        self.assertIn(x_, m.variables_byname("x"))
+        self.assertIn(x.key, m.varkeys.by_name("x"))
+        self.assertIn(x_.key, m.varkeys.by_name("x"))
 
     def test_persistence(self):
         x = gpkit.Variable("x")

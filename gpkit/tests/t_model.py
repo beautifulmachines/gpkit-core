@@ -824,21 +824,21 @@ class TestModelNoSolve(unittest.TestCase):
         area_bounds = BoxAreaBounds(box)
         M = Model(box["V"], [box, area_bounds])
         for var in ("h", "w", "d"):
-            self.assertEqual(len(M.variables_byname(var)), 1)
+            self.assertEqual(len(M.varkeys.by_name(var)), 1)
 
     def test_duplicate_submodel_varnames(self):
         w = Widget()
         # w has two Sub models, both with their own variable m
-        self.assertEqual(len(w.variables_byname("m")), 2)
+        self.assertEqual(len(w.varkeys.by_name("m")), 2)
         # keys for both submodel m's should be in the parent model varkeys
         self.assertIn(w.subA["m"].key, w.varkeys)
         self.assertIn(w.subB["m"].key, w.varkeys)
         # keys of w.variables_byname("m") should match m.varkeys
-        m_vbn_keys = [v.key for v in w.variables_byname("m")]
+        m_vbn_keys = w.varkeys.by_name("m")
         self.assertIn(w.subA["m"].key, m_vbn_keys)
         self.assertIn(w.subB["m"].key, m_vbn_keys)
         # dig a level deeper, into the keymap
-        self.assertEqual(len(w.varkeys.keymap["m"]), 2)
+        self.assertEqual(len(w.varkeys.keys("m")), 2)
 
 
 TESTS = [TestModelSolverSpecific, TestModelNoSolve]
