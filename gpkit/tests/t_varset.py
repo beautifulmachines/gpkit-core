@@ -75,6 +75,7 @@ def test_discard_and_len():
     assert vecx[0].key not in vs
     # discarding a key that isn’t present should be silent
     vs.discard(vecx[2].key)
+    vs.discard(Variable("y").key)
     assert len(vs) == 2
 
 

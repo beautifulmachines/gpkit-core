@@ -70,6 +70,8 @@ class VarSet(set):
         super().add(key)
 
     def discard(self, key):
+        if key not in self:
+            return
         name = key.name
         self._by_name[name].discard(key)
         if not self._by_name[name]:
