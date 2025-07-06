@@ -438,13 +438,12 @@ class SolutionArray(DictOfLists):
             varset = self["variables"].varset
             name_collisions = defaultdict(set)
             for key in varset:
-                if hasattr(key, "key"):
-                    if len(varset.by_name(key.name)) == 1:  # unique
-                        self._name_collision_varkeys[key] = 0
-                    else:
-                        shortname = key.str_without(["lineage", "vec"])
-                        if len(varset.by_name(shortname)) > 1:
-                            name_collisions[shortname].add(key)
+                if len(varset.by_name(key.name)) == 1:  # unique
+                    self._name_collision_varkeys[key] = 0
+                else:
+                    shortname = key.str_without(["lineage", "vec"])
+                    if len(varset.by_name(shortname)) > 1:
+                        name_collisions[shortname].add(key)
             for varkeys in name_collisions.values():
                 min_namespaced = defaultdict(set)
                 for vk in varkeys:

@@ -172,7 +172,7 @@ class VarMap(MutableMapping):
 
     @property
     def varset(self):
-        "public access to this VarMap's varset. may remove eventually."
+        "public access to varset. used by SolutionArray.set_necessarylineage"
         return self._varset
 
     def _key_from_name(self, name):
