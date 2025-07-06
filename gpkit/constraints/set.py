@@ -31,11 +31,6 @@ def add_meq_bounds(bounded, meq_bounded):  # TODO: collapse with GP version?
                     break
 
 
-def _sort_by_name_and_idx(var):
-    "return tuple for Variable sorting"
-    return (var.key.str_without(["units", "idx"]), var.key.idx or ())
-
-
 def _sort_constraints(item):
     "return tuple for Constraint sorting"
     label, constraint = item
