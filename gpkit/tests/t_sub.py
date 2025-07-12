@@ -136,9 +136,7 @@ class TestModelSubs(unittest.TestCase):
         m = Model(v.prod(), [v >= v_min], {v_min: [2 * gpkit.units("nmi")]})
         cost = m.solve(verbosity=0)["cost"]
         self.assertAlmostEqual(cost / 3.704, 1.0)
-        m = Model(
-            v.prod(), [v >= v_min], {v_min: np.array([2]) * gpkit.units("nmi")}
-        )
+        m = Model(v.prod(), [v >= v_min], {v_min: np.array([2]) * gpkit.units("nmi")})
         cost = m.solve(verbosity=0)["cost"]
         self.assertAlmostEqual(cost / 3.704, 1.0)
 
