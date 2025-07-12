@@ -2,20 +2,13 @@
 
 from collections.abc import Iterable
 
-import numpy as np
-
-
-def broadcast_substitution(key, array):
-    "Broadcasts input into the shape of a given key"
-    return np.broadcast_to(array, reversed(key.key.shape)).T
-
 
 def veclinkedfn(linkedfn, i):
     "Generate an indexed linking function."
 
     def newlinkedfn(c):
         "Linked function that pulls out a particular index"
-        return np.array(linkedfn(c))[i]
+        return linkedfn(c)[i]
 
     return newlinkedfn
 
@@ -31,15 +24,6 @@ def initsolwarning(result, category="uncategorized"):
 def appendsolwarning(msg, data, result, category="uncategorized"):
     "Append a particular category of warnings to a solution."
     result["warnings"][category].append((msg, data))
-
-
-@np.vectorize
-def isnan(element):
-    "Determine if something of arbitrary type is a numpy nan."
-    try:
-        return np.isnan(element)
-    except TypeError:
-        return False
 
 
 def maybe_flatten(value):

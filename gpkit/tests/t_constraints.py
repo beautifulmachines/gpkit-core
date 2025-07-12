@@ -4,7 +4,6 @@ import unittest
 
 import numpy as np
 
-import gpkit
 from gpkit import (
     ConstraintSet,
     Model,
@@ -205,9 +204,8 @@ class TestMonomialEquality(unittest.TestCase):
         self.assertTrue(mono.hmap in mec2.as_hmapslt1({}))
         x = Variable("x", "ft")
         y = Variable("y")
-        if gpkit.units:
-            self.assertRaises(DimensionalityError, MonomialEquality, x, y)
-            self.assertRaises(DimensionalityError, MonomialEquality, y, x)
+        self.assertRaises(DimensionalityError, MonomialEquality, x, y)
+        self.assertRaises(DimensionalityError, MonomialEquality, y, x)
 
     def test_vector(self):
         "Monomial Equalities with VectorVariables"

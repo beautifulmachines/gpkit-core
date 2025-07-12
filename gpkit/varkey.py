@@ -10,7 +10,7 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
 
     Arguments
     ---------
-    name : str, VarKey, or Monomial
+    name : str
         Name of this Variable, or object to derive this Variable from.
 
     **descr :

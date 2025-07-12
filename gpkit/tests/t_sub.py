@@ -120,28 +120,25 @@ class TestModelSubs(unittest.TestCase):
             m.solve()
 
     def test_quantity_sub(self):
-        if gpkit.units:
-            x = Variable("x", 1, "cm")
-            y = Variable("y", 1)
-            # pylint: disable=no-member
-            self.assertEqual(x.sub({x: 1 * gpkit.units.m}).c.magnitude, 100)
-            # NOTE: uncomment the below if requiring Quantity substitutions
-            # self.assertRaises(ValueError, x.sub, x, 1)
-            self.assertRaises(DimensionalityError, x.sub, {x: 1 * gpkit.ureg.N})
-            self.assertRaises(DimensionalityError, y.sub, {y: 1 * gpkit.ureg.N})
-            v = gpkit.VectorVariable(3, "v", "cm")
-            subbed = v.sub({v: [1, 2, 3] * gpkit.ureg.m})
-            self.assertEqual([z.c.magnitude for z in subbed], [100, 200, 300])
-            v = VectorVariable(1, "v", "km")
-            v_min = VectorVariable(1, "v_min", "km")
-            m = Model(v.prod(), [v >= v_min], {v_min: [2 * gpkit.units("nmi")]})
-            cost = m.solve(verbosity=0)["cost"]
-            self.assertAlmostEqual(cost / 3.704, 1.0)
-            m = Model(
-                v.prod(), [v >= v_min], {v_min: np.array([2]) * gpkit.units("nmi")}
-            )
-            cost = m.solve(verbosity=0)["cost"]
-            self.assertAlmostEqual(cost / 3.704, 1.0)
+        x = Variable("x", 1, "cm")
+        y = Variable("y", 1)
+        # pylint: disable=no-member
+        self.assertEqual(x.sub({x: 1 * gpkit.units.m}).c.magnitude, 100)
+        # NOTE: uncomment the below if requiring Quantity substitutions
+        # self.assertRaises(ValueError, x.sub, x, 1)
+        self.assertRaises(DimensionalityError, x.sub, {x: 1 * gpkit.ureg.N})
+        self.assertRaises(DimensionalityError, y.sub, {y: 1 * gpkit.ureg.N})
+        v = gpkit.VectorVariable(3, "v", "cm")
+        subbed = v.sub({v: [1, 2, 3] * gpkit.ureg.m})
+        self.assertEqual([z.c.magnitude for z in subbed], [100, 200, 300])
+        v = VectorVariable(1, "v", "km")
+        v_min = VectorVariable(1, "v_min", "km")
+        m = Model(v.prod(), [v >= v_min], {v_min: [2 * gpkit.units("nmi")]})
+        cost = m.solve(verbosity=0)["cost"]
+        self.assertAlmostEqual(cost / 3.704, 1.0)
+        m = Model(v.prod(), [v >= v_min], {v_min: np.array([2]) * gpkit.units("nmi")})
+        cost = m.solve(verbosity=0)["cost"]
+        self.assertAlmostEqual(cost / 3.704, 1.0)
 
     def test_phantoms(self):
         x = Variable("x")
