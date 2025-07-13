@@ -105,6 +105,22 @@ class VarSet(set):
                 out.add(k)
         return out
 
+    def resolve(self, key):
+        "Return *one* canonical VarKey for (Variable, str, or veckey) key"
+        if hasattr(key, "key"):
+            return key.key
+        keys = self.by_name(key)
+        if not len(keys):
+            raise KeyError(f"{key} not present")
+        elif len(keys) > 1:
+            raise KeyError(f"{key} refers to multiple keys {keys}")
+        (out,) = keys
+        return out
+
+    def clean(self, mapping):
+        "return a *new dict* with all keys in mapping resolved."
+        return {self.resolve(k): v for k, v in mapping.items()}
+
     def update(self, keys):
         for k in keys:
             self.add(k)

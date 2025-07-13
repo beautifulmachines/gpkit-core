@@ -39,6 +39,27 @@ def test_keys():
     assert vs.keys(vv[0]) == set()
     assert vs.keys("y") == {y.key}
 
+def test_resolve():
+    x = Variable("x", "m")
+    x2 = Variable("x", "ft")
+    z = Variable("z")
+    vv = VectorVariable(4, "t")
+    vs = VarSet({x.key, x2.key, z.key, vv.key})
+    assert vs.resolve(vv) == vv.key
+    assert vs.resolve(vv.key) == vv.key
+    assert vs.resolve(z) == z.key
+    assert vs.resolve("t") == vv.key
+    with pytest.raises(KeyError):
+        vs.resolve("x")
+    with pytest.raises(KeyError):
+        vs.resolve("y")
+
+def test_clean():
+    x = Variable("x")
+    y = Variable("y")
+    vs = VarSet({x.key, y.key})
+    assert vs.clean({"x": 5, "y": 2}) == {x.key: 5, y.key: 2}
+
 
 # ---------- vector handling --------------------------------------------------
 def test_register_vector():
