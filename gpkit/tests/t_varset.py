@@ -39,6 +39,7 @@ def test_keys():
     assert vs.keys(vv[0]) == set()
     assert vs.keys("y") == {y.key}
 
+
 def test_resolve():
     x = Variable("x", "m")
     x2 = Variable("x", "ft")
@@ -53,6 +54,7 @@ def test_resolve():
         vs.resolve("x")
     with pytest.raises(KeyError):
         vs.resolve("y")
+
 
 def test_clean():
     x = Variable("x")
