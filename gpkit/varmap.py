@@ -105,6 +105,22 @@ class VarSet(set):
                 out.add(k)
         return out
 
+    def resolve(self, key):
+        "Return *one* canonical VarKey for (Variable, str, or veckey) key"
+        if hasattr(key, "key"):
+            return key.key
+        vks = self.by_name(key)
+        if not vks:
+            raise KeyError(f"unrecognized key {key}")
+        if len(vks) == 1:
+            (vk,) = vks
+            return vk
+        raise KeyError(f"{key} refers to multiple keys {vks}")
+
+    def clean(self, mapping):
+        "return a *new dict* with all keys in mapping resolved."
+        return {self.resolve(k): v for k, v in mapping.items()}
+
     def update(self, keys):
         for k in keys:
             self.add(k)
@@ -119,9 +135,9 @@ class VarSet(set):
 
     def _register_key(self, key):
         "adds the key to _by_name and, if applicable, _by_vec"
-        if not hasattr(key, "name"):
+        name = getattr(key, "name", None)
+        if name is None:
             raise TypeError("VarSet keys must be VarKey instances")
-        name = key.name
         if name not in self._by_name:
             self._by_name[name] = set()
         idx = getattr(key, "idx", None)
@@ -158,13 +174,10 @@ class VarMap(MutableMapping):
 
     def item(self, key):
         "get the (varkey, value) pair associated with a (str or key)"
-        key = getattr(key, "key", None) or key  # handles Variable case
+        key = self._varset.resolve(key)
         try:
             return (key, self._data[key])  # single varkey case
         except KeyError as kerr:
-            if isinstance(key, str):  # by name lookup
-                vk = self._key_from_name(key)
-                return self.item(vk)
             key_arr = self._varset.by_vec(key)
             if key_arr.any():
                 return (key, _nested_lookup(key_arr, self._data))
@@ -175,19 +188,8 @@ class VarMap(MutableMapping):
         "public access to varset. used by SolutionArray.set_necessarylineage"
         return self._varset
 
-    def _key_from_name(self, name):
-        vks = self._varset.by_name(name)
-        if not vks:
-            raise KeyError(f"unrecognized key {name}")
-        if len(vks) == 1:
-            (vk,) = vks
-            return vk
-        raise KeyError(f"Multiple VarKeys for name '{name}': {vks}")
-
     def __setitem__(self, key, value):
-        key = getattr(key, "key", None) or key  # handles Variable case
-        if isinstance(key, str):
-            key = self._key_from_name(key)
+        key = self._varset.resolve(key)
         if isinstance(value, Quantity):
             value = value.to(key.units).magnitude
         if is_veckey(key):
@@ -228,11 +230,9 @@ class VarMap(MutableMapping):
         self._varset.update(keys)
 
     def __delitem__(self, key):
-        key = getattr(key, "key", None) or key  # handles Variable case
+        key = self._varset.resolve(key)
         if is_veckey(key):
             raise NotImplementedError
-        if isinstance(key, str):
-            key = self._key_from_name(key)
         del self._data[key]
         self._varset.discard(key)
 
