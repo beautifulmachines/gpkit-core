@@ -119,9 +119,9 @@ class VarSet(set):
 
     def _register_key(self, key):
         "adds the key to _by_name and, if applicable, _by_vec"
-        if not hasattr(key, "name"):
+        name = getattr(key, "name", None)
+        if name is None:
             raise TypeError("VarSet keys must be VarKey instances")
-        name = key.name
         if name not in self._by_name:
             self._by_name[name] = set()
         idx = getattr(key, "idx", None)
