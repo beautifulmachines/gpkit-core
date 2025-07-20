@@ -148,6 +148,7 @@ class VarSet(set):
             self._by_vec[key.veckey][idx] = key
 
     def __contains__(self, key):
+        key = getattr(key, "key", None) or key  # Variable case
         if super().__contains__(key):
             return True
         return key in self._by_name or key in self._by_vec
