@@ -5,7 +5,7 @@ from collections.abc import MutableMapping
 import numpy as np
 
 from .units import Quantity
-from .util.small_scripts import is_sweepvar, veclinkedfn
+from .util.small_scripts import veclinkedfn
 
 
 def _nested_lookup(nested_keys, val_dict):
@@ -196,9 +196,6 @@ class VarMap(MutableMapping):
         if is_veckey(key):
             if key not in self._varset._by_vec:
                 raise NotImplementedError
-            if is_sweepvar(value):
-                self._data[key] = value
-                return
             if hasattr(value, "__call__"):  # a linked vector-function
                 # this case temporarily borrowed from keymap, should refactor
                 key.vecfn = value
