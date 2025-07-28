@@ -484,20 +484,20 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
         hmap = self._simplify_posy_ineq(hmap)
         return [Posynomial(hmap)] if hmap else []
 
-    def as_hmapslt1(self, fixed):
+    def as_hmapslt1(self, substitutions):
         "Returns the posys <= 1 representation of this constraint."
         out = []
         for posy in self.unsubbed:
-            hmap = posy.hmap.sub(fixed, posy.vks, parsedsubs=True)
+            hmap = posy.hmap.sub(substitutions, posy.vks, parsedsubs=True)
             self.pmap = hmap.mmap(
                 posy.hmap
             )  # pylint: disable=attribute-defined-outside-init
             del hmap.expmap, hmap.csmap  # needed only for the mmap call above
-            hmap = self._simplify_posy_ineq(hmap, self.pmap, fixed)
+            hmap = self._simplify_posy_ineq(hmap, self.pmap, substitutions)
             if hmap is not None:
                 if any(c <= 0 for c in hmap.values()):
                     raise InvalidGPConstraint(
-                        f"'{self}' became Signomial after substituting {fixed}"
+                        f"'{self}' became Signomial after substituting {substitutions}"
                     )
                 hmap.parent = self
                 out.append(hmap)

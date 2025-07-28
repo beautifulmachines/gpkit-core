@@ -8,7 +8,8 @@ from ..varmap import VarSet
 
 
 def parse_subs(varkeys, substitutions):
-    out = dict()
+    "Return constant mappings {VarKey: val} w/ broadcasting and shape checks."
+    out = {}
     if not isinstance(varkeys, VarSet):
         raise NotImplementedError
     for var, val in substitutions.items():
@@ -33,7 +34,8 @@ def parse_subs(varkeys, substitutions):
 
 
 def parse_sweep(varkeys, sweeps):
-    out = dict()
+    "Validate and return {VarKey: iterable} mapping for synchronized sweeps."
+    out = {}
     if not sweeps:
         return {}
     for var, val in sweeps.items():
@@ -70,7 +72,8 @@ def parse_sweep(varkeys, sweeps):
 
 
 def parse_linked(varkeys, substitutions):
-    out = dict()
+    "Extract linked-sweep callables and return {VarKey: function} mapping."
+    out = {}
     for var, val in substitutions.items():
         for key in varkeys.keys(var):
             if hasattr(val, "__call__") and not hasattr(val, "key"):
