@@ -8,7 +8,7 @@ from adce import adnumber
 
 from ..exceptions import Infeasible
 from ..globals import SignomialsEnabled
-from ..nomials import parse_subs
+from ..nomials.substitution import parse_linked, parse_subs, parse_sweep
 from ..solution_array import SolutionArray
 from ..util.small_classes import FixedScalar
 from ..util.small_scripts import maybe_flatten
@@ -94,7 +94,8 @@ def progify(program, return_attr=None):
     def programfn(self, constants=None, **initargs):
         "Return program version of self"
         if not constants:
-            constants, _, linked = parse_subs(self.varkeys, self.substitutions)
+            constants = parse_subs(self.varkeys, self.substitutions)
+            linked = parse_linked(self.varkeys, self.substitutions)
             if linked:
                 evaluate_linked(constants, linked)
         prog = program(self.cost, self, constants, **initargs)
@@ -109,7 +110,9 @@ def progify(program, return_attr=None):
 def solvify(genfunction):
     "Returns function for making/solving/sweeping a program."
 
-    def solvefn(self, solver=None, *, verbosity=1, skipsweepfailures=False, **kwargs):
+    def solvefn(
+        self, solver=None, *, verbosity=1, sweep=None, skipsweepfailures=False, **kwargs
+    ):
         """Forms a mathematical program and attempts to solve it.
 
         Arguments
@@ -133,7 +136,9 @@ def solvify(genfunction):
         ValueError if the program is invalid.
         RuntimeWarning if an error occurs in solving or parsing the solution.
         """
-        constants, sweep, linked = parse_subs(self.varkeys, self.substitutions)
+        constants = parse_subs(self.varkeys, self.substitutions)
+        sweep = parse_sweep(self.varkeys, sweep)
+        linked = parse_linked(self.varkeys, self.substitutions)
         solution = SolutionArray()
         solution.modelstr = str(self)
 

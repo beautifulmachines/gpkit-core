@@ -6,7 +6,7 @@ import numpy as np
 
 from ..globals import NamedVariables, Vectorize
 from ..util.small_classes import HashVector, Numbers, Strings
-from ..util.small_scripts import is_sweepvar, veclinkedfn
+from ..util.small_scripts import veclinkedfn
 from ..varkey import VarKey
 from .array import NomialArray
 from .data import NomialData
@@ -29,7 +29,7 @@ class Variable(Monomial):
     ---------
     *args : list
         may contain "name" (Strings)
-                    "value" (Numbers + Quantity) or (Iterable) for a sweep
+                    "value" (Numbers + Quantity)
                     "units" (Strings)
              and/or "label" (Strings)
     **descr : dict
@@ -55,10 +55,7 @@ class Variable(Monomial):
                 ):
                     descr["value"] = arg
                 elif isinstance(arg, Iterable) and not isinstance(arg, Strings):
-                    if is_sweepvar(arg):
-                        descr["value"] = arg
-                    else:
-                        descr["value"] = ("sweep", arg)
+                    raise NotImplementedError
                 elif isinstance(arg, Strings) and "units" not in descr:
                     descr["units"] = arg
                 elif isinstance(arg, Strings) and "label" not in descr:

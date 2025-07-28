@@ -145,11 +145,11 @@ class Model(CostedConstraintSet):
         sols = []
         for sweepvar, sweepvals in sweeps.items():
             original_val = self.substitutions.get(sweepvar, None)
-            self.substitutions.update({sweepvar: ("sweep", sweepvals)})
+            sweepdict = {sweepvar: sweepvals}
             try:
-                sols.append(self.solve(**solveargs))
+                sols.append(self.solve(sweep=sweepdict, **solveargs))
             except InvalidGPConstraint:
-                sols.append(self.localsolve(**solveargs))
+                sols.append(self.localsolve(sweep=sweepdict, **solveargs))
             if original_val:
                 self.substitutions[sweepvar] = original_val
             else:

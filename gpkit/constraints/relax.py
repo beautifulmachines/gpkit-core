@@ -2,7 +2,8 @@
 """Models for assessing primal feasibility"""
 
 from ..globals import NamedVariables, SignomialsEnabled
-from ..nomials import NomialArray, Variable, VectorVariable, parse_subs
+from ..nomials import NomialArray, Variable, VectorVariable
+from ..nomials.substitution import parse_linked, parse_subs
 from ..util.small_scripts import appendsolwarning, initsolwarning, mag
 from ..varmap import VarMap
 from .set import ConstraintSet
@@ -191,7 +192,8 @@ class ConstantsRelaxed(ConstraintSet):
         if not isinstance(constraints, ConstraintSet):
             constraints = ConstraintSet(constraints)
         substitutions = VarMap(constraints.substitutions)
-        constants, _, linked = parse_subs(constraints.vks, substitutions)
+        constants = parse_subs(constraints.vks, substitutions)
+        linked = parse_linked(constraints.vks, substitutions)
         if linked:
             kdc = VarMap(constants)
             constrained_varkeys = constraints.constrained_varkeys()

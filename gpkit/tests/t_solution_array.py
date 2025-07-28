@@ -42,17 +42,16 @@ class TestSolutionArray(unittest.TestCase):
             self.assertAlmostEqual(solx[i], 2.5, places=4)
 
     def test_subinto(self):
-        n_sweep = 20
-        p_vals = np.linspace(13, 24, n_sweep)
         h_max = Variable("h_max", 10, "m", "Length")
         a_min = Variable("A_min", 10, "m^2", "Area")
-        p_max = Variable("P", p_vals, "m", "Perimeter")
+        p_max = Variable("P", "m", "Perimeter")
         h = Variable("h", "m", "Length")
         w = Variable("w", "m", "width")
         m = Model(12 / (w * h**3), [h <= h_max, h * w >= a_min, p_max >= 2 * h + 2 * w])
-        sol = m.solve(verbosity=0)
+        p_vals = np.linspace(13, 24, 20)
+        sol = m.solve(verbosity=0, sweep={p_max: p_vals})
         p_sol = sol.subinto(p_max)
-        self.assertEqual(len(p_sol), n_sweep)
+        self.assertEqual(len(p_sol), 20)
         self.assertAlmostEqual(
             0 * gpkit.ureg.m, np.max(np.abs(p_vals * gpkit.ureg.m - p_sol))
         )

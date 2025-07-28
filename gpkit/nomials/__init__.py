@@ -13,7 +13,6 @@ from .math import (
     SignomialInequality,
     SingleSignomialEquality,
 )
-from .substitution import parse_subs
 from .variables import ArrayVariable, Variable, VectorizableVariable
 
 VectorVariable = ArrayVariable

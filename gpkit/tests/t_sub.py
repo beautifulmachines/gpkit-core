@@ -181,27 +181,27 @@ class TestModelSubs(unittest.TestCase):
             {
                 A: 500 * gpkit.units("USD"),
                 h: 35 * gpkit.units("USD"),
-                Q: ("sweep", [50, 100, 500]),
             }
         )
-        firstcost = m.solve(verbosity=0)["cost"][0]
+        sweep = {Q: [50, 100, 500]}
+        firstcost = m.solve(verbosity=0, sweep=sweep)["cost"][0]
         self.assertAlmostEqual(1760 / firstcost, 1, 5)
 
     def test_skipfailures(self):
         x = Variable("x")
-        x_min = Variable("x_{min}", [1, 2])
-
+        x_min = Variable("x_{min}", 1)
         m = Model(x, [x <= 1, x >= x_min])
-        sol = m.solve(verbosity=0, skipsweepfailures=True)
+        sweep = {x_min: [1, 2]}
+        sol = m.solve(verbosity=0, sweep=sweep, skipsweepfailures=True)
         sol.table()
         self.assertEqual(len(sol), 1)
 
         with self.assertRaises(RuntimeWarning):
-            sol = m.solve(verbosity=0, skipsweepfailures=False)
+            sol = m.solve(verbosity=0, sweep=sweep, skipsweepfailures=False)
 
-        m.substitutions[x_min][1][0] = 5  # so no sweeps solve
+        sweep[x_min][0] = 5  # so no sweeps solve
         with self.assertRaises(RuntimeWarning):
-            sol = m.solve(verbosity=0, skipsweepfailures=True)
+            sol = m.solve(verbosity=0, sweep=sweep, skipsweepfailures=True)
 
     def test_vector_sweep(self):
         """Test sweep involving VectorVariables"""
@@ -209,14 +209,14 @@ class TestModelSubs(unittest.TestCase):
         x_min = Variable("x_min", 1)
         y = VectorVariable(2, "y")
         m = Model(x, [x >= y.prod()])
-        m.substitutions.update({y: ("sweep", [[2, 3], [5, 7], [9, 11]])})
-        a = m.solve(verbosity=0)["cost"]
+        sweep = {y: [[2, 3], [5, 7], [9, 11]]}
+        a = m.solve(verbosity=0, sweep=sweep)["cost"]
         b = [6, 15, 27, 14, 35, 63, 22, 55, 99]
         self.assertTrue(all(abs(a - b) / (a + b) < 1e-7))
         x_min = Variable("x_min", 1)  # constant to check array indexing
         m = Model(x, [x >= y.prod(), x >= x_min])
-        m.substitutions.update({y: ("sweep", [[2, 3], [5, 7, 11]])})
-        sol = m.solve(verbosity=0)
+        sweep = {y: [[2, 3], [5, 7, 11]]}
+        sol = m.solve(verbosity=0, sweep=sweep)
         a = sol["cost"]
         b = [10, 15, 14, 21, 22, 33]
         self.assertTrue(all(abs(a - b) / (a + b) < 1e-7))
@@ -226,17 +226,16 @@ class TestModelSubs(unittest.TestCase):
             ai = m.solution.atindex(i)["cost"]
             self.assertTrue(abs(ai - bi) / (ai + bi) < 1e-7)
         m = Model(x, [x >= y.prod()])
-        m.substitutions.update({y: ("sweep", [[2, 3, 9], [5, 7, 11]])})
-        self.assertRaises(ValueError, m.solve, verbosity=0)
+        sweep = {y: [[2, 3, 9], [5, 7, 11]]}
+        self.assertRaises(ValueError, m.solve, verbosity=0, sweep=sweep)
         m = Model(x, [x >= y.prod()])
-        m.substitutions.update({y[0]: 2, y[1]: ("sweep", [3, 5])})
-        a = m.solve(verbosity=0)["cost"]
+        m.substitutions.update({y[0]: 2})
+        a = m.solve(verbosity=0, sweep={y[1]: [3, 5]})["cost"]
         b = [6, 10]
         self.assertTrue(all(abs(a - b) / (a + b) < 1e-7))
         # create a numpy float array, then insert a sweep element
         m.substitutions.update({y: [2, 3]})
-        m.substitutions.update({y[1]: ("sweep", [3, 5])})
-        a = m.solve(verbosity=0)["cost"]
+        a = m.solve(verbosity=0, sweep={y[1]: [3, 5]})["cost"]
         self.assertTrue(all(abs(a - b) / (a + b) < 1e-7))
 
     def test_calcconst(self):
@@ -249,8 +248,8 @@ class TestModelSubs(unittest.TestCase):
         m = Model(x, [x >= t_day, x >= t_night])
         sol = m.solve(verbosity=0)
         self.assertAlmostEqual(sol(t_night) / gpkit.ureg.hours, 12)
-        m.substitutions.update({t_day: ("sweep", [6, 8, 9, 13])})
-        sol = m.solve(verbosity=0)
+        sweep = {t_day: [6, 8, 9, 13]}
+        sol = m.solve(verbosity=0, sweep=sweep)
         npt.assert_allclose(
             sol["sensitivities"]["variables"][t_day], [-1 / 3, -0.5, -0.6, +1], 1e-3
         )

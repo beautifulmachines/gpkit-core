@@ -7,7 +7,7 @@ import numpy as np
 from .. import units
 from ..units import DimensionalityError, qty
 from ..util.small_classes import EMPTY_HV, HashVector, Strings
-from .substitution import new_parse_subs
+from .substitution import parse_subs
 
 DIMLESS_QUANTITY = qty("dimensionless")
 
@@ -106,7 +106,7 @@ class NomialMap(HashVector):
         if parsedsubs or not substitutions:
             fixed = substitutions
         else:
-            fixed = new_parse_subs(varkeys, substitutions)
+            fixed = parse_subs(varkeys, substitutions)
         if not fixed:
             if not self.expmap:
                 self.expmap, self.csmap = {exp: exp for exp in self}, {}

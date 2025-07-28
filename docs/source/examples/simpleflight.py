@@ -71,11 +71,10 @@ print(sol.diff("solution.pkl"))
 print("SWEEP\n=====")
 N = 2
 sweeps = {
-    V_min: ("sweep", np.linspace(20, 25, N)),
-    V: ("sweep", np.linspace(45, 55, N)),
+    V_min: np.linspace(20, 25, N),
+    V: np.linspace(45, 55, N),
 }
-m.substitutions.update(sweeps)
-sweepsol = m.solve(verbosity=0)
+sweepsol = m.solve(verbosity=0, sweep=sweeps)
 print(sweepsol.summary())
 with open("solution.pkl", "rb") as fil:
     sol_loaded = pickle.load(fil)
