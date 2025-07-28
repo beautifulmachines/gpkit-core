@@ -8,6 +8,28 @@ from ..util.small_scripts import splitsweep
 from ..varmap import VarSet
 
 
+def new_parse_subs(varkeys, substitutions):
+    out = dict()
+    if not isinstance(varkeys, VarSet):
+        raise NotImplementedError
+    for var, val in substitutions.items():
+        if hasattr(val, "__len__") and not hasattr(val, "shape"):
+            # cast for shape and lookup by idx
+            val = np.array(val) if not hasattr(val, "units") else val
+            # else case is pint bug: Quantity's have __len__ but len() raises
+        for key in varkeys.keys(var):
+            if key.shape and getattr(val, "shape", None):
+                if key.shape == val.shape:
+                    out[key] = val[key.idx]
+                    continue
+                raise ValueError(
+                    f"cannot substitute array of shape {val.shape} for"
+                    f" variable {key.veckey} of shape {key.shape}."
+                )
+            out[key] = val
+    return out
+
+
 def parse_subs(varkeys, substitutions, clean=False):
     "Seperates subs into the constants, sweeps, linkedsweeps actually present."
     constants, sweep, linkedsweep = {}, {}, {}
