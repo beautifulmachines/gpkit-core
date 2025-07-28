@@ -1,7 +1,5 @@
 """Assorted helper methods"""
 
-from collections.abc import Iterable
-
 
 def veclinkedfn(linkedfn, i):
     "Generate an indexed linking function."
