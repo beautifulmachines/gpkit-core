@@ -10,8 +10,10 @@ from .nomials import Monomial
 from .programs.gp import GeometricProgram
 from .programs.prog_factories import progify, solvify
 from .programs.sgp import SequentialGeometricProgram
+from .solution_array import SolutionArray
 from .tools.autosweep import autosweep_1d
 from .util.docstring import expected_unbounded
+from .varmap import VarMap
 
 
 class Model(CostedConstraintSet):
@@ -140,21 +142,37 @@ class Model(CostedConstraintSet):
 """
             raise ValueError(err + boundstrs + "\n\n" + docstring)
 
-    def sweep(self, sweeps, **solveargs):
-        "Sweeps {var: values} pairs in sweeps. Returns swept solutions."
-        sols = []
-        for sweepvar, sweepvals in sweeps.items():
-            original_val = self.substitutions.get(sweepvar, None)
-            sweepdict = {sweepvar: sweepvals}
-            try:
-                sols.append(self.solve(sweep=sweepdict, **solveargs))
-            except InvalidGPConstraint:
-                sols.append(self.localsolve(sweep=sweepdict, **solveargs))
-            if original_val:
-                self.substitutions[sweepvar] = original_val
-            else:
-                del self.substitutions[sweepvar]
-        return sols if len(sols) > 1 else sols[0]
+    def sweep(self, sweepvals, skipfailures=False, **solveargs):
+        "Sweeps {var: values} in-sync across one dim. Returns SolutionArray"
+        return self._sweep(self.solve, sweepvals, skipfailures, **solveargs)
+
+    def localsweep(self, sweepvals, skipfailures=False, **solveargs):
+        "Sweeps {var: values} in-sync across one dim. Returns SolutionArray"
+        return self._sweep(self.localsolve, sweepvals, skipfailures, **solveargs)
+
+    def _sweep(self, solvefn, sweepvals, skipfailures, **solveargs):
+        "Runs sweep using solvefn (either self.solve or self.localsolve)"
+        sols = SolutionArray()
+        lengths = {len(vals) for vals in sweepvals.values()}
+        if len(lengths) != 1:
+            raise ValueError(f"sweepvals has mismatched lengths {lengths}")
+        (nsweep,) = lengths
+        oldsubs = self.substitutions
+        for i in range(nsweep):
+            self.substitutions.update({var: vals[i] for var, vals in sweepvals.items()})
+            solvefn(**solveargs)
+            sols.append(self.program.result)
+        sols.to_arrays()
+        self.substitutions = oldsubs
+
+        sols["sweepvariables"] = VarMap()
+        ksweep = VarMap(sweepvals)
+        for var, val in list(sols["constants"].items()):
+            if var in ksweep:
+                sols["sweepvariables"][var] = val
+                del sols["constants"][var]
+
+        return sols
 
     def autosweep(self, sweeps, tol=0.01, samplepoints=100, **solveargs):
         """Autosweeps {var: (start, end)} pairs in sweeps to tol.
