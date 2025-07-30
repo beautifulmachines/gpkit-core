@@ -1,7 +1,5 @@
 "Scripts to parse and collate substitutions"
 
-import warnings as pywarnings
-
 import numpy as np
 
 from ..varmap import VarSet
@@ -30,44 +28,6 @@ def parse_subs(varkeys, substitutions):
                     f" variable {key.veckey} of shape {key.shape}."
                 )
             out[key] = val
-    return out
-
-
-def parse_sweep(varkeys, sweeps):
-    "Validate and return {VarKey: iterable} mapping for synchronized sweeps."
-    out = {}
-    if not sweeps:
-        return {}
-    for var, val in sweeps.items():
-        keys = varkeys.keys(var)
-        for key in keys:
-            if not key.shape:
-                out[key] = val
-                continue
-            with pywarnings.catch_warnings():
-                pywarnings.filterwarnings("error")
-                try:
-                    val = np.array(val) if not hasattr(val, "shape") else val
-                # pylint: disable=fixme
-                except ValueError:  # pragma: no cover  # TODO: coverage this
-                    # ragged nested sequences, eg [[2]], [3, 4]], in py3.7+
-                    val = np.array(val, dtype=object)
-            if key.shape == val.shape:
-                # this silly case goes away once standard sweep lens enforced
-                value = val if np.prod(key.shape) != len(keys) else val[key.idx]
-                # handles coincidental length match case
-                out[key] = value
-                continue
-            try:
-                np.broadcast(val, np.empty(key.shape))
-            except ValueError as exc:
-                raise ValueError(
-                    f"cannot sweep variable {key.veckey} of shape {key.shape}"
-                    f" with array of shape {val.shape}; array shape"
-                    f" must either be {key.shape} or {('N',) + key.shape}"
-                ) from exc
-            idx = (slice(None),) + key.descr["idx"]
-            out[key] = val[idx]
     return out
 
 

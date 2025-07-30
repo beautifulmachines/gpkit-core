@@ -1,5 +1,6 @@
 "Implements Model"
 
+from time import time
 import numpy as np
 
 from .constraints.costed import CostedConstraintSet
@@ -171,6 +172,8 @@ class Model(CostedConstraintSet):
             raise ValueError(f"sweepvals has mismatched lengths {lengths}")
         (nsweep,) = lengths
         oldsubs = self.substitutions
+        verbosity = solveargs.get("verbosity", 1)
+        tic = time()
         for i in range(nsweep):
             self.substitutions.update({var: vals[i] for var, vals in sweepvals.items()})
             try:
@@ -196,6 +199,10 @@ class Model(CostedConstraintSet):
             unique_vals = set(val)
             if len(unique_vals) == 1:
                 sols["constants"][key] = unique_vals
+
+        if verbosity > 0:
+            soltime = time() - tic
+            print(f"Sweeping took {soltime:.3g} seconds.")
 
         sols.to_arrays()
         sols.modelstr = str(self)
