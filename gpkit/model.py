@@ -150,9 +150,22 @@ class Model(CostedConstraintSet):
         "Sweeps {var: values} in-sync across one dim. Returns SolutionArray"
         return self._sweep(self.localsolve, sweepvals, skipfailures, **solveargs)
 
+    def _parse_sweep(self, sweepvals):
+        "Validate and return {VarKey: iterable} mapping"
+        # this logic might eventually live in VarMap
+        for var, vals in sweepvals.items():
+            keys = self.varkeys.keys(var)
+            for key in keys:
+                if not key.shape:
+                    continue
+                # next line raises a ValueError if size mismatch
+                np.broadcast(vals, np.empty(key.shape))
+        return sweepvals
+
     def _sweep(self, solvefn, sweepvals, skipfailures, **solveargs):
         "Runs sweep using solvefn (either self.solve or self.localsolve)"
         sols = SolutionArray()
+        self._parse_sweep(sweepvals)
         lengths = {len(vals) for vals in sweepvals.values()}
         if len(lengths) != 1:
             raise ValueError(f"sweepvals has mismatched lengths {lengths}")
@@ -160,18 +173,32 @@ class Model(CostedConstraintSet):
         oldsubs = self.substitutions
         for i in range(nsweep):
             self.substitutions.update({var: vals[i] for var, vals in sweepvals.items()})
-            solvefn(**solveargs)
-            sols.append(self.program.result)
-        sols.to_arrays()
+            try:
+                solvefn(**solveargs)
+                sols.append(self.program.result)
+            except Infeasible as err:
+                if not skipfailures:
+                    raise RuntimeWarning(
+                        f"Solve {i} was infeasible. To continue sweeping after"
+                        "failures, pass skipfailures=True to Model.sweep."
+                    ) from err
         self.substitutions = oldsubs
+        if not sols:
+            raise RuntimeWarning("All solves were infeasible.")
 
         sols["sweepvariables"] = VarMap()
-        ksweep = VarMap(sweepvals)
-        for var, val in list(sols["constants"].items()):
-            if var in ksweep:
-                sols["sweepvariables"][var] = val
-                del sols["constants"][var]
+        for rawkey in sweepvals:
+            for cleankey in sols["constants"].varset.keys(rawkey):
+                sols["sweepvariables"][cleankey] = sols["constants"][cleankey]
+                del sols["constants"][cleankey]
+        # all remaining constants should be squashed
+        for key, val in sols["constants"].items():
+            unique_vals = set(val)
+            if len(unique_vals) == 1:
+                sols["constants"][key] = unique_vals
 
+        sols.to_arrays()
+        sols.modelstr = str(self)
         return sols
 
     def autosweep(self, sweeps, tol=0.01, samplepoints=100, **solveargs):

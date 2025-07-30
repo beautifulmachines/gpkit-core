@@ -183,25 +183,24 @@ class TestModelSubs(unittest.TestCase):
                 h: 35 * gpkit.units("USD"),
             }
         )
-        sweep = {Q: [50, 100, 500]}
-        firstcost = m.solve(verbosity=0, sweep=sweep)["cost"][0]
-        self.assertAlmostEqual(1760 / firstcost, 1, 5)
+        cost = m.sweep({Q: [50, 100, 500]}, verbosity=0)["cost"]
+        npt.assert_allclose(cost, [1760, 3505, 17501])
 
     def test_skipfailures(self):
         x = Variable("x")
         x_min = Variable("x_{min}", 1)
         m = Model(x, [x <= 1, x >= x_min])
         sweep = {x_min: [1, 2]}
-        sol = m.solve(verbosity=0, sweep=sweep, skipsweepfailures=True)
+        sol = m.sweep(sweep, verbosity=0, skipfailures=True)
         sol.table()
         self.assertEqual(len(sol), 1)
 
         with self.assertRaises(RuntimeWarning):
-            sol = m.solve(verbosity=0, sweep=sweep, skipsweepfailures=False)
+            sol = m.sweep(sweep, verbosity=0, skipfailures=False)
 
         sweep[x_min][0] = 5  # so no sweeps solve
         with self.assertRaises(RuntimeWarning):
-            sol = m.solve(verbosity=0, sweep=sweep, skipsweepfailures=True)
+            sol = m.sweep(sweep, verbosity=0, skipfailures=True)
 
     def test_vector_sweep(self):
         """Test sweep involving VectorVariables"""
@@ -209,33 +208,34 @@ class TestModelSubs(unittest.TestCase):
         x_min = Variable("x_min", 1)
         y = VectorVariable(2, "y")
         m = Model(x, [x >= y.prod()])
-        sweep = {y: [[2, 3], [5, 7], [9, 11]]}
-        a = m.solve(verbosity=0, sweep=sweep)["cost"]
+        sweep = {y: np.reshape(np.meshgrid([2, 5, 9], [3, 7, 11]), (2, 9)).T}
+        a = m.sweep(sweep, verbosity=0)["cost"]
         b = [6, 15, 27, 14, 35, 63, 22, 55, 99]
         self.assertTrue(all(abs(a - b) / (a + b) < 1e-7))
         x_min = Variable("x_min", 1)  # constant to check array indexing
         m = Model(x, [x >= y.prod(), x >= x_min])
-        sweep = {y: [[2, 3], [5, 7, 11]]}
-        sol = m.solve(verbosity=0, sweep=sweep)
+        sweep = {y: [[2, 5], [3, 5], [2, 7], [3, 7], [2, 11], [3, 11]]}
+        # sweep = {y: [[2, 3], [5, 7, 11]]}
+        sol = m.sweep(sweep, verbosity=0)
         a = sol["cost"]
         b = [10, 15, 14, 21, 22, 33]
         self.assertTrue(all(abs(a - b) / (a + b) < 1e-7))
         self.assertEqual(sol["constants"][x_min], 1)
         for i, bi in enumerate(b):
             self.assertEqual(sol.atindex(i)["constants"][x_min], 1)
-            ai = m.solution.atindex(i)["cost"]
+            ai = sol.atindex(i)["cost"]
             self.assertTrue(abs(ai - bi) / (ai + bi) < 1e-7)
         m = Model(x, [x >= y.prod()])
         sweep = {y: [[2, 3, 9], [5, 7, 11]]}
-        self.assertRaises(ValueError, m.solve, verbosity=0, sweep=sweep)
+        self.assertRaises(ValueError, m.sweep, sweep, verbosity=0)
         m = Model(x, [x >= y.prod()])
         m.substitutions.update({y[0]: 2})
-        a = m.solve(verbosity=0, sweep={y[1]: [3, 5]})["cost"]
+        a = m.sweep({y[1]: [3, 5]}, verbosity=0)["cost"]
         b = [6, 10]
         self.assertTrue(all(abs(a - b) / (a + b) < 1e-7))
         # create a numpy float array, then insert a sweep element
         m.substitutions.update({y: [2, 3]})
-        a = m.solve(verbosity=0, sweep={y[1]: [3, 5]})["cost"]
+        a = m.sweep({y[1]: [3, 5]}, verbosity=0)["cost"]
         self.assertTrue(all(abs(a - b) / (a + b) < 1e-7))
 
     def test_calcconst(self):
@@ -248,8 +248,7 @@ class TestModelSubs(unittest.TestCase):
         m = Model(x, [x >= t_day, x >= t_night])
         sol = m.solve(verbosity=0)
         self.assertAlmostEqual(sol(t_night) / gpkit.ureg.hours, 12)
-        sweep = {t_day: [6, 8, 9, 13]}
-        sol = m.solve(verbosity=0, sweep=sweep)
+        sol = m.sweep({t_day: [6, 8, 9, 13]}, verbosity=0)
         npt.assert_allclose(
             sol["sensitivities"]["variables"][t_day], [-1 / 3, -0.5, -0.6, +1], 1e-3
         )

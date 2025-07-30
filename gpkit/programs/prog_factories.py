@@ -110,9 +110,7 @@ def progify(program, return_attr=None):
 def solvify(genfunction):
     "Returns function for making/solving/sweeping a program."
 
-    def solvefn(
-        self, solver=None, *, verbosity=1, sweep=None, skipsweepfailures=False, **kwargs
-    ):
+    def solvefn(self, solver=None, *, verbosity=1, skipsweepfailures=False, **kwargs):
         """Forms a mathematical program and attempts to solve it.
 
         Arguments
@@ -137,7 +135,8 @@ def solvify(genfunction):
         RuntimeWarning if an error occurs in solving or parsing the solution.
         """
         constants = parse_subs(self.varkeys, self.substitutions)
-        sweep = parse_sweep(self.varkeys, sweep)
+        sweep = parse_sweep(self.varkeys, None)
+        assert not sweep
         linked = parse_linked(self.varkeys, self.substitutions)
         solution = SolutionArray()
         solution.modelstr = str(self)

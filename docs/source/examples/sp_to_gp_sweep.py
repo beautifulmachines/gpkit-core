@@ -114,5 +114,5 @@ def SimPleAC():
 
 sa = SimPleAC()
 sa.substitutions.update({"V_f_fuse": 0.5})
-sol = sa.solve(verbosity=0, sweep={"V_f_wing": np.linspace(0.1, 0.5, 3)})
+sol = sa.sweep({"V_f_wing": np.linspace(0.1, 0.5, 3)}, verbosity=0)
 print(sol.summary())

@@ -69,12 +69,11 @@ sol.save_compressed("solution.pgz")
 print(sol.diff("solution.pkl"))
 
 print("SWEEP\n=====")
-N = 2
 sweeps = {
-    V_min: np.linspace(20, 25, N),
-    V: np.linspace(45, 55, N),
+    V_min: [20.0, 20, 25, 25],
+    V: [45.0, 55, 45, 55],
 }
-sweepsol = m.solve(verbosity=0, sweep=sweeps)
+sweepsol = m.sweep(sweeps, verbosity=0)
 print(sweepsol.summary())
 with open("solution.pkl", "rb") as fil:
     sol_loaded = pickle.load(fil)
