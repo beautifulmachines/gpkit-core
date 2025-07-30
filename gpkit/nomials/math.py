@@ -16,9 +16,9 @@ from ..units import DimensionalityError
 from ..util.small_classes import EMPTY_HV, HashVector, Numbers
 from ..util.small_scripts import mag
 from ..varkey import VarKey
+from ..varmap import VarSet
 from .core import Nomial
 from .map import NomialMap
-from .substitution import parse_subs
 
 
 class Signomial(Nomial):
@@ -123,7 +123,7 @@ class Signomial(Nomial):
         -------
         Monomial (unless self(x0) < 0, in which case a Signomial is returned)
         """
-        x0, _, _ = parse_subs(self.vks, x0)  # use only varkey keys
+        x0 = self.vks.clean(x0)
         psub = self.hmap.sub(x0, self.vks, parsedsubs=True)
         if EMPTY_HV not in psub or len(psub) > 1:
             raise ValueError(
@@ -387,7 +387,7 @@ class ScalarSingleEquationConstraint(SingleEquationConstraint):
 
     def __init__(self, left, oper, right):
         lr = [left, right]
-        self.vks = set()
+        self.vks = VarSet()
         for i, sig in enumerate(lr):
             if isinstance(sig, Signomial):
                 for exp in sig.hmap:
@@ -488,17 +488,16 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
         "Returns the posys <= 1 representation of this constraint."
         out = []
         for posy in self.unsubbed:
-            fixed, _, _ = parse_subs(posy.vks, substitutions, clean=True)
-            hmap = posy.hmap.sub(fixed, posy.vks, parsedsubs=True)
+            hmap = posy.hmap.sub(substitutions, posy.vks, parsedsubs=True)
             self.pmap = hmap.mmap(
                 posy.hmap
             )  # pylint: disable=attribute-defined-outside-init
             del hmap.expmap, hmap.csmap  # needed only for the mmap call above
-            hmap = self._simplify_posy_ineq(hmap, self.pmap, fixed)
+            hmap = self._simplify_posy_ineq(hmap, self.pmap, substitutions)
             if hmap is not None:
                 if any(c <= 0 for c in hmap.values()):
                     raise InvalidGPConstraint(
-                        f"'{self}' became Signomial after substituting {fixed}"
+                        f"'{self}' became Signomial after substituting {substitutions}"
                     )
                 hmap.parent = self
                 out.append(hmap)

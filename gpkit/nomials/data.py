@@ -4,6 +4,7 @@ import numpy as np
 
 from ..util.repr_conventions import ReprMixin
 from ..varkey import VarKey
+from ..varmap import VarSet
 
 
 class NomialData(ReprMixin):
@@ -51,7 +52,7 @@ class NomialData(ReprMixin):
     @property
     def vks(self):
         "Set of a NomialData's varkeys, created as necessary."
-        vks = set()
+        vks = VarSet()
         for exp in self.hmap:
             vks.update(exp)
         return vks

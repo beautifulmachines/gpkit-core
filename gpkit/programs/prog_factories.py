@@ -1,14 +1,12 @@
 "Scripts for generating, solving and sweeping programs"
 
 import warnings as pywarnings
-from time import time
 
 import numpy as np
 from adce import adnumber
 
-from ..exceptions import Infeasible
 from ..globals import SignomialsEnabled
-from ..nomials import parse_subs
+from ..nomials.substitution import parse_linked, parse_subs
 from ..solution_array import SolutionArray
 from ..util.small_classes import FixedScalar
 from ..util.small_scripts import maybe_flatten
@@ -94,7 +92,8 @@ def progify(program, return_attr=None):
     def programfn(self, constants=None, **initargs):
         "Return program version of self"
         if not constants:
-            constants, _, linked = parse_subs(self.varkeys, self.substitutions)
+            constants = parse_subs(self.varkeys, self.substitutions)
+            linked = parse_linked(self.varkeys, self.substitutions)
             if linked:
                 evaluate_linked(constants, linked)
         prog = program(self.cost, self, constants, **initargs)
@@ -109,7 +108,7 @@ def progify(program, return_attr=None):
 def solvify(genfunction):
     "Returns function for making/solving/sweeping a program."
 
-    def solvefn(self, solver=None, *, verbosity=1, skipsweepfailures=False, **kwargs):
+    def solvefn(self, solver=None, *, verbosity=1, **kwargs):
         """Forms a mathematical program and attempts to solve it.
 
         Arguments
@@ -119,8 +118,6 @@ def solvify(genfunction):
         verbosity : int (default 1)
             If greater than 0 prints runtime messages.
             Is decremented by one and then passed to programs.
-        skipsweepfailures : bool (default False)
-            If True, when a solve errors during a sweep, skip it.
         **kwargs : Passed to solve and program init calls
 
         Returns
@@ -133,133 +130,17 @@ def solvify(genfunction):
         ValueError if the program is invalid.
         RuntimeWarning if an error occurs in solving or parsing the solution.
         """
-        constants, sweep, linked = parse_subs(self.varkeys, self.substitutions)
         solution = SolutionArray()
         solution.modelstr = str(self)
 
         # NOTE SIDE EFFECTS: self.program and self.solution set below
-        if sweep:
-            run_sweep(
-                genfunction,
-                self,
-                solution,
-                skipsweepfailures,
-                constants,
-                sweep,
-                linked,
-                solver,
-                verbosity,
-                **kwargs,
-            )
-        else:
-            self.program, progsolve = genfunction(self, **kwargs)
-            result = progsolve(solver, verbosity=verbosity, **kwargs)
-            if kwargs.get("process_result", True):
-                self.process_result(result)
-            solution.append(result)
+        self.program, progsolve = genfunction(self, **kwargs)
+        result = progsolve(solver, verbosity=verbosity, **kwargs)
+        if kwargs.get("process_result", True):
+            self.process_result(result)
+        solution.append(result)
         solution.to_arrays()
         self.solution = solution
         return solution
 
     return solvefn
-
-
-# pylint: disable=too-many-locals,too-many-arguments,too-many-branches
-# pylint: disable=too-many-statements,too-many-positional-arguments
-def run_sweep(
-    genfunction,
-    self,
-    solution,
-    skipsweepfailures,
-    constants,
-    sweep,
-    linked,
-    solver,
-    verbosity,
-    **kwargs,
-):
-    "Runs through a sweep."
-    # sort sweeps by the eqstr of their varkey
-    sweepvars, sweepvals = zip(
-        *sorted(list(sweep.items()), key=lambda vkval: vkval[0].eqstr)
-    )
-    if len(sweep) == 1:
-        sweep_grids = np.array(list(sweepvals))
-    else:
-        sweep_grids = np.meshgrid(*list(sweepvals))
-
-    n_passes = sweep_grids[0].size
-    sweep_vects = {
-        var: grid.reshape(n_passes) for (var, grid) in zip(sweepvars, sweep_grids)
-    }
-
-    if verbosity > 0:
-        tic = time()
-
-    self.program = []
-    last_error = None
-    for i in range(n_passes):
-        constants.update(
-            {var: sweep_vect[i] for (var, sweep_vect) in sweep_vects.items()}
-        )
-        if linked:
-            evaluate_linked(constants, linked)
-        program, solvefn = genfunction(self, constants, **kwargs)
-        program.model = None  # so it doesn't try to debug
-        self.program.append(program)  # NOTE: SIDE EFFECTS
-        if i == 0 and verbosity > 0:  # wait for successful program gen
-            # pylint: disable=fixme
-            # TODO: use full string when minimum lineage is set automatically
-            sweepvarsstr = ", ".join(
-                [
-                    str(var)
-                    for var, val in zip(sweepvars, sweepvals)
-                    if not np.isnan(val).all()
-                ]
-            )
-            print(f"Sweeping {sweepvarsstr} with {n_passes} solves:")
-        try:
-            if verbosity > 1:
-                print(f"\nSolve {i}:")
-            result = solvefn(solver, verbosity=verbosity - 1, **kwargs)
-            if kwargs.get("process_result", True):
-                self.process_result(result)
-            solution.append(result)
-            if verbosity == 1:
-                print(".", end="", flush=True)
-        except Infeasible as e:
-            last_error = e
-            if not skipsweepfailures:
-                raise RuntimeWarning(
-                    f"Solve {i} was infeasible; progress saved to m.program."
-                    " To continue sweeping after failures, solve with"
-                    " skipsweepfailures=True."
-                ) from e
-            if verbosity > 1:
-                print(f"Solve {i} was {e.__class__.__name__}.")
-            if verbosity == 1:
-                print("!", end="", flush=True)
-    if not solution:
-        raise RuntimeWarning("All solves were infeasible.") from last_error
-    if verbosity == 1:
-        print()
-
-    solution["sweepvariables"] = VarMap()
-    ksweep = VarMap(sweep)
-    for var, val in list(solution["constants"].items()):
-        if var in ksweep:
-            solution["sweepvariables"][var] = val
-            del solution["constants"][var]
-        elif linked:  # if any variables are linked, we check all of them
-            if hasattr(val[0], "shape"):
-                differences = ((x != val[0]).any() for x in val[1:])
-            else:
-                differences = (x != val[0] for x in val[1:])
-            if not any(differences):
-                solution["constants"][var] = [val[0]]
-        else:
-            solution["constants"][var] = [val[0]]
-
-    if verbosity > 0:
-        soltime = time() - tic
-        print(f"Sweeping took {soltime:.3g} seconds.")

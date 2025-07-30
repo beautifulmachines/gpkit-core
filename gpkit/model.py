@@ -1,5 +1,7 @@
 "Implements Model"
 
+from time import time
+
 import numpy as np
 
 from .constraints.costed import CostedConstraintSet
@@ -10,8 +12,10 @@ from .nomials import Monomial
 from .programs.gp import GeometricProgram
 from .programs.prog_factories import progify, solvify
 from .programs.sgp import SequentialGeometricProgram
+from .solution_array import SolutionArray
 from .tools.autosweep import autosweep_1d
 from .util.docstring import expected_unbounded
+from .varmap import VarMap
 
 
 class Model(CostedConstraintSet):
@@ -140,21 +144,66 @@ class Model(CostedConstraintSet):
 """
             raise ValueError(err + boundstrs + "\n\n" + docstring)
 
-    def sweep(self, sweeps, **solveargs):
-        "Sweeps {var: values} pairs in sweeps. Returns swept solutions."
-        sols = []
-        for sweepvar, sweepvals in sweeps.items():
-            original_val = self.substitutions.get(sweepvar, None)
-            self.substitutions.update({sweepvar: ("sweep", sweepvals)})
+    def sweep(self, sweepvals, skipfailures=False, **solveargs):
+        "Sweeps {var: values} in-sync across one dim. Returns SolutionArray"
+        return self._sweep(self.solve, sweepvals, skipfailures, **solveargs)
+
+    def localsweep(self, sweepvals, skipfailures=False, **solveargs):
+        "Sweeps {var: values} in-sync across one dim. Returns SolutionArray"
+        return self._sweep(self.localsolve, sweepvals, skipfailures, **solveargs)
+
+    def _parse_sweep(self, sweepvals):
+        "Validate and return {VarKey: iterable} mapping"
+        # this logic might eventually live in VarMap
+        for var, vals in sweepvals.items():
+            keys = self.varkeys.keys(var)
+            for key in keys:
+                if not key.shape:
+                    continue
+                # next line raises a ValueError if size mismatch
+                np.broadcast(vals, np.empty(key.shape))
+        return sweepvals
+
+    def _sweep(self, solvefn, sweepvals, skipfailures, **solveargs):
+        "Runs sweep using solvefn (either self.solve or self.localsolve)"
+        sols = SolutionArray()
+        self._parse_sweep(sweepvals)
+        lengths = {len(vals) for vals in sweepvals.values()}
+        if len(lengths) != 1:
+            raise ValueError(f"sweepvals has mismatched lengths {lengths}")
+        oldsubs = self.substitutions
+        tic = time()
+        for i in range(lengths.pop()):
+            self.substitutions.update({var: vals[i] for var, vals in sweepvals.items()})
             try:
-                sols.append(self.solve(**solveargs))
-            except InvalidGPConstraint:
-                sols.append(self.localsolve(**solveargs))
-            if original_val:
-                self.substitutions[sweepvar] = original_val
-            else:
-                del self.substitutions[sweepvar]
-        return sols if len(sols) > 1 else sols[0]
+                solvefn(**solveargs)
+                sols.append(self.program.result)
+            except Infeasible as err:
+                if not skipfailures:
+                    raise RuntimeWarning(
+                        f"Solve {i} was infeasible. To continue sweeping after"
+                        "failures, pass skipfailures=True to Model.sweep."
+                    ) from err
+        self.substitutions = oldsubs
+        if not sols:
+            raise RuntimeWarning("All solves were infeasible.")
+
+        sols["sweepvariables"] = VarMap()
+        for rawkey in sweepvals:
+            for cleankey in sols["constants"].varset.keys(rawkey):
+                sols["sweepvariables"][cleankey] = sols["constants"][cleankey]
+                del sols["constants"][cleankey]
+        # all remaining constants should be squashed
+        for key, val in sols["constants"].items():
+            if len(set(val)) == 1:
+                sols["constants"][key] = set(val)
+
+        if solveargs.get("verbosity", 1) > 0:
+            print(f"Sweeping took {time() - tic:.3g} seconds.")
+
+        sols.to_arrays()
+        sols.modelstr = str(self)
+        return sols
 
     def autosweep(self, sweeps, tol=0.01, samplepoints=100, **solveargs):
         """Autosweeps {var: (start, end)} pairs in sweeps to tol.

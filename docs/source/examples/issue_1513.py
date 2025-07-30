@@ -97,11 +97,6 @@ class Cake(Model):
 
 
 m = Cake()
-m.substitutions.update(
-    {
-        "y": ("sweep", [1, 2, 3]),
-        "z": lambda v: np.array(v["y"]) ** 2,
-    }
-)
-sol = m.solve(verbosity=0)
+m.substitutions.update({"z": lambda v: np.array(v["y"]) ** 2})
+sol = m.sweep({"y": [[1, 2, 3]]}, verbosity=0)
 print(sol.table())

@@ -1,7 +1,5 @@
 """Assorted helper methods"""
 
-from collections.abc import Iterable
-
 
 def veclinkedfn(linkedfn, i):
     "Generate an indexed linking function."
@@ -45,21 +43,3 @@ def try_str_without(item, excluded, *, latex=False):
 def mag(c):
     "Return magnitude of a Number or Quantity"
     return getattr(c, "magnitude", c)
-
-
-def is_sweepvar(sub):
-    "Determines if a given substitution indicates a sweep."
-    return splitsweep(sub)[0]
-
-
-def splitsweep(sub):
-    "Splits a substitution into (is_sweepvar, sweepval)"
-    try:
-        sweep, value = sub
-        if sweep == "sweep" and (
-            isinstance(value, Iterable) or hasattr(value, "__call__")
-        ):
-            return True, value
-    except (TypeError, ValueError):
-        pass
-    return False, None

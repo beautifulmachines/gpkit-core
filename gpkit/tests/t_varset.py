@@ -23,6 +23,7 @@ def test_add_and_membership():
     assert x.key in vs
     # membership by canonical name
     assert "x" in vs
+    assert x in vs
     # by_name should return a set *containing* x
     assert vs.by_name("x") == {x.key}
 

@@ -84,7 +84,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         elif isinstance(constraints, ConstraintSet):
             constraints = [constraints]  # put it one level down
         list.__init__(self, constraints)
-        self.vks = set(self.unique_varkeys)
+        self.vks = VarSet(self.unique_varkeys)
         self.substitutions = VarMap(
             {k: k.value for k in self.unique_varkeys if "value" in k.descr}
         )
