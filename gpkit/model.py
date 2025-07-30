@@ -171,11 +171,9 @@ class Model(CostedConstraintSet):
         lengths = {len(vals) for vals in sweepvals.values()}
         if len(lengths) != 1:
             raise ValueError(f"sweepvals has mismatched lengths {lengths}")
-        (nsweep,) = lengths
         oldsubs = self.substitutions
-        verbosity = solveargs.get("verbosity", 1)
         tic = time()
-        for i in range(nsweep):
+        for i in range(lengths.pop()):
             self.substitutions.update({var: vals[i] for var, vals in sweepvals.items()})
             try:
                 solvefn(**solveargs)
@@ -197,13 +195,11 @@ class Model(CostedConstraintSet):
                 del sols["constants"][cleankey]
         # all remaining constants should be squashed
         for key, val in sols["constants"].items():
-            unique_vals = set(val)
-            if len(unique_vals) == 1:
-                sols["constants"][key] = unique_vals
+            if len(set(val)) == 1:
+                sols["constants"][key] = set(val)
 
-        if verbosity > 0:
-            soltime = time() - tic
-            print(f"Sweeping took {soltime:.3g} seconds.")
+        if solveargs.get("verbosity", 1) > 0:
+            print(f"Sweeping took {time() - tic:.3g} seconds.")
 
         sols.to_arrays()
         sols.modelstr = str(self)
