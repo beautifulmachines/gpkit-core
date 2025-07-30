@@ -1,6 +1,7 @@
 "Implements Model"
 
 from time import time
+
 import numpy as np
 
 from .constraints.costed import CostedConstraintSet
