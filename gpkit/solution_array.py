@@ -157,14 +157,6 @@ def topsenss_filter(data, showvars, nvars=5):
     return {k: data[k] for k in topk[-nvars:]}, filter_already_shown
 
 
-def insenss_table(data, _, maxval=0.1, **kwargs):
-    "Returns insensitivity table lines"
-    if "constants" in data.get("sensitivities", {}):
-        data = data["sensitivities"]["variables"]
-    data = {k: s for k, s in data.items() if np.mean(np.abs(s)) < maxval}
-    return senss_table(data, title="Insensitive Fixed Variables", **kwargs)
-
-
 def tight_table(self, _, ntightconstrs=5, tight_senss=1e-2, **kwargs):
     "Return constraint tightness lines"
     title = "Most Sensitive Constraints"
@@ -349,7 +341,6 @@ def bdtable_gen(key):
 TABLEFNS = {
     "sensitivities": senss_table,
     "top sensitivities": topsenss_table,
-    "insensitivities": insenss_table,
     "model sensitivities": msenss_table,
     "tightest constraints": tight_table,
     "loose constraints": loose_table,

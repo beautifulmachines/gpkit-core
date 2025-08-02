@@ -302,10 +302,6 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
             lines.append("\\end{array}")
         return "\n".join(lines)
 
-    def as_view(self):
-        "Return a ConstraintSetView of this ConstraintSet."
-        return ConstraintSetView(self)
-
 
 def recursively_line(iterable, excluded):
     "Generates lines in a recursive tree-like fashion, the better to indent."
@@ -339,48 +335,6 @@ def recursively_line(iterable, excluded):
             clines = ["  " + line for line in clines]  # named constraint indent
         lines.extend(clines)
     return lines
-
-
-class ConstraintSetView:
-    "Class to access particular views on a set's variables"
-
-    def __init__(self, constraintset, index=()):
-        self.constraintset = constraintset
-        try:
-            self.index = tuple(index)
-        except TypeError:  # probably not iterable
-            self.index = (index,)
-
-    def __getitem__(self, index):
-        "Appends the index to its own and returns a new view."
-        if not isinstance(index, tuple):
-            index = (index,)
-        # indexes are preprended to match Vectorize convention
-        return ConstraintSetView(self.constraintset, index + self.index)
-
-    def __getattr__(self, attr):
-        """Returns attribute from the base ConstraintSets
-
-        If it's a another ConstraintSet, return the matching View;
-        if it's an array, return it at the specified index;
-        otherwise, raise an error.
-        """
-        if not hasattr(self.constraintset, attr):
-            raise AttributeError(f"the underlying object lacks `.{attr}`.")
-
-        value = getattr(self.constraintset, attr)
-        if isinstance(value, ConstraintSet):
-            return ConstraintSetView(value, self.index)
-        if not hasattr(value, "shape"):
-            raise ValueError(
-                f"attribute {attr} with value {value} did not have a shape, "
-                "so ConstraintSetView cannot return an indexed view."
-            )
-        index = self.index
-        newdims = len(value.shape) - len(self.index)
-        if newdims > 0:  # indexes are put last to match Vectorize
-            index = (slice(None),) * newdims + index
-        return value[index]
 
 
 def badelement(cns, i, constraint, cause=""):
