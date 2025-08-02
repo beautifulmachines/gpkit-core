@@ -4,7 +4,9 @@
 import sys
 import warnings as pywarnings
 from collections import defaultdict
+from dataclasses import dataclass
 from time import time
+from typing import Sequence
 
 import numpy as np
 
@@ -63,6 +65,23 @@ def _get_solver(solver, kwargs):
     else:
         raise ValueError(f"Unknown solver '{solver}'.")
     return solver, optimize
+
+
+@dataclass(frozen=True, slots=True)
+class CompiledProgram:
+    """
+    Immutable numerical snapshot of a GP ready for a solver.
+
+    Parameters
+    ----------
+    c : (n_mon,) coefficients of each monomial
+    A : (n_mon, n_var) exponents of each monomial
+    k : (n_posy,) number of monomials present in each constraint
+    """
+
+    c: Sequence
+    A: CootMatrix
+    k: Sequence
 
 
 class GeometricProgram:
