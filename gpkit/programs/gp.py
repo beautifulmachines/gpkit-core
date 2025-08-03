@@ -76,29 +76,25 @@ class CompiledGP:
     ----------
     c : (n_mon,) coefficients of each monomial
     A : (n_mon, n_var) exponents of each monomial
-    k : (n_posy,) number of monomials present in each constraint
-    m_idxs (n_posy,): monomial indices of each posynomial
+    m_idxs (n_posy,): row indices of each posynomial's monomials
     p_idxs (n_mon): posynomial index of each monomial
     """
 
     c: Sequence
     A: CootMatrix
-    k: Sequence
-    m_idxs: Sequence
+    m_idxs: Sequence[range]
     p_idxs: Sequence
 
     @classmethod
-    # pylint: disable=too-many-locals
     def from_hmaps(cls, hmaps, varlocs):
         "Generates nomial and solve data (A, p_idxs) from posynomials."
         assert not varlocs  # set by side effect, should be empty to begin
-        k = [len(hmap) for hmap in hmaps]
         m_idxs, p_idxs, c, exps = [], [], [], []
         m_idx = 0
         row, col, data = [], [], []
-        for p_idx, (n_mons, hmap) in enumerate(zip(k, hmaps)):
-            p_idxs.extend([p_idx] * n_mons)
-            m_idxs.append(slice(m_idx, m_idx + n_mons))
+        for p_idx, hmap in enumerate(hmaps):
+            p_idxs.extend([p_idx] * len(hmap))
+            m_idxs.append(range(m_idx, m_idx + len(hmap)))
             c.extend(hmap.values())
             exps.extend(hmap)
             for exp in hmap:
@@ -115,7 +111,12 @@ class CompiledGP:
             col.extend([j] * len(locs))
             data.extend(exps[i][var] for i in locs)
         A = CootMatrix(row, col, data)
-        return cls(c=c, A=A, k=k, m_idxs=m_idxs, p_idxs=p_idxs)
+        return cls(c=c, A=A, m_idxs=m_idxs, p_idxs=p_idxs)
+
+    @property
+    def k(self):
+        "length of each posynomial"
+        return tuple(len(p) for p in self.m_idxs)
 
     def zvals(self, primal_sol):
         "z values for a given primal solution"
