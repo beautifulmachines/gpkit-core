@@ -166,7 +166,7 @@ solutions and can be solved with 'Model.solve()'."""
             print(f" for {len(self.sgpvks)} free variables")
             print(f"  in {len(self.sgpconstraints)} locally-GP constraints")
             print(f"  and for {len(self._gp.varlocs)} free variables")
-            print(f"       in {len(self._gp.k)} posynomial inequalities.")
+            print(f"  in {len(self._gp.compiled.k)} posynomial inequalities.")
         prevcost, cost, rel_improvement = None, None, None
         while rel_improvement is None or rel_improvement > reltol:
             prevcost = cost
@@ -299,7 +299,7 @@ solutions and can be solved with 'Model.solve()'."""
                     self._gp.compiled.A.col[row_idx] = self._gp.varidxs[var]
                     self._gp.compiled.A.data[row_idx] = x
                 except IndexError:  # numbers of exps increased
-                    a_idxs.append(len(self._gp.A.row))
+                    a_idxs.append(len(self._gp.compiled.A.row))
                     self._gp.compiled.A.row.append(m_idx + i)
                     self._gp.compiled.A.col.append(self._gp.varidxs[var])
                     self._gp.compiled.A.data.append(x)

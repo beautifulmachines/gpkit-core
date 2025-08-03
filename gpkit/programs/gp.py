@@ -89,6 +89,7 @@ class CompiledGP:
     p_idxs: Sequence
 
     @classmethod
+    # pylint: disable=too-many-locals
     def from_hmaps(cls, hmaps, varlocs):
         """Generates nomial and solve data (A, p_idxs) from posynomials.
 
@@ -129,6 +130,7 @@ class CompiledGP:
         return cls(c=c, A=A, k=k, m_idxs=m_idxs, p_idxs=p_idxs)
 
     def zvals(self, primal_sol):
+        "z values for a given primal solution"
         return np.log(self.c) + self.A.dot(primal_sol)
 
     def check_solution(self, cost, primal, nu, la, tol, abstol=1e-20):
@@ -203,7 +205,8 @@ class CompiledGP:
                 "Dual cost %s does not match primal cost %s" % (np.exp(dual_cost), cost)
             )
 
-    def _generate_nula(self, solver_out):
+    def generate_nula(self, solver_out):
+        "generate nu and la from solver output"
         if "nu" in solver_out:
             # solver gave us monomial sensitivities, generate posynomial ones
             solver_out["nu"] = nu = np.ravel(solver_out["nu"])
@@ -308,7 +311,7 @@ class GeometricProgram:
         self.meq_idxs = MonoEqualityIndexes()
         self.exps = []
         m_idx = 0
-        for p_idx, hmap in enumerate(self.hmaps):
+        for hmap in self.hmaps:
             if getattr(hmap, "from_meq", False):
                 self.meq_idxs.all.add(m_idx)
                 if len(self.meq_idxs.all) > 2 * len(self.meq_idxs.first_half):
@@ -345,7 +348,7 @@ class GeometricProgram:
         if verbosity > 0:
             print(f"Using solver '{solvername}'")
             print(f" for {len(self.varlocs)} free variables")
-            print(f"  in {len(self.k)} posynomial inequalities.")
+            print(f"  in {len(self.compiled.k)} posynomial inequalities.")
 
         solverargs = DEFAULT_SOLVER_KWARGS.get(solvername, {})
         solverargs.update(kwargs)
@@ -543,7 +546,7 @@ class GeometricProgram:
             }  # TODO: choicevaridxs seems unnecessary
 
         result["sensitivities"] = {"constraints": {}}
-        la, self.nu_by_posy = self.compiled._generate_nula(solver_out)
+        la, self.nu_by_posy = self.compiled.generate_nula(solver_out)
         cost_senss, gpv_ss, absv_ss, m_senss = self._calculate_sensitivities(
             result, la, self.nu_by_posy
         )
