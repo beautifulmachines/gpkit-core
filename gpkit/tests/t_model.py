@@ -250,9 +250,7 @@ class TestGP(unittest.TestCase):
         self.assertEqual(
             gp1.data.A, CootMatrix(row=[0, 1, 2], col=[0, 0, 0], data=[-1, 1, -1])
         )
-        self.assertEqual(
-            gp2.data.A, CootMatrix(row=[0, 1], col=[0, 0], data=[-1, 1])
-        )
+        self.assertEqual(gp2.data.A, CootMatrix(row=[0, 1], col=[0, 0], data=[-1, 1]))
         self.assertEqual(
             gp3.data.A, CootMatrix(row=[0, 1, 2], col=[0, 0, 0], data=[-1, 1, -1])
         )

@@ -67,7 +67,6 @@ def _get_solver(solver, kwargs):
     return solver, optimize
 
 
-# not frozen because sgp currently mutates
 @dataclass(frozen=True, slots=True)
 class CompiledGP:
     """
@@ -91,18 +90,7 @@ class CompiledGP:
     @classmethod
     # pylint: disable=too-many-locals
     def from_hmaps(cls, hmaps, varlocs):
-        """Generates nomial and solve data (A, p_idxs) from posynomials.
-
-        k [posys]: number of monomials (rows of A) present in each constraint
-        m_idxs [mons]: monomial indices of each posynomial
-        p_idxs [mons]: posynomial index of each monomial
-        cs, exps [mons]: coefficient and exponents of each monomial
-        varlocs: {vk: monomial indices of each variables' location}
-        meq_idxs: {all indices of equality mons} and {the first index of each}
-        varidxs: {vk: which column corresponds to it in A}
-        A [mons, vks]: sparse array of each monomials' variables' exponents
-
-        """
+        "Generates nomial and solve data (A, p_idxs) from posynomials."
         assert not varlocs  # set by side effect, should be empty to begin
         k = [len(hmap) for hmap in hmaps]
         m_idxs, p_idxs, c, exps = [], [], [], []
