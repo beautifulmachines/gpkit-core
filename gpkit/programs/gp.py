@@ -318,7 +318,7 @@ class GeometricProgram:
                     self.meq_idxs.first_half.add(m_idx)
             self.exps.extend(hmap)
             m_idx += len(hmap)
-        self.compiled = CompiledGP.from_hmaps(self.hmaps, self.varlocs)
+        self.data = CompiledGP.from_hmaps(self.hmaps, self.varlocs)
         self.varidxs = {vk: i for i, vk in enumerate(self.varlocs)}
         self.choicevaridxs = {vk: i for i, vk in enumerate(self.varlocs) if vk.choices}
 
@@ -348,7 +348,7 @@ class GeometricProgram:
         if verbosity > 0:
             print(f"Using solver '{solvername}'")
             print(f" for {len(self.varlocs)} free variables")
-            print(f"  in {len(self.compiled.k)} posynomial inequalities.")
+            print(f"  in {len(self.data.k)} posynomial inequalities.")
 
         solverargs = DEFAULT_SOLVER_KWARGS.get(solvername, {})
         solverargs.update(kwargs)
@@ -360,11 +360,11 @@ class GeometricProgram:
         try:
             sys.stdout = SolverLog(original_stdout, verbosity=verbosity - 2)
             solver_out = solverfn(
-                c=self.compiled.c,
-                A=self.compiled.A,
+                c=self.data.c,
+                A=self.data.A,
                 meq_idxs=self.meq_idxs,
-                k=self.compiled.k,
-                p_idxs=self.compiled.p_idxs,
+                k=self.data.k,
+                p_idxs=self.data.p_idxs,
                 **solverargs,
             )
         except Infeasible as e:
@@ -446,7 +446,7 @@ class GeometricProgram:
         initsolwarning(result, "Solution Inconsistency")
         try:
             tol = SOLUTION_TOL.get(solver_out["solver"], 1e-5)
-            self.compiled.check_solution(
+            self.data.check_solution(
                 result["cost"],
                 solver_out["primal"],
                 solver_out["nu"],
@@ -546,7 +546,7 @@ class GeometricProgram:
             }  # TODO: choicevaridxs seems unnecessary
 
         result["sensitivities"] = {"constraints": {}}
-        la, self.nu_by_posy = self.compiled.generate_nula(solver_out)
+        la, self.nu_by_posy = self.data.generate_nula(solver_out)
         cost_senss, gpv_ss, absv_ss, m_senss = self._calculate_sensitivities(
             result, la, self.nu_by_posy
         )
