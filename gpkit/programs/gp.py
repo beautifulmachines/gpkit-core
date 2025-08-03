@@ -77,7 +77,6 @@ class CompiledGP:
     c : (n_mon,) coefficients of each monomial
     A : (n_mon, n_var) exponents of each monomial
     m_idxs (n_posy,): row indices of each posynomial's monomials
-    p_idxs (n_mon): posynomial index of each monomial
     """
 
     c: Sequence
@@ -85,28 +84,24 @@ class CompiledGP:
     m_idxs: Sequence[range]
 
     @classmethod
-    def from_hmaps(cls, hmaps, varlocs):
+    def from_hmaps(cls, hmaps, varcols):
         "Generates nomial and solve data (A, p_idxs) from posynomials."
-        assert not varlocs  # set by side effect, should be empty to begin
-        m_idxs, c, exps = [], [], []
+        m_idxs, c = [], []
         m_idx = 0
         row, col, data = [], [], []
         for hmap in hmaps:
             m_idxs.append(range(m_idx, m_idx + len(hmap)))
             c.extend(hmap.values())
-            exps.extend(hmap)
             for exp in hmap:
                 if not exp:  # space out A matrix with constants for mosek
                     row.append(m_idx)
                     col.append(0)
                     data.append(0)
-                for var in exp:
-                    varlocs[var].append(m_idx)
+                else:
+                    row.extend([m_idx] * len(exp))
+                    col.extend([varcols[var] for var in exp])
+                    data.extend(exp.values())
                 m_idx += 1
-        for j, (var, locs) in enumerate(varlocs.items()):
-            row.extend(locs)
-            col.extend([j] * len(locs))
-            data.extend(exps[i][var] for i in locs)
         return cls(c=c, A=CootMatrix(row, col, data), m_idxs=m_idxs)
 
     def __post_init__(self):
@@ -325,10 +320,13 @@ class GeometricProgram:
                 if len(self.meq_idxs.all) > 2 * len(self.meq_idxs.first_half):
                     self.meq_idxs.first_half.add(m_idx)
             self.exps.extend(hmap)
-            m_idx += len(hmap)
-        self.data = CompiledGP.from_hmaps(self.hmaps, self.varlocs)
-        self.varidxs = {vk: i for i, vk in enumerate(self.varlocs)}
+            for exp in hmap:
+                for var in exp:
+                    self.varlocs[var].append(m_idx)
+                m_idx += 1
+        self.varcols = {vk: i for i, vk in enumerate(self.varlocs)}
         self.choicevaridxs = {vk: i for i, vk in enumerate(self.varlocs) if vk.choices}
+        self.data = CompiledGP.from_hmaps(self.hmaps, self.varcols)
 
     # pylint: disable=too-many-statements, too-many-locals,too-many-branches
     def solve(self, solver=None, *, verbosity=1, gen_result=True, **kwargs):

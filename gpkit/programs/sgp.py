@@ -296,12 +296,12 @@ solutions and can be solved with 'Model.solve()'."""
                 try:  # modify a particular A entry
                     row_idx = a_idxs.pop()
                     self._gp.data.A.row[row_idx] = m_idx + i
-                    self._gp.data.A.col[row_idx] = self._gp.varidxs[var]
+                    self._gp.data.A.col[row_idx] = self._gp.varcols[var]
                     self._gp.data.A.data[row_idx] = x
                 except IndexError:  # numbers of exps increased
                     a_idxs.append(len(self._gp.data.A.row))
                     self._gp.data.A.row.append(m_idx + i)
-                    self._gp.data.A.col.append(self._gp.varidxs[var])
+                    self._gp.data.A.col.append(self._gp.varcols[var])
                     self._gp.data.A.data.append(x)
             for row_idx in a_idxs:  # number of exps decreased
                 self._gp.data.A.row[row_idx] = 0  # zero out this entry
