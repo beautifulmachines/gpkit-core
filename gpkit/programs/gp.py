@@ -109,6 +109,24 @@ class CompiledGP:
             data.extend(exps[i][var] for i in locs)
         return cls(c=c, A=CootMatrix(row, col, data), m_idxs=m_idxs)
 
+    def __post_init__(self):
+        self.validate()
+
+    def validate(self):
+        "simple validation checks"
+        nrow, _ = self.A.shape
+        if len(self.c) != nrow:
+            raise ValueError(f"c has {len(self.c)} rows but A has {nrow}.")
+        last_stop = 0
+        for rng in self.m_idxs:
+            if not isinstance(rng, range):
+                raise TypeError("m_idxs must contain range objects")
+            if rng.start != last_stop:
+                raise ValueError("Posynomial rows must be contiguous in A")
+            last_stop = rng.stop
+        if last_stop != nrow:
+            raise ValueError(f"m_idxs maps {last_stop} rows but A has {nrow}.")
+
     @property
     def k(self):
         "length of each posynomial"
