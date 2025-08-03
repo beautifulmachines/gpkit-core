@@ -13,7 +13,7 @@ from ..exceptions import (
 
 
 # pylint: disable=too-many-locals,too-many-statements,too-many-branches,invalid-name
-def optimize(*, c, A, k, p_idxs, **kwargs):
+def optimize(prob, **kwargs):
     """
     Definitions
     -----------
@@ -60,18 +60,18 @@ def optimize(*, c, A, k, p_idxs, **kwargs):
     #       NOTE: the epigraph of the objective function always gets an "lse"
     #       representation, even if the objective is a monomial.
     #
-    log_c = np.log(np.array(c))
+    log_c = np.log(np.array(prob.c))
     lse_posys = [0]
     lin_posys = []
-    for i, val in enumerate(k[1:]):
+    for i, val in enumerate(prob.k[1:]):
         if val > 1:
             lse_posys.append(i + 1)
         else:
             lin_posys.append(i + 1)
     if lin_posys:
-        A = A.tocsr()
+        A = prob.A.tocsr()
         lin_posys_set = frozenset(lin_posys)
-        lin_idxs = [i for i, p in enumerate(p_idxs) if p in lin_posys_set]
+        lin_idxs = [i for i, p in enumerate(prob.p_idxs) if p in lin_posys_set]
         lse_idxs = np.ones(A.shape[0], dtype=bool)
         lse_idxs[lin_idxs] = False
         A_lse = A[lse_idxs, :].tocoo()
@@ -82,7 +82,7 @@ def optimize(*, c, A, k, p_idxs, **kwargs):
         log_c_lin = None  # A_lin won't be referenced later,
         A_lse = A  # so no need to define it.
         log_c_lse = log_c
-    k_lse = [k[i] for i in lse_posys]
+    k_lse = [prob.k[i] for i in lse_posys]
     n_lse = sum(k_lse)
     p_lse = len(k_lse)
     lse_p_idx = []
@@ -310,7 +310,7 @@ def optimize(*, c, A, k, p_idxs, **kwargs):
             aff_duals = np.array(aff_duals)
             aff_duals[aff_duals < 0] = 0
             # merge z_duals with aff_duals
-            merged_duals = np.zeros(len(k))
+            merged_duals = np.zeros(len(prob.k))
             merged_duals[lse_posys[1:]] = z_duals  # skipping the cost
             merged_duals[lin_posys] = aff_duals
             solution["la"] = merged_duals[1:]

@@ -47,7 +47,7 @@ def optimize_generator(path=None, **_):
         if settings["mosek_bin_dir"] not in os.environ["PATH"]:
             os.environ["PATH"] += ":" + settings["mosek_bin_dir"]
 
-    def optimize(*, c, A, p_idxs, **_):
+    def optimize(prob, **_):
         """Interface to the MOSEK "mskexpopt" command line solver
 
         Definitions
@@ -85,7 +85,7 @@ def optimize_generator(path=None, **_):
             If the format of mskexpopt's output file is unexpected.
 
         """
-        write_output_file(filename, c, A, p_idxs)
+        write_output_file(filename, prob.c, prob.A, prob.p_idxs)
 
         # run mskexpopt and print stdout
         solution_filename = filename + ".sol"

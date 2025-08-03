@@ -8,7 +8,7 @@ from gpkit.exceptions import DualInfeasible, UnknownInfeasible
 
 
 # pylint: disable=too-many-locals,too-many-statements,too-many-branches,invalid-name
-def optimize(*, c, A, k, meq_idxs, use_leqs=True, **kwargs):
+def optimize(prob, meq_idxs, use_leqs=True, **kwargs):
     """Interface to the CVXOPT solver
 
     Definitions
@@ -40,17 +40,17 @@ def optimize(*, c, A, k, meq_idxs, use_leqs=True, **kwargs):
             "dual_sol": floats array of size p
                 Optimal value of the dual variables, in logspace.
     """
-    log_c = np.log(np.array(c))
-    A = A.tocsr()
+    log_c = np.log(np.array(prob.c))
+    A = prob.A.tocsr()
     maxcol = A.shape[1] - 1
     lse_mons, lin_mons, leq_mons = [], [], []
     lse_posys, lin_posys, leq_posys = [], [], []
     constraint_hashes = set()
-    for i, n_monomials in enumerate(k):
-        start = sum(k[:i])
-        mons = range(start, start + k[i])
+    for i, n_monomials in enumerate(prob.k):
+        start = sum(prob.k[:i])
+        mons = prob.m_idxs[i]
         A_m = A[mons, :].tocoo()
-        chash = hash((c[i], tuple(A_m.data), tuple(A_m.row), tuple(A_m.col)))
+        chash = hash((prob.c[i], tuple(A_m.data), tuple(A_m.row), tuple(A_m.col)))
         if chash in constraint_hashes:
             continue  # already got it
         if i:  # skip cost posy
@@ -85,7 +85,7 @@ def optimize(*, c, A, k, meq_idxs, use_leqs=True, **kwargs):
             tc="d",
         )
         kwargs["h"] = matrix(-log_c_lin)
-    k_lse = [k[i] for i in lse_posys]
+    k_lse = [prob.k[i] for i in lse_posys]
     A_lse = A[lse_mons, :].tocoo()
     log_c_lse = log_c[lse_mons]
     F = spmatrix(
@@ -101,7 +101,7 @@ def optimize(*, c, A, k, meq_idxs, use_leqs=True, **kwargs):
         raise DualInfeasible() from e
     if solution["status"] != "optimal":
         raise UnknownInfeasible("solution status " + repr(solution["status"]))
-    la = np.zeros(len(k))
+    la = np.zeros(len(prob.k))
     la[lin_posys] = list(solution["zl"])
     la[lse_posys] = [1.0] + list(solution["znl"])
     for leq_posy, yi in zip(leq_posys, solution["y"]):

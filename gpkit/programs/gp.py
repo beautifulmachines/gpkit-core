@@ -215,6 +215,7 @@ class CompiledGP:
         return np.array([sum(nu[mi]) for mi in self.m_idxs])
 
     def compute_nu(self, la, x):
+        "compute nu from lambda and primal solution x"
         assert np.shape(la) == (len(self.m_idxs),)
         z = self.compute_z(x)
         nu_by_posy = [
@@ -355,14 +356,7 @@ class GeometricProgram:
         solver_out, infeasibility, original_stdout = {}, None, sys.stdout
         try:
             sys.stdout = SolverLog(original_stdout, verbosity=verbosity - 2)
-            solver_out = solverfn(
-                c=self.data.c,
-                A=self.data.A,
-                meq_idxs=self.meq_idxs,
-                k=self.data.k,
-                p_idxs=self.data.p_idxs,
-                **solverargs,
-            )
+            solver_out = solverfn(self.data, meq_idxs=self.meq_idxs, **solverargs)
         except Infeasible as e:
             infeasibility = e
         except InvalidLicense as e:
@@ -545,10 +539,9 @@ class GeometricProgram:
         result["sensitivities"] = {"constraints": {}}
         # fix la, confirmed not needed for cvxopt
         if "la" in solver_out:
-            solver_out["la"]
             if len(solver_out["la"]) == len(self.data.m_idxs) - 1:
                 # assume solver dropped the cost's sensitivity (always 1.0)
-                solver_out["la"] = np.hstack(([1.0], la))
+                solver_out["la"] = np.hstack(([1.0], solver_out["la"]))
         if "la" not in solver_out:
             solver_out["la"] = self.data.compute_la(solver_out["nu"])
         if "nu" not in solver_out:
