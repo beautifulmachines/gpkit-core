@@ -94,6 +94,7 @@ class CompiledGP:
             c.extend(hmap.values())
             for exp in hmap:
                 if not exp:  # space out A matrix with constants for mosek
+                    assert m_idx < len(hmap)  # constants only expected in cost
                     row.append(m_idx)
                     col.append(0)
                     data.append(0)
@@ -132,9 +133,9 @@ class CompiledGP:
         "posynomial index of each monomial"
         return np.repeat(range(len(self.m_idxs)), self.k)
 
-    def zvals(self, primal_sol):
+    def compute_z(self, x):
         "z values for a given primal solution"
-        return np.log(self.c) + self.A.dot(primal_sol)
+        return np.log(self.c) + self.A.dot(x)
 
     def check_solution(self, cost, primal, nu, la, tol, abstol=1e-20):
         # pylint: disable=too-many-arguments,too-many-positional-arguments
@@ -208,30 +209,19 @@ class CompiledGP:
                 "Dual cost %s does not match primal cost %s" % (np.exp(dual_cost), cost)
             )
 
-    def generate_nula(self, solver_out):
-        "generate nu and la from solver output"
-        if "nu" in solver_out:
-            # solver gave us monomial sensitivities, generate posynomial ones
-            solver_out["nu"] = nu = np.ravel(solver_out["nu"])
-            nu_by_posy = [nu[mi] for mi in self.m_idxs]
-            solver_out["la"] = la = np.array([sum(nup) for nup in nu_by_posy])
-        elif "la" in solver_out:
-            la = np.ravel(solver_out["la"])
-            if len(la) == len(self.k) - 1:
-                # assume solver dropped the cost's sensitivity (always 1.0)
-                la = np.hstack(([1.0], la))
-            # solver gave us posynomial sensitivities, generate monomial ones
-            solver_out["la"] = la
-            z = self.zvals(solver_out["primal"])
-            m_iss = [self.p_idxs == i for i in range(len(la))]
-            nu_by_posy = [
-                la[p_i] * np.exp(z[m_is]) / sum(np.exp(z[m_is]))
-                for p_i, m_is in enumerate(m_iss)
-            ]
-            solver_out["nu"] = np.hstack(nu_by_posy)
-        else:
-            raise RuntimeWarning("The dual solution was not returned.")
-        return la, nu_by_posy
+    def compute_la(self, nu):
+        "compute lambda from nu"
+        assert np.shape(nu) == (len(self.c),)
+        return np.array([sum(nu[mi]) for mi in self.m_idxs])
+
+    def compute_nu(self, la, x):
+        assert np.shape(la) == (len(self.m_idxs),)
+        z = self.compute_z(x)
+        nu_by_posy = [
+            la[p_i] * np.exp(z[m_is]) / sum(np.exp(z[m_is]))
+            for p_i, m_is in enumerate(self.m_idxs)
+        ]
+        return np.hstack(nu_by_posy)
 
 
 class GeometricProgram:
@@ -472,7 +462,7 @@ class GeometricProgram:
             )
         return result
 
-    def _calculate_sensitivities(self, result, la, nu_by_posy):
+    def _calculate_sensitivities(self, result, la, nu):
         """Calculate sensitivities for variables and constraints.
 
         Returns
@@ -480,6 +470,7 @@ class GeometricProgram:
         tuple
             (cost_senss, gpv_ss, absv_ss, m_senss)
         """
+        nu_by_posy = [nu[mi] for mi in self.data.m_idxs]
         cost_senss = sum(
             nu_i * exp for (nu_i, exp) in zip(nu_by_posy[0], self.cost.hmap)
         )
@@ -552,9 +543,18 @@ class GeometricProgram:
             }  # TODO: choicevaridxs seems unnecessary
 
         result["sensitivities"] = {"constraints": {}}
-        la, self.nu_by_posy = self.data.generate_nula(solver_out)
+        # fix la, confirmed not needed for cvxopt
+        if "la" in solver_out:
+            solver_out["la"]
+            if len(solver_out["la"]) == len(self.data.m_idxs) - 1:
+                # assume solver dropped the cost's sensitivity (always 1.0)
+                solver_out["la"] = np.hstack(([1.0], la))
+        if "la" not in solver_out:
+            solver_out["la"] = self.data.compute_la(solver_out["nu"])
+        if "nu" not in solver_out:
+            solver_out["nu"] = self.data.compute_nu(solver_out["la"], primal)
         cost_senss, gpv_ss, absv_ss, m_senss = self._calculate_sensitivities(
-            result, la, self.nu_by_posy
+            result, solver_out["la"], solver_out["nu"]
         )
 
         # Handle linked sensitivities
