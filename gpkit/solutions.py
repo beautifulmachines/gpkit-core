@@ -14,8 +14,9 @@ class RawSolution:
     x: Sequence
     nu: Sequence
     la: Sequence
+    objective: float
     status: str
-    runtime: float  # in seconds
+    meta: dict
 
 
 @dataclass(frozen=True, slots=True)

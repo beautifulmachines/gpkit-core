@@ -10,6 +10,7 @@ from ..exceptions import (
     PrimalInfeasible,
     UnknownInfeasible,
 )
+from ..solutions import RawSolution
 
 
 # pylint: disable=too-many-locals,too-many-statements,too-many-branches,invalid-name
@@ -285,17 +286,10 @@ def optimize(prob, **kwargs):
     # recover binary variables
     # xbin = [0.] * (n_choicevars)
     # task.getxxslice(sol, msk_nvars, msk_nvars + n_choicevars, xbin)
-    # wrap things up in a dictionary
-    solution = {
-        "status": "optimal",
-        "primal": np.array(x),
-        "objective": np.exp(task.getprimalobj(sol)),
-    }
     # recover dual variables for log-sum-exp epigraph constraints
     # (skip epigraph of the objective function).
     if choicevaridxs:  # no dual solution
-        solution["la"] = []
-        solution["nu"] = []
+        la, nu = [], []
     else:
         z_duals = [0.0] * (p_lse - 1)
         task.getsuxslice(mosek.soltype.itr, m + 3 * n_lse + 1, msk_nvars, z_duals)
@@ -303,7 +297,7 @@ def optimize(prob, **kwargs):
         z_duals[z_duals < 0] = 0
         # recover dual variables for the remaining user-provided constraints
         if log_c_lin is None:
-            solution["la"] = z_duals
+            la = z_duals
         else:
             aff_duals = [0.0] * log_c_lin.size
             task.getsucslice(mosek.soltype.itr, n_lse + p_lse, cur_con_idx, aff_duals)
@@ -313,7 +307,17 @@ def optimize(prob, **kwargs):
             merged_duals = np.zeros(len(prob.k))
             merged_duals[lse_posys[1:]] = z_duals  # skipping the cost
             merged_duals[lin_posys] = aff_duals
-            solution["la"] = merged_duals[1:]
+            la = merged_duals[1:]
+        nu = prob.compute_nu(la, np.array(x))
+
+    solution = RawSolution(
+        status="optimal",
+        objective=np.exp(task.getprimalobj(sol)),
+        x=np.array(x),
+        nu=nu,
+        la=la,
+        meta={"solver": "mosek_conif"},
+    )
 
     task.__exit__(None, None, None)
     env.__exit__(None, None, None)

@@ -20,6 +20,7 @@ from ..exceptions import (
     UnknownInfeasible,
 )
 from ..globals import settings
+from ..solutions import RawSolution
 
 
 def remove_read_only(func, path, exc):  # pragma: no cover
@@ -125,12 +126,14 @@ def optimize_generator(path=None, **_):
         if tmpdir:
             shutil.rmtree(path, ignore_errors=False, onerror=remove_read_only)
 
-        return {
-            "status": solsta[:-1],
-            "objective": objective_val,
-            "primal": primal_vals,
-            "nu": dual_vals,
-        }
+        return RawSolution(
+            status=solsta[:-1],
+            objective=objective_val,
+            x=primal_vals,
+            nu=dual_vals,
+            la=prob.compute_la(dual_vals),
+            meta={"solver": "mosek_cli"},
+        )
 
     return optimize
 

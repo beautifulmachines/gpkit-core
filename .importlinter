@@ -27,7 +27,7 @@ layers =
     gpkit.programs
 
     # GP representation and solver interfaces
-    gpkit.solvers | gpkit.solution_array | gpkit.solutions
+    gpkit.solvers : gpkit.solution_array : gpkit.solutions
 
     # Modelling primitives + indexing
     gpkit.constraints

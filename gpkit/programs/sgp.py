@@ -186,8 +186,8 @@ solutions and can be solved with 'Model.solve()'."""
                 solver, verbosity=verbosity - 1, gen_result=False, **solveargs
             )
             self.solver_outs.append(solver_out)
-            cost = float(solver_out["objective"])
-            x0 = dict(zip(gp.varlocs, np.exp(solver_out["primal"])))
+            cost = float(solver_out.objective)
+            x0 = dict(zip(gp.varlocs, np.exp(solver_out.x)))
             if verbosity > 2:
                 result = gp.generate_result(solver_out, verbosity=verbosity - 3)
                 self._results.append(result)

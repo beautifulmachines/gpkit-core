@@ -357,6 +357,9 @@ class GeometricProgram:
         try:
             sys.stdout = SolverLog(original_stdout, verbosity=verbosity - 2)
             solver_out = solverfn(self.data, meq_idxs=self.meq_idxs, **solverargs)
+            solver_out.meta["soltime"] = time() - starttime
+            if verbosity > 0:
+                print(f"Solving took {solver_out.meta['soltime']:.3g} seconds.")
         except Infeasible as e:
             infeasibility = e
         except InvalidLicense as e:
@@ -369,11 +372,6 @@ class GeometricProgram:
             self.solve_log = sys.stdout
             sys.stdout = original_stdout
             self.solver_out = solver_out
-
-        solver_out["solver"] = solvername
-        solver_out["soltime"] = time() - starttime
-        if verbosity > 0:
-            print(f"Solving took {solver_out['soltime']:.3g} seconds.")
 
         if infeasibility:
             if isinstance(infeasibility, PrimalInfeasible):
@@ -435,12 +433,12 @@ class GeometricProgram:
         # solution checking #
         initsolwarning(result, "Solution Inconsistency")
         try:
-            tol = SOLUTION_TOL.get(solver_out["solver"], 1e-5)
+            tol = SOLUTION_TOL.get(solver_out.meta["solver"], 1e-5)
             self.data.check_solution(
                 result["cost"],
-                solver_out["primal"],
-                solver_out["nu"],
-                solver_out["la"],
+                solver_out.x,
+                solver_out.nu,
+                solver_out.la,
                 tol,
             )
         except Infeasible as chkerror:
@@ -490,15 +488,15 @@ class GeometricProgram:
         return cost_senss, gpv_ss, absv_ss, m_senss
 
     def _compile_result(self, solver_out):
-        result = {"cost": float(solver_out["objective"]), "cost function": self.cost}
-        primal = solver_out["primal"]
+        result = {"cost": float(solver_out.objective), "cost function": self.cost}
+        primal = solver_out.x
         if len(self.varlocs) != len(primal):
             raise RuntimeWarning("The primal solution was not returned.")
         result["freevariables"] = VarMap(zip(self.varlocs, np.exp(primal)))
         result["constants"] = VarMap(self.substitutions)
         result["variables"] = VarMap(result["freevariables"])
         result["variables"].update(result["constants"])
-        result["soltime"] = solver_out["soltime"]
+        result["soltime"] = solver_out.meta["soltime"]
 
         if self.integersolve:
             result["choicevariables"] = VarMap(
@@ -530,24 +528,18 @@ class GeometricProgram:
                         "This model has the discretized choice variables"
                         " %s, but since the '%s' solver doesn't support discretization"
                         " they were treated as continuous variables."
-                        % (sorted(self.choicevaridxs.keys()), solver_out["solver"]),
+                        % (
+                            sorted(self.choicevaridxs.keys()),
+                            solver_out.meta["solver"],
+                        ),
                         self.choicevaridxs,
                     )
                 ]
             }  # TODO: choicevaridxs seems unnecessary
 
         result["sensitivities"] = {"constraints": {}}
-        # fix la, confirmed not needed for cvxopt
-        if "la" in solver_out:
-            if len(solver_out["la"]) == len(self.data.m_idxs) - 1:
-                # assume solver dropped the cost's sensitivity (always 1.0)
-                solver_out["la"] = np.hstack(([1.0], solver_out["la"]))
-        if "la" not in solver_out:
-            solver_out["la"] = self.data.compute_la(solver_out["nu"])
-        if "nu" not in solver_out:
-            solver_out["nu"] = self.data.compute_nu(solver_out["la"], primal)
         cost_senss, gpv_ss, absv_ss, m_senss = self._calculate_sensitivities(
-            result, solver_out["la"], solver_out["nu"]
+            result, solver_out.la, solver_out.nu
         )
 
         # Handle linked sensitivities
