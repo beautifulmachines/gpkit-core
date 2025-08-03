@@ -83,17 +83,15 @@ class CompiledGP:
     c: Sequence
     A: CootMatrix
     m_idxs: Sequence[range]
-    p_idxs: Sequence
 
     @classmethod
     def from_hmaps(cls, hmaps, varlocs):
         "Generates nomial and solve data (A, p_idxs) from posynomials."
         assert not varlocs  # set by side effect, should be empty to begin
-        m_idxs, p_idxs, c, exps = [], [], [], []
+        m_idxs, c, exps = [], [], []
         m_idx = 0
         row, col, data = [], [], []
         for p_idx, hmap in enumerate(hmaps):
-            p_idxs.extend([p_idx] * len(hmap))
             m_idxs.append(range(m_idx, m_idx + len(hmap)))
             c.extend(hmap.values())
             exps.extend(hmap)
@@ -105,18 +103,22 @@ class CompiledGP:
                 for var in exp:
                     varlocs[var].append(m_idx)
                 m_idx += 1
-        p_idxs = np.array(p_idxs, "int32")  # to use array equalities
         for j, (var, locs) in enumerate(varlocs.items()):
             row.extend(locs)
             col.extend([j] * len(locs))
             data.extend(exps[i][var] for i in locs)
         A = CootMatrix(row, col, data)
-        return cls(c=c, A=A, m_idxs=m_idxs, p_idxs=p_idxs)
+        return cls(c=c, A=A, m_idxs=m_idxs)
 
     @property
     def k(self):
         "length of each posynomial"
         return tuple(len(p) for p in self.m_idxs)
+
+    @property
+    def p_idxs(self):
+        "posynomial index of each monomial"
+        return np.repeat(range(len(self.m_idxs)), self.k)
 
     def zvals(self, primal_sol):
         "z values for a given primal solution"
