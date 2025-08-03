@@ -4,7 +4,9 @@
 import sys
 import warnings as pywarnings
 from collections import defaultdict
+from dataclasses import dataclass
 from time import time
+from typing import Sequence
 
 import numpy as np
 
@@ -63,6 +65,164 @@ def _get_solver(solver, kwargs):
     else:
         raise ValueError(f"Unknown solver '{solver}'.")
     return solver, optimize
+
+
+@dataclass(frozen=True, slots=True)
+class CompiledGP:
+    """
+    Immutable numerical snapshot of a GP ready for a solver.
+
+    Parameters
+    ----------
+    c : (n_mon,) coefficients of each monomial
+    A : (n_mon, n_var) exponents of each monomial
+    m_idxs (n_posy,): row indices of each posynomial's monomials
+    """
+
+    c: Sequence
+    A: CootMatrix
+    m_idxs: Sequence[range]
+
+    @classmethod
+    def from_hmaps(cls, hmaps, varcols):
+        "Generates nomial and solve data (A, p_idxs) from posynomials."
+        m_idxs, c = [], []
+        m_idx = 0
+        row, col, data = [], [], []
+        for hmap in hmaps:
+            m_idxs.append(range(m_idx, m_idx + len(hmap)))
+            c.extend(hmap.values())
+            for exp in hmap:
+                if not exp:  # space out A matrix with constants for mosek
+                    assert m_idx < len(hmap)  # constants only expected in cost
+                    row.append(m_idx)
+                    col.append(0)
+                    data.append(0)
+                else:
+                    row.extend([m_idx] * len(exp))
+                    col.extend([varcols[var] for var in exp])
+                    data.extend(exp.values())
+                m_idx += 1
+        return cls(c=c, A=CootMatrix(row, col, data), m_idxs=m_idxs)
+
+    def __post_init__(self):
+        self.validate()
+
+    def validate(self):
+        "simple validation checks"
+        nrow, _ = self.A.shape
+        if len(self.c) != nrow:
+            raise ValueError(f"c has {len(self.c)} rows but A has {nrow}.")
+        last_stop = 0
+        for rng in self.m_idxs:
+            if not isinstance(rng, range):
+                raise TypeError("m_idxs must contain range objects")
+            if rng.start != last_stop:
+                raise ValueError("Posynomial rows must be contiguous in A")
+            last_stop = rng.stop
+        if last_stop != nrow:
+            raise ValueError(f"m_idxs maps {last_stop} rows but A has {nrow}.")
+
+    @property
+    def k(self):
+        "length of each posynomial"
+        return tuple(len(p) for p in self.m_idxs)
+
+    @property
+    def p_idxs(self):
+        "posynomial index of each monomial"
+        return np.repeat(range(len(self.m_idxs)), self.k)
+
+    def compute_z(self, x):
+        "z values for a given primal solution"
+        return np.log(self.c) + self.A.dot(x)
+
+    def check_solution(self, cost, primal, nu, la, tol, abstol=1e-20):
+        # pylint: disable=too-many-arguments,too-many-positional-arguments
+        """Run checks to mathematically confirm solution solves this GP
+
+        Arguments
+        ---------
+        cost:   float
+            cost returned by solver
+        primal: list
+            primal solution returned by solver
+        nu:     numpy.ndarray
+            monomial lagrange multiplier
+        la:     numpy.ndarray
+            posynomial lagrange multiplier
+
+        Raises
+        ------
+        Infeasible if any problems are found
+        """
+        A = self.A.tocsr()
+
+        def almost_equal(num1, num2):
+            "local almost equal test"
+            return (
+                num1 == num2
+                or abs((num1 - num2) / (num1 + num2)) < tol
+                or abs(num1 - num2) < abstol
+            )
+
+        # check primal sol #
+        primal_exp_vals = self.c * np.exp(A.dot(primal))  # c*e^Ax
+        if not almost_equal(primal_exp_vals[self.m_idxs[0]].sum(), cost):
+            raise Infeasible(
+                "Primal solution computed cost did not match"
+                " solver-returned cost: %s vs %s."
+                % (primal_exp_vals[self.m_idxs[0]].sum(), cost)
+            )
+        for mi in self.m_idxs[1:]:
+            if primal_exp_vals[mi].sum() > 1 + tol:
+                raise Infeasible(
+                    "Primal solution violates constraint: %s is "
+                    "greater than 1" % primal_exp_vals[mi].sum()
+                )
+        # check dual sol #
+        # if self.integersolve:
+        #     return
+        # note: follows dual formulation in section 3.1 of
+        # http://web.mit.edu/~whoburg/www/papers/hoburg_phd_thesis.pdf
+        if not almost_equal(nu[self.m_idxs[0]].sum(), 1):
+            raise Infeasible(
+                "Dual variables associated with objective sum"
+                " to %s, not 1" % nu[self.m_idxs[0]].sum()
+            )
+        if any(nu < 0):
+            minnu = min(nu)
+            if minnu < -tol / 1000:
+                raise Infeasible(
+                    "Dual solution has negative entries as" " large as %s." % minnu
+                )
+        if any(np.abs(A.T.dot(nu)) > tol):
+            raise Infeasible("Dual: sum of nu^T * A did not vanish.")
+        b = np.log(self.c)
+        dual_cost = sum(
+            nu[mi].dot(b[mi] - np.log(nu[mi] / la[i]))
+            for i, mi in enumerate(self.m_idxs)
+            if la[i]
+        )
+        if not almost_equal(np.exp(dual_cost), cost):
+            raise Infeasible(
+                "Dual cost %s does not match primal cost %s" % (np.exp(dual_cost), cost)
+            )
+
+    def compute_la(self, nu):
+        "compute lambda from nu"
+        assert np.shape(nu) == (len(self.c),)
+        return np.array([sum(nu[mi]) for mi in self.m_idxs])
+
+    def compute_nu(self, la, x):
+        "compute nu from lambda and primal solution x"
+        assert np.shape(la) == (len(self.m_idxs),)
+        z = self.compute_z(x)
+        nu_by_posy = [
+            la[p_i] * np.exp(z[m_is]) / sum(np.exp(z[m_is]))
+            for p_i, m_is in enumerate(self.m_idxs)
+        ]
+        return np.hstack(nu_by_posy)
 
 
 class GeometricProgram:
@@ -140,49 +300,24 @@ class GeometricProgram:
         return missingbounds
 
     def gen(self):
-        """Generates nomial and solve data (A, p_idxs) from posynomials.
-
-        k [posys]: number of monomials (rows of A) present in each constraint
-        m_idxs [mons]: monomial indices of each posynomial
-        p_idxs [mons]: posynomial index of each monomial
-        cs, exps [mons]: coefficient and exponents of each monomial
-        varlocs: {vk: monomial indices of each variables' location}
-        meq_idxs: {all indices of equality mons} and {the first index of each}
-        varidxs: {vk: which column corresponds to it in A}
-        A [mons, vks]: sparse array of each monomials' variables' exponents
-
-        """
-        self.k = [len(hmap) for hmap in self.hmaps]
-        self.m_idxs, self.p_idxs, self.cs, self.exps = [], [], [], []
+        "compile this program and set varlocs, meq_idxs"
         self.varkeys = self.varlocs = defaultdict(list)
         self.meq_idxs = MonoEqualityIndexes()
+        self.exps = []
         m_idx = 0
-        row, col, data = [], [], []
-        for p_idx, (n_mons, hmap) in enumerate(zip(self.k, self.hmaps)):
-            self.p_idxs.extend([p_idx] * n_mons)
-            self.m_idxs.append(slice(m_idx, m_idx + n_mons))
-            if getattr(self.hmaps[p_idx], "from_meq", False):
+        for hmap in self.hmaps:
+            if getattr(hmap, "from_meq", False):
                 self.meq_idxs.all.add(m_idx)
                 if len(self.meq_idxs.all) > 2 * len(self.meq_idxs.first_half):
                     self.meq_idxs.first_half.add(m_idx)
             self.exps.extend(hmap)
-            self.cs.extend(hmap.values())
             for exp in hmap:
-                if not exp:  # space out A matrix with constants for mosek
-                    row.append(m_idx)
-                    col.append(0)
-                    data.append(0)
                 for var in exp:
                     self.varlocs[var].append(m_idx)
                 m_idx += 1
-        self.p_idxs = np.array(self.p_idxs, "int32")  # to use array equalities
-        self.varidxs = {vk: i for i, vk in enumerate(self.varlocs)}
+        self.varcols = {vk: i for i, vk in enumerate(self.varlocs)}
         self.choicevaridxs = {vk: i for i, vk in enumerate(self.varlocs) if vk.choices}
-        for j, (var, locs) in enumerate(self.varlocs.items()):
-            row.extend(locs)
-            col.extend([j] * len(locs))
-            data.extend(self.exps[i][var] for i in locs)
-        self.A = CootMatrix(row, col, data)
+        self.data = CompiledGP.from_hmaps(self.hmaps, self.varcols)
 
     # pylint: disable=too-many-statements, too-many-locals,too-many-branches
     def solve(self, solver=None, *, verbosity=1, gen_result=True, **kwargs):
@@ -210,7 +345,7 @@ class GeometricProgram:
         if verbosity > 0:
             print(f"Using solver '{solvername}'")
             print(f" for {len(self.varlocs)} free variables")
-            print(f"  in {len(self.k)} posynomial inequalities.")
+            print(f"  in {len(self.data.k)} posynomial inequalities.")
 
         solverargs = DEFAULT_SOLVER_KWARGS.get(solvername, {})
         solverargs.update(kwargs)
@@ -221,14 +356,10 @@ class GeometricProgram:
         solver_out, infeasibility, original_stdout = {}, None, sys.stdout
         try:
             sys.stdout = SolverLog(original_stdout, verbosity=verbosity - 2)
-            solver_out = solverfn(
-                c=self.cs,
-                A=self.A,
-                meq_idxs=self.meq_idxs,
-                k=self.k,
-                p_idxs=self.p_idxs,
-                **solverargs,
-            )
+            solver_out = solverfn(self.data, meq_idxs=self.meq_idxs, **solverargs)
+            solver_out.meta["soltime"] = time() - starttime
+            if verbosity > 0:
+                print(f"Solving took {solver_out.meta['soltime']:.3g} seconds.")
         except Infeasible as e:
             infeasibility = e
         except InvalidLicense as e:
@@ -241,11 +372,6 @@ class GeometricProgram:
             self.solve_log = sys.stdout
             sys.stdout = original_stdout
             self.solver_out = solver_out
-
-        solver_out["solver"] = solvername
-        solver_out["soltime"] = time() - starttime
-        if verbosity > 0:
-            print(f"Solving took {solver_out['soltime']:.3g} seconds.")
 
         if infeasibility:
             if isinstance(infeasibility, PrimalInfeasible):
@@ -307,12 +433,12 @@ class GeometricProgram:
         # solution checking #
         initsolwarning(result, "Solution Inconsistency")
         try:
-            tol = SOLUTION_TOL.get(solver_out["solver"], 1e-5)
-            self.check_solution(
+            tol = SOLUTION_TOL.get(solver_out.meta["solver"], 1e-5)
+            self.data.check_solution(
                 result["cost"],
-                solver_out["primal"],
-                solver_out["nu"],
-                solver_out["la"],
+                solver_out.x,
+                solver_out.nu,
+                solver_out.la,
                 tol,
             )
         except Infeasible as chkerror:
@@ -328,31 +454,7 @@ class GeometricProgram:
             )
         return result
 
-    def _generate_nula(self, solver_out):
-        if "nu" in solver_out:
-            # solver gave us monomial sensitivities, generate posynomial ones
-            solver_out["nu"] = nu = np.ravel(solver_out["nu"])
-            nu_by_posy = [nu[mi] for mi in self.m_idxs]
-            solver_out["la"] = la = np.array([sum(nup) for nup in nu_by_posy])
-        elif "la" in solver_out:
-            la = np.ravel(solver_out["la"])
-            if len(la) == len(self.hmaps) - 1:
-                # assume solver dropped the cost's sensitivity (always 1.0)
-                la = np.hstack(([1.0], la))
-            # solver gave us posynomial sensitivities, generate monomial ones
-            solver_out["la"] = la
-            z = np.log(self.cs) + self.A.dot(solver_out["primal"])
-            m_iss = [self.p_idxs == i for i in range(len(la))]
-            nu_by_posy = [
-                la[p_i] * np.exp(z[m_is]) / sum(np.exp(z[m_is]))
-                for p_i, m_is in enumerate(m_iss)
-            ]
-            solver_out["nu"] = np.hstack(nu_by_posy)
-        else:
-            raise RuntimeWarning("The dual solution was not returned.")
-        return la, nu_by_posy
-
-    def _calculate_sensitivities(self, result, la, nu_by_posy):
+    def _calculate_sensitivities(self, result, la, nu):
         """Calculate sensitivities for variables and constraints.
 
         Returns
@@ -360,6 +462,7 @@ class GeometricProgram:
         tuple
             (cost_senss, gpv_ss, absv_ss, m_senss)
         """
+        nu_by_posy = [nu[mi] for mi in self.data.m_idxs]
         cost_senss = sum(
             nu_i * exp for (nu_i, exp) in zip(nu_by_posy[0], self.cost.hmap)
         )
@@ -385,15 +488,15 @@ class GeometricProgram:
         return cost_senss, gpv_ss, absv_ss, m_senss
 
     def _compile_result(self, solver_out):
-        result = {"cost": float(solver_out["objective"]), "cost function": self.cost}
-        primal = solver_out["primal"]
+        result = {"cost": float(solver_out.objective), "cost function": self.cost}
+        primal = solver_out.x
         if len(self.varlocs) != len(primal):
             raise RuntimeWarning("The primal solution was not returned.")
         result["freevariables"] = VarMap(zip(self.varlocs, np.exp(primal)))
         result["constants"] = VarMap(self.substitutions)
         result["variables"] = VarMap(result["freevariables"])
         result["variables"].update(result["constants"])
-        result["soltime"] = solver_out["soltime"]
+        result["soltime"] = solver_out.meta["soltime"]
 
         if self.integersolve:
             result["choicevariables"] = VarMap(
@@ -425,16 +528,18 @@ class GeometricProgram:
                         "This model has the discretized choice variables"
                         " %s, but since the '%s' solver doesn't support discretization"
                         " they were treated as continuous variables."
-                        % (sorted(self.choicevaridxs.keys()), solver_out["solver"]),
+                        % (
+                            sorted(self.choicevaridxs.keys()),
+                            solver_out.meta["solver"],
+                        ),
                         self.choicevaridxs,
                     )
                 ]
             }  # TODO: choicevaridxs seems unnecessary
 
         result["sensitivities"] = {"constraints": {}}
-        la, self.nu_by_posy = self._generate_nula(solver_out)
         cost_senss, gpv_ss, absv_ss, m_senss = self._calculate_sensitivities(
-            result, la, self.nu_by_posy
+            result, solver_out.la, solver_out.nu
         )
 
         # Handle linked sensitivities
@@ -468,78 +573,6 @@ class GeometricProgram:
         ]  # NOTE: backwards compat.
         result["sensitivities"]["models"] = dict(m_senss)
         return SolutionArray(result)
-
-    def check_solution(self, cost, primal, nu, la, tol, abstol=1e-20):
-        # pylint: disable=too-many-arguments,too-many-positional-arguments
-        """Run checks to mathematically confirm solution solves this GP
-
-        Arguments
-        ---------
-        cost:   float
-            cost returned by solver
-        primal: list
-            primal solution returned by solver
-        nu:     numpy.ndarray
-            monomial lagrange multiplier
-        la:     numpy.ndarray
-            posynomial lagrange multiplier
-
-        Raises
-        ------
-        Infeasible if any problems are found
-        """
-        A = self.A.tocsr()
-
-        def almost_equal(num1, num2):
-            "local almost equal test"
-            return (
-                num1 == num2
-                or abs((num1 - num2) / (num1 + num2)) < tol
-                or abs(num1 - num2) < abstol
-            )
-
-        # check primal sol #
-        primal_exp_vals = self.cs * np.exp(A.dot(primal))  # c*e^Ax
-        if not almost_equal(primal_exp_vals[self.m_idxs[0]].sum(), cost):
-            raise Infeasible(
-                "Primal solution computed cost did not match"
-                " solver-returned cost: %s vs %s."
-                % (primal_exp_vals[self.m_idxs[0]].sum(), cost)
-            )
-        for mi in self.m_idxs[1:]:
-            if primal_exp_vals[mi].sum() > 1 + tol:
-                raise Infeasible(
-                    "Primal solution violates constraint: %s is "
-                    "greater than 1" % primal_exp_vals[mi].sum()
-                )
-        # check dual sol #
-        if self.integersolve:
-            return
-        # note: follows dual formulation in section 3.1 of
-        # http://web.mit.edu/~whoburg/www/papers/hoburg_phd_thesis.pdf
-        if not almost_equal(self.nu_by_posy[0].sum(), 1):
-            raise Infeasible(
-                "Dual variables associated with objective sum"
-                " to %s, not 1" % self.nu_by_posy[0].sum()
-            )
-        if any(nu < 0):
-            minnu = min(nu)
-            if minnu < -tol / 1000:
-                raise Infeasible(
-                    "Dual solution has negative entries as" " large as %s." % minnu
-                )
-        if any(np.abs(A.T.dot(nu)) > tol):
-            raise Infeasible("Dual: sum of nu^T * A did not vanish.")
-        b = np.log(self.cs)
-        dual_cost = sum(
-            self.nu_by_posy[i].dot(b[mi] - np.log(self.nu_by_posy[i] / la[i]))
-            for i, mi in enumerate(self.m_idxs)
-            if la[i]
-        )
-        if not almost_equal(np.exp(dual_cost), cost):
-            raise Infeasible(
-                "Dual cost %s does not match primal cost %s" % (np.exp(dual_cost), cost)
-            )
 
 
 def gen_meq_bounds(
