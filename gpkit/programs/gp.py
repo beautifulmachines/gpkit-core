@@ -91,7 +91,7 @@ class CompiledGP:
         m_idxs, c, exps = [], [], []
         m_idx = 0
         row, col, data = [], [], []
-        for p_idx, hmap in enumerate(hmaps):
+        for hmap in hmaps:
             m_idxs.append(range(m_idx, m_idx + len(hmap)))
             c.extend(hmap.values())
             exps.extend(hmap)
@@ -107,8 +107,7 @@ class CompiledGP:
             row.extend(locs)
             col.extend([j] * len(locs))
             data.extend(exps[i][var] for i in locs)
-        A = CootMatrix(row, col, data)
-        return cls(c=c, A=A, m_idxs=m_idxs)
+        return cls(c=c, A=CootMatrix(row, col, data), m_idxs=m_idxs)
 
     @property
     def k(self):
