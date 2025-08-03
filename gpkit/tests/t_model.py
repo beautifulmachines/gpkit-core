@@ -248,13 +248,15 @@ class TestGP(unittest.TestCase):
         # pylint: disable=no-member
         gp1, gp2, gp3 = [m.program for m in [m1, m2, m3]]
         self.assertEqual(
-            gp1.A, CootMatrix(row=[0, 1, 2], col=[0, 0, 0], data=[-1, 1, -1])
+            gp1.compiled.A, CootMatrix(row=[0, 1, 2], col=[0, 0, 0], data=[-1, 1, -1])
         )
-        self.assertEqual(gp2.A, CootMatrix(row=[0, 1], col=[0, 0], data=[-1, 1]))
         self.assertEqual(
-            gp3.A, CootMatrix(row=[0, 1, 2], col=[0, 0, 0], data=[-1, 1, -1])
+            gp2.compiled.A, CootMatrix(row=[0, 1], col=[0, 0], data=[-1, 1])
         )
-        self.assertTrue((gp3.A.todense() == np.matrix([-1, 1, -1]).T).all())
+        self.assertEqual(
+            gp3.compiled.A, CootMatrix(row=[0, 1, 2], col=[0, 0, 0], data=[-1, 1, -1])
+        )
+        self.assertTrue((gp3.compiled.A.todense() == np.matrix([-1, 1, -1]).T).all())
         self.assertAlmostEqual(sol1(Mdd), sol2(Mdd))
         self.assertAlmostEqual(sol1(Mdd), sol3(Mdd))
         self.assertAlmostEqual(sol2(Mdd), sol3(Mdd))
@@ -265,8 +267,8 @@ class TestGP(unittest.TestCase):
         m.solve(verbosity=0)
         # pylint: disable=no-member
         gp = m.program  # created by solve()
-        self.assertEqual(gp.cs[1], 2 * gp.cs[2])
-        self.assertEqual(gp.A.data[1], gp.A.data[2])
+        self.assertEqual(gp.compiled.c[1], 2 * gp.compiled.c[2])
+        self.assertEqual(gp.compiled.A.data[1], gp.compiled.A.data[2])
 
     def test_zeroing(self):
         L = Variable("L")
@@ -330,8 +332,8 @@ class TestGP(unittest.TestCase):
         gp1 = m1.gp()
         gp2 = m2.gp()
         # pylint: disable=no-member
-        self.assertEqual(gp1.A, gp2.A)
-        self.assertTrue(gp1.cs == gp2.cs)
+        self.assertEqual(gp1.compiled.A, gp2.compiled.A)
+        self.assertEqual(gp1.compiled.c, gp2.compiled.c)
 
 
 class TestSP(unittest.TestCase):

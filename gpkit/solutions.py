@@ -24,7 +24,7 @@ class Solution:
 
     primal: VarMap
     dual: VarMap
-    # program : CompiledProgram
+    # program : GP
 
     def __getitem__(self, key: VarKey) -> float:
         return self.primal[key]
@@ -32,7 +32,7 @@ class Solution:
 
 class SolutionSequence(List[Solution]):
     """
-    Ordered collection of Solution objects all sharing same CompiledProgram.
+    Ordered collection of Solution objects all sharing same underlying model.
     """
 
     def __init__(self, iterable=(), program=None):
@@ -46,9 +46,7 @@ class SolutionSequence(List[Solution]):
         if self.program is None:
             self.program = sol.program
         elif sol.program is not self.program:
-            raise ValueError(
-                "SolutionSequence elements must share the same CompiledProgram."
-            )
+            raise ValueError("SolutionSequence elements must share the same program")
         super().append(sol)
 
     # ----------------------------------------------------------------
