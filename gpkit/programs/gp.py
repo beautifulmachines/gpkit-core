@@ -488,7 +488,7 @@ class GeometricProgram:
         return cost_senss, gpv_ss, absv_ss, m_senss
 
     def _compile_result(self, solver_out):
-        result = {"cost": float(solver_out.objective), "cost function": self.cost}
+        result = {"cost": float(solver_out.cost), "cost function": self.cost}
         primal = solver_out.x
         if len(self.varlocs) != len(primal):
             raise RuntimeWarning("The primal solution was not returned.")

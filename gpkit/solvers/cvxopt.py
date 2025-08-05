@@ -114,7 +114,7 @@ def optimize(prob, meq_idxs, use_leqs=True, **kwargs):
     primal = np.ravel(solution["x"])
     return RawSolution(
         status=solution["status"],
-        objective=np.exp(solution["primal objective"]),
+        cost=np.exp(solution["primal objective"]),
         x=primal,
         la=la,
         nu=prob.compute_nu(la, primal),

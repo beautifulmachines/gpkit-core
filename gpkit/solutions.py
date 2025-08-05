@@ -14,7 +14,7 @@ class RawSolution:
     x: Sequence
     nu: Sequence
     la: Sequence
-    objective: float
+    cost: float
     status: str
     meta: dict
 
