@@ -180,10 +180,10 @@ class CompiledGP:
         if not almost_equal(rawsol.nu[self.m_idxs[0]].sum(), 1):
             raise Infeasible(
                 "Dual variables associated with objective sum"
-                f" to {nu[self.m_idxs[0]].sum()}, not 1"
+                f" to {rawsol.nu[self.m_idxs[0]].sum()}, not 1"
             )
         if any(rawsol.nu < 0):
-            minnu = min(nu)
+            minnu = min(rawsol.nu)
             if minnu < -tol / 1000:
                 raise Infeasible(
                     f"Dual solution has negative entries as large as {minnu}."
@@ -198,7 +198,7 @@ class CompiledGP:
         )
         if not almost_equal(np.exp(dual_cost), rawsol.cost):
             raise Infeasible(
-                f"Dual cost {np.exp(dual_cost)} does not match primal cost {rawsol.cost}"
+                f"Dual cost {np.exp(dual_cost)} differs from primal cost {rawsol.cost}"
             )
 
     def compute_la(self, nu):
@@ -417,10 +417,8 @@ class GeometricProgram:
         # result packing #
         result = self._compile_result(solver_out)  # NOTE: SIDE EFFECTS
         if verbosity > 0:
-            print(  # pylint: disable=consider-using-f-string
-                "Result packing took %.2g%% of solve time."
-                % ((time() - tic) / soltime * 100)
-            )
+            rpackpct = (time() - tic) / soltime * 100
+            print(f"Result packing took {rpackpct:.2g}%% of solve time.")
             tic = time()
         # solution checking #
         initsolwarning(result, "Solution Inconsistency")
@@ -434,9 +432,9 @@ class GeometricProgram:
                 if verbosity > -4:
                     print(f"Solution check warning: {msg}")
         if verbosity > 0:
-            print(  # pylint: disable=consider-using-f-string
-                "Solution checking took %.2g%% of solve time."
-                % ((time() - tic) / soltime * 100)
+            print(
+                f"Solution checking took "
+                f"{((time() - tic) / soltime * 100):.2g}% of solve time."
             )
         return result
 
@@ -496,11 +494,11 @@ class GeometricProgram:
                 "No Dual Solution": [
                     (
                         "This model has the discretized choice variables"
-                        " %s and hence no dual solution. You can fix those variables"
-                        " to their optimal value and get sensitivities to the resulting"
-                        " continuous problem by updating your model's substitions with"
-                        ' `sol["choicevariables"]`.'
-                        % sorted(self.choicevaridxs.keys()),
+                        f" {sorted(self.choicevaridxs.keys())} and hence no dual"
+                        " solution. You can fix those variables to their optimal"
+                        " values and get sensitivities to the resulting"
+                        " continuous problem by updating your model's"
+                        " substitions with `sol['choicevariables']`.",
                         self.choicevaridxs,
                     )
                 ]
@@ -512,12 +510,9 @@ class GeometricProgram:
                 "Freed Choice Variables": [
                     (
                         "This model has the discretized choice variables"
-                        " %s, but since the '%s' solver doesn't support discretization"
-                        " they were treated as continuous variables."
-                        % (
-                            sorted(self.choicevaridxs.keys()),
-                            solver_out.meta["solver"],
-                        ),
+                        f" {sorted(self.choicevaridxs.keys())}, but since the "
+                        f"'{solver_out.meta['solver']}' solver doesn't support "
+                        "discretization they were treated as continuous variables.",
                         self.choicevaridxs,
                     )
                 ]
