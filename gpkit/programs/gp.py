@@ -482,41 +482,8 @@ class GeometricProgram:
         result["variables"].update(result["constants"])
         result["soltime"] = solver_out.meta["soltime"]
 
-        if self.integersolve:
-            result["choicevariables"] = VarMap(
-                {
-                    k: v
-                    for k, v in result["freevariables"].items()
-                    if k in self.choicevaridxs
-                }
-            )
-            result["warnings"] = {
-                "No Dual Solution": [
-                    (
-                        "This model has the discretized choice variables"
-                        f" {sorted(self.choicevaridxs.keys())} and hence no dual"
-                        " solution. You can fix those variables to their optimal"
-                        " values and get sensitivities to the resulting"
-                        " continuous problem by updating your model's"
-                        " substitions with `sol['choicevariables']`.",
-                        self.choicevaridxs,
-                    )
-                ]
-            }
-            return SolutionArray(result)
-
-        if self.choicevaridxs:
-            result["warnings"] = {
-                "Freed Choice Variables": [
-                    (
-                        "This model has the discretized choice variables"
-                        f" {sorted(self.choicevaridxs.keys())}, but since the "
-                        f"'{solver_out.meta['solver']}' solver doesn't support "
-                        "discretization they were treated as continuous variables.",
-                        self.choicevaridxs,
-                    )
-                ]
-            }  # TODO: choicevaridxs seems unnecessary
+        if self.integersolve or self.choicevaridxs:
+            self._handle_choicevars(solver_out, result)
 
         result["sensitivities"] = {"constraints": {}}
         cost_senss, gpv_ss, absv_ss, m_senss = self._calculate_sensitivities(
@@ -554,6 +521,44 @@ class GeometricProgram:
         ]  # NOTE: backwards compat.
         result["sensitivities"]["models"] = dict(m_senss)
         return SolutionArray(result)
+
+    def _handle_choicevars(self, solver_out, result):
+        "This is essentially archived code, until it can be tested with mosek"
+        if self.integersolve:
+            result["choicevariables"] = VarMap(
+                {
+                    k: v
+                    for k, v in result["freevariables"].items()
+                    if k in self.choicevaridxs
+                }
+            )
+            result["warnings"] = {
+                "No Dual Solution": [
+                    (
+                        "This model has the discretized choice variables"
+                        f" {sorted(self.choicevaridxs.keys())} and hence no dual"
+                        " solution. You can fix those variables to their optimal"
+                        " values and get sensitivities to the resulting"
+                        " continuous problem by updating your model's"
+                        " substitions with `sol['choicevariables']`.",
+                        self.choicevaridxs,
+                    )
+                ]
+            }
+            return SolutionArray(result)
+
+        if self.choicevaridxs:
+            result["warnings"] = {
+                "Freed Choice Variables": [
+                    (
+                        "This model has the discretized choice variables"
+                        f" {sorted(self.choicevaridxs.keys())}, but since the "
+                        f"'{solver_out.meta['solver']}' solver doesn't support "
+                        "discretization they were treated as continuous variables.",
+                        self.choicevaridxs,
+                    )
+                ]
+            }  # TODO: choicevaridxs seems unnecessary
 
 
 def gen_meq_bounds(
