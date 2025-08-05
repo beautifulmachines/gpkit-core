@@ -391,7 +391,7 @@ class GeometricProgram:
                     " constraints/constants, bounding variables, or"
                     " using a different solver might fix it."
                 )
-            if verbosity > 0 and solver_out["soltime"] < 1 and self.model:
+            if verbosity > 0 and solver_out.meta["soltime"] < 1 and self.model:
                 print(
                     msg + "\nSince the model solved in less than a second,"
                     " let's run `.debug()` to analyze what happened.\n"
@@ -420,7 +420,7 @@ class GeometricProgram:
     def generate_result(self, solver_out, *, verbosity=0, dual_check=True):
         "Generates a full SolutionArray and checks it."
         if verbosity > 0:
-            soltime = solver_out["soltime"]
+            soltime = solver_out.meta["soltime"]
             tic = time()
         # result packing #
         result = self._compile_result(solver_out)  # NOTE: SIDE EFFECTS
