@@ -1,4 +1,4 @@
-# pylint: disable=fixme,import-outside-toplevel,consider-using-f-string
+# pylint: disable=fixme,import-outside-toplevel
 """Implement the GeometricProgram class"""
 
 import sys
@@ -137,20 +137,13 @@ class CompiledGP:
         "z values for a given primal solution"
         return np.log(self.c) + self.A.dot(x)
 
-    def check_solution(self, cost, primal, nu, la, tol, abstol=1e-20):
-        # pylint: disable=too-many-arguments,too-many-positional-arguments
+    def check_solution(self, rawsol, tol, abstol=1e-20):
         """Run checks to mathematically confirm solution solves this GP
 
         Arguments
         ---------
-        cost:   float
-            cost returned by solver
-        primal: list
-            primal solution returned by solver
-        nu:     numpy.ndarray
-            monomial lagrange multiplier
-        la:     numpy.ndarray
-            posynomial lagrange multiplier
+        rawsol: RawSolution
+            solution returned by solver
 
         Raises
         ------
@@ -167,46 +160,45 @@ class CompiledGP:
             )
 
         # check primal sol #
-        primal_exp_vals = self.c * np.exp(A.dot(primal))  # c*e^Ax
-        if not almost_equal(primal_exp_vals[self.m_idxs[0]].sum(), cost):
+        primal_exp_vals = self.c * np.exp(A.dot(rawsol.x))  # c*e^Ax
+        if not almost_equal(primal_exp_vals[self.m_idxs[0]].sum(), rawsol.cost):
             raise Infeasible(
-                "Primal solution computed cost did not match"
-                " solver-returned cost: %s vs %s."
-                % (primal_exp_vals[self.m_idxs[0]].sum(), cost)
+                f"Primal computed cost {primal_exp_vals[self.m_idxs[0]].sum()} "
+                f"did not match solver-returned cost {rawsol.cost}."
             )
         for mi in self.m_idxs[1:]:
             if primal_exp_vals[mi].sum() > 1 + tol:
                 raise Infeasible(
-                    "Primal solution violates constraint: %s is "
-                    "greater than 1" % primal_exp_vals[mi].sum()
+                    "Primal solution violates constraint: "
+                    f"{primal_exp_vals[mi].sum()} is greater than 1"
                 )
         # check dual sol #
         # if self.integersolve:
         #     return
         # note: follows dual formulation in section 3.1 of
         # http://web.mit.edu/~whoburg/www/papers/hoburg_phd_thesis.pdf
-        if not almost_equal(nu[self.m_idxs[0]].sum(), 1):
+        if not almost_equal(rawsol.nu[self.m_idxs[0]].sum(), 1):
             raise Infeasible(
                 "Dual variables associated with objective sum"
-                " to %s, not 1" % nu[self.m_idxs[0]].sum()
+                f" to {nu[self.m_idxs[0]].sum()}, not 1"
             )
-        if any(nu < 0):
+        if any(rawsol.nu < 0):
             minnu = min(nu)
             if minnu < -tol / 1000:
                 raise Infeasible(
-                    "Dual solution has negative entries as" " large as %s." % minnu
+                    f"Dual solution has negative entries as large as {minnu}."
                 )
-        if any(np.abs(A.T.dot(nu)) > tol):
-            raise Infeasible("Dual: sum of nu^T * A did not vanish.")
+        if any(np.abs(A.T.dot(rawsol.nu)) > tol):
+            raise Infeasible("Dual: nu^T * A did not vanish.")
         b = np.log(self.c)
         dual_cost = sum(
-            nu[mi].dot(b[mi] - np.log(nu[mi] / la[i]))
+            rawsol.nu[mi].dot(b[mi] - np.log(rawsol.nu[mi] / rawsol.la[i]))
             for i, mi in enumerate(self.m_idxs)
-            if la[i]
+            if rawsol.la[i]
         )
-        if not almost_equal(np.exp(dual_cost), cost):
+        if not almost_equal(np.exp(dual_cost), rawsol.cost):
             raise Infeasible(
-                "Dual cost %s does not match primal cost %s" % (np.exp(dual_cost), cost)
+                f"Dual cost {np.exp(dual_cost)} does not match primal cost {rawsol.cost}"
             )
 
     def compute_la(self, nu):
@@ -434,13 +426,7 @@ class GeometricProgram:
         initsolwarning(result, "Solution Inconsistency")
         try:
             tol = SOLUTION_TOL.get(solver_out.meta["solver"], 1e-5)
-            self.data.check_solution(
-                result["cost"],
-                solver_out.x,
-                solver_out.nu,
-                solver_out.la,
-                tol,
-            )
+            self.data.check_solution(solver_out, tol)
         except Infeasible as chkerror:
             msg = str(chkerror)
             if not ("Dual" in msg and not dual_check):
