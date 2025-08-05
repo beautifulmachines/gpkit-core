@@ -20,15 +20,49 @@ class RawSolution:
 
 
 @dataclass(frozen=True, slots=True)
+class Sensitivities:
+    "Container for a Solution's sensitivities"
+
+    constraints: dict
+    # cost: dict
+    variables: VarMap
+
+    def __getitem__(self, key: VarKey) -> float:
+        return self.variables[key]
+
+    @property
+    def variablerisk(self):
+        raise NotImplementedError
+
+    @property
+    def constants(self):
+        raise NotImplementedError
+
+    @property
+    def models(self):
+        raise NotImplementedError
+
+
+@dataclass(frozen=True, slots=True)
 class Solution:
     "A single GP solution, with mappings back to variables and constraints"
 
+    cost: float
     primal: VarMap
-    dual: VarMap
+    sens: Sensitivities
     # program : GP
+    meta: dict
 
     def __getitem__(self, key: VarKey) -> float:
         return self.primal[key]
+
+    @property
+    def freevariables(self):
+        raise NotImplementedError
+
+    @property
+    def constants(self):
+        raise NotImplementedError
 
 
 class SolutionSequence(List[Solution]):
