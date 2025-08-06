@@ -436,7 +436,7 @@ class GeometricProgram:
             )
         return result
 
-    def _calculate_sensitivities(self, result, la, nu):
+    def _calculate_sensitivities(self, la, nu, varvals):
         """Calculate sensitivities for variables and constraints.
 
         Returns
@@ -450,6 +450,7 @@ class GeometricProgram:
         )
         gpv_ss = cost_senss.copy()
         m_senss = defaultdict(float)
+        constraint_senss = {}
         absv_ss = {vk: abs(x) for vk, x in cost_senss.items()}
 
         for las, nus, c in zip(la[1:], nu_by_posy[1:], self.hmaps[1:]):
@@ -457,46 +458,42 @@ class GeometricProgram:
                 if not isinstance(c, NomialMap):
                     c.parent.child = c
                 c = c.parent  # parents get their sens_from_dual used...
-            v_ss, c_senss = c.sens_from_dual(las, nus, result)
+            v_ss, c_senss = c.sens_from_dual(las, nus, varvals)
             for vk, x in v_ss.items():
                 gpv_ss[vk] = x + gpv_ss.get(vk, 0)
                 absv_ss[vk] = abs(x) + absv_ss.get(vk, 0)
             while getattr(c, "generated_by", None):
                 c.generated_by.generated = c
                 c = c.generated_by  # ...while generated_bys are just labels
-            result["sensitivities"]["constraints"][c] = c_senss
+            constraint_senss[c] = c_senss
             m_senss[lineagestr(c)] += abs(c_senss)
 
-        return cost_senss, gpv_ss, absv_ss, m_senss
+        return cost_senss, gpv_ss, absv_ss, m_senss, constraint_senss
 
     def _compile_result(self, solver_out):
-        result = {"cost": float(solver_out.cost), "cost function": self.cost}
         primal = solver_out.x
         if len(self.varlocs) != len(primal):
             raise RuntimeWarning("The primal solution was not returned.")
-        result["freevariables"] = VarMap(zip(self.varlocs, np.exp(primal)))
-        result["constants"] = VarMap(self.substitutions)
-        result["variables"] = VarMap(result["freevariables"])
-        result["variables"].update(result["constants"])
-        result["soltime"] = solver_out.meta["soltime"]
+        varvals = VarMap(zip(self.varlocs, np.exp(primal)))
+        varvals.update(self.substitutions)
+        warnings = {}
 
         if self.integersolve or self.choicevaridxs:
-            self._handle_choicevars(solver_out, result)
+            warnings.update(self._handle_choicevars(solver_out))
 
-        result["sensitivities"] = {"constraints": {}}
-        cost_senss, gpv_ss, absv_ss, m_senss = self._calculate_sensitivities(
-            result, solver_out.la, solver_out.nu
+        cost_senss, gpv_ss, absv_ss, m_senss, constraint_senss = (
+            self._calculate_sensitivities(solver_out.la, solver_out.nu, varvals)
         )
 
         # Handle linked sensitivities
         for v in list(v for v in gpv_ss if v.gradients):
             dlogcost_dlogv = gpv_ss.pop(v)
             dlogcost_dlogabsv = absv_ss.pop(v)
-            val = np.array(result["constants"][v])
+            val = np.array(self.substitutions[v])
             for c, dv_dc in v.gradients.items():
                 with pywarnings.catch_warnings():  # skip pesky divide-by-zeros
                     pywarnings.simplefilter("ignore")
-                    dlogv_dlogc = dv_dc * result["constants"][c] / val
+                    dlogv_dlogc = dv_dc * self.substitutions[c] / val
                     gpv_ss[c] = gpv_ss.get(c, 0) + dlogcost_dlogv * dlogv_dlogc
                     absv_ss[c] = absv_ss.get(c, 0) + abs(
                         dlogcost_dlogabsv * dlogv_dlogc
@@ -511,6 +508,15 @@ class GeometricProgram:
         for vk, senss in gpv_ss.items():
             m_senss[lineagestr(vk)] += abs(senss)
 
+        result = {"cost": float(solver_out.cost), "cost function": self.cost}
+        result["freevariables"] = VarMap(zip(self.varlocs, np.exp(primal)))
+        result["constants"] = VarMap(self.substitutions)
+        result["variables"] = VarMap(result["freevariables"])
+        result["variables"].update(result["constants"])
+        result["soltime"] = solver_out.meta["soltime"]
+        result["warnings"] = warnings
+
+        result["sensitivities"] = {"constraints": constraint_senss}
         result["sensitivities"]["cost"] = cost_senss
         result["sensitivities"]["variables"] = VarMap(gpv_ss)
         result["sensitivities"]["variablerisk"] = VarMap(absv_ss)
@@ -520,42 +526,35 @@ class GeometricProgram:
         result["sensitivities"]["models"] = dict(m_senss)
         return SolutionArray(result)
 
-    def _handle_choicevars(self, solver_out, result):
+    def _handle_choicevars(self, solver_out):
         "This is essentially archived code, until it can be tested with mosek"
+        warnings = {}
+
         if self.integersolve:
-            result["choicevariables"] = VarMap(
-                {
-                    k: v
-                    for k, v in result["freevariables"].items()
-                    if k in self.choicevaridxs
-                }
-            )
-            result["warnings"] = {
-                "No Dual Solution": [
-                    (
-                        "This model has the discretized choice variables"
-                        f" {sorted(self.choicevaridxs.keys())} and hence no dual"
-                        " solution. You can fix those variables to their optimal"
-                        " values and get sensitivities to the resulting"
-                        " continuous problem by updating your model's"
-                        " substitions with `sol['choicevariables']`.",
-                        self.choicevaridxs,
-                    )
-                ]
-            }
+            warnings["No Dual Solution"] = [
+                (
+                    "This model has the discretized choice variables"
+                    f" {sorted(self.choicevaridxs.keys())} and hence no dual"
+                    " solution. You can fix those variables to their optimal"
+                    " values and get sensitivities to the resulting"
+                    " continuous problem by updating your model's"
+                    " substitions with `sol['choicevariables']`.",
+                    self.choicevaridxs,
+                )
+            ]
 
         if self.choicevaridxs:
-            result["warnings"] = {
-                "Freed Choice Variables": [
-                    (
-                        "This model has the discretized choice variables"
-                        f" {sorted(self.choicevaridxs.keys())}, but since the "
-                        f"'{solver_out.meta['solver']}' solver doesn't support "
-                        "discretization they were treated as continuous variables.",
-                        self.choicevaridxs,
-                    )
-                ]
-            }  # TODO: choicevaridxs seems unnecessary
+            warnings["Freed Choice Variables"] = [
+                (
+                    "This model has the discretized choice variables"
+                    f" {sorted(self.choicevaridxs.keys())}, but since the "
+                    f"'{solver_out.meta['solver']}' solver doesn't support "
+                    "discretization they were treated as continuous variables.",
+                    self.choicevaridxs,
+                )
+            ]  # TODO: choicevaridxs seems unnecessary
+
+        return warnings
 
 
 def gen_meq_bounds(
