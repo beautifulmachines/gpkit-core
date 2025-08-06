@@ -236,7 +236,7 @@ class GeometricProgram:
                         ], {})
     >>> gp.solve()
     """
-    _result = solve_log = solver_out = model = v_ss = nu_by_posy = None
+    _result = solve_log = solver_out = model = None
     choicevaridxs = integersolve = None
 
     def __init__(self, cost, constraints, substitutions, *, checkbounds=True, **_):
