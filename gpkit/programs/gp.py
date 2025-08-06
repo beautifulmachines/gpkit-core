@@ -468,23 +468,6 @@ class GeometricProgram:
             constraint_senss[c] = c_senss
             m_senss[lineagestr(c)] += abs(c_senss)
 
-        return cost_senss, gpv_ss, absv_ss, m_senss, constraint_senss
-
-    def _compile_result(self, solver_out):
-        primal = solver_out.x
-        if len(self.varlocs) != len(primal):
-            raise RuntimeWarning("The primal solution was not returned.")
-        varvals = VarMap(zip(self.varlocs, np.exp(primal)))
-        varvals.update(self.substitutions)
-        warnings = {}
-
-        if self.integersolve or self.choicevaridxs:
-            warnings.update(self._handle_choicevars(solver_out))
-
-        cost_senss, gpv_ss, absv_ss, m_senss, constraint_senss = (
-            self._calculate_sensitivities(solver_out.la, solver_out.nu, varvals)
-        )
-
         # Handle linked sensitivities
         for v in list(v for v in gpv_ss if v.gradients):
             dlogcost_dlogv = gpv_ss.pop(v)
@@ -507,6 +490,23 @@ class GeometricProgram:
         # Add fixed variable sensitivities to models
         for vk, senss in gpv_ss.items():
             m_senss[lineagestr(vk)] += abs(senss)
+
+        return cost_senss, gpv_ss, absv_ss, m_senss, constraint_senss
+
+    def _compile_result(self, solver_out):
+        primal = solver_out.x
+        if len(self.varlocs) != len(primal):
+            raise RuntimeWarning("The primal solution was not returned.")
+        varvals = VarMap(zip(self.varlocs, np.exp(primal)))
+        varvals.update(self.substitutions)
+
+        warnings = {}
+        if self.integersolve or self.choicevaridxs:
+            warnings.update(self._handle_choicevars(solver_out))
+
+        cost_senss, gpv_ss, absv_ss, m_senss, constraint_senss = (
+            self._calculate_sensitivities(solver_out.la, solver_out.nu, varvals)
+        )
 
         result = {"cost": float(solver_out.cost), "cost function": self.cost}
         result["freevariables"] = VarMap(zip(self.varlocs, np.exp(primal)))
