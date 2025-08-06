@@ -267,9 +267,7 @@ class GeometricProgram:
             upperbound, lowerbound = False, False
             for i in locs:
                 if i not in self.meq_idxs.all:
-                    if (
-                        self.exps[i][var] > 0
-                    ):  # pylint:disable=simplifiable-if-statement
+                    if self.exps[i][var] > 0:
                         upperbound = True
                     else:
                         lowerbound = True
@@ -545,7 +543,6 @@ class GeometricProgram:
                     )
                 ]
             }
-            return SolutionArray(result)
 
         if self.choicevaridxs:
             result["warnings"] = {
