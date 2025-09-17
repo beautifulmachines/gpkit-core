@@ -21,7 +21,6 @@ from ..exceptions import (
     UnknownInfeasible,
 )
 from ..nomials.map import NomialMap
-from ..solution_array import SolutionArray
 from ..solutions import Sensitivities, Solution
 from ..util.repr_conventions import lineagestr
 from ..util.small_classes import CootMatrix, FixedScalar, Numbers, SolverLog

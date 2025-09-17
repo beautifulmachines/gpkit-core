@@ -7,8 +7,6 @@ from adce import adnumber
 
 from ..globals import SignomialsEnabled
 from ..nomials.substitution import parse_linked, parse_subs
-from ..solution_array import SolutionArray
-from ..solutions import SolutionSequence
 from ..util.small_classes import FixedScalar
 from ..util.small_scripts import maybe_flatten
 from ..varmap import VarMap

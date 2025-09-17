@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import List, Sequence
 
-from .solution_array import SolSavingEnvironment, SolutionArray
+from .solution_array import SolutionArray
 from .varkey import VarKey
 from .varmap import VarMap
 
