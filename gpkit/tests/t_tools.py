@@ -22,8 +22,8 @@ class TestTools(unittest.TestCase):
 
     def test_binary_sweep_tree(self):
         def dummy_sol(cost):
-            dummies = dict(primal=None, constants=None, sens=None, meta={})
-            return Solution(cost=cost, **dummies)
+            vals = {"primal": None, "constants": None, "sens": None, "meta": {}}
+            return Solution(cost=cost, **vals)
 
         bst0 = BinarySweepTree([1, 2], [dummy_sol(1), dummy_sol(8)], None, None)
         assert_logtol(bst0.sample_at([1, 1.5, 2])["cost"], [1, 3.375, 8], 1e-3)

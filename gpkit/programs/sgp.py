@@ -191,7 +191,7 @@ solutions and can be solved with 'Model.solve()'."""
             if verbosity > 2:
                 result = gp.generate_result(solver_out, verbosity=verbosity - 3)
                 self._results.append(result)
-                vartable = result.table(self.sgpvks, tables=["freevariables"])
+                vartable = result.table(showvars=self.sgpvks, tables=["freevariables"])
                 vartable = "\n" + vartable.replace("Free", "SGP", 1)
                 print(vartable)
             elif verbosity > 1:
@@ -247,21 +247,19 @@ solutions and can be solved with 'Model.solve()'."""
                     print(expl)
             self.result.meta["cost function"] = self.cost
             del self.result.primal[self.slack.key]
-            if True or "sensitivities" in self.result:  # not true for MIGP
-                del self.result.sens.variables[
-                    self.slack.key
-                ]  # pylint: disable=no-member
-                del self.result.sens.variablerisk[
-                    self.slack.key
-                ]  # pylint: disable=no-member
-                slcon = self.gpconstraints[0]
-                slconsenss = self.result.sens.constraints[slcon]
-                del self.result.sens.constraints[slcon]
-                # pylint: disable=fixme
-                # TODO: create constraint in RelaxPCCP namespace
-                self.result.sens.models[""] -= slconsenss
-                if not self.result.sens.models[""]:
-                    del self.result.sens.models[""]
+            assert hasattr(self.result, "sens")  # not true for MIGP
+            del self.result.sens.variables[self.slack.key]  # pylint: disable=no-member
+            del self.result.sens.variablerisk[
+                self.slack.key
+            ]  # pylint: disable=no-member
+            slcon = self.gpconstraints[0]
+            slconsenss = self.result.sens.constraints[slcon]
+            del self.result.sens.constraints[slcon]
+            # pylint: disable=fixme
+            # TODO: create constraint in RelaxPCCP namespace
+            self.result.sens.models[""] -= slconsenss
+            if not self.result.sens.models[""]:
+                del self.result.sens.models[""]
         return self.result
 
     @property

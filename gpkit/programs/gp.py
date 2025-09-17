@@ -504,8 +504,8 @@ class GeometricProgram:
         if self.integersolve or self.choicevaridxs:
             warnings.update(self._handle_choicevars(solver_out))
 
-        cost_senss, gpv_ss, absv_ss, m_senss, constraint_senss = (
-            self._calculate_sensitivities(solver_out.la, solver_out.nu, varvals)
+        _, gpv_ss, absv_ss, m_senss, constraint_senss = self._calculate_sensitivities(
+            solver_out.la, solver_out.nu, varvals
         )
 
         result = Solution(

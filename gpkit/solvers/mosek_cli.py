@@ -128,7 +128,7 @@ def optimize_generator(path=None, **_):
 
         return RawSolution(
             status=solsta[:-1],
-            objective=objective_val,
+            cost=objective_val,
             x=primal_vals,
             nu=dual_vals,
             la=prob.compute_la(dual_vals),

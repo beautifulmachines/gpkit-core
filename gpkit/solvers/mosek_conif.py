@@ -312,7 +312,7 @@ def optimize(prob, **kwargs):
 
     solution = RawSolution(
         status="optimal",
-        objective=np.exp(task.getprimalobj(sol)),
+        cost=np.exp(task.getprimalobj(sol)),
         x=np.array(x),
         nu=nu,
         la=la,
