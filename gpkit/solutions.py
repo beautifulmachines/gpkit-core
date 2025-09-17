@@ -35,6 +35,7 @@ class Sensitivities:
 
     @property
     def constants(self):
+        "Sensitivity to each constant"
         raise NotImplementedError
 
 
@@ -64,24 +65,31 @@ class Solution:
         raise KeyError(f"no variable '{key}' found in the solution")
 
     def almost_equal(self, other, **kwargs):
+        "Checks for almost-equality between two solutions"
         return self.to_solution_array().almost_equal(other, **kwargs)
 
     def diff(self, *args, **kwargs):
+        "Pass through to SolutionArray.diff"
         return self.to_solution_array().diff(*args, **kwargs)
 
     def save(self, *args, **kwargs):
+        "Pass through to SolutionArray.save"
         self.to_solution_array().save(*args, **kwargs)
 
     def save_compressed(self, *args, **kwargs):
+        "Pass through to SolutionArray.save_compressed"
         self.to_solution_array().save_compressed(*args, **kwargs)
 
     def summary(self, *args, **kwargs) -> str:
+        "Pass through to SolutionArray.summary"
         return self.to_solution_array().summary(*args, **kwargs)
 
     def table(self, **kwargs) -> str:
+        "Pass through to SolutionArray.table"
         return self.to_solution_array().table(**kwargs)
 
     def to_solution_array(self):
+        "Convert this to a SolutionArray"
         variables = VarMap(self.primal)
         variables.update(self.constants)
         sol_array = SolutionArray(
