@@ -18,7 +18,7 @@ class TestSolutionArray(unittest.TestCase):
         A = Variable("A", "-", "Test Variable")
         prob = Model(A, [A >= 1])
         sol = prob.solve(verbosity=0)
-        self.assertAlmostEqual(sol(A), 1.0, 8)
+        self.assertAlmostEqual(sol[A], 1.0, 8)
 
     def test_call_units(self):
         # test from issue541
@@ -26,15 +26,15 @@ class TestSolutionArray(unittest.TestCase):
         y = Variable("y", "m")
         m = Model(y, [y >= x])
         sol = m.solve(verbosity=0)
-        self.assertAlmostEqual(sol("y") / sol("x"), 1.0, 6)
-        self.assertAlmostEqual(sol(x) / sol(y), 1.0, 6)
+        self.assertAlmostEqual(sol["y"] / sol["x"], 1.0, 6)
+        self.assertAlmostEqual(sol[x] / sol[y], 1.0, 6)
 
     def test_call_vector(self):
         n = 5
         x = VectorVariable(n, "x")
         prob = Model(sum(x), [x >= 2.5])
         sol = prob.solve(verbosity=0)
-        solx = sol(x)
+        solx = sol[x]
         self.assertEqual(type(solx), Quantity)
         self.assertEqual(type(solx.magnitude), np.ndarray)
         self.assertEqual(solx.shape, (n,))
@@ -72,7 +72,7 @@ class TestSolutionArray(unittest.TestCase):
         tminsub = 1000 * gpkit.ureg.lbf
         m.substitutions.update({tmin: tminsub})
         sol = m.solve(verbosity=0)
-        self.assertAlmostEqual(sol(tmin), tminsub)
+        self.assertAlmostEqual(sol[tmin], tminsub)
         self.assertFalse(
             "1000N" in sol.table().replace(" ", "").replace("[", "").replace("]", "")
         )
@@ -86,11 +86,11 @@ class TestSolutionArray(unittest.TestCase):
         msol = m.localsolve(verbosity=0)
         spsol = m.sp().localsolve(verbosity=0)  # pylint: disable=no-member
         gpsol = m.program.gps[-1].solve(verbosity=0)
-        self.assertEqual(msol(x), msol("x"))
-        self.assertEqual(spsol(x), spsol("x"))
-        self.assertEqual(gpsol(x), gpsol("x"))
-        self.assertEqual(msol(x), spsol(x))
-        self.assertEqual(msol(x), gpsol(x))
+        self.assertEqual(msol[x], msol["x"])
+        self.assertEqual(spsol[x], spsol["x"])
+        self.assertEqual(gpsol[x], gpsol["x"])
+        self.assertEqual(msol[x], spsol[x])
+        self.assertEqual(msol[x], gpsol[x])
 
 
 class TestResultsTable(unittest.TestCase):
@@ -115,8 +115,8 @@ class TestResultsTable(unittest.TestCase):
         self.assertTrue(
             all((isinstance(gp.result.table(), Strings) for gp in m.program.gps))
         )
-        self.assertAlmostEqual(sol["cost"] / 4.0, 1.0, 5)
-        self.assertAlmostEqual(sol("x") / 3.0, 1.0, 3)
+        self.assertAlmostEqual(sol.cost / 4.0, 1.0, 5)
+        self.assertAlmostEqual(sol["x"] / 3.0, 1.0, 3)
 
 
 TESTS = [TestSolutionArray, TestResultsTable]

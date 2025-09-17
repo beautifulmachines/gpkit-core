@@ -177,7 +177,7 @@ class Model(CostedConstraintSet):
             self.substitutions.update({var: vals[i] for var, vals in sweepvals.items()})
             try:
                 solvefn(**solveargs)
-                sols.append(self.program.result)
+                sols.append(self.program.result.to_solution_array())
             except Infeasible as err:
                 if not skipfailures:
                     raise RuntimeWarning(

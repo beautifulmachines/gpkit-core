@@ -22,6 +22,7 @@ from ..exceptions import (
 )
 from ..nomials.map import NomialMap
 from ..solution_array import SolutionArray
+from ..solutions import Sensitivities, Solution
 from ..util.repr_conventions import lineagestr
 from ..util.small_classes import CootMatrix, FixedScalar, Numbers, SolverLog
 from ..util.small_scripts import appendsolwarning, initsolwarning
@@ -508,23 +509,39 @@ class GeometricProgram:
             self._calculate_sensitivities(solver_out.la, solver_out.nu, varvals)
         )
 
-        result = {"cost": float(solver_out.cost), "cost function": self.cost}
-        result["freevariables"] = VarMap(zip(self.varlocs, np.exp(primal)))
-        result["constants"] = VarMap(self.substitutions)
-        result["variables"] = VarMap(result["freevariables"])
-        result["variables"].update(result["constants"])
-        result["soltime"] = solver_out.meta["soltime"]
-        result["warnings"] = warnings
+        result = Solution(
+            cost=float(solver_out.cost),
+            primal=VarMap(zip(self.varlocs, np.exp(primal))),
+            # freevariables=VarMap(zip(self.varlocs, np.exp(primal))),
+            constants=VarMap(self.substitutions),
+            sens=Sensitivities(
+                constraints=constraint_senss,
+                models=dict(m_senss),
+                variables=VarMap(gpv_ss),
+                variablerisk=VarMap(absv_ss),
+            ),
+            meta={"soltime": solver_out.meta["soltime"], "warnings": warnings},
+        )
+        result.meta["cost function"] = self.cost
+        # result = {"cost": float(solver_out.cost), "cost function": self.cost}
+        # result["freevariables"] = VarMap(zip(self.varlocs, np.exp(primal)))
+        # result["constants"] = VarMap(self.substitutions)
+        # result["variables"] = VarMap(result["freevariables"])
+        # result["variables"].update(result["constants"])
+        # result["soltime"] = solver_out.meta["soltime"]
+        # result["warnings"] = warnings
 
-        result["sensitivities"] = {"constraints": constraint_senss}
-        result["sensitivities"]["cost"] = cost_senss
-        result["sensitivities"]["variables"] = VarMap(gpv_ss)
-        result["sensitivities"]["variablerisk"] = VarMap(absv_ss)
-        result["sensitivities"]["constants"] = result["sensitivities"][
-            "variables"
-        ]  # NOTE: backwards compat.
-        result["sensitivities"]["models"] = dict(m_senss)
-        return SolutionArray(result)
+        # result["sensitivities"] = {"constraints": constraint_senss}
+        # result["sensitivities"]["cost"] = cost_senss
+        # result["sensitivities"]["variables"] = VarMap(gpv_ss)
+        # result["sensitivities"]["variablerisk"] = VarMap(absv_ss)
+        # result["sensitivities"]["constants"] = result["sensitivities"][
+        #     "variables"
+        # ]  # NOTE: backwards compat.
+        # result["sensitivities"]["models"] = dict(m_senss)
+
+        # return SolutionArray(result)
+        return result
 
     def _handle_choicevars(self, solver_out):
         "This is essentially archived code, until it can be tested with mosek"

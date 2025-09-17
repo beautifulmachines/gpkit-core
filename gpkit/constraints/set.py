@@ -201,11 +201,11 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         evalfn_vars = {
             v.veckey or v
             for v in self.unique_varkeys
-            if v.evalfn and v not in result["variables"]
+            if v.evalfn and v not in result.primal and v not in result.constants
         }
         for v in evalfn_vars:
-            val = v.evalfn(result["variables"])
-            result["variables"][v] = result["freevariables"][v] = val
+            val = v.evalfn(result.primal)
+            result.primal[v] = val
 
     def __repr__(self):
         "Returns namespaced string."

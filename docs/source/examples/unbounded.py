@@ -14,6 +14,6 @@ sol = m.solve(verbosity=0)
 print(sol.summary())
 # but they can also be accessed from the solution:
 assert (
-    sol["boundedness"]["value near upper bound of 1e+30"]
-    == sol["boundedness"]["sensitive to upper bound of 1e+30"]
+    sol.meta["boundedness"]["value near upper bound of 1e+30"]
+    == sol.meta["boundedness"]["sensitive to upper bound of 1e+30"]
 )

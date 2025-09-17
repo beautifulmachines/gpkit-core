@@ -1,6 +1,7 @@
 """Miscellaneous small classes"""
 
 from collections.abc import MutableMapping
+from dataclasses import fields, is_dataclass
 from functools import reduce
 from operator import xor
 
@@ -127,6 +128,17 @@ class DictOfLists(dict):
 
 def _enlist_dict(d_in, d_out):
     "Recursively copies d_in into d_out, placing non-dict items into lists."
+    if is_dataclass(d_in):
+        for field in fields(d_in):
+            d_out = d_in.__class__(
+                **{
+                    field.name: _enlist_dict(
+                        getattr(d_in, field.name), getattr(d_out, field.name)
+                    )
+                    for field in fields(d_in)
+                }
+            )
+        return d_out
     for k, v in d_in.items():
         if isinstance(v, MutableMapping):
             d_out[k] = _enlist_dict(v, v.__class__())

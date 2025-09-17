@@ -92,7 +92,7 @@ class TestExamples(unittest.TestCase):
 
     def test_checking_result_changes(self, example):
         sol = example.sol
-        self.assertAlmostEqual(sol["cost"], 0.48, 2)
+        self.assertAlmostEqual(sol.cost, 0.48, 2)
         os.remove("last_verified.sol")
 
     def test_evaluated_fixed_variables(self, example):
@@ -108,7 +108,7 @@ class TestExamples(unittest.TestCase):
     def test_evaluated_free_variables(self, example):
         x2 = example.x2
         sol = example.sol
-        self.assertTrue(abs(sol(x2) - 4) <= 1e-4)
+        self.assertTrue(abs(sol[x2] - 4) <= 1e-4)
 
     def test_external_constraint(self, example):
         pass
@@ -126,20 +126,20 @@ class TestExamples(unittest.TestCase):
     def test_external_sp(self, example):
         m = example.m
         sol = m.localsolve(verbosity=0)
-        self.assertAlmostEqual(sol["cost"], 0.707, places=3)
+        self.assertAlmostEqual(sol.cost, 0.707, places=3)
 
     def test_freeing_fixed_variables(self, example):
         x = example.x
         y = Variable("y", 3)
         m = Model(x, [x >= 1 + y, y >= 1])
         sol = m.solve(verbosity=0)
-        self.assertTrue(abs(sol["cost"] - 4) <= 1e-4)
-        self.assertTrue(y in sol["constants"])
+        self.assertTrue(abs(sol.cost - 4) <= 1e-4)
+        self.assertTrue(y in sol.constants)
 
         del m.substitutions["y"]
         sol = m.solve(verbosity=0)
-        self.assertTrue(abs(sol["cost"] - 2) <= 1e-4)
-        self.assertTrue(y in sol["freevariables"])
+        self.assertTrue(abs(sol.cost - 2) <= 1e-4)
+        self.assertTrue(y in sol.primal)
 
     def test_gettingstarted(self, example):
         pass
@@ -147,7 +147,7 @@ class TestExamples(unittest.TestCase):
     def test_loose_constraintsets(self, example):
         m = example.m
         sol = m.solve(verbosity=0)
-        self.assertAlmostEqual(sol["cost"], 2, 3)
+        self.assertAlmostEqual(sol.cost, 2, 3)
 
     def test_sub_multi_values(self, example):
         x = example.x
@@ -167,7 +167,7 @@ class TestExamples(unittest.TestCase):
     def test_tight_constraintsets(self, example):
         m = example.m
         sol = m.solve(verbosity=0)
-        self.assertAlmostEqual(sol["cost"], 2, places=2)
+        self.assertAlmostEqual(sol.cost, 2, places=2)
 
     def test_vectorization(self, example):
         x = example.x
@@ -204,6 +204,7 @@ class TestExamples(unittest.TestCase):
         os.remove("sweepsolution.pkl")
 
         # testing savejson
+        sol = sol.to_solution_array()
         sol.savejson("solution.json")
         json_dict = {}
         with open("solution.json", "r", encoding="utf-8") as rf:
@@ -281,7 +282,7 @@ class TestExamples(unittest.TestCase):
         pass
 
     def test_beam(self, example):
-        self.assertFalse(np.isnan(example.sol("w")).any())
+        self.assertFalse(np.isnan(example.sol["w"]).any())
 
     def test_water_tank(self, example):
         pass
@@ -291,7 +292,7 @@ class TestExamples(unittest.TestCase):
 
     def test_simpleflight(self, example):
         self.assertTrue(example.sol.almost_equal(example.sol_loaded))
-        for sol in [example.sol, example.sol_loaded]:
+        for sol in [example.sol.to_solution_array(), example.sol_loaded]:
             freevarcheck = {
                 "A": 8.46,
                 "C_D": 0.0206,

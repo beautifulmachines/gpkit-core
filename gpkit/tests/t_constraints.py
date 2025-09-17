@@ -73,7 +73,7 @@ class TestConstraint(unittest.TestCase):
         m = Model(x, [x >= 2])
         m.unique_varkeys = set([x2.key])
         sol = m.solve(verbosity=0)
-        self.assertAlmostEqual(sol(x2), sol(x) ** 2)
+        self.assertAlmostEqual(sol[x2], sol[x] ** 2)
 
     def test_relax_list(self):
         x = Variable("x")
@@ -102,7 +102,7 @@ class TestConstraint(unittest.TestCase):
         m = Model(x, [x == 3, x == 4])
         rc = ConstraintsRelaxed(m)
         m2 = Model(rc.relaxvars.prod() * x**0.01, rc)
-        self.assertAlmostEqual(m2.solve(verbosity=0)(x), 3, places=3)
+        self.assertAlmostEqual(m2.solve(verbosity=0)[x], 3, places=3)
 
     def test_constraintget(self):
         x = Variable("x")
@@ -176,7 +176,7 @@ class TestConstraint(unittest.TestCase):
         m = Model(z, [x == z, x >= y], {x: 1, y: 1.0001})
         self.assertRaises(PrimalInfeasible, m.solve, verbosity=0)
         PosynomialInequality.feastol = 1e-3
-        self.assertEqual(m.substitutions["x"], m.solve(verbosity=0)("x"))
+        self.assertEqual(m.substitutions["x"], m.solve(verbosity=0)["x"])
 
 
 class TestCostedConstraint(unittest.TestCase):
@@ -267,7 +267,7 @@ class TestSignomialInequality(unittest.TestCase):
                     PK >= 0.5 * mdot * ujet * (2 + ujet) + fBLI * fsurf * Dp,
                 ],
             )
-        var_senss = m.solve(verbosity=0)["sensitivities"]["variables"]
+        var_senss = m.solve(verbosity=0).sens.variables
         self.assertAlmostEqual(var_senss[Dp], -0.16, 2)
         self.assertAlmostEqual(var_senss[fBLI], -0.16, 2)
         self.assertAlmostEqual(var_senss[fsurf], 0.19, 2)
@@ -286,7 +286,7 @@ class TestSignomialInequality(unittest.TestCase):
                 PK >= 0.5 * mdot * ujet * (2 + ujet) + fBLI * fsurf * Dp,
             ],
         )
-        var_senss = m.solve(verbosity=0)["sensitivities"]["variables"]
+        var_senss = m.solve(verbosity=0).sens.variables
         self.assertAlmostEqual(var_senss[Dp], -0.16, 2)
         self.assertAlmostEqual(var_senss[fBLI], -0.16, 2)
         self.assertAlmostEqual(var_senss[fsurf], 0.19, 2)
@@ -305,7 +305,7 @@ class TestSignomialInequality(unittest.TestCase):
                 PK >= 0.5 * mdot * ujet * (2 + ujet) + fBLI * fsurf * Dp,
             ],
         )
-        var_senss = m.solve(verbosity=0)["sensitivities"]["variables"]
+        var_senss = m.solve(verbosity=0).sens.variables
         self.assertAlmostEqual(var_senss[Dp] + var_senss[mDp], -0.16, 2)
         self.assertAlmostEqual(var_senss[fBLI], -0.16, 2)
         self.assertAlmostEqual(var_senss[fsurf], 0.19, 2)
@@ -349,11 +349,11 @@ class TestLoose(unittest.TestCase):
         x_min = Variable("x_{min}", 2)
         m = Model(x, [Loose([x >= x_min]), x >= 1])
         sol = m.solve(verbosity=0)
-        warndata = sol["warnings"]["Unexpectedly Tight Constraints"][0][1]
+        warndata = sol.meta["warnings"]["Unexpectedly Tight Constraints"][0][1]
         self.assertIs(warndata[-1], m[0][0])
         self.assertAlmostEqual(warndata[0], +1, 3)
         m.substitutions[x_min] = 0.5
-        self.assertAlmostEqual(m.solve(verbosity=0)["cost"], 1)
+        self.assertAlmostEqual(m.solve(verbosity=0).cost, 1)
 
     def test_posyconstr_in_sp(self):
         x = Variable("x")
@@ -364,12 +364,12 @@ class TestLoose(unittest.TestCase):
             sig_constraint = x + y >= 3.5
         m = Model(x * y, [Loose([x >= y]), x >= x_min, y >= y_min, sig_constraint])
         sol = m.localsolve(verbosity=0)
-        warndata = sol["warnings"]["Unexpectedly Tight Constraints"][0][1]
+        warndata = sol.meta["warnings"]["Unexpectedly Tight Constraints"][0][1]
         self.assertIs(warndata[-1], m[0][0])
         self.assertAlmostEqual(warndata[0], +1, 3)
         m.substitutions[x_min] = 2
         m.substitutions[y_min] = 1
-        self.assertAlmostEqual(m.localsolve(verbosity=0)["cost"], 2.5, 5)
+        self.assertAlmostEqual(m.localsolve(verbosity=0).cost, 2.5, 5)
 
 
 class TestTight(unittest.TestCase):
@@ -381,11 +381,11 @@ class TestTight(unittest.TestCase):
         x_min = Variable("x_{min}", 2)
         m = Model(x, [Tight([x >= 1]), x >= x_min])
         sol = m.solve(verbosity=0)
-        warndata = sol["warnings"]["Unexpectedly Loose Constraints"][0][1]
+        warndata = sol.meta["warnings"]["Unexpectedly Loose Constraints"][0][1]
         self.assertIs(warndata[-1], m[0][0])
         self.assertAlmostEqual(warndata[0], 1, 3)
         m.substitutions[x_min] = 0.5
-        self.assertAlmostEqual(m.solve(verbosity=0)["cost"], 1)
+        self.assertAlmostEqual(m.solve(verbosity=0).cost, 1)
 
     def test_posyconstr_in_sp(self):
         x = Variable("x")
@@ -394,11 +394,11 @@ class TestTight(unittest.TestCase):
             sig_constraint = x + y >= 0.1
         m = Model(x * y, [Tight([x >= y]), x >= 2, y >= 1, sig_constraint])
         sol = m.localsolve(verbosity=0)
-        warndata = sol["warnings"]["Unexpectedly Loose Constraints"][0][1]
+        warndata = sol.meta["warnings"]["Unexpectedly Loose Constraints"][0][1]
         self.assertIs(warndata[-1], m[0][0])
         self.assertAlmostEqual(warndata[0], 1, 3)
         m.pop(1)
-        self.assertAlmostEqual(m.localsolve(verbosity=0)["cost"], 1, 5)
+        self.assertAlmostEqual(m.localsolve(verbosity=0).cost, 1, 5)
 
     def test_sigconstr_in_sp(self):
         "Tests tight constraint set with localsolve()"
@@ -409,11 +409,11 @@ class TestTight(unittest.TestCase):
         with SignomialsEnabled():
             m = Model(x, [Tight([x + y >= 1]), x >= x_min, y <= y_max])
         sol = m.localsolve(verbosity=0)
-        warndata = sol["warnings"]["Unexpectedly Loose Constraints"][0][1]
+        warndata = sol.meta["warnings"]["Unexpectedly Loose Constraints"][0][1]
         self.assertIs(warndata[-1], m[0][0])
         self.assertGreater(warndata[0], 0.5)
         m.substitutions[x_min] = 0.5
-        self.assertAlmostEqual(m.localsolve(verbosity=0)["cost"], 0.5, 5)
+        self.assertAlmostEqual(m.localsolve(verbosity=0).cost, 0.5, 5)
 
 
 class TestBounded(unittest.TestCase):
@@ -425,13 +425,13 @@ class TestBounded(unittest.TestCase):
         m = Model(x, [x >= y], {"y": 1})
         bm = Model(m.cost, Bounded(m))
         sol = bm.solve(verbosity=0)
-        self.assertAlmostEqual(sol["cost"], 1.0)
+        self.assertAlmostEqual(sol.cost, 1.0)
         bm = Model(m.cost, Bounded(m, lower=1e-10))
         sol = bm.solve(verbosity=0)
-        self.assertAlmostEqual(sol["cost"], 1.0)
+        self.assertAlmostEqual(sol.cost, 1.0)
         bm = Model(m.cost, Bounded(m, upper=1e10))
         sol = bm.solve(verbosity=0)
-        self.assertAlmostEqual(sol["cost"], 1.0)
+        self.assertAlmostEqual(sol.cost, 1.0)
 
 
 TESTS = [

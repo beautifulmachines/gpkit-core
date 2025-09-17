@@ -61,7 +61,7 @@ class ConstraintsRelaxedEqually(ConstraintSet):
         "Adds relaxation warnings to the result"
         initsolwarning(result, "Relaxed Constraints")
         for val, msg in get_relaxed(
-            [result["freevariables"][self.relaxvar]],
+            [result.primal[self.relaxvar]],
             ["All constraints relaxed by %i%%"],
         ):
             appendsolwarning(
@@ -121,7 +121,7 @@ class ConstraintsRelaxed(ConstraintSet):
     def check_relaxed(self, result):
         "Adds relaxation warnings to the result"
         relaxed = get_relaxed(
-            result["freevariables"][self.relaxvars],
+            result.primal[self.relaxvars],
             range(len(self["relaxed constraints"])),
         )
         initsolwarning(result, "Relaxed Constraints")
@@ -252,7 +252,7 @@ class ConstantsRelaxed(ConstraintSet):
     def process_result(self, result):
         "Transfers constant sensitivities back to the original constants"
         super().process_result(result)
-        constant_senss = result["sensitivities"]["variables"]
+        constant_senss = result.sens.variables
         for new_constant, former_constant in self._derelax_map.items():
             constant_senss[former_constant] = constant_senss[new_constant]
             del constant_senss[new_constant]
@@ -261,14 +261,14 @@ class ConstantsRelaxed(ConstraintSet):
     def check_relaxed(self, result):
         "Adds relaxation warnings to the result"
         relaxed = get_relaxed(
-            [result["freevariables"][r] for r in self.relaxvars], self.freedvars
+            [result.primal[r] for r in self.relaxvars], self.freedvars
         )
         initsolwarning(result, "Relaxed Constants")
         for _, freed in relaxed:
             msg = "  %s: relaxed from %-.4g to %-.4g" % (
                 freed,
                 mag(self.constants[freed.key]),
-                mag(result["freevariables"][freed]),
+                mag(result.primal[freed]),
             )
             appendsolwarning(msg, freed, result, "Relaxed Constants")
 

@@ -6,6 +6,7 @@ import numpy as np
 from numpy import log
 
 from gpkit import Model, Variable, VectorVariable
+from gpkit.solutions import Solution
 from gpkit.tools.autosweep import BinarySweepTree
 from gpkit.tools.tools import te_exp_minus1, te_secant, te_tangent
 from gpkit.util.small_scripts import mag
@@ -20,9 +21,13 @@ class TestTools(unittest.TestCase):
     """TestCase for sweeps and tools"""
 
     def test_binary_sweep_tree(self):
-        bst0 = BinarySweepTree([1, 2], [{"cost": 1}, {"cost": 8}], None, None)
+        def dummy_sol(cost):
+            dummies = dict(primal=None, constants=None, sens=None, meta={})
+            return Solution(cost=cost, **dummies)
+
+        bst0 = BinarySweepTree([1, 2], [dummy_sol(1), dummy_sol(8)], None, None)
         assert_logtol(bst0.sample_at([1, 1.5, 2])["cost"], [1, 3.375, 8], 1e-3)
-        bst0.add_split(1.5, {"cost": 4})
+        bst0.add_split(1.5, dummy_sol(4))
         assert_logtol(
             bst0.sample_at([1, 1.25, 1.5, 1.75, 2])["cost"],
             [1, 2.144, 4, 5.799, 8],

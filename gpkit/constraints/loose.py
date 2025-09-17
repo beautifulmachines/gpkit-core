@@ -19,7 +19,7 @@ class Loose(ConstraintSet):
         "Checks that all constraints are satisfied with equality"
         super().process_result(result)
         initsolwarning(result, "Unexpectedly Tight Constraints")
-        if "sensitivities" not in result:
+        if False and "sensitivities" not in result:
             appendsolwarning(
                 "Could not evaluate due to choice variables.",
                 (),
@@ -28,7 +28,7 @@ class Loose(ConstraintSet):
             )
             return
         for constraint in self.flat():
-            c_senss = result["sensitivities"]["constraints"].get(constraint, 0)
+            c_senss = result.sens.constraints.get(constraint, 0)
             if c_senss >= self.senstol:
                 cstr = "Constraint [ %.100s... %s %.100s... )" % (
                     constraint.left,

@@ -18,7 +18,7 @@ class Tight(ConstraintSet):
     def process_result(self, result):
         "Checks that all constraints are satisfied with equality"
         super().process_result(result)
-        variables = result["variables"]
+        variables = result.primal
         initsolwarning(result, "Unexpectedly Loose Constraints")
         for constraint in self.flat():
             with SignomialsEnabled():

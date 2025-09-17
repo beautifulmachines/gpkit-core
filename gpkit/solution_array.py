@@ -402,7 +402,7 @@ class SolutionArray(DictOfLists):
     >>> sol = gpkit.Model(x, [x >= x_min]).solve(verbosity=0)
     >>>
     >>> # VALUES
-    >>> values = [sol(x), sol.subinto(x), sol["variables"]["x"]]
+    >>> values = [sol[x], sol.subinto(x), sol["variables"]["x"]]
     >>> assert all(np.array(values) == 2)
     >>>
     >>> # SENSITIVITIES
@@ -477,7 +477,10 @@ class SolutionArray(DictOfLists):
 
     def almost_equal(self, other, reltol=1e-3):
         "Checks for almost-equality between two solutions"
-        svars, ovars = self["variables"], other["variables"]
+        if isinstance(other, SolutionArray):
+            svars, ovars = self["variables"], other["variables"]
+        else:
+            svars, ovars = self["freevariables"], other.primal
         svks, ovks = set(svars), set(ovars)
         if svks != ovks:
             return False

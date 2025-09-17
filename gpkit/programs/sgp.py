@@ -211,7 +211,7 @@ solutions and can be solved with 'Model.solve()'."""
                 rel_improvement = cost = None
         # solved successfully!
         self.result = gp.generate_result(solver_out, verbosity=verbosity - 3)
-        self.result["soltime"] = time() - starttime
+        self.result.meta["soltime"] = time() - starttime
         if verbosity > 1:
             print()
         if verbosity > 0:
@@ -222,7 +222,7 @@ solutions and can be solved with 'Model.solve()'."""
         if hasattr(self.slack, "key"):
             initsolwarning(self.result, "Slack Non-GP Constraints")
             excess_slack = (
-                self.result["variables"][self.slack.key] - 1
+                self.result.primal[self.slack.key] - 1
             )  # pylint: disable=no-member
             if excess_slack > EPS:
                 msg = (
@@ -245,26 +245,23 @@ solutions and can be solved with 'Model.solve()'."""
                 )
                 if verbosity > -1:
                     print(expl)
-            self.result["cost function"] = self.cost
-            del self.result["freevariables"][
-                self.slack.key
-            ]  # pylint: disable=no-member
-            del self.result["variables"][self.slack.key]  # pylint: disable=no-member
-            if "sensitivities" in self.result:  # not true for MIGP
-                del self.result["sensitivities"]["variables"][
+            self.result.meta["cost function"] = self.cost
+            del self.result.primal[self.slack.key]
+            if True or "sensitivities" in self.result:  # not true for MIGP
+                del self.result.sens.variables[
                     self.slack.key
                 ]  # pylint: disable=no-member
-                del self.result["sensitivities"]["variablerisk"][
+                del self.result.sens.variablerisk[
                     self.slack.key
                 ]  # pylint: disable=no-member
                 slcon = self.gpconstraints[0]
-                slconsenss = self.result["sensitivities"]["constraints"][slcon]
-                del self.result["sensitivities"]["constraints"][slcon]
+                slconsenss = self.result.sens.constraints[slcon]
+                del self.result.sens.constraints[slcon]
                 # pylint: disable=fixme
                 # TODO: create constraint in RelaxPCCP namespace
-                self.result["sensitivities"]["models"][""] -= slconsenss
-                if not self.result["sensitivities"]["models"][""]:
-                    del self.result["sensitivities"]["models"][""]
+                self.result.sens.models[""] -= slconsenss
+                if not self.result.sens.models[""]:
+                    del self.result.sens.models[""]
         return self.result
 
     @property
