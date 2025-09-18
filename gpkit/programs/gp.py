@@ -522,24 +522,6 @@ class GeometricProgram:
             meta={"soltime": solver_out.meta["soltime"], "warnings": warnings},
         )
         result.meta["cost function"] = self.cost
-        # result = {"cost": float(solver_out.cost), "cost function": self.cost}
-        # result["freevariables"] = VarMap(zip(self.varlocs, np.exp(primal)))
-        # result["constants"] = VarMap(self.substitutions)
-        # result["variables"] = VarMap(result["freevariables"])
-        # result["variables"].update(result["constants"])
-        # result["soltime"] = solver_out.meta["soltime"]
-        # result["warnings"] = warnings
-
-        # result["sensitivities"] = {"constraints": constraint_senss}
-        # result["sensitivities"]["cost"] = cost_senss
-        # result["sensitivities"]["variables"] = VarMap(gpv_ss)
-        # result["sensitivities"]["variablerisk"] = VarMap(absv_ss)
-        # result["sensitivities"]["constants"] = result["sensitivities"][
-        #     "variables"
-        # ]  # NOTE: backwards compat.
-        # result["sensitivities"]["models"] = dict(m_senss)
-
-        # return SolutionArray(result)
         return result
 
     def _handle_choicevars(self, solver_out):
