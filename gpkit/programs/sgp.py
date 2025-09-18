@@ -221,9 +221,7 @@ solutions and can be solved with 'Model.solve()'."""
             )
         if hasattr(self.slack, "key"):
             initsolwarning(self.result, "Slack Non-GP Constraints")
-            excess_slack = (
-                self.result.primal[self.slack.key] - 1
-            )  # pylint: disable=no-member
+            excess_slack = self.result.primal[self.slack.key] - 1
             if excess_slack > EPS:
                 msg = (
                     "Final PCCP solution let non-GP constraints slacken by"
@@ -248,10 +246,8 @@ solutions and can be solved with 'Model.solve()'."""
             self.result.meta["cost function"] = self.cost
             del self.result.primal[self.slack.key]
             assert hasattr(self.result, "sens")  # not true for MIGP
-            del self.result.sens.variables[self.slack.key]  # pylint: disable=no-member
-            del self.result.sens.variablerisk[
-                self.slack.key
-            ]  # pylint: disable=no-member
+            del self.result.sens.variables[self.slack.key]
+            del self.result.sens.variablerisk[self.slack.key]
             slcon = self.gpconstraints[0]
             slconsenss = self.result.sens.constraints[slcon]
             del self.result.sens.constraints[slcon]
