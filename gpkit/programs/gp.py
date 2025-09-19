@@ -291,7 +291,7 @@ class GeometricProgram:
 
     def gen(self):
         "compile this program and set varlocs, meq_idxs"
-        self.varkeys = self.varlocs = defaultdict(list)
+        self.varlocs = defaultdict(list)
         self.meq_idxs = MonoEqualityIndexes()
         self.exps = []
         m_idx = 0
