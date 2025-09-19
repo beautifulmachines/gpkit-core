@@ -57,15 +57,15 @@ sol = m.solve(verbosity=0)
 print(sol.table())
 
 # Printing Results 2
-print(f"The optimal value is {sol['cost']:.4g}.")
+print(f"The optimal value is {sol.cost:.4g}.")
 
 # Example variable sensitivity usage
 x = Variable("x")
 x_min = Variable("x_{min}", 2)
 sol = Model(x, [x_min <= x]).solve(verbosity=0)
-sens_x_min = sol["sensitivities"]["variables"][x_min]
+sens_x_min = sol.sens.variables[x_min]
 
 x = Variable("x")
 x_squared_min = Variable("x^2_{min}", 2)
 sol = Model(x, [x_squared_min <= x**2]).solve(verbosity=0)
-sens_x_min = sol["sensitivities"]["variables"][x_squared_min]
+sens_x_min = sol.sens.variables[x_squared_min]

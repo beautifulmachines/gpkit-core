@@ -20,6 +20,7 @@ from ..exceptions import (
     UnknownInfeasible,
 )
 from ..globals import settings
+from ..solutions import RawSolution
 
 
 def remove_read_only(func, path, exc):  # pragma: no cover
@@ -47,7 +48,7 @@ def optimize_generator(path=None, **_):
         if settings["mosek_bin_dir"] not in os.environ["PATH"]:
             os.environ["PATH"] += ":" + settings["mosek_bin_dir"]
 
-    def optimize(*, c, A, p_idxs, **_):
+    def optimize(prob, **_):
         """Interface to the MOSEK "mskexpopt" command line solver
 
         Definitions
@@ -85,7 +86,7 @@ def optimize_generator(path=None, **_):
             If the format of mskexpopt's output file is unexpected.
 
         """
-        write_output_file(filename, c, A, p_idxs)
+        write_output_file(filename, prob.c, prob.A, prob.p_idxs)
 
         # run mskexpopt and print stdout
         solution_filename = filename + ".sol"
@@ -125,12 +126,14 @@ def optimize_generator(path=None, **_):
         if tmpdir:
             shutil.rmtree(path, ignore_errors=False, onerror=remove_read_only)
 
-        return {
-            "status": solsta[:-1],
-            "objective": objective_val,
-            "primal": primal_vals,
-            "nu": dual_vals,
-        }
+        return RawSolution(
+            status=solsta[:-1],
+            cost=objective_val,
+            x=primal_vals,
+            nu=dual_vals,
+            la=prob.compute_la(dual_vals),
+            meta={"solver": "mosek_cli"},
+        )
 
     return optimize
 

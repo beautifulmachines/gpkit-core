@@ -13,15 +13,15 @@ def veclinkedfn(linkedfn, i):
 
 def initsolwarning(result, category="uncategorized"):
     "Creates a results dictionary for a particular category of warning."
-    if "warnings" not in result:
-        result["warnings"] = {}
-    if category not in result["warnings"]:
-        result["warnings"][category] = []
+    if "warnings" not in result.meta:
+        result.meta["warnings"] = {}
+    if category not in result.meta["warnings"]:
+        result.meta["warnings"][category] = []
 
 
 def appendsolwarning(msg, data, result, category="uncategorized"):
     "Append a particular category of warnings to a solution."
-    result["warnings"][category].append((msg, data))
+    result.meta["warnings"][category].append((msg, data))
 
 
 def maybe_flatten(value):

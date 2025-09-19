@@ -134,10 +134,10 @@ class TestModelSubs(unittest.TestCase):
         v = VectorVariable(1, "v", "km")
         v_min = VectorVariable(1, "v_min", "km")
         m = Model(v.prod(), [v >= v_min], {v_min: [2 * gpkit.units("nmi")]})
-        cost = m.solve(verbosity=0)["cost"]
+        cost = m.solve(verbosity=0).cost
         self.assertAlmostEqual(cost / 3.704, 1.0)
         m = Model(v.prod(), [v >= v_min], {v_min: np.array([2]) * gpkit.units("nmi")})
-        cost = m.solve(verbosity=0)["cost"]
+        cost = m.solve(verbosity=0).cost
         self.assertAlmostEqual(cost / 3.704, 1.0)
 
     def test_phantoms(self):
@@ -163,13 +163,13 @@ class TestModelSubs(unittest.TestCase):
         with gpkit.SignomialsEnabled():
             m = gpkit.Model(x, [x >= 1 - y, y <= ymax])
             m.substitutions[ymax] = 0.2
-            self.assertAlmostEqual(m.localsolve(verbosity=0)["cost"], 0.8, 3)
+            self.assertAlmostEqual(m.localsolve(verbosity=0).cost, 0.8, 3)
             m = gpkit.Model(x, [x >= 1 - y, y <= ymax])
             with self.assertRaises(UnboundedGP):  # from unbounded ymax
                 m.localsolve(verbosity=0)
             m = gpkit.Model(x, [x >= 1 - y, y <= ymax])
             m.substitutions[ymax] = 0.1
-            self.assertAlmostEqual(m.localsolve(verbosity=0)["cost"], 0.9, 3)
+            self.assertAlmostEqual(m.localsolve(verbosity=0).cost, 0.9, 3)
 
     def test_united_sub_sweep(self):
         A = Variable("A", "USD")
@@ -247,7 +247,7 @@ class TestModelSubs(unittest.TestCase):
         _ = pickle.dumps(t_night)
         m = Model(x, [x >= t_day, x >= t_night])
         sol = m.solve(verbosity=0)
-        self.assertAlmostEqual(sol(t_night) / gpkit.ureg.hours, 12)
+        self.assertAlmostEqual(sol[t_night] / gpkit.ureg.hours, 12)
         sol = m.sweep({t_day: [6, 8, 9, 13]}, verbosity=0)
         npt.assert_allclose(
             sol["sensitivities"]["variables"][t_day], [-1 / 3, -0.5, -0.6, +1], 1e-3
@@ -277,7 +277,7 @@ class TestModelSubs(unittest.TestCase):
         eqns = phys_constraints
         m = Model(objective, eqns)
         sol = m.solve(verbosity=0)
-        a, b = sol("xi"), xi_dist * gpkit.ureg.N
+        a, b = sol["xi"], xi_dist * gpkit.ureg.N
         self.assertTrue(all(abs(a - b) / (a + b) < 1e-7))
 
     # pylint: disable=too-many-locals
@@ -312,13 +312,13 @@ class TestModelSubs(unittest.TestCase):
 
         a, b = Above(), Below()
         concatm = Model(a.cost * b.cost, [a, b])
-        concat_cost = concatm.solve(verbosity=0)["cost"]
+        concat_cost = concatm.solve(verbosity=0).cost
         almostequal = self.assertAlmostEqual
         yard, cm = gpkit.ureg("yard"), gpkit.ureg("cm")
         ft, meter = gpkit.ureg("ft"), gpkit.ureg("m")
         if not isinstance(a["x"].key.units, str):
-            almostequal(a.solve(verbosity=0)["cost"], ft / yard, 5)
-            almostequal(b.solve(verbosity=0)["cost"], cm / meter, 5)
+            almostequal(a.solve(verbosity=0).cost, ft / yard, 5)
+            almostequal(b.solve(verbosity=0).cost, cm / meter, 5)
             almostequal(cm / yard, concat_cost, 5)
         NamedVariables.reset_modelnumbers()
         a1, b1 = Above(), Below()
@@ -326,17 +326,17 @@ class TestModelSubs(unittest.TestCase):
         m = Model(a1["x"], [a1, b1, b1["x"] == a1["x"]])
         sol = m.solve(verbosity=0)
         if not isinstance(a1["x"].key.units, str):
-            almostequal(sol["cost"], cm / ft, 5)
+            almostequal(sol.cost, cm / ft, 5)
         a1, b1 = Above(), Below()
         self.assertEqual(a1["x"].key.lineage, (("Above", 1),))
         m = Model(b1["x"], [a1, b1, b1["x"] == a1["x"]])
         sol = m.solve(verbosity=0)
         if not isinstance(b1["x"].key.units, str):
-            almostequal(sol["cost"], cm / meter, 5)
-        self.assertIn(a1["x"], sol["variables"])
-        self.assertIn(b1["x"], sol["variables"])
-        self.assertNotIn(a["x"], sol["variables"])
-        self.assertNotIn(b["x"], sol["variables"])
+            almostequal(sol.cost, cm / meter, 5)
+        self.assertIn(a1["x"], sol.primal)
+        self.assertIn(b1["x"], sol.primal)
+        self.assertNotIn(a["x"], sol.primal)
+        self.assertNotIn(b["x"], sol.primal)
 
     def test_getkey(self):
         class Top(Model):
@@ -368,7 +368,7 @@ class TestModelSubs(unittest.TestCase):
                 return [y >= 2]
 
         sol = Top().solve(verbosity=0)
-        self.assertAlmostEqual(sol["cost"], 2)
+        self.assertAlmostEqual(sol.cost, 2)
 
     def test_model_recursion(self):
         class Top(Model):
@@ -401,7 +401,7 @@ class TestModelSubs(unittest.TestCase):
                 return [y >= 2]
 
         sol = Top().solve(verbosity=0)
-        self.assertAlmostEqual(sol["cost"], 2)
+        self.assertAlmostEqual(sol.cost, 2)
 
     def test_vector_sub(self):
         x = VectorVariable(3, "x")

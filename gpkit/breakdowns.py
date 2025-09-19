@@ -984,9 +984,6 @@ def plotlyify(tree, solution, minval=None):
     model: Model
         GPkit model object
 
-    itemize (optional): string, either "variables" or "constraints"
-        Specify whether to iterate over the model varkeys or constraints
-
     sizebycount (optional): bool
         Whether to size blocks by number of variables/constraints or use
         default sizing

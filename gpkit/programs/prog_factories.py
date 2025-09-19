@@ -7,7 +7,6 @@ from adce import adnumber
 
 from ..globals import SignomialsEnabled
 from ..nomials.substitution import parse_linked, parse_subs
-from ..solution_array import SolutionArray
 from ..util.small_classes import FixedScalar
 from ..util.small_scripts import maybe_flatten
 from ..varmap import VarMap
@@ -130,17 +129,16 @@ def solvify(genfunction):
         ValueError if the program is invalid.
         RuntimeWarning if an error occurs in solving or parsing the solution.
         """
-        solution = SolutionArray()
-        solution.modelstr = str(self)
 
         # NOTE SIDE EFFECTS: self.program and self.solution set below
         self.program, progsolve = genfunction(self, **kwargs)
         result = progsolve(solver, verbosity=verbosity, **kwargs)
         if kwargs.get("process_result", True):
             self.process_result(result)
-        solution.append(result)
-        solution.to_arrays()
-        self.solution = solution
-        return solution
+        # solution.append(result)
+        # solution.to_arrays()
+        self.solution = result
+        self.solution.meta["modelstr"] = str(self)
+        return result
 
     return solvefn

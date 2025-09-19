@@ -8,4 +8,4 @@ x2 = Variable("x^2", evalfn=lambda v: v[x] ** 2)
 m = Model(x, [x >= 2])
 m.unique_varkeys = set([x2.key])
 sol = m.solve(verbosity=0)
-assert abs(sol(x2) - 4) <= 1e-4
+assert abs(sol[x2] - 4) <= 1e-4

@@ -658,7 +658,7 @@ class SignomialInequality(ScalarSingleEquationConstraint):
         }
         return p_ineq.as_hmapslt1(substitutions)
 
-    def sens_from_dual(self, la, nu, result):
+    def sens_from_dual(self, la, nu, varvals):
         """We want to do the following chain:
            dlog(Obj)/dlog(monomial[i])    = nu[i]
            * dlog(monomial)/d(monomial)   = 1/(monomial value)
@@ -676,7 +676,7 @@ class SignomialInequality(ScalarSingleEquationConstraint):
         # pylint: disable=no-member
         def subval(posy):
             "Substitute solution into a posynomial and return the result"
-            hmap = posy.sub(result["variables"], require_positive=False).hmap
+            hmap = posy.sub(varvals, require_positive=False).hmap
             ((key, value),) = hmap.items()
             assert not key  # constant
             return value
@@ -691,7 +691,7 @@ class SignomialInequality(ScalarSingleEquationConstraint):
                 d_mon_d_var = subval(coeff.diff(var)) * invnegy_val - (
                     subval(self._negysig.diff(var)) * subval(coeff) * invnegy_val**2
                 )
-                var_val = result["variables"][var]
+                var_val = varvals[var]
                 sens = nu_i * inv_mon_val * d_mon_d_var * var_val
                 assert isinstance(sens, float)
                 self.v_ss[var] = sens + self.v_ss.get(var, 0)

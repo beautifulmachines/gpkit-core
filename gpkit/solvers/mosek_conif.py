@@ -10,10 +10,11 @@ from ..exceptions import (
     PrimalInfeasible,
     UnknownInfeasible,
 )
+from ..solutions import RawSolution
 
 
 # pylint: disable=too-many-locals,too-many-statements,too-many-branches,invalid-name
-def optimize(*, c, A, k, p_idxs, **kwargs):
+def optimize(prob, **kwargs):
     """
     Definitions
     -----------
@@ -60,18 +61,18 @@ def optimize(*, c, A, k, p_idxs, **kwargs):
     #       NOTE: the epigraph of the objective function always gets an "lse"
     #       representation, even if the objective is a monomial.
     #
-    log_c = np.log(np.array(c))
+    log_c = np.log(np.array(prob.c))
     lse_posys = [0]
     lin_posys = []
-    for i, val in enumerate(k[1:]):
+    for i, val in enumerate(prob.k[1:]):
         if val > 1:
             lse_posys.append(i + 1)
         else:
             lin_posys.append(i + 1)
     if lin_posys:
-        A = A.tocsr()
+        A = prob.A.tocsr()
         lin_posys_set = frozenset(lin_posys)
-        lin_idxs = [i for i, p in enumerate(p_idxs) if p in lin_posys_set]
+        lin_idxs = [i for i, p in enumerate(prob.p_idxs) if p in lin_posys_set]
         lse_idxs = np.ones(A.shape[0], dtype=bool)
         lse_idxs[lin_idxs] = False
         A_lse = A[lse_idxs, :].tocoo()
@@ -82,7 +83,7 @@ def optimize(*, c, A, k, p_idxs, **kwargs):
         log_c_lin = None  # A_lin won't be referenced later,
         A_lse = A  # so no need to define it.
         log_c_lse = log_c
-    k_lse = [k[i] for i in lse_posys]
+    k_lse = [prob.k[i] for i in lse_posys]
     n_lse = sum(k_lse)
     p_lse = len(k_lse)
     lse_p_idx = []
@@ -285,17 +286,10 @@ def optimize(*, c, A, k, p_idxs, **kwargs):
     # recover binary variables
     # xbin = [0.] * (n_choicevars)
     # task.getxxslice(sol, msk_nvars, msk_nvars + n_choicevars, xbin)
-    # wrap things up in a dictionary
-    solution = {
-        "status": "optimal",
-        "primal": np.array(x),
-        "objective": np.exp(task.getprimalobj(sol)),
-    }
     # recover dual variables for log-sum-exp epigraph constraints
     # (skip epigraph of the objective function).
     if choicevaridxs:  # no dual solution
-        solution["la"] = []
-        solution["nu"] = []
+        la, nu = [], []
     else:
         z_duals = [0.0] * (p_lse - 1)
         task.getsuxslice(mosek.soltype.itr, m + 3 * n_lse + 1, msk_nvars, z_duals)
@@ -303,17 +297,27 @@ def optimize(*, c, A, k, p_idxs, **kwargs):
         z_duals[z_duals < 0] = 0
         # recover dual variables for the remaining user-provided constraints
         if log_c_lin is None:
-            solution["la"] = z_duals
+            la = z_duals
         else:
             aff_duals = [0.0] * log_c_lin.size
             task.getsucslice(mosek.soltype.itr, n_lse + p_lse, cur_con_idx, aff_duals)
             aff_duals = np.array(aff_duals)
             aff_duals[aff_duals < 0] = 0
             # merge z_duals with aff_duals
-            merged_duals = np.zeros(len(k))
+            merged_duals = np.zeros(len(prob.k))
             merged_duals[lse_posys[1:]] = z_duals  # skipping the cost
             merged_duals[lin_posys] = aff_duals
-            solution["la"] = merged_duals[1:]
+            la = merged_duals[1:]
+        nu = prob.compute_nu(la, np.array(x))
+
+    solution = RawSolution(
+        status="optimal",
+        cost=np.exp(task.getprimalobj(sol)),
+        x=np.array(x),
+        nu=nu,
+        la=la,
+        meta={"solver": "mosek_conif"},
+    )
 
     task.__exit__(None, None, None)
     env.__exit__(None, None, None)

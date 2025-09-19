@@ -110,11 +110,11 @@ solutions and can be solved with 'Model.solve()'."""
         )
         self._gp.x0 = x0
         self.a_idxs = defaultdict(list)
-        last_cost_mon = self._gp.k[0]
-        first_gp_mon = sum(self._gp.k[: 1 + len(self.approxconstraints)])
-        for row_idx, m_idx in enumerate(self._gp.A.row):
+        last_cost_mon = self._gp.data.k[0]
+        first_gp_mon = sum(self._gp.data.k[: 1 + len(self.approxconstraints)])
+        for row_idx, m_idx in enumerate(self._gp.data.A.row):
             if last_cost_mon <= m_idx <= first_gp_mon:
-                self.a_idxs[self._gp.p_idxs[m_idx]].append(row_idx)
+                self.a_idxs[self._gp.data.p_idxs[m_idx]].append(row_idx)
 
     # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     # pylint: disable=too-many-arguments
@@ -166,7 +166,7 @@ solutions and can be solved with 'Model.solve()'."""
             print(f" for {len(self.sgpvks)} free variables")
             print(f"  in {len(self.sgpconstraints)} locally-GP constraints")
             print(f"  and for {len(self._gp.varlocs)} free variables")
-            print(f"       in {len(self._gp.k)} posynomial inequalities.")
+            print(f"  in {len(self._gp.data.k)} posynomial inequalities.")
         prevcost, cost, rel_improvement = None, None, None
         while rel_improvement is None or rel_improvement > reltol:
             prevcost = cost
@@ -186,12 +186,12 @@ solutions and can be solved with 'Model.solve()'."""
                 solver, verbosity=verbosity - 1, gen_result=False, **solveargs
             )
             self.solver_outs.append(solver_out)
-            cost = float(solver_out["objective"])
-            x0 = dict(zip(gp.varlocs, np.exp(solver_out["primal"])))
+            cost = float(solver_out.cost)
+            x0 = dict(zip(gp.varlocs, np.exp(solver_out.x)))
             if verbosity > 2:
                 result = gp.generate_result(solver_out, verbosity=verbosity - 3)
                 self._results.append(result)
-                vartable = result.table(self.sgpvks, tables=["freevariables"])
+                vartable = result.table(showvars=self.sgpvks, tables=["freevariables"])
                 vartable = "\n" + vartable.replace("Free", "SGP", 1)
                 print(vartable)
             elif verbosity > 1:
@@ -211,7 +211,7 @@ solutions and can be solved with 'Model.solve()'."""
                 rel_improvement = cost = None
         # solved successfully!
         self.result = gp.generate_result(solver_out, verbosity=verbosity - 3)
-        self.result["soltime"] = time() - starttime
+        self.result.meta["soltime"] = time() - starttime
         if verbosity > 1:
             print()
         if verbosity > 0:
@@ -221,9 +221,7 @@ solutions and can be solved with 'Model.solve()'."""
             )
         if hasattr(self.slack, "key"):
             initsolwarning(self.result, "Slack Non-GP Constraints")
-            excess_slack = (
-                self.result["variables"][self.slack.key] - 1
-            )  # pylint: disable=no-member
+            excess_slack = self.result.primal[self.slack.key] - 1
             if excess_slack > EPS:
                 msg = (
                     "Final PCCP solution let non-GP constraints slacken by"
@@ -245,26 +243,19 @@ solutions and can be solved with 'Model.solve()'."""
                 )
                 if verbosity > -1:
                     print(expl)
-            self.result["cost function"] = self.cost
-            del self.result["freevariables"][
-                self.slack.key
-            ]  # pylint: disable=no-member
-            del self.result["variables"][self.slack.key]  # pylint: disable=no-member
-            if "sensitivities" in self.result:  # not true for MIGP
-                del self.result["sensitivities"]["variables"][
-                    self.slack.key
-                ]  # pylint: disable=no-member
-                del self.result["sensitivities"]["variablerisk"][
-                    self.slack.key
-                ]  # pylint: disable=no-member
-                slcon = self.gpconstraints[0]
-                slconsenss = self.result["sensitivities"]["constraints"][slcon]
-                del self.result["sensitivities"]["constraints"][slcon]
-                # pylint: disable=fixme
-                # TODO: create constraint in RelaxPCCP namespace
-                self.result["sensitivities"]["models"][""] -= slconsenss
-                if not self.result["sensitivities"]["models"][""]:
-                    del self.result["sensitivities"]["models"][""]
+            self.result.meta["cost function"] = self.cost
+            del self.result.primal[self.slack.key]
+            assert hasattr(self.result, "sens")  # not true for MIGP
+            del self.result.sens.variables[self.slack.key]
+            del self.result.sens.variablerisk[self.slack.key]
+            slcon = self.gpconstraints[0]
+            slconsenss = self.result.sens.constraints[slcon]
+            del self.result.sens.constraints[slcon]
+            # pylint: disable=fixme
+            # TODO: create constraint in RelaxPCCP namespace
+            self.result.sens.models[""] -= slconsenss
+            if not self.result.sens.models[""]:
+                del self.result.sens.models[""]
         return self.result
 
     @property
@@ -291,22 +282,22 @@ solutions and can be solved with 'Model.solve()'."""
         """
         for i, (exp, c) in enumerate(hmap.items()):
             self._gp.exps[m_idx + i] = exp
-            self._gp.cs[m_idx + i] = c
+            self._gp.data.c[m_idx + i] = c
             for var, x in exp.items():
                 try:  # modify a particular A entry
                     row_idx = a_idxs.pop()
-                    self._gp.A.row[row_idx] = m_idx + i
-                    self._gp.A.col[row_idx] = self._gp.varidxs[var]
-                    self._gp.A.data[row_idx] = x
+                    self._gp.data.A.row[row_idx] = m_idx + i
+                    self._gp.data.A.col[row_idx] = self._gp.varcols[var]
+                    self._gp.data.A.data[row_idx] = x
                 except IndexError:  # numbers of exps increased
-                    a_idxs.append(len(self._gp.A.row))
-                    self._gp.A.row.append(m_idx + i)
-                    self._gp.A.col.append(self._gp.varidxs[var])
-                    self._gp.A.data.append(x)
+                    a_idxs.append(len(self._gp.data.A.row))
+                    self._gp.data.A.row.append(m_idx + i)
+                    self._gp.data.A.col.append(self._gp.varcols[var])
+                    self._gp.data.A.data.append(x)
             for row_idx in a_idxs:  # number of exps decreased
-                self._gp.A.row[row_idx] = 0  # zero out this entry
-                self._gp.A.col[row_idx] = 0
-                self._gp.A.data[row_idx] = 0
+                self._gp.data.A.row[row_idx] = 0  # zero out this entry
+                self._gp.data.A.col[row_idx] = 0
+                self._gp.data.A.data[row_idx] = 0
 
     def gp(self, x0=None, *, cleanx0=False):
         "Update self._gp for x0 and return it."
@@ -328,7 +319,7 @@ solutions and can be solved with 'Model.solve()'."""
                 p_idx += 1  # p_idx=0 is the cost; sp constraints are after it
                 (hmap,) = approxc.as_hmapslt1(self._gp.substitutions)
                 self._gp.hmaps[p_idx] = hmap
-                m_idx = self._gp.m_idxs[p_idx].start
+                m_idx = self._gp.data.m_idxs[p_idx].start
                 a_idxs = list(self.a_idxs[p_idx])  # A's entries we can modify
                 self._update_a_matrix(m_idx, hmap, a_idxs)
         return self._gp

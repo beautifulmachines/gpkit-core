@@ -46,7 +46,7 @@ class BinarySweepTree:  # pylint: disable=too-many-instance-attributes
             raise ValueError("bounds[0] must be smaller than bounds[1].")
         self.bounds = bounds
         self.sols = sols
-        self.costs = np.log([mag(sol["cost"]) for sol in sols])
+        self.costs = np.log([mag(sol.cost) for sol in sols])
         self.splits = None
         self.splitval = None
         self.splitlb = None
@@ -94,8 +94,8 @@ class BinarySweepTree:  # pylint: disable=too-many-instance-attributes
             raise ValueError("query value is outside bounds.")
         bst = self.min_bst(value)
         lo, hi = bst.bounds
-        loval, hival = [sol(posy) for sol in bst.sols]
-        lo, hi, loval, hival = np.log(list(map(mag, [lo, hi, loval, hival])))
+        loval, hival = [sol[posy] for sol in bst.sols]
+        lo, hi, loval, hival = np.log([float(mag(v)) for v in (lo, hi, loval, hival)])
         interp = (hi - np.log(value)) / float(hi - lo)
         return np.exp(interp * loval + (1 - interp) * hival)
 
@@ -114,13 +114,13 @@ class BinarySweepTree:  # pylint: disable=too-many-instance-attributes
                 splitcost = np.exp((bst.splitlb + bst.splitub) / 2)
             if value <= bst.splitval:
                 lo, hi = bst.bounds[0], bst.splitval
-                loval, hival = bst.sols[0]["cost"], splitcost
+                loval, hival = bst.sols[0].cost, splitcost
             else:
                 lo, hi = bst.splitval, bst.bounds[1]
-                loval, hival = splitcost, bst.sols[1]["cost"]
+                loval, hival = splitcost, bst.sols[1].cost
         else:
             lo, hi = bst.bounds
-            loval, hival = [sol["cost"] for sol in bst.sols]
+            loval, hival = [sol.cost for sol in bst.sols]
         lo, hi, loval, hival = np.log(list(map(mag, [lo, hi, loval, hival])))
         interp = (hi - np.log(value)) / float(hi - lo)
         return np.exp(interp * loval + (1 - interp) * hival)
@@ -151,7 +151,7 @@ class BinarySweepTree:  # pylint: disable=too-many-instance-attributes
         "Returns a solution array of all the solutions in an autosweep"
         solution = SolutionArray()
         for sol in self.sollist:
-            solution.append(sol)
+            solution.append(sol.to_solution_array())
         solution.to_arrays()
         return solution
 
@@ -194,23 +194,23 @@ class SolutionOracle:
         "Gets values from the BST and units them"
         if self._is_cost(key):
             key_at = self.bst.cost_at
-            v0 = self.bst.sols[0]["cost"]
+            v0 = self.bst.sols[0].cost
         else:
             key_at = self.bst.posy_at
-            v0 = self.bst.sols[0](key)
+            v0 = self.bst.sols[0][key]
         units = getattr(v0, "units", None)
         fit = [key_at(key, x) for x in self.sampled_at]
         return fit * units if units else np.array(fit)
 
     def cost_lb(self):
         "Gets cost lower bounds from the BST and units them"
-        units = getattr(self.bst.sols[0]["cost"], "units", None)
+        units = getattr(self.bst.sols[0].cost, "units", None)
         fit = [self.bst.cost_at("cost", x, "lb") for x in self.sampled_at]
         return fit * units if units else np.array(fit)
 
     def cost_ub(self):
         "Gets cost upper bounds from the BST and units them"
-        units = getattr(self.bst.sols[0]["cost"], "units", None)
+        units = getattr(self.bst.sols[0].cost, "units", None)
         fit = [self.bst.cost_at("cost", x, "ub") for x in self.sampled_at]
         return fit * units if units else np.array(fit)
 
@@ -297,7 +297,7 @@ def get_tol(costs, bounds, sols, variable):  # pylint: disable=too-many-locals
     "Gets the intersection point and corresponding bounds from two solutions."
     y0, y1 = costs
     x0, x1 = np.log(bounds)
-    s0, s1 = [sol["sensitivities"]["variables"][variable] for sol in sols]
+    s0, s1 = [sol.sens.variables[variable] for sol in sols]
     # y0 + s0*(x - x0) == y1 + s1*(x - x1)
     num = y1 - y0 + x0 * s0 - x1 * s1
     denom = s0 - s1
