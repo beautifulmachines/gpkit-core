@@ -260,23 +260,21 @@ class GeometricProgram:
         if checkbounds:
             self.check_bounds(err_on_missing_bounds=True)
 
-    def check_bounds(self, *, err_on_missing_bounds=False):
+    def check_bounds(self, err_on_missing_bounds=False):
         "Checks if any variables are unbounded, through equality constraints."
         missingbounds = {}
-        for var, locs in self.varlocs.items():
-            upperbound, lowerbound = False, False
-            for i in locs:
-                if i not in self.meq_idxs.all:
-                    if self.exps[i][var] > 0:
-                        upperbound = True
-                    else:
-                        lowerbound = True
-                if upperbound and lowerbound:
-                    break
-            if not upperbound:
-                missingbounds[(var, "upper")] = "."
-            if not lowerbound:
-                missingbounds[(var, "lower")] = "."
+        if not self.vars:  # temporary band-aid for problems with no variables
+            return missingbounds
+        A = self.data.A.tocsc()
+        nrow, ncol = A.shape
+        ineq_idxs = [i for i in range(nrow) if i not in self.meq_idxs.all]
+        A = A[ineq_idxs, :]  # only take credit for inequalities, not ==
+        for j in range(ncol):
+            istart, iend = A.indptr[j], A.indptr[j + 1]
+            if not np.any(A.data[istart:iend] > 0):
+                missingbounds[(self.vars[j], "upper")] = "."
+            if not np.any(A.data[istart:iend] < 0):
+                missingbounds[(self.vars[j], "lower")] = "."
         if not missingbounds:
             return {}  # all bounds found in inequalities
         meq_bounds = gen_meq_bounds(missingbounds, self.exps, self.meq_idxs)
@@ -306,6 +304,7 @@ class GeometricProgram:
                     self.varlocs[var].append(m_idx)
                 m_idx += 1
         self.varcols = {vk: i for i, vk in enumerate(self.varlocs)}
+        self.vars = tuple(self.varcols)
         self.choicevaridxs = {vk: i for i, vk in enumerate(self.varlocs) if vk.choices}
         self.data = CompiledGP.from_hmaps(self.hmaps, self.varcols)
 
@@ -334,7 +333,7 @@ class GeometricProgram:
         solvername, solverfn = _get_solver(solver, kwargs)
         if verbosity > 0:
             print(f"Using solver '{solvername}'")
-            print(f" for {len(self.varlocs)} free variables")
+            print(f" for {len(self.varcols)} free variables")
             print(f"  in {len(self.data.k)} posynomial inequalities.")
 
         solverargs = DEFAULT_SOLVER_KWARGS.get(solvername, {})
@@ -495,7 +494,7 @@ class GeometricProgram:
 
     def _compile_result(self, solver_out):
         primal = solver_out.x
-        if len(self.varlocs) != len(primal):
+        if len(self.varcols) != len(primal):
             raise RuntimeWarning("The primal solution was not returned.")
         varvals = VarMap(zip(self.varlocs, np.exp(primal)))
         varvals.update(self.substitutions)
@@ -511,7 +510,6 @@ class GeometricProgram:
         result = Solution(
             cost=float(solver_out.cost),
             primal=VarMap(zip(self.varlocs, np.exp(primal))),
-            # freevariables=VarMap(zip(self.varlocs, np.exp(primal))),
             constants=VarMap(self.substitutions),
             sens=Sensitivities(
                 constraints=constraint_senss,
