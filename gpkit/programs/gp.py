@@ -288,8 +288,8 @@ class GeometricProgram:
         return missingbounds
 
     def gen(self):
-        "compile this program and set varlocs, meq_idxs"
-        self.varlocs = defaultdict(list)
+        "compile this program and set meq_idxs"
+        variables = set()
         self.meq_idxs = MonoEqualityIndexes()
         self.exps = []
         m_idx = 0
@@ -300,12 +300,11 @@ class GeometricProgram:
                     self.meq_idxs.first_half.add(m_idx)
             self.exps.extend(hmap)
             for exp in hmap:
-                for var in exp:
-                    self.varlocs[var].append(m_idx)
+                variables.update(exp)
                 m_idx += 1
-        self.varcols = {vk: i for i, vk in enumerate(self.varlocs)}
-        self.vars = tuple(self.varcols)
-        self.choicevaridxs = {vk: i for i, vk in enumerate(self.varlocs) if vk.choices}
+        self.varcols = {vk: i for i, vk in enumerate(variables)}
+        self.vars = tuple(variables)
+        self.choicevaridxs = {vk: i for i, vk in enumerate(variables) if vk.choices}
         self.data = CompiledGP.from_hmaps(self.hmaps, self.varcols)
 
     # pylint: disable=too-many-statements, too-many-locals,too-many-branches
@@ -333,7 +332,7 @@ class GeometricProgram:
         solvername, solverfn = _get_solver(solver, kwargs)
         if verbosity > 0:
             print(f"Using solver '{solvername}'")
-            print(f" for {len(self.varcols)} free variables")
+            print(f" for {len(self.vars)} free variables")
             print(f"  in {len(self.data.k)} posynomial inequalities.")
 
         solverargs = DEFAULT_SOLVER_KWARGS.get(solvername, {})
@@ -494,9 +493,9 @@ class GeometricProgram:
 
     def _compile_result(self, solver_out):
         primal = solver_out.x
-        if len(self.varcols) != len(primal):
+        if len(self.vars) != len(primal):
             raise RuntimeWarning("The primal solution was not returned.")
-        varvals = VarMap(zip(self.varlocs, np.exp(primal)))
+        varvals = VarMap(zip(self.vars, np.exp(primal)))
         varvals.update(self.substitutions)
 
         warnings = {}
@@ -509,7 +508,7 @@ class GeometricProgram:
 
         result = Solution(
             cost=float(solver_out.cost),
-            primal=VarMap(zip(self.varlocs, np.exp(primal))),
+            primal=VarMap(zip(self.vars, np.exp(primal))),
             constants=VarMap(self.substitutions),
             sens=Sensitivities(
                 constraints=constraint_senss,

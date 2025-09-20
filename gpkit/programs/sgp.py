@@ -165,7 +165,7 @@ solutions and can be solved with 'Model.solve()'."""
             print("Starting a sequence of GP solves")
             print(f" for {len(self.sgpvks)} free variables")
             print(f"  in {len(self.sgpconstraints)} locally-GP constraints")
-            print(f"  and for {len(self._gp.varlocs)} free variables")
+            print(f"  and for {len(self._gp.vars)} free variables")
             print(f"  in {len(self._gp.data.k)} posynomial inequalities.")
         prevcost, cost, rel_improvement = None, None, None
         while rel_improvement is None or rel_improvement > reltol:
@@ -187,7 +187,7 @@ solutions and can be solved with 'Model.solve()'."""
             )
             self.solver_outs.append(solver_out)
             cost = float(solver_out.cost)
-            x0 = dict(zip(gp.varlocs, np.exp(solver_out.x)))
+            x0 = dict(zip(gp.vars, np.exp(solver_out.x)))
             if verbosity > 2:
                 result = gp.generate_result(solver_out, verbosity=verbosity - 3)
                 self._results.append(result)
