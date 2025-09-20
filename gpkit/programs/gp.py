@@ -307,7 +307,7 @@ class GeometricProgram:
         self.choicevaridxs = {vk: i for i, vk in enumerate(variables) if vk.choices}
         self.data = CompiledGP.from_hmaps(self.hmaps, self.varcols)
 
-    # pylint: disable=too-many-statements, too-many-locals,too-many-branches
+    # pylint: disable=too-many-locals,too-many-branches
     def solve(self, solver=None, *, verbosity=1, gen_result=True, **kwargs):
         """Solves a GeometricProgram and returns the solution.
 
