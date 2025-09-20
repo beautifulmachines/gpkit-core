@@ -214,8 +214,7 @@ class TestModelSubs(unittest.TestCase):
         self.assertTrue(all(abs(a - b) / (a + b) < 1e-7))
         x_min = Variable("x_min", 1)  # constant to check array indexing
         m = Model(x, [x >= y.prod(), x >= x_min])
-        sweep = {y: [[2, 5], [3, 5], [2, 7], [3, 7], [2, 11], [3, 11]]}
-        # sweep = {y: [[2, 3], [5, 7, 11]]}
+        sweep = {"y": [[2, 5], [3, 5], [2, 7], [3, 7], [2, 11], [3, 11]]}
         sol = m.sweep(sweep, verbosity=0)
         a = sol["cost"]
         b = [10, 15, 14, 21, 22, 33]
