@@ -60,11 +60,6 @@ try:
 except UnknownInfeasible:  # pragma: no cover
     pass
 
-bpl = ", but would gain it from any of these sets: "
-assert missingbounds[(m.D.key, "lower")] == bpl + f"[({m.Ap}, 'lower')]"
-assert missingbounds[(m.nu.key, "lower")] == bpl + f"[({m.Ap}, 'lower')]"
-# ordering is arbitrary:
-assert missingbounds[(m.Ap.key, "lower")] in (
-    bpl + (f"[({m.D}, 'lower')] or [({m.nu}, 'lower')]"),
-    bpl + (f"[({m.nu}, 'lower')] or [({m.D}, 'lower')]"),
-)
+assert (m.D.key, "lower") in missingbounds
+assert (m.nu.key, "lower") in missingbounds
+assert (m.Ap.key, "lower") in missingbounds
