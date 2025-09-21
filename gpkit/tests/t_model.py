@@ -339,7 +339,7 @@ class TestGP(unittest.TestCase):
         m = Model(A, [A >= np.pi / 4 * d**2])
         self.assertEqual(m.substitutions, {d.key: 6})
         sol = m.sweep({d: [3, 12, 36]}, verbosity=0)
-        self.assertAlmostEqual(sol["variables"][A][1], 0.785398165)
+        self.assertAlmostEqual(sol[1][A], 0.785398165 * A.units)
         self.assertEqual(m.substitutions, {d.key: 6})
 
 

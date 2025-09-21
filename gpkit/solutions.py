@@ -96,8 +96,8 @@ class Solution:
             {
                 "cost": self.cost,
                 "cost function": self.meta["cost function"],
-                "freevariables": self.primal,
-                "constants": self.constants,
+                "freevariables": VarMap(self.primal),
+                "constants": VarMap(self.constants),
                 "variables": variables,
                 "soltime": self.meta["soltime"],
                 "warnings": self.meta["warnings"],
@@ -143,3 +143,27 @@ class SolutionSequence(List[Solution]):
         if not self:
             return "SolutionSequence([])"
         return f"SolutionSequence(n={len(self)})"
+
+    def to_solution_array(self) -> SolutionArray:
+        "Convert to SolutionArray"
+        out = SolutionArray()
+        for sol in self:
+            solarray = sol.to_solution_array()
+            solarray["sweepvariables"] = sol.meta["sweep_point"]
+            for sweepvar in sol.meta["sweep_point"]:
+                if sweepvar in solarray["constants"]:
+                    del solarray["constants"][sweepvar]
+            out.append(solarray)
+        out.to_arrays()
+        modelstrs = {sol.meta["modelstr"] for sol in self}
+        assert len(modelstrs) == 1
+        (out.modelstr,) = modelstrs
+        return out
+
+    def table(self, **kwargs):
+        "Fall back to SolutionArray.table"
+        return self.to_solution_array().table(**kwargs)
+
+    def summary(self, **kwargs):
+        "Fall back to SolutionArray.summary"
+        return self.to_solution_array().summary(**kwargs)

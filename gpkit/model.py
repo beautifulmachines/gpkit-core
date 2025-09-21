@@ -12,7 +12,7 @@ from .nomials import Monomial
 from .programs.gp import GeometricProgram
 from .programs.prog_factories import progify, solvify
 from .programs.sgp import SequentialGeometricProgram
-from .solution_array import SolutionArray
+from .solutions import SolutionSequence
 from .tools.autosweep import autosweep_1d
 from .util.docstring import expected_unbounded
 from .varmap import VarMap
@@ -145,11 +145,11 @@ class Model(CostedConstraintSet):
             raise ValueError(err + boundstrs + "\n\n" + docstring)
 
     def sweep(self, sweepvals, skipfailures=False, **solveargs):
-        "Sweeps {var: values} in-sync across one dim. Returns SolutionArray"
+        "Sweeps {var: values} in-sync across one dim. Returns SolutionSequence"
         return self._sweep(self.solve, sweepvals, skipfailures, **solveargs)
 
     def localsweep(self, sweepvals, skipfailures=False, **solveargs):
-        "Sweeps {var: values} in-sync across one dim. Returns SolutionArray"
+        "Sweeps {var: values} in-sync across one dim. Returns SolutionSequence"
         return self._sweep(self.localsolve, sweepvals, skipfailures, **solveargs)
 
     def _validate_sweep(self, sweepvals):
@@ -166,7 +166,7 @@ class Model(CostedConstraintSet):
 
     def _sweep(self, solvefn, sweepvals, skipfailures, **solveargs):
         "Runs sweep using solvefn (either self.solve or self.localsolve)"
-        sols = SolutionArray()
+        sols = SolutionSequence()
         self._validate_sweep(sweepvals)
         lengths = {len(vals) for vals in sweepvals.values()}
         if len(lengths) != 1:
@@ -177,8 +177,11 @@ class Model(CostedConstraintSet):
             sweepsubs = {var: vals[i] for var, vals in sweepvals.items()}
             self.substitutions = {**oldsubs, **sweepsubs}
             try:
-                sol = solvefn(**solveargs)
-                sols.append(sol.to_solution_array())
+                sols.append(solvefn(**solveargs))
+                sp = VarMap()
+                sp.register_keys(self.varkeys)
+                sp.update(sweepsubs)
+                sols[-1].meta["sweep_point"] = sp
             except Infeasible as err:
                 if not skipfailures:
                     raise RuntimeWarning(
@@ -189,20 +192,20 @@ class Model(CostedConstraintSet):
         if not sols:
             raise RuntimeWarning("All solves were infeasible.")
 
-        sols["sweepvariables"] = VarMap()
-        for rawkey in sweepvals:
-            for cleankey in sols["constants"].varset.keys(rawkey):
-                sols["sweepvariables"][cleankey] = sols["constants"][cleankey]
-                del sols["constants"][cleankey]
-        # all remaining constants should be squashed
-        for key, val in sols["constants"].items():
-            if len(set(val)) == 1:
-                sols["constants"][key] = set(val)
+        # sols["sweepvariables"] = VarMap()
+        # for rawkey in sweepvals:
+        #     for cleankey in sols["constants"].varset.keys(rawkey):
+        #         sols["sweepvariables"][cleankey] = sols["constants"][cleankey]
+        #         del sols["constants"][cleankey]
+        # # all remaining constants should be squashed
+        # for key, val in sols["constants"].items():
+        #     if len(set(val)) == 1:
+        #         sols["constants"][key] = set(val)
 
         if solveargs.get("verbosity", 1) > 0:
             print(f"Sweeping took {time() - tic:.3g} seconds.")
 
-        sols.to_arrays()
+        # sols.to_arrays()
         sols.modelstr = str(self)
         return sols
 
