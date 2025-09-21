@@ -192,20 +192,9 @@ class Model(CostedConstraintSet):
         if not sols:
             raise RuntimeWarning("All solves were infeasible.")
 
-        # sols["sweepvariables"] = VarMap()
-        # for rawkey in sweepvals:
-        #     for cleankey in sols["constants"].varset.keys(rawkey):
-        #         sols["sweepvariables"][cleankey] = sols["constants"][cleankey]
-        #         del sols["constants"][cleankey]
-        # # all remaining constants should be squashed
-        # for key, val in sols["constants"].items():
-        #     if len(set(val)) == 1:
-        #         sols["constants"][key] = set(val)
-
         if solveargs.get("verbosity", 1) > 0:
             print(f"Sweeping took {time() - tic:.3g} seconds.")
 
-        # sols.to_arrays()
         sols.modelstr = str(self)
         return sols
 
