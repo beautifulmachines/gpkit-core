@@ -174,7 +174,8 @@ class Model(CostedConstraintSet):
         oldsubs = self.substitutions
         tic = time()
         for i in range(lengths.pop()):
-            self.substitutions.update({var: vals[i] for var, vals in sweepvals.items()})
+            sweepsubs = {var: vals[i] for var, vals in sweepvals.items()}
+            self.substitutions = {**oldsubs, **sweepsubs}
             try:
                 solvefn(**solveargs)
                 sols.append(self.program.result.to_solution_array())
