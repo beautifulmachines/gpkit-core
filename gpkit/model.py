@@ -152,7 +152,7 @@ class Model(CostedConstraintSet):
         "Sweeps {var: values} in-sync across one dim. Returns SolutionArray"
         return self._sweep(self.localsolve, sweepvals, skipfailures, **solveargs)
 
-    def _parse_sweep(self, sweepvals):
+    def _validate_sweep(self, sweepvals):
         "Validate and return {VarKey: iterable} mapping"
         # this logic might eventually live in VarMap
         for var, vals in sweepvals.items():
@@ -167,7 +167,7 @@ class Model(CostedConstraintSet):
     def _sweep(self, solvefn, sweepvals, skipfailures, **solveargs):
         "Runs sweep using solvefn (either self.solve or self.localsolve)"
         sols = SolutionArray()
-        self._parse_sweep(sweepvals)
+        self._validate_sweep(sweepvals)
         lengths = {len(vals) for vals in sweepvals.values()}
         if len(lengths) != 1:
             raise ValueError(f"sweepvals has mismatched lengths {lengths}")
