@@ -121,22 +121,18 @@ def solvify(genfunction):
 
         Returns
         -------
-        sol : SolutionArray
-            See the SolutionArray documentation for details.
+        sol : Solution
 
         Raises
         ------
         ValueError if the program is invalid.
         RuntimeWarning if an error occurs in solving or parsing the solution.
         """
-
         # NOTE SIDE EFFECTS: self.program and self.solution set below
         self.program, progsolve = genfunction(self, **kwargs)
         result = progsolve(solver, verbosity=verbosity, **kwargs)
         if kwargs.get("process_result", True):
             self.process_result(result)
-        # solution.append(result)
-        # solution.to_arrays()
         self.solution = result
         self.solution.meta["modelstr"] = str(self)
         return result
