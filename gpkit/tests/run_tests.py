@@ -36,9 +36,9 @@ def import_tests():
 
     tests += t_model.TESTS
 
-    from gpkit.tests import t_solution_array
+    from gpkit.tests import t_solution
 
-    tests += t_solution_array.TESTS
+    tests += t_solution.TESTS
 
     from gpkit.tests import t_examples
 
