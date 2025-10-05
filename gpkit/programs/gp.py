@@ -320,14 +320,14 @@ class GeometricProgram:
         verbosity : int (default 1)
             If greater than 0, prints solver name and solve time.
         gen_result : bool (default True)
-            If True, makes a human-readable SolutionArray from solver output.
+            If True, makes a Solution from solver output.
         **kwargs :
             Passed to solver constructor and solver function.
 
 
         Returns
         -------
-        SolutionArray (or dict if gen_result is False)
+        Solution (or RawSolution if gen_result is False)
         """
         solvername, solverfn = _get_solver(solver, kwargs)
         if verbosity > 0:
@@ -394,7 +394,7 @@ class GeometricProgram:
 
         if not gen_result:
             return solver_out
-        # else, generate a human-readable SolutionArray
+        # else, generate a Solution object
         self._result = self.generate_result(solver_out, verbosity=verbosity - 2)
         return self.result
 
@@ -406,7 +406,7 @@ class GeometricProgram:
         return self._result
 
     def generate_result(self, solver_out, *, verbosity=0, dual_check=True):
-        "Generates a full SolutionArray and checks it."
+        "Generates a Solution object and checks it."
         if verbosity > 0:
             soltime = solver_out.meta["soltime"]
             tic = time()
