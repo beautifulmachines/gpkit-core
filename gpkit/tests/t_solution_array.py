@@ -1,4 +1,4 @@
-"""Tests for SolutionArray class"""
+"""Tests for Solution class"""
 
 import unittest
 
@@ -11,16 +11,16 @@ from gpkit.util.small_classes import Quantity, Strings
 from gpkit.varkey import VarKey
 
 
-class TestSolutionArray(unittest.TestCase):
-    """Unit tests for the SolutionArray class"""
+class TestSolution(unittest.TestCase):
+    """Unit tests for the Solution class"""
 
-    def test_call(self):
+    def test_getitem(self):
         A = Variable("A", "-", "Test Variable")
         prob = Model(A, [A >= 1])
         sol = prob.solve(verbosity=0)
         self.assertAlmostEqual(sol[A], 1.0, 8)
 
-    def test_call_units(self):
+    def test_getitem_units(self):
         # test from issue541
         x = Variable("x", 10, "ft")
         y = Variable("y", "m")
@@ -119,7 +119,7 @@ class TestResultsTable(unittest.TestCase):
         self.assertAlmostEqual(sol["x"] / 3.0, 1.0, 3)
 
 
-TESTS = [TestSolutionArray, TestResultsTable]
+TESTS = [TestSolution, TestResultsTable]
 
 if __name__ == "__main__":  # pragma: no cover
     # pylint: disable=wrong-import-position
