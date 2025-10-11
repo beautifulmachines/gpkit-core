@@ -6,7 +6,7 @@ from time import time
 import numpy as np
 
 from ..exceptions import InvalidGPConstraint
-from ..solution_array import SolutionArray
+from ..solutions import SolutionSequence
 from ..util.small_classes import Count
 from ..util.small_scripts import mag
 
@@ -149,11 +149,7 @@ class BinarySweepTree:  # pylint: disable=too-many-instance-attributes
     @property
     def solarray(self):
         "Returns a solution array of all the solutions in an autosweep"
-        solution = SolutionArray()
-        for sol in self.sollist:
-            solution.append(sol.to_solution_array())
-        solution.to_arrays()
-        return solution
+        return SolutionSequence(self.sollist)
 
     def save(self, filename="autosweep.p"):
         """Pickles the autosweep and saves it to a file.
@@ -173,7 +169,7 @@ class BinarySweepTree:  # pylint: disable=too-many-instance-attributes
 
 
 class SolutionOracle:
-    "Acts like a SolutionArray for autosweeps"
+    "Acts like a Solution/SolutionSequence for autosweeps"
 
     def __init__(self, bst, sampled_at):
         self.sampled_at = sampled_at

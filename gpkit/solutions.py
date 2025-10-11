@@ -119,7 +119,7 @@ class SolutionSequence(List[Solution]):
     """
 
     def __init__(self, iterable=(), program=None):
-        self.program = program  # may start as None, set on first append
+        # self.program = program  # may start as None, set on first append
         super().__init__()
         for s in iterable:
             self.append(s)
@@ -149,10 +149,11 @@ class SolutionSequence(List[Solution]):
         out = SolutionArray()
         for sol in self:
             solarray = sol.to_solution_array()
-            solarray["sweepvariables"] = sol.meta["sweep_point"]
-            for sweepvar in sol.meta["sweep_point"]:
-                if sweepvar in solarray["constants"]:
-                    del solarray["constants"][sweepvar]
+            if "sweep_point" in sol.meta:
+                solarray["sweepvariables"] = sol.meta["sweep_point"]
+                for sweepvar in sol.meta["sweep_point"]:
+                    if sweepvar in solarray["constants"]:
+                        del solarray["constants"][sweepvar]
             out.append(solarray)
         out.to_arrays()
         modelstrs = {sol.meta["modelstr"] for sol in self}
