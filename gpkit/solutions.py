@@ -118,18 +118,13 @@ class SolutionSequence(List[Solution]):
     Ordered collection of Solution objects all sharing same underlying model.
     """
 
-    def __init__(self, iterable=(), program=None):
-        # self.program = program  # may start as None, set on first append
+    def __init__(self, iterable=()):
         super().__init__()
         for s in iterable:
             self.append(s)
 
     def append(self, sol: Solution) -> None:
         "Standard list append, with integrity check"
-        # if self.program is None:
-        #    self.program = sol.program
-        # elif sol.program is not self.program:
-        #    raise ValueError("SolutionSequence elements must share the same program")
         super().append(sol)
 
     # ----------------------------------------------------------------
