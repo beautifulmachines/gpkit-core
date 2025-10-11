@@ -152,7 +152,6 @@ class SolutionSequence(List[Solution]):
             out.append(solarray)
         out.to_arrays()
         modelstrs = {sol.meta["modelstr"] for sol in self}
-        assert len(modelstrs) == 1
         (out.modelstr,) = modelstrs
         return out
 
