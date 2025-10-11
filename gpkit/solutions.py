@@ -96,8 +96,8 @@ class Solution:
             {
                 "cost": self.cost,
                 "cost function": self.meta["cost function"],
-                "freevariables": self.primal,
-                "constants": self.constants,
+                "freevariables": VarMap(self.primal),
+                "constants": VarMap(self.constants),
                 "variables": variables,
                 "soltime": self.meta["soltime"],
                 "warnings": self.meta["warnings"],
@@ -118,18 +118,13 @@ class SolutionSequence(List[Solution]):
     Ordered collection of Solution objects all sharing same underlying model.
     """
 
-    def __init__(self, iterable=(), program=None):
-        self.program = program  # may start as None, set on first append
+    def __init__(self, iterable=()):
         super().__init__()
         for s in iterable:
             self.append(s)
 
     def append(self, sol: Solution) -> None:
         "Standard list append, with integrity check"
-        # if self.program is None:
-        #    self.program = sol.program
-        # elif sol.program is not self.program:
-        #    raise ValueError("SolutionSequence elements must share the same program")
         super().append(sol)
 
     # ----------------------------------------------------------------
@@ -143,3 +138,27 @@ class SolutionSequence(List[Solution]):
         if not self:
             return "SolutionSequence([])"
         return f"SolutionSequence(n={len(self)})"
+
+    def to_solution_array(self) -> SolutionArray:
+        "Convert to SolutionArray"
+        out = SolutionArray()
+        for sol in self:
+            solarray = sol.to_solution_array()
+            if "sweep_point" in sol.meta:
+                solarray["sweepvariables"] = sol.meta["sweep_point"]
+                for sweepvar in sol.meta["sweep_point"]:
+                    if sweepvar in solarray["constants"]:
+                        del solarray["constants"][sweepvar]
+            out.append(solarray)
+        out.to_arrays()
+        modelstrs = {sol.meta["modelstr"] for sol in self}
+        (out.modelstr,) = modelstrs
+        return out
+
+    def table(self, **kwargs):
+        "Fall back to SolutionArray.table"
+        return self.to_solution_array().table(**kwargs)
+
+    def summary(self, **kwargs):
+        "Fall back to SolutionArray.summary"
+        return self.to_solution_array().summary(**kwargs)

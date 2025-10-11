@@ -183,7 +183,7 @@ class TestModelSubs(unittest.TestCase):
                 h: 35 * gpkit.units("USD"),
             }
         )
-        cost = m.sweep({Q: [50, 100, 500]}, verbosity=0)["cost"]
+        cost = [sol.cost for sol in m.sweep({Q: [50, 100, 500]}, verbosity=0)]
         npt.assert_allclose(cost, [1760, 3505, 17501])
 
     def test_skipfailures(self):
@@ -209,34 +209,29 @@ class TestModelSubs(unittest.TestCase):
         y = VectorVariable(2, "y")
         m = Model(x, [x >= y.prod()])
         sweep = {y: np.reshape(np.meshgrid([2, 5, 9], [3, 7, 11]), (2, 9)).T}
-        a = m.sweep(sweep, verbosity=0)["cost"]
+        a = [sol.cost for sol in m.sweep(sweep, verbosity=0)]
         b = [6, 15, 27, 14, 35, 63, 22, 55, 99]
-        self.assertTrue(all(abs(a - b) / (a + b) < 1e-7))
+        npt.assert_allclose(a, b)
         x_min = Variable("x_min", 1)  # constant to check array indexing
         m = Model(x, [x >= y.prod(), x >= x_min])
-        sweep = {y: [[2, 5], [3, 5], [2, 7], [3, 7], [2, 11], [3, 11]]}
-        # sweep = {y: [[2, 3], [5, 7, 11]]}
+        sweep = {"y": [[2, 5], [3, 5], [2, 7], [3, 7], [2, 11], [3, 11]]}
         sol = m.sweep(sweep, verbosity=0)
-        a = sol["cost"]
         b = [10, 15, 14, 21, 22, 33]
-        self.assertTrue(all(abs(a - b) / (a + b) < 1e-7))
-        self.assertEqual(sol["constants"][x_min], 1)
         for i, bi in enumerate(b):
-            self.assertEqual(sol.atindex(i)["constants"][x_min], 1)
-            ai = sol.atindex(i)["cost"]
-            self.assertTrue(abs(ai - bi) / (ai + bi) < 1e-7)
+            self.assertEqual(sol[i].constants[x_min], 1)
+            self.assertAlmostEqual(sol[i].cost / bi, 1, 6)
         m = Model(x, [x >= y.prod()])
         sweep = {y: [[2, 3, 9], [5, 7, 11]]}
         self.assertRaises(ValueError, m.sweep, sweep, verbosity=0)
         m = Model(x, [x >= y.prod()])
         m.substitutions.update({y[0]: 2})
-        a = m.sweep({y[1]: [3, 5]}, verbosity=0)["cost"]
+        a = [sol.cost for sol in m.sweep({y[1]: [3, 5]}, verbosity=0)]
         b = [6, 10]
-        self.assertTrue(all(abs(a - b) / (a + b) < 1e-7))
+        npt.assert_allclose(a, b)
         # create a numpy float array, then insert a sweep element
         m.substitutions.update({y: [2, 3]})
-        a = m.sweep({y[1]: [3, 5]}, verbosity=0)["cost"]
-        self.assertTrue(all(abs(a - b) / (a + b) < 1e-7))
+        a = [sol.cost for sol in m.sweep({y[1]: [3, 5]}, verbosity=0)]
+        npt.assert_allclose(a, b)
 
     def test_calcconst(self):
         x = Variable("x", "hours")
@@ -249,13 +244,12 @@ class TestModelSubs(unittest.TestCase):
         sol = m.solve(verbosity=0)
         self.assertAlmostEqual(sol[t_night] / gpkit.ureg.hours, 12)
         sol = m.sweep({t_day: [6, 8, 9, 13]}, verbosity=0)
-        npt.assert_allclose(
-            sol["sensitivities"]["variables"][t_day], [-1 / 3, -0.5, -0.6, +1], 1e-3
-        )
-        self.assertEqual(len(sol["cost"]), 4)
-        npt.assert_allclose(
-            [float(d) for d in (sol(t_day) + sol(t_night)) / gpkit.ureg.hours], 24
-        )
+        self.assertAlmostEqual(sol[0].sens[t_day], -1 / 3)
+        self.assertAlmostEqual(sol[1].sens[t_day], -0.5, 5)
+        self.assertAlmostEqual(sol[2].sens[t_day], -0.6, 4)
+        self.assertAlmostEqual(sol[3].sens[t_day], +1, 5)
+        self.assertEqual(len(sol), 4)
+        npt.assert_allclose([(s[t_day] + s[t_night]) / gpkit.ureg.hr for s in sol], 24)
 
     def test_vector_init(self):
         N = 6

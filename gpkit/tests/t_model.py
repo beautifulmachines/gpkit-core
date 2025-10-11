@@ -332,6 +332,16 @@ class TestGP(unittest.TestCase):
         self.assertEqual(gp1.data.A, gp2.data.A)
         self.assertEqual(gp1.data.c, gp2.data.c)
 
+    def test_sweep_not_modify_subs(self):
+        "make sure sweeping does not modify substitutions"
+        A = Variable("A", "ft^2")
+        d = Variable("d", 6, "in")
+        m = Model(A, [A >= np.pi / 4 * d**2])
+        self.assertEqual(m.substitutions, {d.key: 6})
+        sol = m.sweep({d: [3, 12, 36]}, verbosity=0)
+        self.assertAlmostEqual(sol[1][A], 0.785398165 * A.units)
+        self.assertEqual(m.substitutions, {d.key: 6})
+
 
 class TestSP(unittest.TestCase):
     "test case for SP class -- gets run for each installed solver"

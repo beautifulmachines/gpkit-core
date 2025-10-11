@@ -43,8 +43,8 @@ class TestTools(unittest.TestCase):
         w_s = Variable("v_{CO}", lambda c: 1 - c[ws], "-")
         obj = ws * (x + y) + w_s * (y**-1 * x**-3)
         m = Model(obj, eqns)
-        sol = m.sweep({ws: np.linspace(1 / n, 1 - 1 / n, n)}, verbosity=0)
-        a = sol["cost"]
+        sols = m.sweep({ws: np.linspace(1 / n, 1 - 1 / n, n)}, verbosity=0)
+        a = [sol.cost for sol in sols]
         b = np.array([1.58856898, 2.6410391, 3.69348122, 4.74591386])
         self.assertTrue((abs(a - b) / (a + b + 1e-7) < 1e-7).all())
 

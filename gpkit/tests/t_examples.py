@@ -96,14 +96,14 @@ class TestExamples(unittest.TestCase):
         os.remove("last_verified.sol")
 
     def test_evaluated_fixed_variables(self, example):
-        sol = example.sol
         t_night = example.t_night
+        self.assertAlmostEqual(example.sol[t_night], 12 * ureg.hr)
         expected = [16, 12, 8]
-        actual = sol["variables"][t_night]
+        actual = [sol[t_night] for sol in example.sols]
         for exp, act in zip(expected, actual):
             # self.assertEqual(exp, act)
             # odd floating point round off issues when running with pytest
-            self.assertAlmostEqual(exp, act)
+            self.assertAlmostEqual(exp * ureg.hr, act)
 
     def test_evaluated_free_variables(self, example):
         x2 = example.x2
@@ -114,10 +114,12 @@ class TestExamples(unittest.TestCase):
         pass
 
     def test_migp(self, example):
+        solx = [sol[example.x] for sol in example.sols]
         if settings["default_solver"] == "mosek_conif":
-            assert_logtol(example.sol(example.x), [1] * 3 + [2] * 6 + [3] * 2)
+            assert_logtol(solx, [1] * 3 + [2] * 6 + [3] * 2)
         else:
-            assert_logtol(example.sol(example.x), np.sqrt(example.sol(example.num)))
+            num = example.num
+            assert_logtol(solx, np.sqrt([sol[num] for sol in example.sols]))
 
     def test_external_function(self, example):
         external_code = example.external_code
@@ -196,7 +198,7 @@ class TestExamples(unittest.TestCase):
 
         sweepsol = m.sweep({example.AC.fuse.W: (50, 100, 150)}, verbosity=0)
         sweepsol.table()
-        sweepsol.save("sweepsolution.pkl")
+        sweepsol.to_solution_array().save("sweepsolution.pkl")
         sweepsol.table()
         with open("sweepsolution.pkl", "rb") as fil:
             sol_loaded = pickle.load(fil)
@@ -218,10 +220,9 @@ class TestExamples(unittest.TestCase):
 
     def test_sp_to_gp_sweep(self, example):
         sol = example.sol
-        cost = sol["cost"]
-        self.assertAlmostEqual(cost[0], 4628.21, places=2)
-        self.assertAlmostEqual(cost[1], 6226.60, places=2)
-        self.assertAlmostEqual(cost[2], 7362.77, places=2)
+        self.assertAlmostEqual(sol[0].cost, 4628.21, places=2)
+        self.assertAlmostEqual(sol[1].cost, 6226.60, places=2)
+        self.assertAlmostEqual(sol[2].cost, 7362.77, places=2)
 
     def test_boundschecking(self, example):  # pragma: no cover
         if "mosek_cli" in settings["default_solver"]:

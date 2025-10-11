@@ -121,8 +121,8 @@ We can also print the optimal value and solved variables individually.
     The x dimension is 0.5774 meter.
     The y dimension is 0.2887 meter.
 
-.. refactor this section; explain what can be done with a SolutionArray
-.. e.g. table(), __call__, ["variables"], etc.
+.. refactor this section; explain what can be done with a Solution
+.. e.g. table(), __call__, .variables, etc.
 
 Sensitivities and Dual Variables
 ================================
@@ -134,7 +134,7 @@ From the dual solution GPkit computes the sensitivities for every fixed variable
 Using Variable Sensitivities
 ----------------------------
 
-Fixed variable sensitivities can be accessed from a SolutionArray’s ``["sensitivities"]["variables"]`` dict, as in this example:
+Fixed variable sensitivities can be accessed from a Solution’s ``.sens.variables``, as in this example:
 
 .. literalinclude:: examples/gettingstarted.py
     :lines: 72-75
