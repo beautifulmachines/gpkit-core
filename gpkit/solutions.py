@@ -3,7 +3,8 @@
 from dataclasses import dataclass
 from typing import List, Sequence
 
-from .solution_array import SolutionArray
+from .printing import table as printing_table
+from .solution_array import SolutionArray, bdtable_gen
 from .varkey import VarKey
 from .varmap import VarMap
 
@@ -86,7 +87,38 @@ class Solution:
 
     def table(self, **kwargs) -> str:
         "Pass through to SolutionArray.table"
-        return self.to_solution_array().table(**kwargs)
+        lines = self.cost_breakdown() + self.model_sens_breakdown() + [""]
+        if "tables" not in kwargs:
+            kwargs["tables"] = (
+                "warnings",
+                "sweepvariables",
+                "freevariables",
+                "constants",
+                "sensitivities",
+                "tightest constraints",
+            )
+        else:
+            lines = []  # temp hack, avoid adding breakdowns if tables set
+        return "\n".join(lines) + self.to_solution_array().table(**kwargs)
+        # return printing_table(self, **kwargs)
+
+    def cost_breakdown(self) -> str:
+        "printable visualization of cost breakdown"
+        solarr = self.to_solution_array()
+        solarr.set_necessarylineage()
+        showvars = solarr._parse_showvars(
+            (),
+        )
+        return bdtable_gen("cost")(solarr, showvars)
+
+    def model_sens_breakdown(self) -> str:
+        "printable visualization of model sensitivity breakdown"
+        solarr = self.to_solution_array()
+        solarr.set_necessarylineage()
+        showvars = solarr._parse_showvars(
+            (),
+        )
+        return bdtable_gen("model sensitivities")(solarr, showvars)
 
     def to_solution_array(self):
         "Convert this to a SolutionArray"
