@@ -14,5 +14,5 @@ sol = m.solve(verbosity=0)
 # floating point roundoff errors running with pytest
 
 sols = m.sweep({t_day: [8, 12, 16]}, verbosity=0)
-# assert (sol["variables"][t_night] == [16, 12, 8]).all()
+# assert (sols["variables"][t_night] == [16, 12, 8]).all()
 # floating point roundoff errors running with pytest
