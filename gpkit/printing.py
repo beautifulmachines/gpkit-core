@@ -1,4 +1,4 @@
-# printing.py
+"printing functionality for gpkit objects"
 from __future__ import annotations
 
 from typing import Any, Sequence, Tuple
@@ -43,7 +43,7 @@ def _looks_like_sequence_of_solutions(x) -> bool:
     except TypeError:
         return False
     try:
-        first = next(iter(x))
+        first = next(it)
     except StopIteration:
         return True
     return _looks_like_solution(first)
