@@ -84,11 +84,11 @@ def _format_table_rows(rows) -> list[str]:
 
     formatted_rows = []
     for name, value, unit, label in rows:
-        line = f"{name:<{name_width}}  {value:<{val_width}}"
-        if unit:
+        line = f"{name:>{name_width}} : {value:<{val_width}}"
+        if unit or True:
             line += f"  {unit:<{unit_width}}"
         if label:
-            line += f"  {label}"
+            line += f" {label}"
         formatted_rows.append(line.rstrip())
 
     return formatted_rows
@@ -144,7 +144,7 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
         lines += _format_table_rows(rows)
 
     if "constants" in tables:
-        lines += ["", "Constants", "---------"]
+        lines += ["", "Fixed Variables", "---------------"]
         rows = []
         for vk, val in sorted(
             solution.constants.vector_parent_items(), key=lambda x: str(x[0])
@@ -175,7 +175,7 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
                 sabs = float(np.nanmax(np.abs(val))) if val.size else 0.0
                 items.append((vk, sabs, v))
             items.sort(key=lambda t: -t[1])
-            lines += ["", "Top Variable Sensitivities", "--------------------------"]
+            lines += ["", "Variable Sensitivities", "----------------------"]
             rows = []
             for vk, _, raw in items[:topn]:
                 name = _fmt_name(vk)
