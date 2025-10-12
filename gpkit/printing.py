@@ -52,15 +52,17 @@ def _looks_like_sequence_of_solutions(x) -> bool:
     return _looks_like_solution(first)
 
 
-def _fmt_qty(q) -> str:
+def _fmt_qty(q) -> tuple[str, str]:
+    """Return (value, unit) tuple for separate formatting"""
     try:
         mag = float(getattr(q, "magnitude", q))
-        return f"{mag:.4g}" + unitstr(q, into=" [%s]", dimless="")
+        unit_str = unitstr(q, into="[%s]", dimless="")
+        return f"{mag:.4g}", unit_str
     except Exception:
         try:
-            return f"{float(q):.4g}"
+            return f"{float(q):.4g}", ""
         except Exception:
-            return str(q)
+            return str(q), ""
 
 
 def _fmt_name(vk) -> str:
@@ -75,13 +77,16 @@ def _format_table_rows(rows) -> list[str]:
     if not rows:
         return []
 
-    # Calculate max widths for name and value columns
+    # Calculate max widths for name, value, and unit columns
     name_width = max(len(row[0]) for row in rows)
     val_width = max(len(row[1]) for row in rows)
+    unit_width = max(len(row[2]) for row in rows) if any(row[2] for row in rows) else 0
 
     formatted_rows = []
-    for name, value, label in rows:
+    for name, value, unit, label in rows:
         line = f"  {name:<{name_width}}  {value:<{val_width}}"
+        if unit:
+            line += f"  {unit:<{unit_width}}"
         if label:
             line += f"  {label}"
         formatted_rows.append(line.rstrip())
@@ -103,14 +108,15 @@ def _fmt_number(x) -> str:
         return str(x)
 
 
-def _fmt_array_preview(arr, unit: str = "", n: int = 6) -> str:
+def _fmt_array_preview(arr, unit: str = "", n: int = 6) -> tuple[str, str]:
+    """Return (value, unit) tuple for separate formatting"""
     flat = np.asarray(arr).ravel()
     shown = flat[:n]
     body = "  ".join(_fmt_number(x) for x in shown)
     tail = " ..." if flat.size > n else ""
-    return f"[ {body}{tail} ]" + (
-        f" [{unit}]" if unit and unit != "dimensionless" else ""
-    )
+    value = f"[ {body}{tail} ]"
+    unit_str = f"[{unit}]" if unit and unit != "dimensionless" else ""
+    return value, unit_str
 
 
 # ---------------- single solution ----------------
@@ -130,11 +136,11 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
             unit = _get_unit(vk)
             label = vk.descr.get("label", "")
             if np.shape(val):
-                value = _fmt_array_preview(val, unit, n=max_elems)
+                value, unit_str = _fmt_array_preview(val, unit, n=max_elems)
                 name = f"{name}[{np.shape(val)}]"
             else:
-                value = _fmt_qty(solution.primal.quantity(vk))
-            rows.append((name, value, label))
+                value, unit_str = _fmt_qty(solution.primal.quantity(vk))
+            rows.append((name, value, unit_str, label))
         lines += _format_table_rows(rows)
 
     if "constants" in tables:
@@ -147,11 +153,11 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
             unit = _get_unit(vk)
             label = vk.descr.get("label", "")
             if np.shape(val):
-                value = _fmt_array_preview(val, unit, n=max_elems)
+                value, unit_str = _fmt_array_preview(val, unit, n=max_elems)
                 name = f"{name}[{np.shape(val)}]"
             else:
-                value = _fmt_qty(solution.constants.quantity(vk))
-            rows.append((name, value, label))
+                value, unit_str = _fmt_qty(solution.constants.quantity(vk))
+            rows.append((name, value, unit_str, label))
         lines += _format_table_rows(rows)
 
     if "sensitivities" in tables:
@@ -175,10 +181,11 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
                 name = _fmt_name(vk)
                 label = vk.descr.get("label", "")
                 if np.shape(raw):
-                    value = _fmt_array_preview(raw, n=max_elems)
+                    value, unit_str = _fmt_array_preview(raw, n=max_elems)
                 else:
                     value = f"{float(raw):+.3g}"
-                rows.append((name, value, label))
+                    unit_str = ""
+                rows.append((name, value, unit_str, label))
             lines += _format_table_rows(rows)
 
     if "warnings" in tables:
