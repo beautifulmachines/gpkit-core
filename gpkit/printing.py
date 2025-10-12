@@ -6,6 +6,8 @@ from typing import Any, Sequence, Tuple
 
 import numpy as np
 
+from .util.repr_conventions import unitstr
+
 
 def table(
     obj: Any,
@@ -53,13 +55,10 @@ def _looks_like_sequence_of_solutions(x) -> bool:
 def _fmt_qty(q) -> str:
     try:
         mag = float(getattr(q, "magnitude", q))
-        unit = f"{q.units:~}" if hasattr(q, "units") else ""
-        if unit in ("", "dimensionless"):
-            return f"{mag:.3g}"
-        return f"{mag:.3g} {unit}"
+        return f"{mag:.4g}" + unitstr(q, into=" [%s]", dimless="")
     except Exception:
         try:
-            return f"{float(q):.3g}"
+            return f"{float(q):.4g}"
         except Exception:
             return str(q)
 
@@ -71,8 +70,23 @@ def _fmt_name(vk) -> str:
         return repr(vk)
 
 
-def _fmt_row(name: str, val: str) -> str:
-    return f"  {name:<28} {val}"
+def _format_table_rows(rows) -> list[str]:
+    """Format table rows with dynamic column widths"""
+    if not rows:
+        return []
+
+    # Calculate max widths for name and value columns
+    name_width = max(len(row[0]) for row in rows)
+    val_width = max(len(row[1]) for row in rows)
+
+    formatted_rows = []
+    for name, value, label in rows:
+        line = f"  {name:<{name_width}}  {value:<{val_width}}"
+        if label:
+            line += f"  {label}"
+        formatted_rows.append(line.rstrip())
+
+    return formatted_rows
 
 
 def _get_unit(vk) -> str:
@@ -94,9 +108,9 @@ def _fmt_array_preview(arr, unit: str = "", n: int = 6) -> str:
     shown = flat[:n]
     body = "  ".join(_fmt_number(x) for x in shown)
     tail = " ..." if flat.size > n else ""
-    if not unit or unit == "dimensionless":
-        return f"[ {body}{tail} ]"
-    return f"[ {body}{tail} ] {unit}"
+    return f"[ {body}{tail} ]" + (
+        f" [{unit}]" if unit and unit != "dimensionless" else ""
+    )
 
 
 # ---------------- single solution ----------------
@@ -104,36 +118,41 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
     lines: list[str] = []
 
     if "cost" in tables:
-        lines += ["\nOptimal Cost", "------------", f"  {solution.cost:.6g}"]
+        lines += ["\nOptimal Cost", "------------", f"  {solution.cost:.4g}"]
 
     if "freevariables" in tables:
         lines += ["", "Free Variables", "--------------"]
-        for vk, val in solution.primal.vector_parent_items():
+        rows = []
+        for vk, val in sorted(
+            solution.primal.vector_parent_items(), key=lambda x: str(x[0])
+        ):
             name = _fmt_name(vk)
             unit = _get_unit(vk)
+            label = vk.descr.get("label", "")
             if np.shape(val):
-                lines.append(
-                    _fmt_row(
-                        f"{name}[{np.shape(val)}]",
-                        _fmt_array_preview(val, unit, n=max_elems),
-                    )
-                )
+                value = _fmt_array_preview(val, unit, n=max_elems)
+                name = f"{name}[{np.shape(val)}]"
             else:
-                lines.append(_fmt_row(name, _fmt_qty(solution.primal.quantity(vk))))
+                value = _fmt_qty(solution.primal.quantity(vk))
+            rows.append((name, value, label))
+        lines += _format_table_rows(rows)
 
     if "constants" in tables:
         lines += ["", "Constants", "---------"]
-        for vk, val in solution.constants.vector_parent_items():
+        rows = []
+        for vk, val in sorted(
+            solution.constants.vector_parent_items(), key=lambda x: str(x[0])
+        ):
             name = _fmt_name(vk)
+            unit = _get_unit(vk)
+            label = vk.descr.get("label", "")
             if np.shape(val):
-                lines.append(
-                    _fmt_row(
-                        f"{name}[{np.shape(val)}]",
-                        _fmt_array_preview(val, _get_unit(vk), n=max_elems),
-                    )
-                )
+                value = _fmt_array_preview(val, unit, n=max_elems)
+                name = f"{name}[{np.shape(val)}]"
             else:
-                lines.append(_fmt_row(name, _fmt_qty(solution.constants.quantity(vk))))
+                value = _fmt_qty(solution.constants.quantity(vk))
+            rows.append((name, value, label))
+        lines += _format_table_rows(rows)
 
     if "sensitivities" in tables:
         sens_vars = getattr(getattr(solution, "sens", None), "variables", None)
@@ -151,13 +170,16 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
                 items.append((vk, sabs, v))
             items.sort(key=lambda t: -t[1])
             lines += ["", "Top Variable Sensitivities", "--------------------------"]
+            rows = []
             for vk, _, raw in items[:topn]:
+                name = _fmt_name(vk)
+                label = vk.descr.get("label", "")
                 if np.shape(raw):
-                    lines.append(
-                        _fmt_row(_fmt_name(vk), _fmt_array_preview(raw, n=max_elems))
-                    )
+                    value = _fmt_array_preview(raw, n=max_elems)
                 else:
-                    lines.append(_fmt_row(_fmt_name(vk), f"{float(raw):+.3g}"))
+                    value = f"{float(raw):+.3g}"
+                rows.append((name, value, label))
+            lines += _format_table_rows(rows)
 
     if "warnings" in tables:
         warns = (getattr(solution, "meta", None) or {}).get("warnings", [])
