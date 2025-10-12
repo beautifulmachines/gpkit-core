@@ -46,7 +46,7 @@ def unitstr(units, into="%s", options=UNIT_FORMATTING, dimless=""):
     else:
         rawstr = ("{%s}" % options).format(units.units)
     units = rawstr.replace(" ", "").replace("dimensionless", dimless)
-    return into % units or dimless
+    return into % units if units else dimless
 
 
 def latex_unitstr(units):
