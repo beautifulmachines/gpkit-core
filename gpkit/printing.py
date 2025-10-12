@@ -84,7 +84,7 @@ def _format_table_rows(rows) -> list[str]:
 
     formatted_rows = []
     for name, value, unit, label in rows:
-        line = f"  {name:<{name_width}}  {value:<{val_width}}"
+        line = f"{name:<{name_width}}  {value:<{val_width}}"
         if unit:
             line += f"  {unit:<{unit_width}}"
         if label:
