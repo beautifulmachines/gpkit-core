@@ -177,7 +177,9 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
             items.sort(key=lambda t: -t[1])
             lines += ["", "Variable Sensitivities", "----------------------"]
             rows = []
-            for vk, _, raw in items[:topn]:
+            for vk, sabs, raw in items[:topn]:
+                if sabs < 0.01:  # temporary hack to mimic SolutionArray
+                    break
                 name = _fmt_name(vk)
                 label = vk.descr.get("label", "")
                 if np.shape(raw):
