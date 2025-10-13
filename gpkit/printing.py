@@ -137,7 +137,6 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
             label = vk.descr.get("label", "")
             if np.shape(val):
                 value, unit_str = _fmt_array_preview(val, unit, n=max_elems)
-                name = f"{name}[{np.shape(val)}]"
             else:
                 value, unit_str = _fmt_qty(solution.primal.quantity(vk))
             rows.append((name, value, unit_str, label))
@@ -154,7 +153,6 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
             label = vk.descr.get("label", "")
             if np.shape(val):
                 value, unit_str = _fmt_array_preview(val, unit, n=max_elems)
-                name = f"{name}[{np.shape(val)}]"
             else:
                 value, unit_str = _fmt_qty(solution.constants.quantity(vk))
             rows.append((name, value, unit_str, label))
