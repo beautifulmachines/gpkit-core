@@ -80,21 +80,21 @@ def _format_table_rows(rows) -> list[str]:
     # Calculate max widths for name, value, and unit columns
     name_width = max(len(row[0]) for row in rows)
     val_width = max(len(row[1]) for row in rows)
-    unit_width = max(len(row[2]) for row in rows) if any(row[2] for row in rows) else 0
+    unit_width = max(len(row[2]) for row in rows)
 
     formatted_rows = []
     for name, value, unit, label in rows:
-        line = f"{name:>{name_width}} : {value:<{val_width}}"
-        if unit or True:
-            line += f"  {unit:<{unit_width}}"
+        line = f"{name:>{name_width}} : {value:<{val_width}} "
+        line += f" {unit:<{unit_width}}"
         if label:
-            line += f" {label}"
+            line += (" " if unit_width else "") + f"{label}"
         formatted_rows.append(line.rstrip())
 
     return formatted_rows
 
 
 def _get_unit(vk) -> str:
+    "get the unit string from a varkey"
     try:
         return f"{vk.units:~}" if getattr(vk, "units", None) else ""
     except Exception:
@@ -102,6 +102,7 @@ def _get_unit(vk) -> str:
 
 
 def _fmt_number(x) -> str:
+    "default number to string conversion"
     try:
         return f"{float(x):.3g}"
     except Exception:
@@ -119,6 +120,47 @@ def _fmt_array_preview(arr, unit: str = "", n: int = 6) -> tuple[str, str]:
     return value, unit_str
 
 
+def _group_items_by_model(items):
+    """Group VarMap items by model string
+    Input: iterable of (VarKey, value) pairs
+    Output: mapping model: iterable of (VarKey, value) pairs
+    lineage is dropped in the output strings, since it's captured in the key
+    """
+    out = {}
+    for key, val in items:
+        mod = key.lineagestr()
+        if mod not in out:
+            out[mod] = []
+        out[mod].append((key, val))
+    return out
+
+
+def _fmt_items(vmap, max_elems: int, group_by_model=True, sortkey=None):
+    "format (key, value) pairs in a VarMap, optionally grouping by model"
+    bymod = (
+        _group_items_by_model(vmap.vector_parent_items())
+        if group_by_model
+        else {"": items}
+    )
+    lines = []
+    for modelname, items in sorted(bymod.items(), key=lambda x: x[0]):
+        if modelname:
+            lines += ["", f"  | {modelname}"]
+        rows = []
+        for vk, val in sorted(items, key=sortkey):
+            # name = _fmt_name(vk)
+            name = vk.str_without("lineage") if group_by_model else _fmt_name(vk)
+            unit = _get_unit(vk)
+            label = vk.descr.get("label", "")
+            if np.shape(val):
+                value, unit_str = _fmt_array_preview(val, unit, n=max_elems)
+            else:
+                value, unit_str = _fmt_qty(vmap.quantity(vk))
+            rows.append((name, value, unit_str, label))
+        lines += _format_table_rows(rows)
+    return lines
+
+
 # ---------------- single solution ----------------
 def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
     lines: list[str] = []
@@ -128,19 +170,12 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
 
     if "freevariables" in tables:
         lines += ["", "Free Variables", "--------------"]
-        rows = []
-        for vk, val in sorted(
-            solution.primal.vector_parent_items(), key=lambda x: str(x[0])
-        ):
-            name = _fmt_name(vk)
-            unit = _get_unit(vk)
-            label = vk.descr.get("label", "")
-            if np.shape(val):
-                value, unit_str = _fmt_array_preview(val, unit, n=max_elems)
-            else:
-                value, unit_str = _fmt_qty(solution.primal.quantity(vk))
-            rows.append((name, value, unit_str, label))
-        lines += _format_table_rows(rows)
+        lines += _fmt_items(
+            # sorted(solution.primal.vector_parent_items(), key=lambda x: str(x[0])),
+            solution.primal,
+            max_elems=max_elems,
+            sortkey=lambda x: str(x[0]),
+        )
 
     if "constants" in tables:
         lines += ["", "Fixed Variables", "---------------"]
@@ -188,6 +223,15 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
                 rows.append((name, value, unit_str, label))
             lines += _format_table_rows(rows)
 
+    if "tightest constraints" in tables:
+        lines += ["", "Most Sensitive Constraints", "-" * 26]
+        for constraint, sens in sorted(
+            solution.sens.constraints.items(), key=lambda x: -abs(x[1])
+        ):
+            if abs(sens) < 0.001:
+                break
+            lines += [f"  {sens:+.4g} : {constraint}"]
+
     if "warnings" in tables:
         warns = (getattr(solution, "meta", None) or {}).get("warnings", [])
         if warns:
@@ -209,7 +253,9 @@ def _table_sequence(
         costs = np.array([getattr(s, "cost", np.nan) for s in sols], dtype=float)
         lines.append(f"  count: {n}")
         lines.append(
-            f"  cost: min {np.nanmin(costs):.6g}  median {np.nanmedian(costs):.6g}  max {np.nanmax(costs):.6g}"
+            f"  cost: min {np.nanmin(costs):.6g}"
+            f"  median {np.nanmedian(costs):.6g}"
+            f"  max {np.nanmax(costs):.6g}"
         )
 
     # Append short per-solution summaries for the first few
