@@ -31,7 +31,7 @@ lint = [
     "isort>=5.12.0",
     "black>=24.1.0",
     "flake8>=7.0.0",
-    "pylint>=3.0.0",
+    "pylint>=4.0.0",
     "import-linter>=2.3",
 ]
 test = [

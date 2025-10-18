@@ -5,15 +5,15 @@ import shutil
 import subprocess
 import sys
 
-LOGSTR = ""
+logstr_global = ""
 settings = {}
 
 
 def log(*args):
     "Print a line and append it to the log string."
-    global LOGSTR  # pylint: disable=global-statement
+    global logstr_global  # pylint: disable=global-statement
     print(*args)
-    LOGSTR += " ".join(args) + "\n"
+    logstr_global += " ".join(args) + "\n"
 
 
 def pathjoin(*args):
@@ -214,7 +214,7 @@ def build():
         for setting, value in sorted(settings.items()):
             f.write(f"{setting} : {value}\n")
     with open(pathjoin(envpath, "build.log"), "w", encoding="utf-8") as f:
-        f.write(LOGSTR)
+        f.write(logstr_global)
 
     os.chdir(start_dir)
 

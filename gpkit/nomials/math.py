@@ -178,12 +178,12 @@ class Signomial(Nomial):
         )
 
     def __le__(self, other):
-        if isinstance(other, (Numbers, Signomial)):
+        if isinstance(other, Numbers | Signomial):
             return SignomialInequality(self, "<=", other)
         return NotImplemented
 
     def __ge__(self, other):
-        if isinstance(other, (Numbers, Signomial)):
+        if isinstance(other, Numbers | Signomial):
             return SignomialInequality(self, ">=", other)
         return NotImplemented
 
@@ -288,7 +288,7 @@ class Posynomial(Signomial):
     __hash__ = Signomial.__hash__
 
     def __le__(self, other):
-        if isinstance(other, Numbers + (Monomial,)):
+        if isinstance(other, Numbers | Monomial):
             return PosynomialInequality(self, "<=", other)
         return NotImplemented
 
@@ -334,7 +334,7 @@ class Monomial(Posynomial):
 
     def __rtruediv__(self, other):
         "Divide other by this Monomial"
-        if isinstance(other, Numbers + (Signomial,)):
+        if isinstance(other, Numbers | Signomial):
             out = other * self**-1
             out.ast = ("div", (other, self))
             return out
@@ -355,7 +355,7 @@ class Monomial(Posynomial):
         return NotImplemented
 
     def __eq__(self, other):
-        if isinstance(other, MONS):
+        if isinstance(other, Numbers | Monomial):
             try:  # if both are monomials, return a constraint
                 return MonomialEquality(self, other)
             except (DimensionalityError, ValueError) as e:
@@ -364,7 +364,7 @@ class Monomial(Posynomial):
         return super().__eq__(other)
 
     def __ge__(self, other):
-        if isinstance(other, Numbers + (Posynomial,)):
+        if isinstance(other, Numbers | Posynomial):
             return PosynomialInequality(self, ">=", other)
         # elif isinstance(other, np.ndarray):
         #     return other.__le__(self, rev=True)
@@ -374,9 +374,6 @@ class Monomial(Posynomial):
 
     def mono_approximation(self, x0):
         return self
-
-
-MONS = Numbers + (Monomial,)
 
 
 class ScalarSingleEquationConstraint(SingleEquationConstraint):
