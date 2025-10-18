@@ -247,7 +247,21 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
                 break
             lines += [f" {f'{sens:>+.3g}':>5} : {constraint}"]
 
-    return "\n".join(lines).strip()
+    if "slack constraints" in tables:
+        maxsens = 1e-5
+        lines += ["", f"Insensitive Constraints (below {maxsens})", "-" * 37]
+        printed = False
+        for constraint, sens in sorted(
+            solution.sens.constraints.items(), key=lambda x: abs(x[1])
+        ):
+            if abs(sens) > 1e-5:
+                if not printed:
+                    lines += ["(none)", ""]
+                break
+            lines += [f" {f'{sens:>+.3g}':>5} : {constraint}"]
+            printed = True
+
+    return "\n".join(lines).lstrip()
 
 
 # ---------------- sequence summary ----------------

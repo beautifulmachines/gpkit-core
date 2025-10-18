@@ -77,8 +77,8 @@ x_max : -0.5
 
 Most Sensitive Constraints
 --------------------------
-  +0.5 : x_min ≤ C·x
   +0.5 : x ≤ C·x_max
+  +0.5 : x_min ≤ C·x
 
 C (1.41)
   breaks down into:
