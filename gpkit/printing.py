@@ -168,6 +168,15 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
     if "cost" in tables:
         lines += ["\nOptimal Cost", "------------", f"  {solution.cost:.4g}"]
 
+    if "warnings" in tables:
+        warns = (getattr(solution, "meta", None) or {}).get("warnings", {})
+        if warns:
+            lines += ["~" * 8, "WARNINGS", "~" * 8]
+            for name, detail in warns.items():
+                for tup in detail:
+                    lines += [f"{name}", "-" * len(name), f"{tup[0]}"]
+            lines += ["~" * 8]
+
     if "freevariables" in tables:
         lines += ["", "Free Variables", "--------------"]
         lines += _fmt_items(
@@ -231,12 +240,6 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
             if abs(sens) < 0.001:
                 break
             lines += [f"  {sens:+.4g} : {constraint}"]
-
-    if "warnings" in tables:
-        warns = (getattr(solution, "meta", None) or {}).get("warnings", [])
-        if warns:
-            lines += ["", "Warnings", "--------"]
-            lines += [f"  - {w}" for w in warns]
 
     return "\n".join(lines).strip()
 
