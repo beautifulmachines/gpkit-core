@@ -144,8 +144,6 @@ def _fmt_items(vmap, max_elems: int, group_by_model=True, sortkey=None):
     )
     lines = []
     for modelname, items in sorted(bymod.items(), key=lambda x: x[0]):
-        if modelname:
-            lines += ["", f"  | {modelname}"]
         rows = []
         for vk, val in sorted(items, key=sortkey):
             # name = _fmt_name(vk)
@@ -157,6 +155,9 @@ def _fmt_items(vmap, max_elems: int, group_by_model=True, sortkey=None):
             else:
                 value, unit_str = _fmt_qty(vmap.quantity(vk))
             rows.append((name, value, unit_str, label))
+        if modelname:
+            pad = max(len(str(r[0])) + 2 for r in rows)
+            lines += ["", f"{'|':>{pad}} {modelname}"]
         lines += _format_table_rows(rows)
     return lines
 
@@ -188,19 +189,24 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
 
     if "constants" in tables:
         lines += ["", "Fixed Variables", "---------------"]
-        rows = []
-        for vk, val in sorted(
-            solution.constants.vector_parent_items(), key=lambda x: str(x[0])
-        ):
-            name = _fmt_name(vk)
-            unit = _get_unit(vk)
-            label = vk.descr.get("label", "")
-            if np.shape(val):
-                value, unit_str = _fmt_array_preview(val, unit, n=max_elems)
-            else:
-                value, unit_str = _fmt_qty(solution.constants.quantity(vk))
-            rows.append((name, value, unit_str, label))
-        lines += _format_table_rows(rows)
+        lines += _fmt_items(
+            solution.constants,
+            max_elems=max_elems,
+            sortkey=lambda x: str(x[0]),
+        )
+        # rows = []
+        # for vk, val in sorted(
+        #     solution.constants.vector_parent_items(), key=lambda x: str(x[0])
+        # ):
+        #     name = _fmt_name(vk)
+        #     unit = _get_unit(vk)
+        #     label = vk.descr.get("label", "")
+        #     if np.shape(val):
+        #         value, unit_str = _fmt_array_preview(val, unit, n=max_elems)
+        #     else:
+        #         value, unit_str = _fmt_qty(solution.constants.quantity(vk))
+        #     rows.append((name, value, unit_str, label))
+        # lines += _format_table_rows(rows)
 
     if "sensitivities" in tables:
         sens_vars = getattr(getattr(solution, "sens", None), "variables", None)
@@ -237,9 +243,9 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
         for constraint, sens in sorted(
             solution.sens.constraints.items(), key=lambda x: -abs(x[1])
         ):
-            if abs(sens) < 0.001:
+            if abs(sens) < 0.01:
                 break
-            lines += [f"  {sens:+.4g} : {constraint}"]
+            lines += [f" {f'{sens:>+.3g}':>5} : {constraint}"]
 
     return "\n".join(lines).strip()
 
