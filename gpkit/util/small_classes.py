@@ -4,14 +4,15 @@ from collections.abc import MutableMapping
 from dataclasses import fields, is_dataclass
 from functools import reduce
 from operator import xor
+from typing import TypeAlias
 
 import numpy as np
 from scipy.sparse import csr_matrix
 
 from ..units import Quantity
 
-Strings = (str,)
-Numbers = (int, float, np.number, Quantity)
+Strings: TypeAlias = str
+Numbers: TypeAlias = int | float | np.number | Quantity
 
 
 # pylint: disable=too-few-public-methods
