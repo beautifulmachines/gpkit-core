@@ -379,6 +379,8 @@ class GeometricProgram:
                     " constraints/constants, bounding variables, or"
                     " using a different solver might fix it."
                 )
+            else:
+                raise ValueError("Unexpected infeasibility {infeasibility}")
             if verbosity > 0 and solver_out.meta["soltime"] < 1 and self.model:
                 print(
                     msg + "\nSince the model solved in less than a second,"
