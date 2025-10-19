@@ -72,8 +72,49 @@ def _fmt_name(vk) -> str:
         return repr(vk)
 
 
+def _format_aligned_columns(
+    rows: list[list[str]],  # each row is list of column strings
+    col_alignments: str = "><<",  # '<' left, '>' right, one char per column
+    col_sep: str = " : ",  # separator after first column
+) -> list[str]:
+    """Align arbitrary columns with dynamic widths.
+
+    Input: list of rows, where each row is list of column strings
+    Output: list of formatted/aligned lines
+
+    Example:
+        rows = [["x", "1.5", "[m]", "length"],
+                ["force", "10.2", "[N]", "thrust"]]
+        alignments = "><<<"  # right, left, left, left
+        -> ["    x : 1.5  [m]  length",
+            "force : 10.2 [N]  thrust"]
+
+    Does NOT sort - expects pre-sorted input.
+    """
+    if not rows:
+        return []
+
+    ncols = len(rows[0])
+    widths = [max(len(row[i]) for row in rows) for i in range(ncols)]
+
+    formatted = []
+    for row in rows:
+        parts = []
+        for i, (cell, width, align) in enumerate(zip(row, widths, col_alignments)):
+            if align == "<":
+                parts.append(f"{cell:<{width}}")
+            else:
+                parts.append(f"{cell:>{width}}")
+
+        # Join with special separator after first column
+        line = parts[0] + col_sep + " ".join(parts[1:])
+        formatted.append(line.rstrip())
+
+    return formatted
+
+
 def _format_table_rows(rows) -> list[str]:
-    """Format table rows with dynamic column widths"""
+    """Format table rows with dynamic column widths (legacy method)"""
     if not rows:
         return []
 
@@ -135,31 +176,140 @@ def _group_items_by_model(items):
     return out
 
 
-def _fmt_items(vmap, max_elems: int, group_by_model=True, sortkey=None):
-    "format (key, value) pairs in a VarMap, optionally grouping by model"
-    bymod = (
-        _group_items_by_model(vmap.vector_parent_items())
-        if group_by_model
-        else {"": items}
-    )
+# ---------------- extractors ----------------
+def _extract_variable_columns(key, val, vmap, max_elems):
+    """Extract [name, value, unit, label] for variable tables."""
+    name = key.str_without("lineage")
+    unit = _get_unit(key)
+    label = key.descr.get("label", "")
+
+    if np.shape(val):
+        value, unit_str = _fmt_array_preview(val, unit, n=max_elems)
+    else:
+        value, unit_str = _fmt_qty(vmap.quantity(key))
+
+    return [name, value, unit_str, label]
+
+
+def _extract_sensitivity_columns(key, val, vmap, max_elems):
+    """Extract [name, value, label] for sensitivity tables (no units!)."""
+    name = key.str_without("lineage")
+    label = key.descr.get("label", "")
+
+    if np.shape(val):
+        value, _ = _fmt_array_preview(val, unit="", n=max_elems)
+    else:
+        value = f"{float(val):+.3g}"
+
+    return [name, value, label]
+
+
+def _extract_constraint_columns(constraint, sens_str, vmap=None, max_elems=6):
+    """Extract [sens, constraint_str] for constraint tables."""
+    # Import here to avoid circular imports
+    from .util.small_scripts import try_str_without
+
+    excluded = {"units", "lineage"}
+    # Handle case where constraint might not have lineagestr method
+    try:
+        lineage_str = constraint.lineagestr()
+    except AttributeError:
+        lineage_str = ""
+
+    constrstr = try_str_without(constraint, {":MAGIC:" + lineage_str}.union(excluded))
+    if " at 0x" in constrstr:  # don't print memory addresses
+        constrstr = constrstr[: constrstr.find(" at 0x")] + ">"
+
+    return [sens_str, constrstr]
+
+
+# ---------------- table formatters ----------------
+def _format_model_group(
+    items: list[tuple],  # (key, value) pairs for ONE model
+    extractor,  # function(key, val, vmap, max_elems) -> list[str]
+    vmap=None,  # may be needed by extractor
+    *,
+    max_elems: int = 6,
+    sortkey=None,  # function((key, val)) -> sortable
+    col_alignments: str = "><<<",  # alignment per column
+) -> list[str]:
+    """Process one model group: sort, extract columns, align.
+
+    Returns list of formatted line strings (no model header).
+    """
+    # 1. Sort within this model group
+    if sortkey:
+        items = sorted(items, key=sortkey)
+
+    # 2. Extract to column strings
+    rows = [extractor(k, v, vmap, max_elems) for k, v in items]
+
+    # 3. Align columns
+    return _format_aligned_columns(rows, col_alignments)
+
+
+def _format_variable_table(
+    items_or_vmap,  # VarMap or iterable of (key, val)
+    extractor,  # specific to table type
+    *,
+    vmap=None,  # for extractors that need it
+    max_elems: int = 6,
+    group_by_model: bool = True,
+    sortkey=None,  # sort within each model
+    col_alignments: str = "><<<",
+) -> list[str]:
+    """High-level table formatter with model grouping.
+
+    1. Normalize input to items
+    2. Group by model (outer loop)
+    3. For each model: format group (sort, extract, align)
+    4. Insert model headers
+    """
+    # Normalize to items
+    if hasattr(items_or_vmap, "vector_parent_items"):
+        vmap = items_or_vmap
+        items = list(vmap.vector_parent_items())
+    else:
+        items = list(items_or_vmap)
+
+    # Group by model
+    if group_by_model:
+        bymod = _group_items_by_model(items)
+    else:
+        bymod = {"": items}
+
+    # Process each model group
     lines = []
-    for modelname, items in sorted(bymod.items(), key=lambda x: x[0]):
-        rows = []
-        for vk, val in sorted(items, key=sortkey):
-            # name = _fmt_name(vk)
-            name = vk.str_without("lineage") if group_by_model else _fmt_name(vk)
-            unit = _get_unit(vk)
-            label = vk.descr.get("label", "")
-            if np.shape(val):
-                value, unit_str = _fmt_array_preview(val, unit, n=max_elems)
+    for modelname in sorted(bymod.keys()):
+        model_items = bymod[modelname]
+
+        # Format this model's group
+        model_lines = _format_model_group(
+            model_items,
+            extractor,
+            vmap,
+            max_elems=max_elems,
+            sortkey=sortkey,
+            col_alignments=col_alignments,
+        )
+
+        # Add model header
+        if modelname and model_lines:
+            # Compute padding from first line of model_lines
+            first_line = model_lines[0]
+            colon_pos = first_line.find(":")
+            if colon_pos > 0:
+                pad = colon_pos
             else:
-                value, unit_str = _fmt_qty(vmap.quantity(vk))
-            rows.append((name, value, unit_str, label))
-        if modelname:
-            pad = max(len(str(r[0])) + 2 for r in rows)
+                pad = 10  # fallback
             lines += ["", f"{'|':>{pad}} {modelname}"]
-        lines += _format_table_rows(rows)
+
+        lines += model_lines
+
     return lines
+
+
+# Legacy function removed - replaced by _format_variable_table
 
 
 # ---------------- single solution ----------------
@@ -180,37 +330,26 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
 
     if "freevariables" in tables:
         lines += ["", "Free Variables", "--------------"]
-        lines += _fmt_items(
-            # sorted(solution.primal.vector_parent_items(), key=lambda x: str(x[0])),
+        lines += _format_variable_table(
             solution.primal,
-            max_elems=max_elems,
+            extractor=_extract_variable_columns,
             sortkey=lambda x: str(x[0]),
+            col_alignments="><<<",  # name, value, unit, label
         )
 
     if "constants" in tables:
         lines += ["", "Fixed Variables", "---------------"]
-        lines += _fmt_items(
+        lines += _format_variable_table(
             solution.constants,
-            max_elems=max_elems,
+            extractor=_extract_variable_columns,
             sortkey=lambda x: str(x[0]),
+            col_alignments="><<<",  # name, value, unit, label
         )
-        # rows = []
-        # for vk, val in sorted(
-        #     solution.constants.vector_parent_items(), key=lambda x: str(x[0])
-        # ):
-        #     name = _fmt_name(vk)
-        #     unit = _get_unit(vk)
-        #     label = vk.descr.get("label", "")
-        #     if np.shape(val):
-        #         value, unit_str = _fmt_array_preview(val, unit, n=max_elems)
-        #     else:
-        #         value, unit_str = _fmt_qty(solution.constants.quantity(vk))
-        #     rows.append((name, value, unit_str, label))
-        # lines += _format_table_rows(rows)
 
     if "sensitivities" in tables:
         sens_vars = getattr(getattr(solution, "sens", None), "variables", None)
         if sens_vars is not None:
+            # Pre-process: filter and prepare items
             items = []
             vpi = getattr(sens_vars, "vector_parent_items", None)
             iterable = (
@@ -222,44 +361,64 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
                 val = np.asarray(v, dtype=float)
                 sabs = float(np.nanmax(np.abs(val))) if val.size else 0.0
                 items.append((vk, sabs, v))
+
+            # Sort by absolute value descending, filter by threshold
             items.sort(key=lambda t: -t[1])
+            items = [(vk, raw) for vk, sabs, raw in items[:topn] if sabs >= 0.01]
+
             lines += ["", "Variable Sensitivities", "----------------------"]
-            rows = []
-            for vk, sabs, raw in items[:topn]:
-                if sabs < 0.01:  # temporary hack to mimic SolutionArray
-                    break
-                name = _fmt_name(vk)
-                label = vk.descr.get("label", "")
-                if np.shape(raw):
-                    value, unit_str = _fmt_array_preview(raw, n=max_elems)
-                else:
-                    value = f"{float(raw):+.3g}"
-                    unit_str = ""
-                rows.append((name, value, unit_str, label))
-            lines += _format_table_rows(rows)
+            lines += _format_variable_table(
+                items,
+                extractor=_extract_sensitivity_columns,  # 3 columns, no units
+                vmap=sens_vars,
+                sortkey=None,  # already sorted
+                col_alignments="<<<",  # name, value, label
+                group_by_model=True,  # NEW FEATURE!
+            )
 
     if "tightest constraints" in tables:
+        # Pre-process: convert constraints to items with sensitivity strings
+        items = []
+        for constraint, sens in solution.sens.constraints.items():
+            sens_str = f"{sens:+.3g}"
+            items.append((constraint, sens_str))
+
+        # Sort by sensitivity descending
+        items.sort(key=lambda x: -abs(float(x[1])))
+        items = items[:topn]  # top N
+
         lines += ["", "Most Sensitive Constraints", "-" * 26]
-        for constraint, sens in sorted(
-            solution.sens.constraints.items(), key=lambda x: -abs(x[1])
-        ):
-            if abs(sens) < 0.01:
-                break
-            lines += [f" {f'{sens:>+.3g}':>5} : {constraint}"]
+        lines += _format_variable_table(
+            items,
+            extractor=_extract_constraint_columns,  # 2 columns
+            sortkey=None,  # already sorted
+            col_alignments="><",  # sens right-aligned, constraint left
+            group_by_model=True,  # NEW FEATURE!
+        )
 
     if "slack constraints" in tables:
         maxsens = 1e-5
+        # Pre-process: convert constraints to items with sensitivity strings
+        items = []
+        for constraint, sens in solution.sens.constraints.items():
+            sens_str = f"{sens:+.3g}"
+            items.append((constraint, sens_str))
+
+        # Sort by sensitivity ascending, filter by threshold
+        items.sort(key=lambda x: abs(float(x[1])))
+        items = [item for item in items if abs(float(item[1])) <= maxsens]
+
         lines += ["", f"Insensitive Constraints (below {maxsens})", "-" * 37]
-        printed = False
-        for constraint, sens in sorted(
-            solution.sens.constraints.items(), key=lambda x: abs(x[1])
-        ):
-            if abs(sens) > 1e-5:
-                if not printed:
-                    lines += ["(none)", ""]
-                break
-            lines += [f" {f'{sens:>+.3g}':>5} : {constraint}"]
-            printed = True
+        if not items:
+            lines += ["(none)", ""]
+        else:
+            lines += _format_variable_table(
+                items,
+                extractor=_extract_constraint_columns,  # 2 columns
+                sortkey=None,  # already sorted
+                col_alignments="><",  # sens right-aligned, constraint left
+                group_by_model=True,  # NEW FEATURE!
+            )
 
     return "\n".join(lines).lstrip()
 
