@@ -232,10 +232,11 @@ def _extract_cost_columns(key, val, vmap=None, max_elems=6):
 def _extract_warning_columns(warning_type, warning_detail, vmap=None, max_elems=6):
     """Extract [warning_type, details] for warning display."""
     # warning_detail is a tuple, format it appropriately
-    if isinstance(warning_detail, tuple) and len(warning_detail) > 0:
-        details = str(warning_detail[0])  # First element is usually the message
-    else:
-        details = str(warning_detail)
+    # if isinstance(warning_detail, tuple) and len(warning_detail) > 0:
+    #     details = str(warning_detail[0])  # First element is usually the message
+    # else:
+    #     details = str(warning_detail)
+    details = "\n" + "\n".join(warning_detail)
     return [warning_type, details]
 
 
@@ -346,10 +347,7 @@ def _section_warnings(solution, **kwargs):
         return None
 
     # Convert warnings to items list
-    items = []
-    for name, detail in warns.items():
-        for tup in detail:
-            items.append((name, tup))
+    items = [(name, (x[0] for x in detail)) for name, detail in warns.items()]
 
     return {
         "title": "WARNINGS",
