@@ -313,12 +313,12 @@ def _format_variable_table(
         if modelname and model_lines:
             # Compute padding from first line of model_lines
             first_line = model_lines[0]
-            colon_pos = first_line.find(":")
+            colon_pos = first_line.rfind(":")
             if colon_pos > 0:
                 pad = colon_pos
             else:
                 pad = 10  # fallback
-            lines += ["", f"{'|':>{pad}} {modelname}"]
+            lines += ["", f"{'|':>{pad + 1}} {modelname}"]
 
         lines += model_lines
 
