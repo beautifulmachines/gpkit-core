@@ -56,7 +56,7 @@ def _fmt_qty(q) -> tuple[str, str]:
     try:
         mag = float(getattr(q, "magnitude", q))
         unit_str = unitstr(q, into="[%s]", dimless="")
-        return f"{mag:.4g}", unit_str
+        return f"{mag:.4g} ", unit_str
     except Exception:
         try:
             return f"{float(q):.4g}", ""
@@ -439,7 +439,7 @@ def _section_tight_constraints(solution, topn, **kwargs):
 
     # Sort by sensitivity descending
     items.sort(key=lambda x: -abs(float(x[1])))
-    items = items[:topn]  # top N
+    items = [x for x in items if abs(float(x[1])) > 1e-3]  # slow, fix this
 
     if not items:
         return None
