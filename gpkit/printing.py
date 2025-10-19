@@ -1,7 +1,5 @@
 "printing functionality for gpkit objects"
 
-from __future__ import annotations
-
 from typing import Any, Sequence, Tuple
 
 import numpy as np
@@ -29,9 +27,10 @@ def table(
     if _looks_like_solution(obj):
         return _table_solution(obj, tables, topn=topn, max_elems=max_elems)
     if _looks_like_sequence_of_solutions(obj):
-        return _table_sequence(
-            obj, tables, topn=topn, max_elems=max_elems, max_solutions=max_solutions
-        )
+        raise NotImplementedError
+        # return _table_sequence(
+        #     obj, tables, topn=topn, max_elems=max_elems, max_solutions=max_solutions
+        # )
     raise TypeError("Expected a Solution or iterable of Solutions.")
 
 
@@ -113,25 +112,25 @@ def _format_aligned_columns(
     return formatted
 
 
-def _format_table_rows(rows) -> list[str]:
-    """Format table rows with dynamic column widths (legacy method)"""
-    if not rows:
-        return []
-
-    # Calculate max widths for name, value, and unit columns
-    name_width = max(len(row[0]) for row in rows)
-    val_width = max(len(row[1]) for row in rows)
-    unit_width = max(len(row[2]) for row in rows)
-
-    formatted_rows = []
-    for name, value, unit, label in rows:
-        line = f"{name:>{name_width}} : {value:<{val_width}} "
-        line += f" {unit:<{unit_width}}"
-        if label:
-            line += (" " if unit_width else "") + f"{label}"
-        formatted_rows.append(line.rstrip())
-
-    return formatted_rows
+# def _format_table_rows(rows) -> list[str]:
+#     """Format table rows with dynamic column widths (legacy method)"""
+#     if not rows:
+#         return []
+# 
+#     # Calculate max widths for name, value, and unit columns
+#     name_width = max(len(row[0]) for row in rows)
+#     val_width = max(len(row[1]) for row in rows)
+#     unit_width = max(len(row[2]) for row in rows)
+# 
+#     formatted_rows = []
+#     for name, value, unit, label in rows:
+#         line = f"{name:>{name_width}} : {value:<{val_width}} "
+#         line += f" {unit:<{unit_width}}"
+#         if label:
+#             line += (" " if unit_width else "") + f"{label}"
+#         formatted_rows.append(line.rstrip())
+# 
+#     return formatted_rows
 
 
 def _get_unit(vk) -> str:
@@ -309,9 +308,6 @@ def _format_variable_table(
     return lines
 
 
-# Legacy function removed - replaced by _format_variable_table
-
-
 # ---------------- single solution ----------------
 def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
     lines: list[str] = []
@@ -424,32 +420,32 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
 
 
 # ---------------- sequence summary ----------------
-def _table_sequence(
-    seq: Sequence, tables, *, topn: int, max_elems: int, max_solutions: int
-) -> str:
-    sols = list(seq)
-    n = len(sols)
-    lines = ["\nSolution Sequence", "-----------------"]
-
-    if n:
-        costs = np.array([getattr(s, "cost", np.nan) for s in sols], dtype=float)
-        lines.append(f"  count: {n}")
-        lines.append(
-            f"  cost: min {np.nanmin(costs):.6g}"
-            f"  median {np.nanmedian(costs):.6g}"
-            f"  max {np.nanmax(costs):.6g}"
-        )
-
-    # Append short per-solution summaries for the first few
-    for i, s in enumerate(sols[:max_solutions], 1):
-        lines += ["", f"--- Solution {i} ---"]
-        lines.append(
-            _table_solution(
-                s, ("cost", "freevariables"), topn=topn, max_elems=max_elems
-            )
-        )
-
-    if n > max_solutions:
-        lines += ["", f"(… {n - max_solutions} more solutions omitted …)"]
-
-    return "\n".join(lines).strip()
+# def _table_sequence(
+#     seq: Sequence, tables, *, topn: int, max_elems: int, max_solutions: int
+# ) -> str:
+#     sols = list(seq)
+#     n = len(sols)
+#     lines = ["\nSolution Sequence", "-----------------"]
+# 
+#     if n:
+#         costs = np.array([getattr(s, "cost", np.nan) for s in sols], dtype=float)
+#         lines.append(f"  count: {n}")
+#         lines.append(
+#             f"  cost: min {np.nanmin(costs):.6g}"
+#             f"  median {np.nanmedian(costs):.6g}"
+#             f"  max {np.nanmax(costs):.6g}"
+#         )
+# 
+#     # Append short per-solution summaries for the first few
+#     for i, s in enumerate(sols[:max_solutions], 1):
+#         lines += ["", f"--- Solution {i} ---"]
+#         lines.append(
+#             _table_solution(
+#                 s, ("cost", "freevariables"), topn=topn, max_elems=max_elems
+#             )
+#         )
+# 
+#     if n > max_solutions:
+#         lines += ["", f"(… {n - max_solutions} more solutions omitted …)"]
+# 
+#     return "\n".join(lines).strip()
