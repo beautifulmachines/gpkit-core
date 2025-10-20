@@ -53,7 +53,7 @@ def _fmt_qty(q) -> tuple[str, str]:
 
 def _format_aligned_columns(
     rows: list[list[str]],  # each row is list of column strings
-    col_alignments: str = "><<",  # '<' left, '>' right, one char per column
+    col_alignments: str,  # '<' left, '>' right, one char per column
     col_sep: str = " : ",  # separator after first column
 ) -> list[str]:
     """Align arbitrary columns with dynamic widths.
@@ -61,29 +61,18 @@ def _format_aligned_columns(
     Input: list of rows, where each row is list of column strings
     Output: list of formatted/aligned lines
 
-    Example:
-        rows = [["x", "1.5", "[m]", "length"],
-                ["force", "10.2", "[N]", "thrust"]]
-        alignments = "><<<"  # right, left, left, left
-        -> ["    x : 1.5  [m]  length",
-            "force : 10.2 [N]  thrust"]
-
     Does NOT sort - expects pre-sorted input.
     """
-    if not rows:
-        return []
-
-    ncols = len(rows[0])
+    (ncols,) = set(len(r) for r in rows) or (0,)
+    assert len(col_alignments) >= ncols
     widths = [max(len(row[i]) for row in rows) for i in range(ncols)]
 
     formatted = []
     for row in rows:
-        parts = []
-        for i, (cell, width, align) in enumerate(zip(row, widths, col_alignments)):
-            if align == "<":
-                parts.append(f"{cell:<{width}}")
-            else:
-                parts.append(f"{cell:>{width}}")
+        parts = [
+            f"{cell:{align}{width}}"
+            for cell, width, align in zip(row, widths, col_alignments)
+        ]
 
         # Join with special separator after first column
         line = parts[0] + (col_sep if parts[1:] else "") + " ".join(parts[1:])
