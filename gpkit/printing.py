@@ -179,7 +179,7 @@ def _group_items_by_model(items):
 def _extract_variable_columns(key, val, vmap, max_elems):
     """Extract [name, value, unit, label] for variable tables."""
     name = key.str_without("lineage")
-    unit = _get_unit(key)
+    unit = unitstr(key)
     label = key.descr.get("label", "")
 
     if np.shape(val):
