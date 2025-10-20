@@ -351,14 +351,14 @@ def _section_warnings(solution, **kwargs):
         return None
 
     # Convert warnings to items list
-    items = [(name, (x[0] for x in detail)) for name, detail in warns.items()]
+    items = [(name, [x[0] for x in detail]) for name, detail in warns.items() if detail]
 
     return {
         "title": "WARNINGS",
         "data": items,
         "extractor": _extract_warning_columns,
         "format_kwargs": {
-            "col_alignments": "><",  # warning_type, details
+            "col_alignments": "<",  # warning_type, details
             "group_by_model": False,  # warnings don't have model context
         },
     }

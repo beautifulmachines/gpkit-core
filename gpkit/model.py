@@ -256,8 +256,8 @@ class Model(CostedConstraintSet):
             except Infeasible:
                 print("<DEBUG> Model is not feasible with bounded constraints.")
         if sol and verbosity:
-            warnings = sol.table(tables=["warnings"]).split("\n")[3:-2]
-            if warnings:
+            warnings = sol.table(tables=["warnings"]).split("\n")[2:]
+            if warnings and warnings != ["(none)"]:
                 print("<DEBUG> Model is feasible with these modifications:")
                 print("\n" + "\n".join(warnings) + "\n")
             else:
