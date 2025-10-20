@@ -90,14 +90,14 @@ def _fmt_number(x) -> str:
     return f"{float(x):.3g}"
 
 
-def _fmt_array_preview(arr, unit: str = "", n: int = 6) -> tuple[str, str]:
+def _fmt_array_preview(arr, n: int = 6) -> tuple[str, str]:
     """Return (value, unit) tuple for separate formatting"""
-    flat = np.asarray(arr).ravel()
+    flat = np.asarray(getattr(arr, "magnitude", arr)).ravel()
     shown = flat[:n]
     body = "  ".join(_fmt_number(x) for x in shown)
     tail = " ..." if flat.size > n else ""
     value = f"[ {body}{tail} ]"
-    unit_str = f"[{unit}]" if unit and unit != "dimensionless" else ""
+    unit_str = unitstr(arr, into="[%s]", dimless="")
     return value, unit_str
 
 
@@ -124,7 +124,7 @@ def _extract_variable_columns(key, val, vmap, max_elems):
     label = key.descr.get("label", "")
 
     if np.shape(val):
-        value, unit_str = _fmt_array_preview(val, unit, n=max_elems)
+        value, unit_str = _fmt_array_preview(vmap.quantity(key), n=max_elems)
     else:
         value, unit_str = _fmt_qty(vmap.quantity(key))
 
@@ -137,7 +137,7 @@ def _extract_sensitivity_columns(key, val, vmap, max_elems):
     label = key.descr.get("label", "")
 
     if np.shape(val):
-        value, _ = _fmt_array_preview(val, unit="", n=max_elems)
+        value, _ = _fmt_array_preview(val, n=max_elems)
     else:
         value = f"{float(val):+.3g}"
 
