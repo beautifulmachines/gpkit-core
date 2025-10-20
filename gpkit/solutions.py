@@ -99,7 +99,8 @@ class Solution:
             )
         else:
             lines = []  # temp hack, avoid adding breakdowns if tables set
-        return "\n".join(lines) + self.to_solution_array().table(**kwargs)
+        # return "\n".join(lines) + self.to_solution_array().table(**kwargs)
+        return "\n".join(lines) + printing_table(self, **kwargs)
         # return printing_table(self, **kwargs)
 
     def cost_breakdown(self) -> str:
