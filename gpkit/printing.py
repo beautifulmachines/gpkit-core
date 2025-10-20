@@ -345,7 +345,7 @@ def _section_sensitivities(solution, topn, **kwargs):
         items.append((vk, sabs, v))
 
     # Sort by absolute value descending, filter by threshold
-    items.sort(key=lambda t: -t[1])
+    items.sort(key=lambda t: (-t[1], str(t[0])))
     items = [(vk, raw) for vk, sabs, raw in items[:topn] if sabs >= 0.01]
 
     if not items:
