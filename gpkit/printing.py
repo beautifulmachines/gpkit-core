@@ -255,11 +255,11 @@ def _format_section(
                 pad = colon_pos
             else:
                 pad = 10  # fallback
-            lines += ["", f"{'|':>{pad + 1}} {modelname}"]
+            lines += [f"{'|':>{pad + 1}} {modelname}"]
 
-        lines += model_lines
+        lines += model_lines + [""]
 
-    return lines
+    return lines[:-1]
 
 
 # ---------------- section methods ----------------

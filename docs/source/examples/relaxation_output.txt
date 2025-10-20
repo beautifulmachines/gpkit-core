@@ -226,7 +226,6 @@ x_min : 2
 
 Fixed Variables
 ---------------
-
       | Relax2.OriginalValues
 x_max : 1
 x_min : 2
