@@ -5,7 +5,6 @@ from typing import Any, Tuple
 import numpy as np
 
 from .util.repr_conventions import unitstr
-from .util.small_scripts import try_str_without
 
 
 def table(
@@ -154,9 +153,11 @@ def _extract_constraint_columns(constraint, sens_str, vmap=None, max_elems=6):
     except AttributeError:
         lineage_str = ""
 
-    constrstr = try_str_without(constraint, {":MAGIC:" + lineage_str}.union(excluded))
-    if " at 0x" in constrstr:  # don't print memory addresses
-        constrstr = constrstr[: constrstr.find(" at 0x")] + ">"
+    constrstr = (
+        constraint.str_without(excluded)
+        if hasattr(constraint, "str_without")
+        else str(constraint)
+    )
 
     if sens_str == "" and constrstr == "(none)":
         return [constrstr]
