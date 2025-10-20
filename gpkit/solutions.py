@@ -86,19 +86,10 @@ class Solution:
         return self.to_solution_array().summary(*args, **kwargs)
 
     def table(self, **kwargs) -> str:
-        "Pass through to SolutionArray.table"
-        lines = self.cost_breakdown() + self.model_sens_breakdown() + [""]
-        if "tables" not in kwargs:
-            kwargs["tables"] = (
-                "warnings",
-                "sweepvariables",
-                "freevariables",
-                "constants",
-                "sensitivities",
-                "tightest constraints",
-            )
-        else:
-            lines = []  # temp hack, avoid adding breakdowns if tables set
+        "Per legacy, prints breakdowns then Solution.table"
+        lines = []
+        if "tables" not in kwargs:  # don't add breakdowns if tables custom
+            lines += self.cost_breakdown() + self.model_sens_breakdown() + [""]
         return "\n".join(lines) + printing_table(self, **kwargs)
 
     def cost_breakdown(self) -> str:

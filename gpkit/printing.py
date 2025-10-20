@@ -9,13 +9,14 @@ from .util.small_scripts import try_str_without
 
 
 def table(
-    obj: Any,
+    obj: Any,  # Solution or SolutionSequence
     tables: Tuple[str, ...] = (
-        "cost",
+        # "cost",
+        "warnings",
         "freevariables",
         "constants",
         "sensitivities",
-        "warnings",
+        "tightest constraints",
     ),
     *,
     topn: int = 10,
