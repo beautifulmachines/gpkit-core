@@ -101,27 +101,6 @@ def _format_aligned_columns(
     return formatted
 
 
-# def _format_table_rows(rows) -> list[str]:
-#     """Format table rows with dynamic column widths (legacy method)"""
-#     if not rows:
-#         return []
-#
-#     # Calculate max widths for name, value, and unit columns
-#     name_width = max(len(row[0]) for row in rows)
-#     val_width = max(len(row[1]) for row in rows)
-#     unit_width = max(len(row[2]) for row in rows)
-#
-#     formatted_rows = []
-#     for name, value, unit, label in rows:
-#         line = f"{name:>{name_width}} : {value:<{val_width}} "
-#         line += f" {unit:<{unit_width}}"
-#         if label:
-#             line += (" " if unit_width else "") + f"{label}"
-#         formatted_rows.append(line.rstrip())
-#
-#     return formatted_rows
-
-
 def _get_unit(vk) -> str:
     "get the unit string from a varkey"
     return f"{vk.units:~}" if getattr(vk, "units", None) else ""
@@ -214,13 +193,6 @@ def _extract_cost_columns(key, val, vmap=None, max_elems=6):
 
 def _extract_warning_columns(warning_type, warning_detail, vmap=None, max_elems=6):
     """Extract [warning_type, details] for warning display."""
-    # warning_detail is a tuple, format it appropriately
-    # if isinstance(warning_detail, tuple) and len(warning_detail) > 0:
-    #     details = str(warning_detail[0])  # First element is usually the message
-    # else:
-    #     details = str(warning_detail)
-    # details = "\n" + "\n".join(warning_detail)
-    # return [warning_type, details]
     return [f"{warning_type}:\n" + "\n".join(warning_detail)]
 
 
