@@ -18,14 +18,10 @@ def table(
         "sensitivities",
         "tightest constraints",
     ),
-    # topn: int = 10,
-    #max_elems: int = 6,
-    #max_solutions: int = 8,
-    #latex: bool = False,
     **kwargs,
 ) -> str:
     """Render a simple text table for a Solution or SolutionSequence."""
-    if _looks_like_solution(obj):
+    if hasattr(obj, "cost") and hasattr(obj, "primal"):  # looks like Solution
         return _table_solution(obj, tables, **kwargs)
     if _looks_like_sequence_of_solutions(obj):
         raise NotImplementedError
@@ -36,10 +32,6 @@ def table(
 
 
 # ---------------- helpers ----------------
-def _looks_like_solution(x) -> bool:
-    return hasattr(x, "cost") and hasattr(x, "primal")
-
-
 def _looks_like_sequence_of_solutions(x) -> bool:
     try:
         it = iter(x)
@@ -54,7 +46,6 @@ def _looks_like_sequence_of_solutions(x) -> bool:
 
 def _fmt_qty(q) -> tuple[str, str]:
     """Return (value, unit) tuple for separate formatting"""
-    #try:
     mag = float(getattr(q, "magnitude", q))
     unit_str = unitstr(q, into="[%s]", dimless="")
     return f"{mag:.4g} ", unit_str
@@ -461,7 +452,7 @@ SECTION_METHODS = {
 
 # ---------------- single solution ----------------
 def _table_solution(sol, tables, topn: int = 10, max_elems: int = 6) -> str:
-    lines: list[str] = []
+    sections: list[str] = []
 
     for table_name in tables:
         if table_name not in SECTION_METHODS:
@@ -473,8 +464,8 @@ def _table_solution(sol, tables, topn: int = 10, max_elems: int = 6) -> str:
         if not section:  # Skip empty sections
             continue
 
-        # Add title
-        lines += ["", section["title"], "-" * len(section["title"])]
+        # title
+        lines = [section["title"], "-" * len(section["title"])]
 
         # Format table content
         table_lines = _format_variable_table(
@@ -484,8 +475,9 @@ def _table_solution(sol, tables, topn: int = 10, max_elems: int = 6) -> str:
             **section["format_kwargs"],
         )
         lines += table_lines or ["(none)"]
+        sections.append("\n".join(lines))
 
-    return "\n".join(lines).lstrip()
+    return "\n\n".join(sections)
 
 
 # ---------------- sequence summary ----------------
