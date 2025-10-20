@@ -18,16 +18,15 @@ def table(
         "sensitivities",
         "tightest constraints",
     ),
-    *,
-    topn: int = 10,
-    max_elems: int = 6,
-    max_solutions: int = 8,
-    latex: bool = False,
-    **_,
+    # topn: int = 10,
+    #max_elems: int = 6,
+    #max_solutions: int = 8,
+    #latex: bool = False,
+    **kwargs,
 ) -> str:
     """Render a simple text table for a Solution or SolutionSequence."""
     if _looks_like_solution(obj):
-        return _table_solution(obj, tables, topn=topn, max_elems=max_elems)
+        return _table_solution(obj, tables, **kwargs)
     if _looks_like_sequence_of_solutions(obj):
         raise NotImplementedError
         # return _table_sequence(
@@ -461,7 +460,7 @@ SECTION_METHODS = {
 
 
 # ---------------- single solution ----------------
-def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
+def _table_solution(sol, tables, topn: int = 10, max_elems: int = 6) -> str:
     lines: list[str] = []
 
     for table_name in tables:
@@ -469,7 +468,7 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
             continue
 
         section_method = SECTION_METHODS[table_name]
-        section = section_method(solution, topn=topn, max_elems=max_elems)
+        section = section_method(sol, topn=topn, max_elems=max_elems)
 
         if not section:  # Skip empty sections
             continue
