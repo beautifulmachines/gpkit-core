@@ -212,7 +212,7 @@ def _format_model_group(
     return _format_aligned_columns(rows, col_alignments)
 
 
-def _format_variable_table(
+def _format_section(
     items_or_vmap,  # VarMap or iterable of (key, val)
     extractor,  # specific to table type
     *,
@@ -468,7 +468,7 @@ def _table_solution(sol, tables, topn: int = 10, max_elems: int = 6) -> str:
         lines = [section["title"], "-" * len(section["title"])]
 
         # Format table content
-        table_lines = _format_variable_table(
+        table_lines = _format_section(
             section["data"],
             section["extractor"],
             max_elems=max_elems,
