@@ -1,10 +1,11 @@
 "printing functionality for gpkit objects"
 
-from typing import Any, Sequence, Tuple
+from typing import Any, Tuple
 
 import numpy as np
 
 from .util.repr_conventions import unitstr
+from .util.small_scripts import try_str_without
 
 
 def table(
@@ -53,22 +54,10 @@ def _looks_like_sequence_of_solutions(x) -> bool:
 
 def _fmt_qty(q) -> tuple[str, str]:
     """Return (value, unit) tuple for separate formatting"""
-    try:
-        mag = float(getattr(q, "magnitude", q))
-        unit_str = unitstr(q, into="[%s]", dimless="")
-        return f"{mag:.4g} ", unit_str
-    except Exception:
-        try:
-            return f"{float(q):.4g}", ""
-        except Exception:
-            return str(q), ""
-
-
-def _fmt_name(vk) -> str:
-    try:
-        return str(vk)
-    except Exception:
-        return repr(vk)
+    #try:
+    mag = float(getattr(q, "magnitude", q))
+    unit_str = unitstr(q, into="[%s]", dimless="")
+    return f"{mag:.4g} ", unit_str
 
 
 def _format_aligned_columns(
@@ -135,18 +124,12 @@ def _format_aligned_columns(
 
 def _get_unit(vk) -> str:
     "get the unit string from a varkey"
-    try:
-        return f"{vk.units:~}" if getattr(vk, "units", None) else ""
-    except Exception:
-        return ""
+    return f"{vk.units:~}" if getattr(vk, "units", None) else ""
 
 
 def _fmt_number(x) -> str:
     "default number to string conversion"
-    try:
-        return f"{float(x):.3g}"
-    except Exception:
-        return str(x)
+    return f"{float(x):.3g}"
 
 
 def _fmt_array_preview(arr, unit: str = "", n: int = 6) -> tuple[str, str]:
@@ -205,9 +188,6 @@ def _extract_sensitivity_columns(key, val, vmap, max_elems):
 
 def _extract_constraint_columns(constraint, sens_str, vmap=None, max_elems=6):
     """Extract [sens, constraint_str] for constraint tables."""
-    # Import here to avoid circular imports
-    from .util.small_scripts import try_str_without
-
     excluded = {"units", "lineage"}
     # Handle case where constraint might not have lineagestr method
     try:
