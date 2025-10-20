@@ -80,21 +80,11 @@ def _format_aligned_columns(
     return formatted
 
 
-def _get_unit(vk) -> str:
-    "get the unit string from a varkey"
-    return f"{vk.units:~}" if getattr(vk, "units", None) else ""
-
-
-def _fmt_number(x) -> str:
-    "default number to string conversion"
-    return f"{float(x):.3g}"
-
-
 def _fmt_array_preview(arr, n: int = 6) -> tuple[str, str]:
     """Return (value, unit) tuple for separate formatting"""
     flat = np.asarray(getattr(arr, "magnitude", arr)).ravel()
     shown = flat[:n]
-    body = "  ".join(_fmt_number(x) for x in shown)
+    body = "  ".join(f"{x:.3g}" for x in shown)
     tail = " ..." if flat.size > n else ""
     value = f"[ {body}{tail} ]"
     unit_str = unitstr(arr, into="[%s]", dimless="")
