@@ -106,7 +106,7 @@ def _format_aligned_columns(
                 parts.append(f"{cell:>{width}}")
 
         # Join with special separator after first column
-        line = parts[0] + col_sep + " ".join(parts[1:])
+        line = parts[0] + (col_sep if parts[1:] else "") + " ".join(parts[1:])
         formatted.append(line.rstrip())
 
     return formatted
@@ -236,8 +236,9 @@ def _extract_warning_columns(warning_type, warning_detail, vmap=None, max_elems=
     #     details = str(warning_detail[0])  # First element is usually the message
     # else:
     #     details = str(warning_detail)
-    details = "\n" + "\n".join(warning_detail)
-    return [warning_type, details]
+    # details = "\n" + "\n".join(warning_detail)
+    # return [warning_type, details]
+    return [f"{warning_type}:\n" + "\n".join(warning_detail)]
 
 
 # ---------------- table formatters ----------------
@@ -437,7 +438,7 @@ def _section_tight_constraints(solution, topn, **kwargs):
 
     # Sort by sensitivity descending
     items.sort(key=lambda x: -abs(float(x[1])))
-    items = [x for x in items if abs(float(x[1])) > 1e-3]  # slow, fix this
+    items = [x for x in items if abs(float(x[1])) > 1e-2]  # slow, fix this
 
     if not items:
         return None
