@@ -531,7 +531,7 @@ def _table_solution(solution, tables, *, topn: int, max_elems: int) -> str:
             max_elems=max_elems,
             **section["format_kwargs"],
         )
-        lines += table_lines
+        lines += table_lines or ["(none)"]
 
     return "\n".join(lines).lstrip()
 
