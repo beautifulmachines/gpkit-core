@@ -97,7 +97,6 @@ Wfuel : [ 1.09      0.817     0.544     0.272    ]  [lbf] fuel weight
 Insensitive Constraints (below 1e-05)
 -------------------------------------
 (none)
-
 Solution Diff (for selected variables)
 ======================================
 (argument is the baseline solution)

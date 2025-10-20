@@ -219,6 +219,9 @@ def _extract_constraint_columns(constraint, sens_str, vmap=None, max_elems=6):
     if " at 0x" in constrstr:  # don't print memory addresses
         constrstr = constrstr[: constrstr.find(" at 0x")] + ">"
 
+    if sens_str == "" and constrstr == "(none)":
+        return [constrstr]
+
     return [sens_str, constrstr]
 
 
