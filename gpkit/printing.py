@@ -101,7 +101,7 @@ def _group_items_by_model(items):
 
 
 # ---------------- extractors ----------------
-def _extract_variable_columns(key, val, vmap, max_elems):
+def _extract_variable_columns(key, val, max_elems):
     """Extract [name, value, unit, label] for variable tables."""
     name = key.str_without("lineage")
     unit = unitstr(key)
@@ -110,7 +110,7 @@ def _extract_variable_columns(key, val, vmap, max_elems):
     return [name, value, unit_str, label]
 
 
-def _extract_sensitivity_columns(key, val, vmap, max_elems):
+def _extract_sensitivity_columns(key, val, max_elems):
     """Extract [name, value, label] for sensitivity tables (no units!)."""
     name = key.str_without("lineage")
     label = key.descr.get("label", "")
@@ -123,7 +123,7 @@ def _extract_sensitivity_columns(key, val, vmap, max_elems):
     return [name, value, label]
 
 
-def _extract_constraint_columns(constraint, sens_str, vmap=None, max_elems=6):
+def _extract_constraint_columns(constraint, sens_str, max_elems=6):
     """Extract [sens, constraint_str] for constraint tables."""
     excluded = {"units", "lineage"}
     # Handle case where constraint might not have lineagestr method
@@ -144,14 +144,14 @@ def _extract_constraint_columns(constraint, sens_str, vmap=None, max_elems=6):
     return [sens_str, constrstr]
 
 
-def _extract_cost_columns(key, val, vmap=None, max_elems=6):
+def _extract_cost_columns(key, val, max_elems=6):
     """Extract [name, value, unit] for cost display."""
     name = str(key) if key else "cost"
     value, unit_str = _fmt_item(key, val)
     return [name, value, unit_str]
 
 
-def _extract_warning_columns(warning_type, warning_detail, vmap=None, max_elems=6):
+def _extract_warning_columns(warning_type, warning_detail, max_elems=6):
     """Extract [warning_type, details] for warning display."""
     return [f"{warning_type}:\n" + "\n".join(warning_detail)]
 
@@ -159,8 +159,7 @@ def _extract_warning_columns(warning_type, warning_detail, vmap=None, max_elems=
 # ---------------- table formatters ----------------
 def _format_model_group(
     items: list[tuple],  # (key, value) pairs for ONE model
-    extractor,  # function(key, val, vmap, max_elems) -> list[str]
-    vmap=None,  # may be needed by extractor
+    extractor,  # function(key, val, max_elems) -> list[str]
     *,
     max_elems: int = 6,
     sortkey=None,  # function((key, val)) -> sortable
@@ -175,7 +174,7 @@ def _format_model_group(
         items = sorted(items, key=sortkey)
 
     # 2. Extract to column strings
-    rows = [extractor(k, v, vmap, max_elems) for k, v in items]
+    rows = [extractor(k, v, max_elems) for k, v in items]
 
     # 3. Align columns
     return _format_aligned_columns(rows, col_alignments)
@@ -185,7 +184,6 @@ def _format_section(
     items_or_vmap,  # VarMap or iterable of (key, val)
     extractor,  # specific to table type
     *,
-    vmap=None,  # for extractors that need it
     max_elems: int = 6,
     group_by_model: bool = True,
     sortkey=None,  # sort within each model
@@ -200,8 +198,7 @@ def _format_section(
     """
     # Normalize to items
     if hasattr(items_or_vmap, "vector_parent_items"):
-        vmap = items_or_vmap
-        items = list(vmap.vector_parent_items())
+        items = list(items_or_vmap.vector_parent_items())
     else:
         items = list(items_or_vmap)
 
@@ -220,7 +217,6 @@ def _format_section(
         model_lines = _format_model_group(
             model_items,
             extractor,
-            vmap,
             max_elems=max_elems,
             sortkey=sortkey,
             col_alignments=col_alignments,
@@ -335,7 +331,6 @@ def _section_sensitivities(solution, topn, **kwargs):
         "data": items,
         "extractor": _extract_sensitivity_columns,
         "format_kwargs": {
-            "vmap": sens_vars,
             "sortkey": None,  # already sorted
             "col_alignments": "<<<",  # name, value, label
             "group_by_model": True,
