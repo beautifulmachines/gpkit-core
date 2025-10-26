@@ -43,13 +43,6 @@ def _looks_like_sequence_of_solutions(x) -> bool:
     return _looks_like_solution(first)
 
 
-def _fmt_qty(q) -> tuple[str, str]:
-    """Return (value, unit) tuple for separate formatting"""
-    mag = float(getattr(q, "magnitude", q))
-    unit_str = unitstr(q, into="[%s]", dimless="")
-    return f"{mag:.4g} ", unit_str
-
-
 def _format_aligned_columns(
     rows: list[list[str]],  # each row is list of column strings
     col_alignments: str,  # '<' left, '>' right, one char per column
@@ -80,15 +73,16 @@ def _format_aligned_columns(
     return formatted
 
 
-def _fmt_array_preview(arr, n: int = 6) -> tuple[str, str]:
-    """Return (value, unit) tuple for separate formatting"""
-    flat = np.asarray(getattr(arr, "magnitude", arr)).ravel()
-    shown = flat[:n]
-    body = "  ".join(f"{x:.3g}" for x in shown)
-    tail = " ..." if flat.size > n else ""
-    value = f"[ {body}{tail} ]"
-    unit_str = unitstr(arr, into="[%s]", dimless="")
-    return value, unit_str
+def _fmt_item(key, val, n: int = 6) -> tuple[str, str]:
+    "Return (value, unit) tuple for separate formatting. Gets unit from key"
+    unit_str = unitstr(key, into="[%s]", dimless="")
+    if np.shape(val):
+        flat = np.asarray(val).ravel()
+        shown = flat[:n]
+        body = "  ".join(f"{x:.3g}" for x in shown)
+        tail = " ..." if flat.size > n else ""
+        return f"[ {body}{tail} ]", unit_str
+    return f"{val:.4g} ", unit_str
 
 
 def _group_items_by_model(items):
@@ -112,12 +106,7 @@ def _extract_variable_columns(key, val, vmap, max_elems):
     name = key.str_without("lineage")
     unit = unitstr(key)
     label = key.descr.get("label", "")
-
-    if np.shape(val):
-        value, unit_str = _fmt_array_preview(vmap.quantity(key), n=max_elems)
-    else:
-        value, unit_str = _fmt_qty(vmap.quantity(key))
-
+    value, unit_str = _fmt_item(key, val)
     return [name, value, unit_str, label]
 
 
@@ -127,7 +116,7 @@ def _extract_sensitivity_columns(key, val, vmap, max_elems):
     label = key.descr.get("label", "")
 
     if np.shape(val):
-        value, _ = _fmt_array_preview(val, n=max_elems)
+        value, _ = _fmt_item("", val, n=max_elems)
     else:
         value = f"{float(val):+.3g}"
 
@@ -158,7 +147,7 @@ def _extract_constraint_columns(constraint, sens_str, vmap=None, max_elems=6):
 def _extract_cost_columns(key, val, vmap=None, max_elems=6):
     """Extract [name, value, unit] for cost display."""
     name = str(key) if key else "cost"
-    value, unit_str = _fmt_qty(val)
+    value, unit_str = _fmt_item(key, val)
     return [name, value, unit_str]
 
 
