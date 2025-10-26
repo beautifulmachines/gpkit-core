@@ -299,9 +299,7 @@ def _section_constants(solution, **kwargs):
 
 def _section_sensitivities(solution, topn, **kwargs):
     """Section method for sensitivities display."""
-    sens_vars = getattr(getattr(solution, "sens", None), "variables", None)
-    if sens_vars is None:
-        return None
+    sens_vars = solution.sens.variables
 
     # Pre-process: filter and prepare items (from original logic)
     items = []
