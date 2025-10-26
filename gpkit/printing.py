@@ -342,7 +342,7 @@ def _section_tight_constraints(solution, topn, **kwargs):
         items.append((constraint, sens_str))
 
     # Sort by sensitivity descending
-    items.sort(key=lambda x: -abs(float(x[1])))
+    items.sort(key=lambda x: (-abs(float(x[1])), str(x[0])))
     items = [x for x in items if abs(float(x[1])) > 1e-2]  # slow, fix this
 
     if not items:
