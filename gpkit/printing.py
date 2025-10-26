@@ -104,7 +104,6 @@ def _group_items_by_model(items):
 def _extract_variable_columns(key, val, max_elems):
     """Extract [name, value, unit, label] for variable tables."""
     name = key.str_without("lineage")
-    unit = unitstr(key)
     label = key.descr.get("label", "")
     value, unit_str = _fmt_item(key, val)
     return [name, value, unit_str, label]
@@ -160,7 +159,6 @@ def _extract_warning_columns(warning_type, warning_detail, max_elems=6):
 def _format_model_group(
     items: list[tuple],  # (key, value) pairs for ONE model
     extractor,  # function(key, val, max_elems) -> list[str]
-    *,
     max_elems: int = 6,
     sortkey=None,  # function((key, val)) -> sortable
     col_alignments: str = "><<<",  # alignment per column
@@ -183,7 +181,6 @@ def _format_model_group(
 def _format_section(
     items_or_vmap,  # VarMap or iterable of (key, val)
     extractor,  # specific to table type
-    *,
     max_elems: int = 6,
     group_by_model: bool = True,
     sortkey=None,  # sort within each model
