@@ -1,10 +1,18 @@
 "printing functionality for gpkit objects"
-
+from dataclasses import dataclass
 from typing import Any, Tuple
 
 import numpy as np
 
 from .util.repr_conventions import unitstr
+
+
+@dataclass(frozen=True)
+class PrintOptions:
+    precision: int = 4
+    topn: int | None = None     # truncation per-group
+    vecn: int = 6               # max vector elements to print before ...
+    empty: str | None = None    # print this (e.g. "(none)" for empty section
 
 
 def table(
@@ -17,11 +25,12 @@ def table(
         "sensitivities",
         "tightest constraints",
     ),
-    **kwargs,
+    **options,
 ) -> str:
     """Render a simple text table for a Solution or SolutionSequence."""
+    opt = PrintOptions(**options)
     if hasattr(obj, "cost") and hasattr(obj, "primal"):  # looks like Solution
-        return _table_solution(obj, tables, **kwargs)
+        return _table_solution(obj, tables, opt)
     if _looks_like_sequence_of_solutions(obj):
         raise NotImplementedError
         # return _table_sequence(
@@ -159,7 +168,7 @@ def _extract_warning_columns(warning_type, warning_detail, max_elems=6):
 def _format_model_group(
     items: list[tuple],  # (key, value) pairs for ONE model
     extractor,  # function(key, val, max_elems) -> list[str]
-    max_elems: int = 6,
+    options,
     sortkey=None,  # function((key, val)) -> sortable
     col_alignments: str = "><<<",  # alignment per column
 ) -> list[str]:
@@ -172,7 +181,7 @@ def _format_model_group(
         items = sorted(items, key=sortkey)
 
     # 2. Extract to column strings
-    rows = [extractor(k, v, max_elems) for k, v in items]
+    rows = [extractor(k, v, options.vecn) for k, v in items]
 
     # 3. Align columns
     return _format_aligned_columns(rows, col_alignments)
@@ -181,10 +190,10 @@ def _format_model_group(
 def _format_section(
     items_or_vmap,  # VarMap or iterable of (key, val)
     extractor,  # specific to table type
-    max_elems: int = 6,
+    options,
+    col_alignments: str,
     group_by_model: bool = True,
     sortkey=None,  # sort within each model
-    col_alignments: str = "><<<",
 ) -> list[str]:
     """High-level table formatter with model grouping.
 
@@ -214,7 +223,7 @@ def _format_section(
         model_lines = _format_model_group(
             model_items,
             extractor,
-            max_elems=max_elems,
+            options,
             sortkey=sortkey,
             col_alignments=col_alignments,
         )
@@ -236,7 +245,7 @@ def _format_section(
 
 
 # ---------------- section methods ----------------
-def _section_cost(solution, **kwargs):
+def _section_cost(solution, options):
     """Section method for cost display."""
     return {
         "title": "Optimal Cost",
@@ -249,7 +258,7 @@ def _section_cost(solution, **kwargs):
     }
 
 
-def _section_warnings(solution, **kwargs):
+def _section_warnings(solution, options):
     """Section method for warnings display."""
     warns = (getattr(solution, "meta", None) or {}).get("warnings", {})
     if not warns:
@@ -269,7 +278,7 @@ def _section_warnings(solution, **kwargs):
     }
 
 
-def _section_freevariables(solution, **kwargs):
+def _section_freevariables(solution, options):
     """Section method for free variables display."""
     return {
         "title": "Free Variables",
@@ -283,7 +292,7 @@ def _section_freevariables(solution, **kwargs):
     }
 
 
-def _section_constants(solution, **kwargs):
+def _section_constants(solution, options):
     """Section method for constants display."""
     return {
         "title": "Fixed Variables",
@@ -297,7 +306,7 @@ def _section_constants(solution, **kwargs):
     }
 
 
-def _section_sensitivities(solution, topn, **kwargs):
+def _section_sensitivities(solution, options):
     """Section method for sensitivities display."""
     sens_vars = solution.sens.variables
 
@@ -316,7 +325,7 @@ def _section_sensitivities(solution, topn, **kwargs):
 
     # Sort by absolute value descending, filter by threshold
     items.sort(key=lambda t: (-t[1], str(t[0])))
-    items = [(vk, raw) for vk, sabs, raw in items[:topn] if sabs >= 0.01]
+    items = [(vk, raw) for vk, sabs, raw in items[:options.topn] if sabs >= 0.01]
 
     if not items:
         return None
@@ -333,7 +342,7 @@ def _section_sensitivities(solution, topn, **kwargs):
     }
 
 
-def _section_tight_constraints(solution, topn, **kwargs):
+def _section_tight_constraints(solution, options):
     """Section method for tightest constraints display."""
     # Pre-process: convert constraints to items with sensitivity strings
     items = []
@@ -360,7 +369,7 @@ def _section_tight_constraints(solution, topn, **kwargs):
     }
 
 
-def _section_slack_constraints(solution, **kwargs):
+def _section_slack_constraints(solution, options):
     """Section method for slack constraints display."""
     maxsens = 1e-5
     # Pre-process: convert constraints to items with sensitivity strings
@@ -410,7 +419,7 @@ SECTION_METHODS = {
 
 
 # ---------------- single solution ----------------
-def _table_solution(sol, tables, topn: int = 10, max_elems: int = 6) -> str:
+def _table_solution(sol, tables, options) -> str:
     sections: list[str] = []
 
     for table_name in tables:
@@ -418,7 +427,7 @@ def _table_solution(sol, tables, topn: int = 10, max_elems: int = 6) -> str:
             continue
 
         section_method = SECTION_METHODS[table_name]
-        section = section_method(sol, topn=topn, max_elems=max_elems)
+        section = section_method(sol, options)
 
         if not section:  # Skip empty sections
             continue
@@ -430,7 +439,7 @@ def _table_solution(sol, tables, topn: int = 10, max_elems: int = 6) -> str:
         table_lines = _format_section(
             section["data"],
             section["extractor"],
-            max_elems=max_elems,
+            options,
             **section["format_kwargs"],
         )
         lines += table_lines or ["(none)"]
