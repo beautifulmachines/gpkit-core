@@ -135,11 +135,6 @@ def _extract_sensitivity_columns(key, val, max_elems):
 def _extract_constraint_columns(constraint, sens_str, max_elems=6):
     """Extract [sens, constraint_str] for constraint tables."""
     excluded = {"units", "lineage"}
-    # Handle case where constraint might not have lineagestr method
-    try:
-        lineage_str = constraint.lineagestr()
-    except AttributeError:
-        lineage_str = ""
 
     constrstr = (
         constraint.str_without(excluded)
