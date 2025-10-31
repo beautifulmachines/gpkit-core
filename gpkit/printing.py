@@ -10,6 +10,8 @@ from .util.repr_conventions import unitstr
 
 @dataclass(frozen=True)
 class PrintOptions:
+    "container for printing options"
+
     precision: int = 4
     topn: int | None = None  # truncation per-group
     vecn: int = 6  # max vector elements to print before ...
@@ -30,17 +32,19 @@ def table(
 ) -> str:
     """Render a simple text table for a Solution or SolutionSequence."""
     opt = PrintOptions(**options)
-    if hasattr(obj, "cost") and hasattr(obj, "primal"):  # looks like Solution
+    if _looks_like_solution(obj):  # looks like Solution
         return _table_solution(obj, tables, opt)
     if _looks_like_sequence_of_solutions(obj):
         raise NotImplementedError
-        # return _table_sequence(
-        #     obj, tables, topn=topn, max_elems=max_elems, max_solutions=max_solutions
-        # )
+        # return _table_sequence(obj, tables, opt)
     raise TypeError("Expected a Solution or iterable of Solutions.")
 
 
 # ---------------- helpers ----------------
+def _looks_like_solution(x) -> bool:
+    return hasattr(x, "cost") and hasattr(x, "primal")
+
+
 def _looks_like_sequence_of_solutions(x) -> bool:
     try:
         it = iter(x)
@@ -111,7 +115,7 @@ def _group_items_by_model(items):
 
 
 # ---------------- extractors ----------------
-def _extract_variable_columns(key, val, max_elems):
+def _extract_variable_columns(key, val):
     """Extract [name, value, unit, label] for variable tables."""
     name = key.str_without("lineage")
     label = key.descr.get("label", "")
@@ -119,20 +123,7 @@ def _extract_variable_columns(key, val, max_elems):
     return [name, value, unit_str, label]
 
 
-def _extract_sensitivity_columns(key, val, max_elems):
-    """Extract [name, value, label] for sensitivity tables (no units!)."""
-    name = key.str_without("lineage")
-    label = key.descr.get("label", "")
-
-    if np.shape(val):
-        value, _ = _fmt_item("", val, n=max_elems)
-    else:
-        value = f"{float(val):+.3g}"
-
-    return [name, value, label]
-
-
-def _extract_constraint_columns(constraint, sens_str, max_elems=6):
+def _extract_constraint_columns(constraint, sens_str):
     """Extract [sens, constraint_str] for constraint tables."""
     excluded = {"units", "lineage"}
 
@@ -148,14 +139,14 @@ def _extract_constraint_columns(constraint, sens_str, max_elems=6):
     return [sens_str, constrstr]
 
 
-def _extract_cost_columns(key, val, max_elems=6):
+def _extract_cost_columns(key, val):
     """Extract [name, value, unit] for cost display."""
     name = str(key) if key else "cost"
     value, unit_str = _fmt_item(key, val)
     return [name, value, unit_str]
 
 
-def _extract_warning_columns(warning_type, warning_detail, max_elems=6):
+def _extract_warning_columns(warning_type, warning_detail):
     """Extract [warning_type, details] for warning display."""
     return [f"{warning_type}:\n" + "\n".join(warning_detail)]
 
@@ -163,7 +154,7 @@ def _extract_warning_columns(warning_type, warning_detail, max_elems=6):
 # ---------------- table formatters ----------------
 def _format_model_group(
     items: list[tuple],  # (key, value) pairs for ONE model
-    extractor,  # function(key, val, max_elems) -> list[str]
+    extractor,  # function(key, val) -> list[str]
     options,
     sortkey=None,  # function((key, val)) -> sortable
     col_alignments: str = "><<<",  # alignment per column
@@ -177,7 +168,7 @@ def _format_model_group(
         items = sorted(items, key=sortkey)
 
     # 2. Extract to column strings
-    rows = [extractor(k, v, options.vecn) for k, v in items]
+    rows = [extractor(k, v) for k, v in items]
 
     # 3. Align columns
     return _format_aligned_columns(rows, col_alignments)
@@ -304,6 +295,19 @@ def _section_constants(solution, options):
 
 def _section_sensitivities(solution, options):
     """Section method for sensitivities display."""
+
+    def _extract_sensitivity_columns(key, val):
+        """Extract [name, value, label] for sensitivity tables (no units!)."""
+        name = key.str_without("lineage")
+        label = key.descr.get("label", "")
+
+        if np.shape(val):
+            value, _ = _fmt_item("", val, n=options.vecn)
+        else:
+            value = f"{float(val):+.3g}"
+
+        return [name, value, label]
+
     sens_vars = solution.sens.variables
 
     # Pre-process: filter and prepare items (from original logic)
@@ -446,7 +450,7 @@ def _table_solution(sol, tables, options: PrintOptions) -> str:
 
 # ---------------- sequence summary ----------------
 # def _table_sequence(
-#     seq: Sequence, tables, *, topn: int, max_elems: int, max_solutions: int
+#     seq: Sequence, tables, *, topn: int, max_solutions: int
 # ) -> str:
 #     sols = list(seq)
 #     n = len(sols)
@@ -466,7 +470,7 @@ def _table_solution(sol, tables, options: PrintOptions) -> str:
 #         lines += ["", f"--- Solution {i} ---"]
 #         lines.append(
 #             _table_solution(
-#                 s, ("cost", "freevariables"), topn=topn, max_elems=max_elems
+#                 s, ("cost", "freevariables"), topn=topn
 #             )
 #         )
 #
