@@ -1,4 +1,5 @@
 "printing functionality for gpkit objects"
+
 from dataclasses import dataclass
 from typing import Any, Tuple
 
@@ -10,9 +11,9 @@ from .util.repr_conventions import unitstr
 @dataclass(frozen=True)
 class PrintOptions:
     precision: int = 4
-    topn: int | None = None     # truncation per-group
-    vecn: int = 6               # max vector elements to print before ...
-    empty: str | None = None    # print this (e.g. "(none)" for empty section
+    topn: int | None = None  # truncation per-group
+    vecn: int = 6  # max vector elements to print before ...
+    empty: str | None = None  # print this (e.g. "(none)" for empty section
 
 
 def table(
@@ -325,7 +326,7 @@ def _section_sensitivities(solution, options):
 
     # Sort by absolute value descending, filter by threshold
     items.sort(key=lambda t: (-t[1], str(t[0])))
-    items = [(vk, raw) for vk, sabs, raw in items[:options.topn] if sabs >= 0.01]
+    items = [(vk, raw) for vk, sabs, raw in items[: options.topn] if sabs >= 0.01]
 
     if not items:
         return None
@@ -419,7 +420,7 @@ SECTION_METHODS = {
 
 
 # ---------------- single solution ----------------
-def _table_solution(sol, tables, options) -> str:
+def _table_solution(sol, tables, options: PrintOptions) -> str:
     sections: list[str] = []
 
     for table_name in tables:
