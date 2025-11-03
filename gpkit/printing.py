@@ -44,6 +44,8 @@ class SectionSpec:
         lines = []
         for modelname in sorted(bymod.keys()):
             model_items = bymod[modelname]
+            if self.sortkey:
+                model_items.sort(key=self.sortkey)
             # each row is a list of strings
             rows = [self.row_from(item) for item in model_items]
 
@@ -51,7 +53,7 @@ class SectionSpec:
             # print(f"rows has {len(rows)} lines")
             # print(f"first row is {rows[0]}")
             # print(f"sortkey is {self.sortkey}")
-            rows = sorted(rows, key=self.sortkey)
+            # rows = sorted(rows, key=self.sortkey)
 
             # 3. Align columns
             model_lines = _format_aligned_columns(rows, self.align)
@@ -130,6 +132,7 @@ def _section_warnings(solution, options):
 class FreeVariables(SectionSpec):
     title = "Free Variables"
     align = "><<<"
+    sortkey = staticmethod(lambda x: str(x[0]))
 
     def items_from(self, sol):
         return sol.primal.vector_parent_items()
@@ -157,6 +160,7 @@ def _section_freevariables(solution, options):
 class Constants(SectionSpec):
     title = "Fixed Variables"
     align = "><<<"
+    sortkey = staticmethod(lambda x: str(x[0]))
 
     def items_from(self, sol):
         return sol.constants.vector_parent_items()
@@ -183,6 +187,7 @@ def _section_constants(solution, options):
 
 class Sensitivities(SectionSpec):
     title = "Variable Sensitivities"
+    sortkey = staticmethod(lambda x: (-rounded_mag(x[1]), str(x[0])))
 
     def items_from(self, sol):
         sens_vars = sol.sens.variables
@@ -201,7 +206,7 @@ class Sensitivities(SectionSpec):
             items.append((vk, sabs, v))
 
         # Sort by absolute value descending, filter by threshold
-        items.sort(key=lambda t: (-t[1], str(t[0])))
+        # items.sort(key=lambda t: (-t[1], str(t[0])))
         items = [(vk, raw) for vk, sabs, raw in items if sabs >= 0.01]
         return items
 
@@ -233,7 +238,8 @@ def _section_sensitivities(solution, options):
 
 
 class Constraints(SectionSpec):
-    sortkey = staticmethod(lambda x: (-abs(float(x[0])), str(x[1])))
+    # sortkey = staticmethod(lambda x: (-abs(float(x[0])), str(x[1])))
+    sortkey = None
 
     def row_from(self, item):
         """Extract [sens, constraint_str] for constraint tables."""
@@ -393,6 +399,11 @@ def _format_aligned_columns(
         formatted.append(line.rstrip())
 
     return formatted
+
+
+def rounded_mag(val, nround=8):
+    "get the magnitude of a (vector or scalar) for stable sorting purposes"
+    return round(np.nanmax(np.absolute(val)), nround)
 
 
 def _fmt_item(key, val, n: int = 6) -> tuple[str, str]:
