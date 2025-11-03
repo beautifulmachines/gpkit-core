@@ -290,10 +290,9 @@ def _section_tight_constraints(solution, options):
 
 class SlackConstraints(Constraints):
 
-    title = "Insensitive Constraints"
+    maxsens = 1e-5
 
     def items_from(self, sol):
-        maxsens = 1e-5
         # Pre-process: convert constraints to items with sensitivity strings
         items = []
         for constraint, sens in sol.sens.constraints.items():
@@ -302,7 +301,11 @@ class SlackConstraints(Constraints):
 
         # Sort by sensitivity ascending, filter by threshold
         items.sort(key=lambda x: abs(float(x[1])))
-        return [item for item in items if abs(float(item[1])) <= maxsens]
+        return [x for x in items if abs(float(x[1])) <= self.maxsens]
+
+    @property
+    def title(self):
+        return f"Insensitive Constraints (below {self.maxsens})"
 
 
 def _section_slack_constraints(solution, options):
