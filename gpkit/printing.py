@@ -304,8 +304,7 @@ def _fmt_item(key, val, n: int = 6) -> tuple[str, str]:
 def _group_items_by_model(items):
     """Group VarMap items by model string
     Input: iterable of (VarKey, value) pairs
-    Output: mapping model: iterable of (VarKey, value) pairs
-    lineage is dropped in the output strings, since it's captured in the key
+    Output: mapping model_str: iterable of (VarKey, value) pairs
     """
     out = {}
     for key, val in items:
