@@ -15,7 +15,7 @@ class PrintOptions:
     precision: int = 4
     topn: int | None = None  # truncation per-group
     vecn: int = 6  # max vector elements to print before ...
-    empty: str | None = None  # print this (e.g. "(none)" for empty section
+    empty: str | None = None  # output (e.g. "(none)") for empty sections
 
 
 class SectionSpec:
@@ -86,18 +86,7 @@ class Cost(SectionSpec):
         return [("cost", sol.cost)]
 
 
-def _section_cost(solution, options):
-    """Section method for cost display."""
-    return {
-        "format_kwargs": {
-            "col_alignments": "><<",  # name, value, unit
-            "group_by_model": False,
-        },
-    }
-
-
 class Warnings(SectionSpec):
-
     title = "WARNINGS"
 
     def row_from(self, item):
@@ -107,23 +96,9 @@ class Warnings(SectionSpec):
 
     def items_from(self, sol):
         warns = (getattr(sol, "meta", None) or {}).get("warnings", {})
-        # if not warns:
-        #     return None
-        # Convert warnings to items list
         return [
             (name, [x[0] for x in detail]) for name, detail in warns.items() if detail
         ]
-
-
-def _section_warnings(solution, options):
-    """Section method for warnings display."""
-
-    return {
-        "format_kwargs": {
-            "col_alignments": "<",  # warning_type, details
-            "group_by_model": False,  # warnings don't have model context
-        },
-    }
 
 
 class FreeVariables(SectionSpec):
@@ -143,17 +118,6 @@ class FreeVariables(SectionSpec):
         return [name, value, unit_str, label]
 
 
-def _section_freevariables(solution, options):
-    """Section method for free variables display."""
-    return {
-        "format_kwargs": {
-            "col_alignments": "><<<",  # name, value, unit, label
-            "sortkey": lambda x: str(x[0]),
-            "group_by_model": True,
-        },
-    }
-
-
 class Constants(SectionSpec):
     title = "Fixed Variables"
     align = "><<<"
@@ -171,39 +135,12 @@ class Constants(SectionSpec):
         return [name, value, unit_str, label]
 
 
-def _section_constants(solution, options):
-    """Section method for constants display."""
-    return {
-        "format_kwargs": {
-            "col_alignments": "><<<",  # name, value, unit, label
-            "sortkey": lambda x: str(x[0]),
-            "group_by_model": True,
-        },
-    }
-
-
 class Sensitivities(SectionSpec):
     title = "Variable Sensitivities"
     sortkey = staticmethod(lambda x: (-rounded_mag(x[1]), str(x[0])))
 
     def items_from(self, sol):
         items = sol.sens.variables.vector_parent_items()
-
-        # # Pre-process: filter and prepare items (from original logic)
-        # items = []
-        # vpi = getattr(sens_vars, "vector_parent_items", None)
-        # iterable = (
-        #     sens_vars.vector_parent_items()
-        #     if callable(vpi)
-        #     else getattr(sens_vars, "items", lambda: [])()
-        # )
-        # for vk, v in iterable:
-        #     val = np.asarray(v, dtype=float)
-        #     sabs = float(np.nanmax(np.abs(val))) if val.size else 0.0
-        #     items.append((vk, sabs, v))
-
-        # Sort by absolute value descending, filter by threshold
-        # items.sort(key=lambda t: (-t[1], str(t[0])))
         return [(k, v) for k, v in items if rounded_mag(v) >= 0.01]
 
     def row_from(self, item):
@@ -220,22 +157,7 @@ class Sensitivities(SectionSpec):
         return [name, value, label]
 
 
-def _section_sensitivities(solution, options):
-    """Section method for sensitivities display."""
-
-    return {
-        "extractor": _extract_sensitivity_columns,
-        "format_kwargs": {
-            "sortkey": None,  # already sorted
-            "col_alignments": "<<<",  # name, value, label
-            "group_by_model": True,
-        },
-    }
-
-
 class Constraints(SectionSpec):
-    # sortkey = staticmethod(lambda x: (-abs(float(x[0])), str(x[1])))
-    sortkey = None
     align = "><"
 
     def row_from(self, item):
@@ -268,25 +190,6 @@ class TightConstraints(Constraints):
         items.sort(key=lambda x: (-abs(float(x[1])), str(x[0])))
         return [x for x in items if abs(float(x[1])) > 1e-2]  # slow, fix this
 
-    # def row_from(self, item):
-    #     constraint, sens = item
-    #     return [constraint]
-
-
-def _section_tight_constraints(solution, options):
-    """Section method for tightest constraints display."""
-
-    return {
-        "title": "Most Sensitive Constraints",
-        "data": items,
-        "extractor": _extract_constraint_columns,
-        "format_kwargs": {
-            "sortkey": None,  # already sorted
-            "col_alignments": "><",  # sens right-aligned, constraint left
-            "group_by_model": True,
-        },
-    }
-
 
 class SlackConstraints(Constraints):
 
@@ -306,17 +209,6 @@ class SlackConstraints(Constraints):
     @property
     def title(self):
         return f"Insensitive Constraints (below {self.maxsens})"
-
-
-def _section_slack_constraints(solution, options):
-    return {
-        "title": f"Insensitive Constraints (below {maxsens})",
-        "format_kwargs": {
-            "sortkey": None,  # already sorted
-            "col_alignments": "><",  # sens right-aligned, constraint left
-            "group_by_model": True,
-        },
-    }
 
 
 SECTION_SPECS = {
@@ -453,18 +345,6 @@ def _format_model_group(
 
     # 3. Align columns
     return _format_aligned_columns(rows, col_alignments)
-
-
-# ---------------- dispatcher ----------------
-# SECTION_METHODS = {
-#     "cost": _section_cost,
-#     "warnings": _section_warnings,
-#     "freevariables": _section_freevariables,
-#     "constants": _section_constants,
-#     "sensitivities": _section_sensitivities,
-#     "tightest constraints": _section_tight_constraints,
-#     "slack constraints": _section_slack_constraints,
-# }
 
 
 # ---------------- single solution ----------------
