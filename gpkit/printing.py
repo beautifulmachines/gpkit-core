@@ -316,28 +316,6 @@ def _group_items_by_model(items):
     return out
 
 
-# ---------------- table formatters ----------------
-def _format_model_group(
-    items: list[tuple],  # (key, value) pairs for ONE model
-    extractor,  # function(key, val) -> list[str]
-    sortkey=None,  # function((key, val)) -> sortable
-    col_alignments: str = "><<<",  # alignment per column
-) -> list[str]:
-    """Process one model group: sort, extract columns, align.
-
-    Returns list of formatted line strings (no model header).
-    """
-    # 1. Sort within this model group
-    if sortkey:
-        items = sorted(items, key=sortkey)
-
-    # 2. Extract to column strings
-    rows = [extractor((k, v)) for k, v in items]
-
-    # 3. Align columns
-    return _format_aligned_columns(rows, col_alignments)
-
-
 # ---------------- single solution ----------------
 def _table_solution(sol, tables, options: PrintOptions) -> str:
     sections: list[str] = []
