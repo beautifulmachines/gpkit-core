@@ -21,6 +21,8 @@ class PrintOptions:
 class SectionSpec:
     title: str = "Untitled Section"
     group_by_model = True
+    sortkey = None
+    align = None
 
     def __init__(self, options: PrintOptions):
         self.options = options
@@ -42,15 +44,17 @@ class SectionSpec:
         lines = []
         for modelname in sorted(bymod.keys()):
             model_items = bymod[modelname]
+            # each row is a list of strings
+            rows = [self.row_from(item) for item in model_items]
 
-            # format this model's group
-            model_lines = _format_model_group(
-                model_items,
-                self.row_from,
-                #         options,
-                #         sortkey=sortkey,
-                #         col_alignments=col_alignments,
-            )
+            # Sort within this model group
+            # print(f"rows has {len(rows)} lines")
+            # print(f"first row is {rows[0]}")
+            # print(f"sortkey is {self.sortkey}")
+            rows = sorted(rows, key=self.sortkey)
+
+            # 3. Align columns
+            model_lines = _format_aligned_columns(rows, self.align)
 
             # add model header
             if modelname and model_lines:
@@ -125,6 +129,7 @@ def _section_warnings(solution, options):
 
 class FreeVariables(SectionSpec):
     title = "Free Variables"
+    align = "><<<"
 
     def items_from(self, sol):
         return sol.primal.vector_parent_items()
@@ -151,6 +156,7 @@ def _section_freevariables(solution, options):
 
 class Constants(SectionSpec):
     title = "Fixed Variables"
+    align = "><<<"
 
     def items_from(self, sol):
         return sol.constants.vector_parent_items()
@@ -176,6 +182,7 @@ def _section_constants(solution, options):
 
 
 class Sensitivities(SectionSpec):
+    title = "Variable Sensitivities"
 
     def items_from(self, sol):
         sens_vars = sol.sens.variables
@@ -216,8 +223,6 @@ def _section_sensitivities(solution, options):
     """Section method for sensitivities display."""
 
     return {
-        "title": "Variable Sensitivities",
-        "data": items,
         "extractor": _extract_sensitivity_columns,
         "format_kwargs": {
             "sortkey": None,  # already sorted
@@ -228,6 +233,7 @@ def _section_sensitivities(solution, options):
 
 
 class Constraints(SectionSpec):
+    sortkey = staticmethod(lambda x: (-abs(float(x[0])), str(x[1])))
 
     def row_from(self, item):
         """Extract [sens, constraint_str] for constraint tables."""
@@ -247,7 +253,6 @@ class Constraints(SectionSpec):
 
 
 class TightConstraints(Constraints):
-
     title = "Most Sensitive Constraints"
 
     def items_from(self, sol):
@@ -371,6 +376,8 @@ def _format_aligned_columns(
     Does NOT sort - expects pre-sorted input.
     """
     (ncols,) = set(len(r) for r in rows) or (0,)
+    if col_alignments is None:
+        col_alignments = "<" * ncols
     assert len(col_alignments) >= ncols
     widths = [max(len(row[i]) for row in rows) for i in range(ncols)]
 
@@ -437,63 +444,6 @@ def _format_model_group(
     return _format_aligned_columns(rows, col_alignments)
 
 
-def _format_section(
-    items_or_vmap,  # VarMap or iterable of (key, val)
-    extractor,  # specific to table type
-    options,
-    col_alignments: str,
-    group_by_model: bool = True,
-    sortkey=None,  # sort within each model
-) -> list[str]:
-    """High-level table formatter with model grouping.
-
-    1. Normalize input to items
-    2. Group by model (outer loop)
-    3. For each model: format group (sort, extract, align)
-    4. Insert model headers
-    """
-    # Normalize to items
-    if hasattr(items_or_vmap, "vector_parent_items"):
-        items = list(items_or_vmap.vector_parent_items())
-    else:
-        items = list(items_or_vmap)
-
-    # group by model
-    if group_by_model:
-        bymod = _group_items_by_model(items)
-    else:
-        bymod = {"": items}
-
-    # process each model group
-    lines = []
-    for modelname in sorted(bymod.keys()):
-        model_items = bymod[modelname]
-
-        # format this model's group
-        model_lines = _format_model_group(
-            model_items,
-            extractor,
-            options,
-            sortkey=sortkey,
-            col_alignments=col_alignments,
-        )
-
-        # add model header
-        if modelname and model_lines:
-            # compute padding from first line of model_lines
-            first_line = model_lines[0]
-            colon_pos = first_line.rfind(":")
-            if colon_pos > 0:
-                pad = colon_pos
-            else:
-                pad = 10  # fallback
-            lines += [f"{'|':>{pad + 1}} {modelname}"]
-
-        lines += model_lines + [""]
-
-    return lines[:-1]
-
-
 # ---------------- dispatcher ----------------
 # SECTION_METHODS = {
 #     "cost": _section_cost,
@@ -516,23 +466,12 @@ def _table_solution(sol, tables, options: PrintOptions) -> str:
 
         section_spec = SECTION_SPECS[table_name]
         section = section_spec(options=options)
-
-        if not section:  # Skip empty sections
+        sec_lines = section.format(sol)
+        if not sec_lines:  # empty section
             continue
-
         # title
-        lines = [section.title, "-" * len(section.title)]
-
-        # Format table content
-        # table_lines = _format_section(
-        #     section["data"],
-        #     section["extractor"],
-        #     options,
-        #     **section["format_kwargs"],
-        # )
-        table_lines = section.format(sol)
-        lines += table_lines or ["(none)"]
-        sections.append("\n".join(lines))
+        title_lines = [section.title, "-" * len(section.title)]
+        sections.append("\n".join(title_lines + sec_lines))
 
     return "\n\n".join(sections)
 
