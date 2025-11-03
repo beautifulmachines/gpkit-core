@@ -476,7 +476,10 @@ def _table_solution(sol, tables, options: PrintOptions) -> str:
         section = section_spec(options=options)
         sec_lines = section.format(sol)
         if not sec_lines:  # empty section
-            continue
+            if options.empty is not None:
+                sec_lines = [str(options.empty)]
+            else:
+                continue
         # title
         title_lines = [section.title, "-" * len(section.title)]
         sections.append("\n".join(title_lines + sec_lines))
