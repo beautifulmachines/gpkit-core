@@ -44,16 +44,13 @@ class SectionSpec:
         lines = []
         for modelname in sorted(bymod.keys()):
             model_items = bymod[modelname]
+
+            # 1. sort
             if self.sortkey:
                 model_items.sort(key=self.sortkey)
-            # each row is a list of strings
-            rows = [self.row_from(item) for item in model_items]
 
-            # Sort within this model group
-            # print(f"rows has {len(rows)} lines")
-            # print(f"first row is {rows[0]}")
-            # print(f"sortkey is {self.sortkey}")
-            # rows = sorted(rows, key=self.sortkey)
+            # 2. extract rows
+            rows = [self.row_from(item) for item in model_items]
 
             # 3. Align columns
             model_lines = _format_aligned_columns(rows, self.align)
@@ -240,6 +237,7 @@ def _section_sensitivities(solution, options):
 class Constraints(SectionSpec):
     # sortkey = staticmethod(lambda x: (-abs(float(x[0])), str(x[1])))
     sortkey = None
+    align = "><"
 
     def row_from(self, item):
         """Extract [sens, constraint_str] for constraint tables."""
