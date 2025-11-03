@@ -60,10 +60,7 @@ class SectionSpec:
                 # compute padding from first line of model_lines
                 first_line = model_lines[0]
                 colon_pos = first_line.rfind(":")
-                if colon_pos > 0:
-                    pad = colon_pos
-                else:
-                    pad = 10  # fallback
+                pad = colon_pos if colon_pos > 0 else 0
                 lines += [f"{'|':>{pad + 1}} {modelname}"]
 
             lines += model_lines + [""]
@@ -73,7 +70,7 @@ class SectionSpec:
 
 class Cost(SectionSpec):
 
-    title = ("Optimal Cost",)
+    title = "Optimal Cost"
 
     def row_from(self, item):
         """Extract [name, value, unit] for cost display."""
@@ -159,6 +156,7 @@ class Sensitivities(SectionSpec):
 
 class Constraints(SectionSpec):
     align = "><"
+    sortkey = staticmethod(lambda x: (-abs(float(x[1])), str(x[0])))
 
     def row_from(self, item):
         """Extract [sens, constraint_str] for constraint tables."""
@@ -170,9 +168,6 @@ class Constraints(SectionSpec):
             if hasattr(constraint, "str_without")
             else str(constraint)
         )
-
-        if sens_str == "" and constrstr == "(none)":
-            return [constrstr]
 
         return [sens_str, constrstr]
 
@@ -186,9 +181,7 @@ class TightConstraints(Constraints):
             sens_str = f"{sens:+.3g}"
             items.append((constraint, sens_str))
 
-        # Sort by sensitivity descending
-        items.sort(key=lambda x: (-abs(float(x[1])), str(x[0])))
-        return [x for x in items if abs(float(x[1])) > 1e-2]  # slow, fix this
+        return [x for x in items if abs(float(x[1])) > 1e-2]
 
 
 class SlackConstraints(Constraints):
@@ -202,8 +195,6 @@ class SlackConstraints(Constraints):
             sens_str = f"{sens:+.3g}"
             items.append((constraint, sens_str))
 
-        # Sort by sensitivity ascending, filter by threshold
-        items.sort(key=lambda x: abs(float(x[1])))
         return [x for x in items if abs(float(x[1])) <= self.maxsens]
 
     @property
