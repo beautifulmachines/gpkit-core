@@ -187,25 +187,24 @@ class Sensitivities(SectionSpec):
     sortkey = staticmethod(lambda x: (-rounded_mag(x[1]), str(x[0])))
 
     def items_from(self, sol):
-        sens_vars = sol.sens.variables
+        items = sol.sens.variables.vector_parent_items()
 
-        # Pre-process: filter and prepare items (from original logic)
-        items = []
-        vpi = getattr(sens_vars, "vector_parent_items", None)
-        iterable = (
-            sens_vars.vector_parent_items()
-            if callable(vpi)
-            else getattr(sens_vars, "items", lambda: [])()
-        )
-        for vk, v in iterable:
-            val = np.asarray(v, dtype=float)
-            sabs = float(np.nanmax(np.abs(val))) if val.size else 0.0
-            items.append((vk, sabs, v))
+        # # Pre-process: filter and prepare items (from original logic)
+        # items = []
+        # vpi = getattr(sens_vars, "vector_parent_items", None)
+        # iterable = (
+        #     sens_vars.vector_parent_items()
+        #     if callable(vpi)
+        #     else getattr(sens_vars, "items", lambda: [])()
+        # )
+        # for vk, v in iterable:
+        #     val = np.asarray(v, dtype=float)
+        #     sabs = float(np.nanmax(np.abs(val))) if val.size else 0.0
+        #     items.append((vk, sabs, v))
 
         # Sort by absolute value descending, filter by threshold
         # items.sort(key=lambda t: (-t[1], str(t[0])))
-        items = [(vk, raw) for vk, sabs, raw in items if sabs >= 0.01]
-        return items
+        return [(k, v) for k, v in items if rounded_mag(v) >= 0.01]
 
     def row_from(self, item):
         """Extract [name, value, label] (no units!)."""
