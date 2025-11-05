@@ -1,7 +1,7 @@
 "printing functionality for gpkit objects"
 
 from dataclasses import dataclass
-from typing import Any, Tuple
+from typing import Any, List, Tuple
 
 import numpy as np
 
@@ -18,6 +18,7 @@ class PrintOptions:
     empty: str | None = None  # output (e.g. "(none)") for empty sections
 
 
+# pylint: disable=missing-class-docstring
 class SectionSpec:
     title: str = "Untitled Section"
     group_by_model = True
@@ -28,12 +29,15 @@ class SectionSpec:
         self.options = options
 
     def items_from(self, sol):
+        "Return an iterable of items given sol. 'item' defs are section-specific"
         raise NotImplementedError
 
     def row_from(self, item):
+        "Convert a section-specific 'item' to a row, i.e. List[str]"
         raise NotImplementedError
 
-    def format(self, sol):
+    def format(self, sol) -> List[str]:
+        "Output this section's lines given a solution"
         items = self.items_from(sol)
         if self.group_by_model:
             bymod = _group_items_by_model(items)
@@ -199,6 +203,7 @@ class SlackConstraints(Constraints):
 
     @property
     def title(self):
+        "custom title property with embedded maxsens"
         return f"Insensitive Constraints (below {self.maxsens})"
 
 
