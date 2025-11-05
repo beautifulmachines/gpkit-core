@@ -160,11 +160,11 @@ class Sensitivities(SectionSpec):
 
 class Constraints(SectionSpec):
     align = "><"
-    sortkey = staticmethod(lambda x: (-abs(float(x[1])), str(x[0])))
+    sortkey = staticmethod(lambda x: (-rounded_mag(x[1]), str(x[0])))
 
     def row_from(self, item):
         """Extract [sens, constraint_str] for constraint tables."""
-        constraint, sens_str = item
+        constraint, sens = item
         excluded = {"units", "lineage"}
 
         constrstr = (
@@ -173,19 +173,17 @@ class Constraints(SectionSpec):
             else str(constraint)
         )
 
-        return [sens_str, constrstr]
+        return [f"{sens:+.3g}", constrstr]
+
+    def items_from(self, sol):
+        return sol.sens.constraints.items()
 
 
 class TightConstraints(Constraints):
     title = "Most Sensitive Constraints"
 
     def items_from(self, sol):
-        items = []
-        for constraint, sens in sol.sens.constraints.items():
-            sens_str = f"{sens:+.3g}"
-            items.append((constraint, sens_str))
-
-        return [x for x in items if abs(float(x[1])) > 1e-2]
+        return [x for x in super().items_from(sol) if abs(x[1]) > 1e-2]
 
 
 class SlackConstraints(Constraints):
@@ -193,13 +191,7 @@ class SlackConstraints(Constraints):
     maxsens = 1e-5
 
     def items_from(self, sol):
-        # Pre-process: convert constraints to items with sensitivity strings
-        items = []
-        for constraint, sens in sol.sens.constraints.items():
-            sens_str = f"{sens:+.3g}"
-            items.append((constraint, sens_str))
-
-        return [x for x in items if abs(float(x[1])) <= self.maxsens]
+        return [x for x in super().items_from(sol) if abs(x[1]) <= self.maxsens]
 
     @property
     def title(self):
