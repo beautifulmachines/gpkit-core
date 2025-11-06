@@ -326,11 +326,7 @@ def _table_solution(sol, tables, options: PrintOptions) -> str:
     sections: list[str] = []
 
     for table_name in tables:
-        if table_name not in SECTION_SPECS:
-            raise ValueError(f"Unexpected table '{table_name}'")
-
-        section_spec = SECTION_SPECS[table_name]
-        section = section_spec(options=options)
+        section = SECTION_SPECS[table_name](options=options)
         sec_lines = section.format(sol)
         if sec_lines:
             sections.append("\n".join(sec_lines))
