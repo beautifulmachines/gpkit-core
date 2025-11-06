@@ -86,7 +86,7 @@ h : +0.2952 minimum height
 
 Most Sensitive Constraints
 --------------------------
-       | Cube
-    +1 : A ≥ 2·(s[0]·s[1] + s[1]·s[2] + s[2]·s[0])
-+0.568 : V ≤ s[:].prod()
-+0.295 : s[2] ≥ h
+        | Cube
++1      : A ≥ 2·(s[0]·s[1] + s[1]·s[2] + s[2]·s[0])
++0.5683 : V ≤ s[:].prod()
++0.2952 : s[2] ≥ h

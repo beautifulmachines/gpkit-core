@@ -176,21 +176,13 @@ class Sensitivities(SectionSpec):
 
 
 class Constraints(SectionSpec):
-    align = "><"
     sortkey = staticmethod(lambda x: (-rounded_mag(x[1]), str(x[0])))
 
     def row_from(self, item):
         """Extract [sens, constraint_str] for constraint tables."""
         constraint, sens = item
-        excluded = {"units", "lineage"}
-
-        constrstr = (
-            constraint.str_without(excluded)
-            if hasattr(constraint, "str_without")
-            else str(constraint)
-        )
-
-        return [f"{sens:+.3g}", constrstr]
+        constrstr = constraint.str_without({"units", "lineage"})
+        return [self._fmt_val(sens, pm="+"), constrstr]
 
     def items_from(self, sol):
         return sol.sens.constraints.items()
