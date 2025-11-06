@@ -24,6 +24,7 @@ class SectionSpec:
     group_by_model = True
     sortkey = None
     align = None
+    filterfun = None
 
     def __init__(self, options: PrintOptions):
         self.options = options
@@ -38,7 +39,7 @@ class SectionSpec:
 
     def format(self, sol) -> List[str]:
         "Output this section's lines given a solution"
-        items = self.items_from(sol)
+        items = filter(self.filterfun, self.items_from(sol))
         if self.group_by_model:
             bymod = _group_items_by_model(items)
         else:
@@ -184,22 +185,21 @@ class Constraints(SectionSpec):
 
 class TightConstraints(Constraints):
     title = "Most Sensitive Constraints"
-
-    def items_from(self, sol):
-        return [x for x in super().items_from(sol) if abs(x[1]) > 1e-2]
+    filterfun = staticmethod(lambda x: abs(x[1]) > 1e-2)
 
 
 class SlackConstraints(Constraints):
 
     maxsens = 1e-5
 
-    def items_from(self, sol):
-        return [x for x in super().items_from(sol) if abs(x[1]) <= self.maxsens]
-
     @property
     def title(self):
         "custom title property with embedded maxsens"
         return f"Insensitive Constraints (below {self.maxsens})"
+
+    @property
+    def filterfun(self):
+        return lambda x: abs(x[1]) <= self.maxsens
 
 
 SECTION_SPECS = {
