@@ -44,6 +44,10 @@
        ┃┛      ┛
 
 
+Optimal Cost
+------------
+y[0] + y[1] + y[2] + y[3] + y[4] : 15
+
 Free Variables
 --------------
      | Yum1.Cake
@@ -81,6 +85,10 @@ Most Sensitive Constraints
        ┃┣╸y[0] ≥ x[1,0]
        ┃┛
 
+
+Optimal Cost
+------------
+y[0] : 3
 
 Free Variables
 --------------

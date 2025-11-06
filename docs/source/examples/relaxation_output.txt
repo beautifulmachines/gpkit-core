@@ -50,6 +50,10 @@ Constraints
        ┃┛
 
 
+Optimal Cost
+------------
+C : 1.414
+
 WARNINGS
 --------
 Relaxed Constraints:
@@ -128,6 +132,10 @@ Constraints
        ┃┣╸x_max = 1
        ┃┛
 
+
+Optimal Cost
+------------
+Relax1.C[:].prod()·x^0.01 : 2
 
 WARNINGS
 --------
@@ -209,6 +217,10 @@ Constraints
        ┃┣╸x_max ≤ OriginalValues.x_max·Relax2.x_max
        ┃┛
 
+
+Optimal Cost
+------------
+[Relax2.x_max, Relax2.x_min].prod()·x^0.01 : 2
 
 WARNINGS
 --------

@@ -79,12 +79,12 @@ class Cost(SectionSpec):
     def row_from(self, item):
         """Extract [name, value, unit] for cost display."""
         key, val = item
-        name = str(key) if key else "cost"
+        name = key.str_without("units") if key else "cost"
         value, unit_str = _fmt_item(key, val)
         return [name, value, unit_str]
 
     def items_from(self, sol):
-        return [("cost", sol.cost)]
+        return [(sol.meta["cost function"], sol.cost)]
 
 
 class Warnings(SectionSpec):
@@ -213,7 +213,7 @@ SECTION_SPECS = {
 def table(
     obj: Any,  # Solution or SolutionSequence
     tables: Tuple[str, ...] = (
-        # "cost",
+        "cost",
         "warnings",
         "freevariables",
         "constants",

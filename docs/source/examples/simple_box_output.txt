@@ -24,6 +24,10 @@
        ┃┛
 
 
+Optimal Cost
+------------
+1/(h·w·d) : 0.003674  [1/m³]
+
 Free Variables
 --------------
 d : 8.17   [m] depth
