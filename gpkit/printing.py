@@ -156,10 +156,10 @@ class Constants(SectionSpec):
 class Sensitivities(SectionSpec):
     title = "Variable Sensitivities"
     sortkey = staticmethod(lambda x: (-rounded_mag(x[1]), str(x[0])))
+    filterfun = staticmethod(lambda x: rounded_mag(x[1]) >= 0.01)
 
     def items_from(self, sol):
-        items = sol.sens.variables.vector_parent_items()
-        return [(k, v) for k, v in items if rounded_mag(v) >= 0.01]
+        return sol.sens.variables.vector_parent_items()
 
     def row_from(self, item):
         """Extract [name, value, label] (no units!)."""
