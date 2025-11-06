@@ -90,9 +90,6 @@ class SectionSpec:
             return f"[ {body}{dots} ]"
         return f"{val:{pm}.{self.options.precision}g}"
 
-    def _fmt_unit(self, key) -> str:
-        return unitstr(key, into="[%s]", dimless="")
-
 
 class Cost(SectionSpec):
 
@@ -102,8 +99,7 @@ class Cost(SectionSpec):
         """Extract [name, value, unit] for cost display."""
         key, val = item
         name = key.str_without("units") if key else "cost"
-        value, unit_str = self._fmt_val(val), self._fmt_unit(key)
-        return [name, value, unit_str]
+        return [name, self._fmt_val(val), _unitstr(key)]
 
     def items_from(self, sol):
         return [(sol.meta["cost function"], sol.cost)]
@@ -137,8 +133,7 @@ class FreeVariables(SectionSpec):
         key, val = item
         name = key.str_without("lineage")
         label = key.descr.get("label", "")
-        unit = self._fmt_unit(key)
-        return [name, self._fmt_val(val), unit, label]
+        return [name, self._fmt_val(val), _unitstr(key), label]
 
 
 class Constants(SectionSpec):
@@ -154,8 +149,7 @@ class Constants(SectionSpec):
         key, val = item
         name = key.str_without("lineage")
         label = key.descr.get("label", "")
-        value, unit_str = self._fmt_val(val), self._fmt_unit(key)
-        return [name, value, unit_str, label]
+        return [name, self._fmt_val(val), _unitstr(key), label]
 
 
 class Sensitivities(SectionSpec):
@@ -288,6 +282,10 @@ def _format_aligned_columns(
         formatted.append(line.rstrip())
 
     return formatted
+
+
+def _unitstr(key) -> str:
+    return unitstr(key, into="[%s]", dimless="")
 
 
 def rounded_mag(val, nround=8):
