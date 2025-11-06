@@ -69,7 +69,16 @@ class SectionSpec:
 
             lines += model_lines + [""]
 
-        return lines[:-1]
+        if not lines:  # empty section
+            if self.options.empty is not None:
+                lines += [str(self.options.empty), ""]
+            else:
+                return lines
+
+        # title
+        title_lines = [self.title, "-" * len(self.title)]
+        assert lines[-1] == ""
+        return title_lines + lines[:-1]
 
 
 class Cost(SectionSpec):
@@ -323,14 +332,8 @@ def _table_solution(sol, tables, options: PrintOptions) -> str:
         section_spec = SECTION_SPECS[table_name]
         section = section_spec(options=options)
         sec_lines = section.format(sol)
-        if not sec_lines:  # empty section
-            if options.empty is not None:
-                sec_lines = [str(options.empty)]
-            else:
-                continue
-        # title
-        title_lines = [section.title, "-" * len(section.title)]
-        sections.append("\n".join(title_lines + sec_lines))
+        if sec_lines:
+            sections.append("\n".join(sec_lines))
 
     return "\n\n".join(sections)
 
