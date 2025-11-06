@@ -80,6 +80,19 @@ class SectionSpec:
         assert lines[-1] == ""
         return title_lines + lines[:-1]
 
+    def _fmt_val(self, val, pm="") -> str:
+        n = self.options.vecn
+        if np.shape(val):
+            flat = np.asarray(val).ravel()
+            shown = flat[:n]
+            body = "  ".join(f"{x:.3g}" for x in shown)
+            dots = " ..." if flat.size > n else ""
+            return f"[ {body}{dots} ]"
+        return f"{val:{pm}.{self.options.precision}g}"
+
+    def _fmt_unit(self, key) -> str:
+        return unitstr(key, into="[%s]", dimless="")
+
 
 class Cost(SectionSpec):
 
@@ -89,7 +102,7 @@ class Cost(SectionSpec):
         """Extract [name, value, unit] for cost display."""
         key, val = item
         name = key.str_without("units") if key else "cost"
-        value, unit_str = _fmt_item(key, val)
+        value, unit_str = self._fmt_val(val), self._fmt_unit(key)
         return [name, value, unit_str]
 
     def items_from(self, sol):
@@ -124,8 +137,8 @@ class FreeVariables(SectionSpec):
         key, val = item
         name = key.str_without("lineage")
         label = key.descr.get("label", "")
-        value, unit_str = _fmt_item(key, val)
-        return [name, value, unit_str, label]
+        unit = self._fmt_unit(key)
+        return [name, self._fmt_val(val), unit, label]
 
 
 class Constants(SectionSpec):
@@ -141,7 +154,7 @@ class Constants(SectionSpec):
         key, val = item
         name = key.str_without("lineage")
         label = key.descr.get("label", "")
-        value, unit_str = _fmt_item(key, val)
+        value, unit_str = self._fmt_val(val), self._fmt_unit(key)
         return [name, value, unit_str, label]
 
 
@@ -158,12 +171,7 @@ class Sensitivities(SectionSpec):
         key, val = item
         name = key.str_without("lineage")
         label = key.descr.get("label", "")
-
-        if np.shape(val):
-            value, _ = _fmt_item("", val, n=self.options.vecn)
-        else:
-            value = f"{float(val):+.3g}"
-
+        value = self._fmt_val(val, pm="+")
         return [name, value, label]
 
 
@@ -293,18 +301,6 @@ def _format_aligned_columns(
 def rounded_mag(val, nround=8):
     "get the magnitude of a (vector or scalar) for stable sorting purposes"
     return round(np.nanmax(np.absolute(val)), nround)
-
-
-def _fmt_item(key, val, n: int = 6) -> tuple[str, str]:
-    "Return (value, unit) tuple for separate formatting. Gets unit from key"
-    unit_str = unitstr(key, into="[%s]", dimless="")
-    if np.shape(val):
-        flat = np.asarray(val).ravel()
-        shown = flat[:n]
-        body = "  ".join(f"{x:.3g}" for x in shown)
-        tail = " ..." if flat.size > n else ""
-        return f"[ {body}{tail} ]", unit_str
-    return f"{val:.4g} ", unit_str
 
 
 def _group_items_by_model(items):
