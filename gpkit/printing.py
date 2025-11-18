@@ -25,6 +25,7 @@ class SectionSpec:
     sortkey = None
     align = None
     filterfun = None
+    col_sep = " "
 
     def __init__(self, options: PrintOptions):
         self.options = options
@@ -58,7 +59,7 @@ class SectionSpec:
             rows = [self.row_from(item) for item in model_items]
 
             # 3. Align columns
-            model_lines = _format_aligned_columns(rows, self.align)
+            model_lines = _format_aligned_columns(rows, self.align, self.col_sep)
 
             # add model header
             if modelname and model_lines:
@@ -96,7 +97,7 @@ class Cost(SectionSpec):
         """Extract [name, value, unit] for cost display."""
         key, val = item
         name = key.str_without("units") if key else "cost"
-        return [name, self._fmt_val(val), _unitstr(key)]
+        return [f"{name} :", self._fmt_val(val), _unitstr(key)]
 
     def items_from(self, sol):
         return [(sol.meta["cost function"], sol.cost)]
@@ -130,7 +131,7 @@ class FreeVariables(SectionSpec):
         key, val = item
         name = key.str_without("lineage")
         label = key.descr.get("label", "")
-        return [name, self._fmt_val(val), _unitstr(key), label]
+        return [f"{name} :", self._fmt_val(val), _unitstr(key), label]
 
 
 class Constants(SectionSpec):
@@ -146,13 +147,14 @@ class Constants(SectionSpec):
         key, val = item
         name = key.str_without("lineage")
         label = key.descr.get("label", "")
-        return [name, self._fmt_val(val), _unitstr(key), label]
+        return [f"{name} :", self._fmt_val(val), _unitstr(key), label]
 
 
 class Sensitivities(SectionSpec):
     title = "Variable Sensitivities"
     sortkey = staticmethod(lambda x: (-rounded_mag(x[1]), str(x[0])))
     filterfun = staticmethod(lambda x: rounded_mag(x[1]) >= 0.01)
+    align = "><<"
 
     def items_from(self, sol):
         return sol.sens.variables.vector_parent_items()
@@ -163,17 +165,19 @@ class Sensitivities(SectionSpec):
         name = key.str_without("lineage")
         label = key.descr.get("label", "")
         value = self._fmt_val(val, pm="+")
-        return [name, value, label]
+        return [f"{name} :", value, label]
 
 
 class Constraints(SectionSpec):
     sortkey = staticmethod(lambda x: (-rounded_mag(x[1]), str(x[0])))
+    col_sep = " : "
 
     def row_from(self, item):
         """Extract [sens, constraint_str] for constraint tables."""
         constraint, sens = item
         constrstr = constraint.str_without({"units", "lineage"})
-        return [self._fmt_val(sens, pm="+"), constrstr]
+        valstr = self._fmt_val(sens, pm="+")
+        return [valstr, constrstr]
 
     def items_from(self, sol):
         return sol.sens.constraints.items()
@@ -252,7 +256,7 @@ def _looks_like_sequence_of_solutions(x) -> bool:
 def _format_aligned_columns(
     rows: list[list[str]],  # each row is list of column strings
     col_alignments: str,  # '<' left, '>' right, one char per column
-    col_sep: str = " : ",  # separator after first column
+    col_sep: str = " ",  # separator between each column
 ) -> list[str]:
     """Align arbitrary columns with dynamic widths.
 
@@ -274,8 +278,7 @@ def _format_aligned_columns(
             for cell, width, align in zip(row, widths, col_alignments)
         ]
 
-        # Join with special separator after first column
-        line = parts[0] + (col_sep if parts[1:] else "") + " ".join(parts[1:])
+        line = col_sep.join(parts)
         formatted.append(line.rstrip())
 
     return formatted
