@@ -264,7 +264,7 @@ def _format_aligned_columns(
     (ncols,) = set(len(r) for r in rows) or (0,)
     if col_alignments is None:
         col_alignments = "<" * ncols
-    assert len(col_alignments) >= ncols
+    assert len(col_alignments) == ncols
     widths = [max(len(row[i]) for row in rows) for i in range(ncols)]
 
     formatted = []
