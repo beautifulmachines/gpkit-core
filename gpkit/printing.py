@@ -62,11 +62,7 @@ class SectionSpec:
 
             # add model header
             if modelname and model_lines:
-                # compute padding from first line of model_lines
-                first_line = model_lines[0]
-                colon_pos = first_line.rfind(":")
-                pad = colon_pos if colon_pos > 0 else 0
-                lines += [f"{'|':>{pad + 1}} {modelname}"]
+                lines += [f"{modelname}"]
 
             lines += model_lines + [""]
 
@@ -199,6 +195,7 @@ class SlackConstraints(Constraints):
 
     @property
     def filterfun(self):
+        "returns True if slack"
         return lambda x: abs(x[1]) <= self.maxsens
 
 

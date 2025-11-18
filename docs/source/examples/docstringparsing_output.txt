@@ -68,25 +68,25 @@ A : 1.465 [m²]
 
 Free Variables
 --------------
-     | Cube
+Cube
    A : 1.465               [m²] surface area
 s[:] : [ 0.316  0.316  1 ] [m]  side length
 
 Fixed Variables
 ---------------
-  | Cube
+Cube
 V : 100 [l] minimum volume
 h : 1   [m] minimum height
 
 Variable Sensitivities
 ----------------------
-  | Cube
+Cube
 V : +0.5683 minimum volume
 h : +0.2952 minimum height
 
 Most Sensitive Constraints
 --------------------------
-        | Cube
+Cube
 +1      : A ≥ 2·(s[0]·s[1] + s[1]·s[2] + s[2]·s[0])
 +0.5683 : V ≤ s[:].prod()
 +0.2952 : s[2] ≥ h

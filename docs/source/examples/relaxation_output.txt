@@ -63,7 +63,7 @@ Free Variables
 --------------
 x : 1.414
 
-  | Relax
+Relax
 C : 1.414
 
 Fixed Variables
@@ -147,7 +147,7 @@ Free Variables
 --------------
 x : 1
 
-     | Relax1
+Relax1
 C[:] : [ 1  2 ]
 
 Fixed Variables
@@ -233,13 +233,13 @@ Free Variables
 x_max : 1
 x_min : 1
 
-      | Relax2
+Relax2
 x_max : 1
 x_min : 2
 
 Fixed Variables
 ---------------
-      | Relax2.OriginalValues
+Relax2.OriginalValues
 x_max : 1
 x_min : 2
 
