@@ -96,19 +96,13 @@ class Solution:
         "printable visualization of cost breakdown"
         solarr = self.to_solution_array()
         solarr.set_necessarylineage()
-        showvars = solarr._parse_showvars(
-            (),
-        )
-        return bdtable_gen("cost")(solarr, showvars)
+        return bdtable_gen("cost")(solarr, set())
 
     def model_sens_breakdown(self) -> str:
         "printable visualization of model sensitivity breakdown"
         solarr = self.to_solution_array()
         solarr.set_necessarylineage()
-        showvars = solarr._parse_showvars(
-            (),
-        )
-        return bdtable_gen("model sensitivities")(solarr, showvars)
+        return bdtable_gen("model sensitivities")(solarr, set())
 
     def to_solution_array(self):
         "Convert this to a SolutionArray"
