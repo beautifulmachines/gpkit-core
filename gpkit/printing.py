@@ -48,8 +48,7 @@ class SectionSpec:
 
         # process each model group
         lines = []
-        for modelname in sorted(bymod.keys()):
-            model_items = bymod[modelname]
+        for modelname, model_items in sorted(bymod.items()):
 
             # 1. sort
             if self.sortkey:
