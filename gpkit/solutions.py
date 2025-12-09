@@ -83,7 +83,9 @@ class Solution:
 
     def summary(self, *args, **kwargs) -> str:
         "Pass through to SolutionArray.summary"
-        return self.to_solution_array().summary(*args, **kwargs)
+        lines = self.cost_breakdown() + self.model_sens_breakdown() + [""]
+        table = printing_table(self, tables=("warnings", "freevariables"))
+        return "\n".join(lines) + table
 
     def table(self, **kwargs) -> str:
         "Per legacy, prints breakdowns then Solution.table"

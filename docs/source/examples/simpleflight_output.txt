@@ -36,16 +36,16 @@ SINGLE
 
 Free Variables
 --------------
-  A : 8.46             aspect ratio
-C_D : 0.02059          Drag coefficient of wing
-C_L : 0.4988           Lift coefficent of wing
-C_f : 0.003599         skin friction coefficient
-  D : 303.1      [N]   total drag force
- Re : 3.675e+06        Reynold's number
-  S : 16.44      [m²]  total wing area
-  V : 38.15      [m/s] cruising speed
-  W : 7341       [N]   total aircraft weight
-W_w : 2401       [N]   wing weight
+  A : 8.46            aspect ratio
+C_D : 0.02059         Drag coefficient of wing
+C_L : 0.4988          Lift coefficent of wing
+C_f : 0.003599        skin friction coefficient
+  D : 303.1     [N]   total drag force
+ Re : 3.675e+06       Reynold's number
+  S : 16.44     [m²]  total wing area
+  V : 38.15     [m/s] cruising speed
+  W : 7341      [N]   total aircraft weight
+W_w : 2401      [N]   wing weight
 
 Solution Diff
 =============
