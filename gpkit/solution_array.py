@@ -73,46 +73,6 @@ class SolSavingEnvironment:
             self.solarray["sensitivities"]["constraints"] = self.constraintstore
 
 
-def msenss_table(data, _, **kwargs):
-    "Returns model sensitivity table lines"
-    if "models" not in data.get("sensitivities", {}):
-        return ""
-    data = sorted(
-        data["sensitivities"]["models"].items(),
-        key=lambda i: (
-            (i[1] < 0.1).all(),
-            -np.max(i[1]) if (i[1] < 0.1).all() else -round(np.mean(i[1]), 1),
-            i[0],
-        ),
-    )
-    lines = ["Model Sensitivities", "-------------------"]
-    if kwargs["sortmodelsbysenss"]:
-        lines[0] += " (sorts models in sections below)"
-    previousmsenssstr = ""
-    for model, msenss in data:
-        if not model:  # for now let's only do named models
-            continue
-        if (msenss < 0.1).all():
-            msenss = np.max(msenss)
-            if msenss:
-                msenssstr = f"{f'<1e{max(-3, np.log10(msenss))}':6s}"
-            else:
-                msenssstr = "  =0  "
-        else:
-            meansenss = round(np.mean(msenss), 1)
-            msenssstr = f"{meansenss:+6.1f}"
-            deltas = msenss - meansenss
-            if np.max(np.abs(deltas)) > 0.1:
-                deltastrs = [f"{d:+4.1f}" if abs(d) >= 0.1 else "  - " for d in deltas]
-                msenssstr += f" + [ {'  '.join(deltastrs)} ]"
-        if msenssstr == previousmsenssstr:
-            msenssstr = " " * len(msenssstr)
-        else:
-            previousmsenssstr = msenssstr
-        lines.append(f"{msenssstr} : {model}")
-    return lines + [""] if len(lines) > 3 else []
-
-
 def senss_table(data, showvars=(), title="Variable Sensitivities", **kwargs):
     "Returns sensitivity table lines"
     if "variables" in data.get("sensitivities", {}):
@@ -341,7 +301,6 @@ def bdtable_gen(key):
 TABLEFNS = {
     "sensitivities": senss_table,
     "top sensitivities": topsenss_table,
-    "model sensitivities": msenss_table,
     "tightest constraints": tight_table,
     "loose constraints": loose_table,
     "warnings": warnings_table,
@@ -1042,7 +1001,7 @@ def var_table(
         model = lineagestr(k.lineage) if sortbymodel else ""
         if not sortmodelsbysenss:
             msenss = 0
-        else:  # sort should match that in msenss_table above
+        else:  # sort should match deprecated msenss_table
             msenss = -round(np.mean(sortmodelsbysenss.get(model, 0)), 4)
         models.add(model)
         b = bool(getattr(k, "shape", None) or getattr(v, "shape", None))
