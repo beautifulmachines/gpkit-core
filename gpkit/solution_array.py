@@ -92,15 +92,6 @@ def senss_table(data, showvars=(), title="Variable Sensitivities", **kwargs):
     )
 
 
-def topsenss_table(data, showvars, nvars=5, **kwargs):
-    "Returns top sensitivity table lines"
-    data, filtered = topsenss_filter(data, showvars, nvars)
-    title = "Most Sensitive Variables"
-    if filtered:
-        title = "Next Most Sensitive Variables"
-    return senss_table(data, title=title, hidebelowminval=True, **kwargs)
-
-
 def topsenss_filter(data, showvars, nvars=5):
     "Filters sensitivities down to top N vars"
     if "variables" in data.get("sensitivities", {}):
@@ -133,25 +124,6 @@ def tight_table(self, _, ntightconstrs=5, tight_senss=1e-2, **kwargs):
             for c, s in self["sensitivities"]["constraints"].items()
             if s >= tight_senss
         )[:ntightconstrs]
-    return constraint_table(data, title, **kwargs)
-
-
-def loose_table(self, _, min_senss=1e-5, **kwargs):
-    "Return constraint tightness lines"
-    title = f"Insensitive Constraints |below {min_senss:+g}|"
-    if len(self) > 1:
-        title += " (in last sweep)"
-        data = [
-            (0, "", id(c), c)
-            for c, s in self["sensitivities"]["constraints"].items()
-            if s[-1] <= min_senss
-        ]
-    else:
-        data = [
-            (0, "", id(c), c)
-            for c, s in self["sensitivities"]["constraints"].items()
-            if s <= min_senss
-        ]
     return constraint_table(data, title, **kwargs)
 
 
@@ -300,9 +272,7 @@ def bdtable_gen(key):
 
 TABLEFNS = {
     "sensitivities": senss_table,
-    "top sensitivities": topsenss_table,
     "tightest constraints": tight_table,
-    "loose constraints": loose_table,
     "warnings": warnings_table,
     "model sensitivities breakdown": bdtable_gen("model sensitivities"),
     "cost breakdown": bdtable_gen("cost"),
