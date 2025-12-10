@@ -92,22 +92,6 @@ def senss_table(data, showvars=(), title="Variable Sensitivities", **kwargs):
     )
 
 
-def topsenss_filter(data, showvars, nvars=5):
-    "Filters sensitivities down to top N vars"
-    if "variables" in data.get("sensitivities", {}):
-        data = data["sensitivities"]["variables"]
-    mean_abs_senss = {
-        k: np.abs(s).mean() for k, s in data.items() if not np.isnan(s).any()
-    }
-    topk = [k for k, _ in sorted(mean_abs_senss.items(), key=lambda x: x[1])]
-    filter_already_shown = showvars.intersection(topk)
-    for k in filter_already_shown:
-        topk.remove(k)
-        if nvars > 3:  # always show at least 3
-            nvars -= 1
-    return {k: data[k] for k in topk[-nvars:]}, filter_already_shown
-
-
 def tight_table(self, _, ntightconstrs=5, tight_senss=1e-2, **kwargs):
     "Return constraint tightness lines"
     title = "Most Sensitive Constraints"
@@ -602,18 +586,6 @@ class SolutionArray(DictOfLists):
                 names[k.str_without(exclude)] = k
         self.set_necessarylineage(clear=True)
         return names
-
-    def savemat(self, filename="solution.mat", *, showvars=None, excluded="vec"):
-        "Saves primal solution as matlab file"
-        from scipy.io import savemat  # pylint: disable=import-outside-toplevel
-
-        savemat(
-            filename,
-            {
-                name.replace(".", "_"): np.array(self["variables"][key], "f")
-                for name, key in self.varnames(showvars, excluded).items()
-            },
-        )
 
     def todataframe(self, showvars=None, excluded="vec"):
         "Returns primal solution as pandas dataframe"
