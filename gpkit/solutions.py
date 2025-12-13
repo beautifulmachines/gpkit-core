@@ -81,10 +81,10 @@ class Solution:
         "Pass through to SolutionArray.save_compressed"
         self.to_solution_array().save_compressed(*args, **kwargs)
 
-    def summary(self, *args, **kwargs) -> str:
+    def summary(self, **kwargs) -> str:
         "Pass through to SolutionArray.summary"
         lines = self.cost_breakdown() + self.model_sens_breakdown() + [""]
-        table = printing_table(self, tables=("warnings", "freevariables"))
+        table = printing_table(self, tables=("warnings", "freevariables"), **kwargs)
         return "\n".join(lines) + table
 
     def table(self, **kwargs) -> str:
