@@ -148,6 +148,13 @@ class Constants(SectionSpec):
         return [f"{name} :", self._fmt_val(val), _unitstr(key), label]
 
 
+class Sweeps(Constants):
+    title = "Swept Variables"
+
+    def items_from(self, ctx):
+        return ctx.swept_items()
+
+
 class Sensitivities(SectionSpec):
     title = "Variable Sensitivities"
     sortkey = staticmethod(lambda x: (-rounded_mag(x[1]), str(x[0])))
@@ -206,6 +213,7 @@ SECTION_SPECS = {
     "warnings": Warnings,
     "freevariables": FreeVariables,
     "constants": Constants,
+    "sweeps": Sweeps,
     "sensitivities": Sensitivities,
     "tightest constraints": TightConstraints,
     "slack constraints": SlackConstraints,
@@ -237,6 +245,10 @@ class SolutionContext:
     def constant_items(self) -> Iterable[Item]:
         """Return constant values grouped by parent."""
         return self.sol.constants.vector_parent_items()
+
+    def swept_items(self) -> Iterable[Item]:
+        "Return nothing for single Solution case"
+        return []
 
     def variable_sens_items(self) -> Iterable[Item]:
         """Return sensitivities with respect to variables."""
