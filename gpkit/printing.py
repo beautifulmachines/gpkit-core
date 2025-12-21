@@ -1,11 +1,13 @@
 "printing functionality for gpkit objects"
 
 from dataclasses import dataclass
-from typing import Any, List, Tuple
+from typing import Any, Callable, Iterable, List, Sequence, Tuple
 
 import numpy as np
 
 from .util.repr_conventions import unitstr
+
+Item = tuple[Any, Any]
 
 
 @dataclass(frozen=True)
@@ -211,6 +213,121 @@ SECTION_SPECS = {
     "tightest constraints": TightConstraints,
     "slack constraints": SlackConstraints,
 }
+
+
+@dataclass(frozen=True)
+class SolutionContext:
+    """Adapter that exposes a single Solution's printable items."""
+
+    sol: Any
+
+    def cost_items(self) -> Iterable[Item]:
+        """Return the solution cost as a single keyed item."""
+        return [(self.sol.meta.get("cost function"), self.sol.cost)]
+
+    def warning_items(self) -> Iterable[tuple[str, list[str]]]:
+        """Return flattened warning messages keyed by warning name."""
+        warns = (getattr(self.sol, "meta", None) or {}).get("warnings", {})
+        # printing.py currently flattens warning details into strings
+        return [
+            (name, [x[0] for x in detail]) for name, detail in warns.items() if detail
+        ]
+
+    def primal_items(self) -> Iterable[Item]:
+        """Return primal variable values grouped by parent."""
+        return self.sol.primal.vector_parent_items()
+
+    def constant_items(self) -> Iterable[Item]:
+        """Return constant values grouped by parent."""
+        return self.sol.constants.vector_parent_items()
+
+    def variable_sens_items(self) -> Iterable[Item]:
+        """Return sensitivities with respect to variables."""
+        return self.sol.sens.variables.vector_parent_items()
+
+    def constraint_sens_items(self) -> Iterable[tuple[Any, Any]]:
+        """Return sensitivities with respect to constraints."""
+        return self.sol.sens.constraints.items()
+
+
+@dataclass(frozen=True)
+class SequenceContext:
+    """Adapter that stacks printable items across a sequence of Solutions."""
+
+    sols: Sequence[Any]  # sequence of Solution-like objects
+
+    def _stack(self, get_items: Callable[[Any], Iterable[Item]]) -> list[Item]:
+        """Strict stacking: keys (and their order) must match across all sols."""
+        if not self.sols:
+            return []
+
+        first = list(get_items(self.sols[0]))
+        keys0 = tuple(k for k, _ in first)
+        cols = {k: [v] for k, v in first}  # k -> list of values, seeded with sol[0]
+
+        for s in self.sols[1:]:
+            items = list(get_items(s))
+            if tuple(k for k, _ in items) != keys0:
+                raise ValueError("SolutionSequence key mismatch")
+            for k, v in items:
+                cols[k].append(v)
+
+        return [(k, np.asarray(cols[k])) for k in keys0]
+
+    def _stack_scalar(self, key: Any, get_val: Callable[[Any], Any]) -> list[Item]:
+        if not self.sols:
+            return []
+        return [(key, np.asarray([get_val(s) for s in self.sols]))]
+
+    def _sweep_point(self, s: Any) -> dict[Any, Any]:
+        return (getattr(s, "meta", None) or {}).get("sweep_point", {}) or {}
+
+    # ---- methods used by SectionSpecs ----
+
+    def cost_items(self) -> Iterable[Item]:
+        """Return the cost stacked across all solutions."""
+        key = self.sols[0].meta.get("cost function") if self.sols else None
+        return self._stack_scalar(key, lambda s: s.cost)
+
+    def warning_items(self) -> Iterable[tuple[str, list[str]]]:
+        """Merge warnings from all solutions into a single mapping."""
+        # Optional: could just return [] for sequences to keep this simple
+        merged: dict[str, list[str]] = {}
+        for s in self.sols:
+            warns = (getattr(s, "meta", None) or {}).get("warnings", {})
+            for name, detail in warns.items():
+                if detail:
+                    merged.setdefault(name, []).extend(x[0] for x in detail)
+        return list(merged.items())
+
+    def primal_items(self) -> Iterable[Item]:
+        """Stack primal variable values across solutions."""
+        return self._stack(lambda s: s.primal.vector_parent_items())
+
+    def swept_items(self) -> Iterable[Item]:
+        """Stack swept parameters, enforcing identical sweep keys."""
+        # Strict: sweep keys/order taken from first; must match for all.
+        if not self.sols:
+            return []
+        keys0 = tuple(self._sweep_point(self.sols[0]).keys())
+        return self._stack(lambda s: [(k, self._sweep_point(s)[k]) for k in keys0])
+
+    def constant_items(self) -> Iterable[Item]:
+        """Stack constants excluding any swept parameters."""
+        swept = set(self._sweep_point(self.sols[0]).keys()) if self.sols else set()
+        return self._stack(
+            lambda s: [
+                (k, v) for k, v in s.constants.vector_parent_items() if k not in swept
+            ]
+        )
+
+    def variable_sens_items(self) -> Iterable[Item]:
+        """Stack variable sensitivities across solutions."""
+        return self._stack(lambda s: s.sens.variables.vector_parent_items())
+
+    def constraint_sens_items(self) -> Iterable[Item]:
+        """Stack constraint sensitivities across solutions."""
+        return self._stack(lambda s: s.sens.constraints.items())
 
 
 def table(
