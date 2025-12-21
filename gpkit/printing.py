@@ -32,17 +32,17 @@ class SectionSpec:
     def __init__(self, options: PrintOptions):
         self.options = options
 
-    def items_from(self, sol):
-        "Return an iterable of items given sol. 'item' defs are section-specific"
+    def items_from(self, ctx):
+        "Return iterable of items given SolContext. Item defs are section-specific"
         raise NotImplementedError
 
     def row_from(self, item):
         "Convert a section-specific 'item' to a row, i.e. List[str]"
         raise NotImplementedError
 
-    def format(self, sol) -> List[str]:
-        "Output this section's lines given a solution"
-        items = filter(self.filterfun, self.items_from(sol))
+    def format(self, ctx) -> List[str]:
+        "Output this section's lines given a solution or solution context"
+        items = filter(self.filterfun, self.items_from(ctx))
         if self.group_by_model:
             bymod = _group_items_by_model(items)
         else:
@@ -100,8 +100,8 @@ class Cost(SectionSpec):
         name = key.str_without("units") if key else "cost"
         return [f"{name} :", self._fmt_val(val), _unitstr(key)]
 
-    def items_from(self, sol):
-        return [(sol.meta["cost function"], sol.cost)]
+    def items_from(self, ctx):
+        return ctx.cost_items()
 
 
 class Warnings(SectionSpec):
@@ -112,11 +112,8 @@ class Warnings(SectionSpec):
         warning_type, warning_detail = item
         return [f"{warning_type}:\n" + "\n".join(warning_detail)]
 
-    def items_from(self, sol):
-        warns = (getattr(sol, "meta", None) or {}).get("warnings", {})
-        return [
-            (name, [x[0] for x in detail]) for name, detail in warns.items() if detail
-        ]
+    def items_from(self, ctx):
+        return ctx.warning_items()
 
 
 class FreeVariables(SectionSpec):
@@ -124,8 +121,8 @@ class FreeVariables(SectionSpec):
     align = "><<<"
     sortkey = staticmethod(lambda x: str(x[0]))
 
-    def items_from(self, sol):
-        return sol.primal.vector_parent_items()
+    def items_from(self, ctx):
+        return ctx.primal_items()
 
     def row_from(self, item):
         """Extract [name, value, unit, label] for variable tables."""
@@ -140,8 +137,8 @@ class Constants(SectionSpec):
     align = "><<<"
     sortkey = staticmethod(lambda x: str(x[0]))
 
-    def items_from(self, sol):
-        return sol.constants.vector_parent_items()
+    def items_from(self, ctx):
+        return ctx.constant_items()
 
     def row_from(self, item):
         """Extract [name, value, unit, label] for variable tables."""
@@ -157,8 +154,8 @@ class Sensitivities(SectionSpec):
     filterfun = staticmethod(lambda x: rounded_mag(x[1]) >= 0.01)
     align = "><<"
 
-    def items_from(self, sol):
-        return sol.sens.variables.vector_parent_items()
+    def items_from(self, ctx):
+        return ctx.variable_sens_items()
 
     def row_from(self, item):
         """Extract [name, value, label] (no units!)."""
@@ -180,8 +177,8 @@ class Constraints(SectionSpec):
         valstr = self._fmt_val(sens, pm="+")
         return [valstr, constrstr]
 
-    def items_from(self, sol):
-        return sol.sens.constraints.items()
+    def items_from(self, ctx):
+        return ctx.constraint_sens_items()
 
 
 class TightConstraints(Constraints):
@@ -223,7 +220,7 @@ class SolutionContext:
 
     def cost_items(self) -> Iterable[Item]:
         """Return the solution cost as a single keyed item."""
-        return [(self.sol.meta.get("cost function"), self.sol.cost)]
+        return [(self.sol.meta["cost function"], self.sol.cost)]
 
     def warning_items(self) -> Iterable[tuple[str, list[str]]]:
         """Return flattened warning messages keyed by warning name."""
@@ -429,7 +426,8 @@ def _table_solution(sol, tables, options: PrintOptions) -> str:
 
     for table_name in tables:
         section = SECTION_SPECS[table_name](options=options)
-        sec_lines = section.format(sol)
+        ctx = SolutionContext(sol)
+        sec_lines = section.format(ctx)
         if sec_lines:
             sections.append("\n".join(sec_lines))
 
