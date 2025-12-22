@@ -49,5 +49,5 @@ tol2 = {"mosek_cli": 1e-6, "mosek_conif": 1e-6, "cvxopt": 1e-7}[
 sol2 = m2.autosweep({w: [1, 10]}, tol2, verbosity=0)
 bst2 = sol2.bst
 print(f"Solved after {bst2.nsols} passes, cost logtol +/-{bst2.tol:.3g}")
-print("Table of solutions used in the autosweep:")
+print("Table of solutions used in the autosweep:\n")
 print(bst2.solarray.table())

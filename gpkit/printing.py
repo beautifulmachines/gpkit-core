@@ -1,5 +1,6 @@
 "printing functionality for gpkit objects"
 
+from collections import Counter
 from dataclasses import dataclass
 from typing import Any, Callable, Iterable, List, Sequence, Tuple
 
@@ -27,6 +28,7 @@ class SectionSpec:
     sortkey = None
     align = None
     filterfun = None
+    filter_reduce = staticmethod(any)
     col_sep = " "
 
     def __init__(self, options: PrintOptions):
@@ -42,7 +44,7 @@ class SectionSpec:
 
     def format(self, ctx) -> List[str]:
         "Output this section's lines given a solution or solution context"
-        items = filter(self.filterfun, self.items_from(ctx))
+        items = [item for item in self.items_from(ctx) if self._passes_filter(item)]
         if self.group_by_model:
             bymod = _group_items_by_model(items)
         else:
@@ -88,6 +90,16 @@ class SectionSpec:
             dots = " ..." if flat.size > n else ""
             return f"[ {body}{dots} ]"
         return f"{val:{pm}.{self.options.precision}g}"
+
+    def _passes_filter(self, item) -> bool:
+        # pylint: disable=not-callable
+        if self.filterfun is None:
+            return True
+        k, v = item
+        if not np.shape(v):  # scalar case
+            return bool(self.filterfun(item))
+        flags = (bool(self.filterfun((k, vi))) for vi in v)
+        return self.filter_reduce(flags)  # vector case
 
 
 class Cost(SectionSpec):
@@ -196,6 +208,7 @@ class TightConstraints(Constraints):
 class SlackConstraints(Constraints):
 
     maxsens = 1e-5
+    filter_reduce = staticmethod(all)
 
     @property
     def title(self):
@@ -300,14 +313,18 @@ class SequenceContext:
 
     def warning_items(self) -> Iterable[tuple[str, list[str]]]:
         """Merge warnings from all solutions into a single mapping."""
-        # Optional: could just return [] for sequences to keep this simple
-        merged: dict[str, list[str]] = {}
+        # merged: dict[str, list[str]] = {}
+        counts = Counter()
         for s in self.sols:
             warns = (getattr(s, "meta", None) or {}).get("warnings", {})
             for name, detail in warns.items():
-                if detail:
-                    merged.setdefault(name, []).extend(x[0] for x in detail)
-        return list(merged.items())
+                for msg, *_ in detail:
+                    counts[(name, msg)] += 1
+        items = []
+        n = len(self.sols)
+        for (name, msg), c in counts.items():
+            items.append((f"{name} - in {c} of {n} solutions:", [msg]))
+        return items
 
     def primal_items(self) -> Iterable[Item]:
         """Stack primal variable values across solutions."""
@@ -342,6 +359,7 @@ class SequenceContext:
 def table(
     obj: Any,  # Solution or SolutionSequence
     tables: Tuple[str, ...] = (
+        "sweeps",
         "cost",
         "warnings",
         "freevariables",
@@ -356,8 +374,7 @@ def table(
     if _looks_like_solution(obj):  # looks like Solution
         return _table_solution(obj, tables, opt)
     if _looks_like_sequence_of_solutions(obj):
-        raise NotImplementedError
-        # return _table_sequence(obj, tables, opt)
+        return _table_sequence(obj, tables, opt)
     raise TypeError("Expected a Solution or iterable of Solutions.")
 
 
@@ -415,6 +432,8 @@ def _unitstr(key) -> str:
 
 def rounded_mag(val, nround=8):
     "get the magnitude of a (vector or scalar) for stable sorting purposes"
+    # if np.shape(val) and np.isnan(val).all():
+    #     raise ValueError("all-nan-slice")
     return round(np.nanmax(np.absolute(val)), nround)
 
 
@@ -447,6 +466,19 @@ def _table_solution(sol, tables, options: PrintOptions) -> str:
 
 
 # ---------------- sequence summary ----------------
+def _table_sequence(seq, tables, options: PrintOptions) -> str:
+    sections: list[str] = []
+
+    for table_name in tables:
+        section = SECTION_SPECS[table_name](options=options)
+        ctx = SequenceContext(seq)
+        sec_lines = section.format(ctx)
+        if sec_lines:
+            sections.append("\n".join(sec_lines))
+
+    return "\n\n".join(sections)
+
+
 # def _table_sequence(
 #     seq: Sequence, tables, *, topn: int, max_solutions: int
 # ) -> str:
