@@ -477,34 +477,3 @@ def _table_sequence(seq, tables, options: PrintOptions) -> str:
             sections.append("\n".join(sec_lines))
 
     return "\n\n".join(sections)
-
-
-# def _table_sequence(
-#     seq: Sequence, tables, *, topn: int, max_solutions: int
-# ) -> str:
-#     sols = list(seq)
-#     n = len(sols)
-#     lines = ["\nSolution Sequence", "-----------------"]
-#
-#     if n:
-#         costs = np.array([getattr(s, "cost", np.nan) for s in sols], dtype=float)
-#         lines.append(f"  count: {n}")
-#         lines.append(
-#             f"  cost: min {np.nanmin(costs):.6g}"
-#             f"  median {np.nanmedian(costs):.6g}"
-#             f"  max {np.nanmax(costs):.6g}"
-#         )
-#
-#     # Append short per-solution summaries for the first few
-#     for i, s in enumerate(sols[:max_solutions], 1):
-#         lines += ["", f"--- Solution {i} ---"]
-#         lines.append(
-#             _table_solution(
-#                 s, ("cost", "freevariables"), topn=topn
-#             )
-#         )
-#
-#     if n > max_solutions:
-#         lines += ["", f"(… {n - max_solutions} more solutions omitted …)"]
-#
-#     return "\n".join(lines).strip()
