@@ -394,27 +394,18 @@ def table(
 ) -> str:
     """Render a simple text table for a Solution or SolutionSequence."""
     opt = PrintOptions(**options)
-    if _looks_like_solution(obj):  # looks like Solution
+    if _looks_like_solution(obj):
         return _table_solution(obj, tables, opt)
-    if _looks_like_sequence_of_solutions(obj):
-        return _table_sequence(obj, tables, opt)
-    raise TypeError("Expected a Solution or iterable of Solutions.")
+    try:
+        seq = list(obj)
+        assert all(_looks_like_solution(s) for s in seq)
+    except (TypeError, AssertionError):
+        raise TypeError("table() expected a Solution or iterable of Solutions")
+    return _table_sequence(seq, tables, opt)
 
 
 def _looks_like_solution(x) -> bool:
     return hasattr(x, "cost") and hasattr(x, "primal")
-
-
-def _looks_like_sequence_of_solutions(x) -> bool:
-    try:
-        it = iter(x)
-    except TypeError:
-        return False
-    try:
-        first = next(it)
-    except StopIteration:
-        return True
-    return _looks_like_solution(first)
 
 
 def _format_aligned_columns(
