@@ -53,6 +53,13 @@ class SectionSpec:
         else:
             bymod = {"": items}
 
+        # auto-compute width and replace option, if required
+        rowspec = self
+        if ctx.align_vec and self.align_seq and self.options.vec_width is None:
+            width = self.max_val_width(items)
+            if width:
+                rowspec = self.__class__(options=replace(self.options, vec_width=width))
+
         # process each model group
         lines = []
         for modelname, model_items in sorted(bymod.items()):
@@ -60,7 +67,7 @@ class SectionSpec:
             if self.sortkey:
                 model_items.sort(key=self.sortkey)
             # 2. extract rows
-            rows = [self.row_from(item) for item in model_items]
+            rows = [rowspec.row_from(item) for item in model_items]
             # 3. Align columns
             model_lines = _format_aligned_columns(rows, self.align, self.col_sep)
             # add model header
@@ -101,9 +108,8 @@ class SectionSpec:
         flags = (bool(self.filterfun((k, vi))) for vi in v)
         return self.filter_reduce(flags)  # vector case
 
-    def max_val_width(self, ctx):
+    def max_val_width(self, items):
         "infer how wide the widest vector element will be"
-        items = [item for item in self.items_from(ctx) if self._passes_filter(item)]
         w = 0
         p = self.options.precision
         for _, v in items:
@@ -249,6 +255,7 @@ class SolutionContext:
     """Adapter that exposes a single Solution's printable items."""
 
     sol: Any
+    align_vec = False
 
     def cost_items(self) -> Iterable[Item]:
         """Return the solution cost as a single keyed item."""
@@ -288,6 +295,7 @@ class SequenceContext:
     """Adapter that stacks printable items across a sequence of Solutions."""
 
     sols: Sequence[Any]  # sequence of Solution-like objects
+    align_vec = True
 
     def _stack(self, get_items: Callable[[Any], Iterable[Item]]) -> list[Item]:
         """Strict stacking: keys (and their order) must match across all sols."""
@@ -394,14 +402,14 @@ def table(
 ) -> str:
     """Render a simple text table for a Solution or SolutionSequence."""
     opt = PrintOptions(**options)
-    if _looks_like_solution(obj):
-        return _table_solution(obj, tables, opt)
-    try:
-        seq = list(obj)
-        assert all(_looks_like_solution(s) for s in seq)
-    except (TypeError, AssertionError):
-        raise TypeError("table() expected a Solution or iterable of Solutions")
-    return _table_sequence(seq, tables, opt)
+    ctx = SolutionContext(obj) if _looks_like_solution(obj) else SequenceContext(obj)
+    blocks: list[str] = []
+    for table_name in tables:
+        sec = SECTION_SPECS[table_name](options=opt)
+        sec_lines = sec.format(ctx)
+        if sec_lines:
+            blocks.append("\n".join(sec_lines))
+    return "\n\n".join(blocks)
 
 
 def _looks_like_solution(x) -> bool:
@@ -462,34 +470,3 @@ def _group_items_by_model(items):
             out[mod] = []
         out[mod].append((key, val))
     return out
-
-
-def _table_solution(sol, tables, options: PrintOptions) -> str:
-    sections: list[str] = []
-
-    for table_name in tables:
-        section = SECTION_SPECS[table_name](options=options)
-        ctx = SolutionContext(sol)
-        sec_lines = section.format(ctx)
-        if sec_lines:
-            sections.append("\n".join(sec_lines))
-
-    return "\n\n".join(sections)
-
-
-def _table_sequence(seq, tables, options: PrintOptions) -> str:
-    blocks: list[str] = []
-    ctx = SequenceContext(seq)
-
-    for table_name in tables:
-        sec = SECTION_SPECS[table_name](options=options)
-        if options.vec_width is None and sec.align_seq:  # auto-infer alignment width
-            width = sec.max_val_width(ctx)
-            opt_mod = replace(options, vec_width=width)
-            sec = SECTION_SPECS[table_name](options=opt_mod)
-
-        sec_lines = sec.format(ctx)
-        if sec_lines:
-            blocks.append("\n".join(sec_lines))
-
-    return "\n\n".join(blocks)
