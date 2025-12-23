@@ -173,7 +173,7 @@ class SolutionSequence(List[Solution]):
         (out.modelstr,) = modelstrs
         return out
 
-    def plot(self):
+    def plot(self, var):
         "Eventual plotting capability"
         raise NotImplementedError
 
