@@ -175,10 +175,6 @@ class SolutionSequence(List[Solution]):
 
     def table(self, **kwargs):
         "Per legacy, prints breakdowns then Solution.table"
-        # lines = []
-        # if "tables" not in kwargs:  # don't add breakdowns if tables custom
-        #     lines += self.cost_breakdown() + self.model_sens_breakdown() + [""]
-        # return "\n".join(lines) + printing_table(self, **kwargs)
         return printing_table(self, **kwargs)
 
     def summary(self, **kwargs):
