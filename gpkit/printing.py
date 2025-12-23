@@ -105,7 +105,8 @@ class SectionSpec:
         k, v = item
         if not np.shape(v):  # scalar case
             return bool(self.filterfun(item))
-        flags = (bool(self.filterfun((k, vi))) for vi in v)
+        arr = np.asarray(v).ravel()
+        flags = (bool(self.filterfun((k, vi))) for vi in arr)
         return self.filter_reduce(flags)  # vector case
 
     def max_val_width(self, items):
