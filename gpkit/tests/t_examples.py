@@ -192,7 +192,7 @@ class TestExamples(unittest.TestCase):
         sol.save("solution.pkl")
         sol.table()
         with open("solution.pkl", "rb") as fil:
-            sol_loaded = pickle.load(fil)
+            _ = pickle.load(fil)
         # sol_loaded.table()  # dropped to deprecate SolutionArray printing
         os.remove("solution.pkl")
 
@@ -201,7 +201,7 @@ class TestExamples(unittest.TestCase):
         sweepsol.to_solution_array().save("sweepsolution.pkl")
         sweepsol.table()
         with open("sweepsolution.pkl", "rb") as fil:
-            sol_loaded = pickle.load(fil)
+            _ = pickle.load(fil)
         # sol_loaded.table()  # dropped to deprecate SolutionArray printing
         os.remove("sweepsolution.pkl")
 
