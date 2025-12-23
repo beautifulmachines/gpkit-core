@@ -474,10 +474,10 @@ def _table_solution(sol, tables, options: PrintOptions) -> str:
 # ---------------- sequence summary ----------------
 def _table_sequence(seq, tables, options: PrintOptions) -> str:
     sections: list[str] = []
+    ctx = SequenceContext(seq)
 
     for table_name in tables:
         section = SECTION_SPECS[table_name](options=options)
-        ctx = SequenceContext(seq)
         sec_lines = section.format(ctx)
         if sec_lines:
             sections.append("\n".join(sec_lines))
