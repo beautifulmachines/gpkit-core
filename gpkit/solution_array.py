@@ -17,9 +17,8 @@ import numpy as np
 from .breakdowns import Breakdowns
 from .nomials import NomialArray
 from .units import Quantity
-from .util.repr_conventions import UNICODE_EXPONENTS, lineagestr, unitstr
+from .util.repr_conventions import lineagestr
 from .util.small_classes import DictOfLists, SolverLog, Strings
-from .util.small_scripts import mag, try_str_without
 
 CONSTRSPLITPATTERN = re.compile(r"([^*]\*[^*])|( \+ )|( >= )|( <= )|( = )")
 
@@ -73,169 +72,6 @@ class SolSavingEnvironment:
             self.solarray["sensitivities"]["constraints"] = self.constraintstore
 
 
-def senss_table(data, showvars=(), title="Variable Sensitivities", **kwargs):
-    "Returns sensitivity table lines"
-    if "variables" in data.get("sensitivities", {}):
-        data = data["sensitivities"]["variables"]
-    if showvars:
-        data = {k: data[k] for k in showvars if k in data}
-    return var_table(
-        data,
-        title,
-        sortbyvals=True,
-        skipifempty=True,
-        valfmt="%+-.2g  ",
-        vecfmt="%+-8.2g",
-        printunits=False,
-        minval=1e-3,
-        **kwargs,
-    )
-
-
-def tight_table(self, _, ntightconstrs=5, tight_senss=1e-2, **kwargs):
-    "Return constraint tightness lines"
-    title = "Most Sensitive Constraints"
-    if len(self) > 1:
-        title += " (in last sweep)"
-        data = sorted(
-            ((-float(f"{abs(s[-1]):+6.2g}"), str(c)), f"{abs(s[-1]):+6.2g}", id(c), c)
-            for c, s in self["sensitivities"]["constraints"].items()
-            if s[-1] >= tight_senss
-        )[:ntightconstrs]
-    else:
-        data = sorted(
-            ((-float(f"{abs(s):+6.2g}"), str(c)), f"{abs(s):+6.2g}", id(c), c)
-            for c, s in self["sensitivities"]["constraints"].items()
-            if s >= tight_senss
-        )[:ntightconstrs]
-    return constraint_table(data, title, **kwargs)
-
-
-# pylint: disable=too-many-branches,too-many-locals,too-many-statements,fixme
-def constraint_table(data, title, sortbymodel=True, showmodels=True, **_):
-    "Creates lines for tables where the right side is a constraint."
-    # TODO: this should support 1D array inputs from sweeps
-    excluded = {"units"} if showmodels else {"units", "lineage"}
-    models, decorated = {}, []
-    for sortby, openingstr, _, constraint in sorted(data):
-        model = lineagestr(constraint) if sortbymodel else ""
-        if model not in models:
-            models[model] = len(models)
-        constrstr = try_str_without(
-            constraint, {":MAGIC:" + lineagestr(constraint)}.union(excluded)
-        )
-        if " at 0x" in constrstr:  # don't print memory addresses
-            constrstr = constrstr[: constrstr.find(" at 0x")] + ">"
-        decorated.append((models[model], model, sortby, constrstr, openingstr))
-    decorated.sort()
-    previous_model, lines = None, []
-    for varlist in decorated:
-        _, model, _, constrstr, openingstr = varlist
-        if model != previous_model:
-            if lines:
-                lines.append(["", ""])
-            if model or lines:
-                lines.append([("newmodelline",), model])
-            previous_model = model
-        minlen, maxlen = 25, 80
-        segments = [s for s in CONSTRSPLITPATTERN.split(constrstr) if s]
-        constraintlines = []
-        line = ""
-        next_idx = 0
-        while next_idx < len(segments):
-            segment = segments[next_idx]
-            next_idx += 1
-            if CONSTRSPLITPATTERN.match(segment) and next_idx < len(segments):
-                segments[next_idx] = segment[1:] + segments[next_idx]
-                segment = segment[0]
-            elif len(line) + len(segment) > maxlen and len(line) > minlen:
-                constraintlines.append(line)
-                line = "  "  # start a new line
-            line += segment
-            while len(line) > maxlen:
-                constraintlines.append(line[:maxlen])
-                line = "  " + line[maxlen:]
-        constraintlines.append(line)
-        lines += [(openingstr + " : ", constraintlines[0])]
-        lines += [("", x) for x in constraintlines[1:]]
-    if not lines:
-        lines = [("", "(none)")]
-    maxlens = np.max(
-        [list(map(len, line)) for line in lines if line[0] != ("newmodelline",)], axis=0
-    )
-    dirs = [">", "<"]  # we'll check lengths before using zip
-    assert len(list(dirs)) == len(list(maxlens))
-    fmts = ["{0:%s%s}" % (direc, L) for direc, L in zip(dirs, maxlens)]
-    for i, line in enumerate(lines):
-        if line[0] == ("newmodelline",):
-            linelist = [fmts[0].format(" | "), line[1]]
-        else:
-            linelist = [fmt.format(s) for fmt, s in zip(fmts, line)]
-        lines[i] = "".join(linelist).rstrip()
-    return [title] + ["-" * len(title)] + lines + [""]
-
-
-def warnings_table(self, _, **kwargs):
-    "Makes a table for all warnings in the solution."
-    title = "WARNINGS"
-    lines = ["~" * len(title), title, "~" * len(title)]
-    if "warnings" not in self or not self["warnings"]:
-        return []
-    for wtype in sorted(self["warnings"]):
-        data_vec = self["warnings"][wtype]
-        if len(data_vec) == 0:
-            continue
-        if not hasattr(data_vec, "shape"):
-            data_vec = [data_vec]  # not a sweep
-        else:
-            all_equal = True
-            for data in data_vec[1:]:
-                eq_i = data == data_vec[0]
-                if hasattr(eq_i, "all"):
-                    eq_i = eq_i.all()
-                if not eq_i:
-                    all_equal = False
-                    break
-            if all_equal:
-                data_vec = [data_vec[0]]  # warnings identical across sweeps
-        for i, data in enumerate(data_vec):
-            if len(data) == 0:
-                continue
-            data = sorted(data, key=lambda x: x[0])  # sort by msg
-            title = wtype
-            if len(data_vec) > 1:
-                title += f" in sweep {i}"
-            if wtype == "Unexpectedly Tight Constraints" and data[0][1]:
-                data = [
-                    (
-                        -int(1e5 * relax_sensitivity),
-                        f"{relax_sensitivity:+6.2g}",
-                        id(c),
-                        c,
-                    )
-                    for _, (relax_sensitivity, c) in data
-                ]
-                lines += constraint_table(data, title, **kwargs)
-            elif wtype == "Unexpectedly Loose Constraints" and data[0][1]:
-                data = [
-                    (
-                        -int(1e5 * rel_diff),
-                        f"{tightvalues[0]:.4g} {tightvalues[1]} {tightvalues[2]:.4g}",
-                        id(c),
-                        c,
-                    )
-                    for _, (rel_diff, tightvalues, c) in data
-                ]
-                lines += constraint_table(data, title, **kwargs)
-            else:
-                lines += [title] + ["-" * len(wtype)]
-                lines += [msg for msg, _ in data] + [""]
-    if len(lines) == 3:  # just the header
-        return []
-    lines[-1] = "~~~~~~~~"
-    return lines + [""]
-
-
 def bdtable_gen(key):
     "Generator for breakdown tablefns"
 
@@ -252,15 +88,6 @@ def bdtable_gen(key):
         return lines
 
     return bdtable
-
-
-TABLEFNS = {
-    "sensitivities": senss_table,
-    "tightest constraints": tight_table,
-    "warnings": warnings_table,
-    "model sensitivities breakdown": bdtable_gen("model sensitivities"),
-    "cost breakdown": bdtable_gen("cost"),
-}
 
 
 def unrolled_absmax(values):
@@ -587,65 +414,6 @@ class SolutionArray(DictOfLists):
         self.set_necessarylineage(clear=True)
         return names
 
-    def todataframe(self, showvars=None, excluded="vec"):
-        "Returns primal solution as pandas dataframe"
-        import pandas as pd  # pylint:disable=import-outside-toplevel,import-error
-
-        rows = []
-        cols = ["Name", "Index", "Value", "Units", "Label", "Lineage", "Other"]
-        for _, key in sorted(
-            self.varnames(showvars, excluded).items(), key=lambda k: k[0]
-        ):
-            value = self["variables"][key]
-            if key.shape:
-                idxs = []
-                it = np.nditer(np.empty(value.shape), flags=["multi_index"])
-                while not it.finished:
-                    idx = it.multi_index
-                    idxs.append(idx[0] if len(idx) == 1 else idx)
-                    it.iternext()
-            else:
-                idxs = [None]
-            for idx in idxs:
-                row = [
-                    key.name,
-                    "" if idx is None else idx,
-                    value if idx is None else value[idx],
-                ]
-                rows.append(row)
-                row.extend(
-                    [
-                        key.unitstr(),
-                        key.label or "",
-                        key.lineage or "",
-                        ", ".join(
-                            f"{k}={v}"
-                            for (k, v) in key.descr.items()
-                            if k
-                            not in [
-                                "name",
-                                "units",
-                                "unitrepr",
-                                "idx",
-                                "shape",
-                                "veckey",
-                                "value",
-                                "vecfn",
-                                "lineage",
-                                "label",
-                            ]
-                        ),
-                    ]
-                )
-        return pd.DataFrame(rows, columns=cols)
-
-    def savetxt(self, filename="solution.txt", *, printmodel=True, **kwargs):
-        "Saves solution table as a text file"
-        with open(filename, "w", encoding="utf-8") as f:
-            if printmodel:
-                f.write(self.modelstr + "\n")
-            f.write(self.table(**kwargs))
-
     def savejson(self, filename="solution.json", showvars=None):
         "Saves solution table as a json file"
         sol_dict = {}
@@ -741,6 +509,7 @@ class SolutionArray(DictOfLists):
             key = getattr(key, "veckey", None) or key
             showvars_out.add(key)
         return showvars_out
+
 
 # pylint: disable=too-many-branches,too-many-locals,too-many-statements
 # pylint: disable=too-many-arguments,consider-using-f-string
