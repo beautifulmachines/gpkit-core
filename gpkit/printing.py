@@ -316,18 +316,12 @@ class SequenceContext:
 
         return [(k, np.asarray(cols[k])) for k in keys0]
 
-    def _stack_scalar(self, key: Any, get_val: Callable[[Any], Any]) -> list[Item]:
-        if not self.sols:
-            return []
-        return [(key, np.asarray([get_val(s) for s in self.sols]))]
-
     def _sweep_point(self, s: Any) -> dict[Any, Any]:
         return (getattr(s, "meta", None) or {}).get("sweep_point", {}) or {}
 
     def cost_items(self) -> Iterable[Item]:
         """Return the cost stacked across all solutions."""
-        key = self.sols[0].meta.get("cost function") if self.sols else None
-        return self._stack_scalar(key, lambda s: s.cost)
+        return self._stack(lambda s: [(s.meta["cost function"], s.cost)])
 
     def warning_items(self) -> Iterable[tuple[str, list[str]]]:
         """Merge warnings from all solutions into a single mapping."""
