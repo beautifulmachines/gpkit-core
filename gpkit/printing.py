@@ -106,6 +106,16 @@ class SectionSpec:
         flags = (bool(self.filterfun((k, vi))) for vi in v)
         return self.filter_reduce(flags)  # vector case
 
+    def max_val_width(self, ctx):
+        "infer how wide the widest vector element will be"
+        items = [item for item in self.items_from(ctx) if self._passes_filter(item)]
+        w = 0
+        p = self.options.precision
+        for _, v in items:
+            assert np.shape(v)
+            w = max(w, max(len(f"{el:.{p-1}g}") for el in np.asarray(v).ravel()))
+        return w
+
 
 class Cost(SectionSpec):
 
@@ -321,22 +331,26 @@ class SequenceContext:
 
     def warning_items(self) -> Iterable[tuple[str, list[str]]]:
         """Merge warnings from all solutions into a single mapping."""
-        # merged: dict[str, list[str]] = {}
+
+        def _special_case(name, payload) -> str:
+            # refactor architecture to avoid these two special cases
+            if "Unexpectedly Loose Constraints" in name:
+                _rel_diff, loosevalues, c = payload
+                lhs, op, rhs = loosevalues
+                cstr = c.str_without({"units", "lineage"})
+                return f"{lhs:.4g} {op} {rhs:.4g} : {cstr}"
+            if "Unexpectedly Tight Constraints" in name:
+                relax_sens, c = payload
+                cstr = c.str_without({"units", "lineage"})
+                return f"{relax_sens:+6.2g} : {cstr}"
+            return ""
+
         counts = Counter()
         for s in self.sols:
             warns = (getattr(s, "meta", None) or {}).get("warnings", {})
             for name, detail in warns.items():
                 for msg, pay in detail:
-                    # refactor architecture to avoid these two special cases
-                    if "Unexpectedly Loose Constraints" in name:
-                        _rel_diff, loosevalues, c = pay
-                        lhs, op, rhs = loosevalues
-                        cstr = c.str_without({"units", "lineage"})
-                        msg = f"{lhs:.4g} {op} {rhs:.4g} : {cstr}"
-                    if "Unexpectedly Tight Constraints" in name:
-                        relax_sens, c = pay
-                        cstr = c.str_without({"units", "lineage"})
-                        msg = f"{relax_sens:+6.2g} : {cstr}"
+                    msg = _special_case(name, pay) or msg
                     counts[(name, msg)] += 1
         items = []
         n = len(self.sols)
@@ -444,17 +458,6 @@ def _format_aligned_columns(
     return formatted
 
 
-def _max_val_width(sec: SectionSpec, ctx: SequenceContext):
-    "infer how wide the widest vector element will be"
-    items = [item for item in sec.items_from(ctx) if sec._passes_filter(item)]
-    w = 0
-    p = sec.options.precision
-    for _, v in items:
-        assert np.shape(v)
-        w = max(w, max(len(f"{el:.{p-1}g}") for el in np.asarray(v).ravel()))
-    return w
-
-
 def _unitstr(key) -> str:
     return unitstr(key, into="[%s]", dimless="")
 
@@ -502,7 +505,7 @@ def _table_sequence(seq, tables, options: PrintOptions) -> str:
     for table_name in tables:
         sec = SECTION_SPECS[table_name](options=options)
         if options.vec_width is None and sec.align_seq:  # auto-infer alignment width
-            width = _max_val_width(sec, ctx)
+            width = sec.max_val_width(ctx)
             opt_mod = replace(options, vec_width=width)
             sec = SECTION_SPECS[table_name](options=opt_mod)
 
