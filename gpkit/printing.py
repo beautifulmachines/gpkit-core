@@ -15,10 +15,11 @@ Item = tuple[Any, Any]
 class PrintOptions:
     "container for printing options"
 
+    empty: str | None = None  # output (e.g. "(none)") for empty sections
     precision: int = 4
     topn: int | None = None  # truncation per-group
     vecn: int = 6  # max vector elements to print before ...
-    empty: str | None = None  # output (e.g. "(none)") for empty sections
+    vec_width: int | None = None  # None -> auto-align elements when applicable
 
 
 # pylint: disable=missing-class-docstring
