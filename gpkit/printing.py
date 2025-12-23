@@ -1,6 +1,6 @@
 "printing functionality for gpkit objects"
 
-from collections import Counter
+from collections import Counter, defaultdict
 from dataclasses import dataclass, replace
 from typing import Any, Callable, Iterable, List, Sequence, Tuple
 
@@ -72,8 +72,9 @@ class SectionSpec:
             model_lines = _format_aligned_columns(rows, self.align, self.col_sep)
             # add model header
             if modelname and model_lines:
-                lines += [f"{modelname}"]
-            lines += model_lines + [""]
+                lines.append(f"{modelname}")
+            lines.extend(model_lines)
+            lines.append("")
 
         if not lines:  # empty section
             if self.options.empty is not None:
@@ -458,10 +459,8 @@ def _group_items_by_model(items):
     Input: iterable of (VarKey, value) pairs
     Output: mapping model_str: iterable of (VarKey, value) pairs
     """
-    out = {}
+    out = defaultdict(list)
     for key, val in items:
         mod = key.lineagestr() if hasattr(key, "lineagestr") else ""
-        if mod not in out:
-            out[mod] = []
         out[mod].append((key, val))
     return out
