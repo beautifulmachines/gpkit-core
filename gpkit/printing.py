@@ -56,21 +56,16 @@ class SectionSpec:
         # process each model group
         lines = []
         for modelname, model_items in sorted(bymod.items()):
-
             # 1. sort
             if self.sortkey:
                 model_items.sort(key=self.sortkey)
-
             # 2. extract rows
             rows = [self.row_from(item) for item in model_items]
-
             # 3. Align columns
             model_lines = _format_aligned_columns(rows, self.align, self.col_sep)
-
             # add model header
             if modelname and model_lines:
                 lines += [f"{modelname}"]
-
             lines += model_lines + [""]
 
         if not lines:  # empty section
@@ -118,7 +113,6 @@ class SectionSpec:
 
 
 class Cost(SectionSpec):
-
     title = "Optimal Cost"
 
     def row_from(self, item):
@@ -224,7 +218,6 @@ class TightConstraints(Constraints):
 
 
 class SlackConstraints(Constraints):
-
     maxsens = 1e-5
     filter_reduce = staticmethod(all)
 
@@ -322,8 +315,6 @@ class SequenceContext:
     def _sweep_point(self, s: Any) -> dict[Any, Any]:
         return (getattr(s, "meta", None) or {}).get("sweep_point", {}) or {}
 
-    # ---- methods used by SectionSpecs ----
-
     def cost_items(self) -> Iterable[Item]:
         """Return the cost stacked across all solutions."""
         key = self.sols[0].meta.get("cost function") if self.sols else None
@@ -410,7 +401,6 @@ def table(
     raise TypeError("Expected a Solution or iterable of Solutions.")
 
 
-# ---------------- helpers ----------------
 def _looks_like_solution(x) -> bool:
     return hasattr(x, "cost") and hasattr(x, "primal")
 
@@ -483,7 +473,6 @@ def _group_items_by_model(items):
     return out
 
 
-# ---------------- single solution ----------------
 def _table_solution(sol, tables, options: PrintOptions) -> str:
     sections: list[str] = []
 
@@ -497,7 +486,6 @@ def _table_solution(sol, tables, options: PrintOptions) -> str:
     return "\n\n".join(sections)
 
 
-# ---------------- sequence summary ----------------
 def _table_sequence(seq, tables, options: PrintOptions) -> str:
     blocks: list[str] = []
     ctx = SequenceContext(seq)
