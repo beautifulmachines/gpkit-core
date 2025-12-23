@@ -6,7 +6,6 @@ import gzip
 import json
 import pickle
 import pickletools
-import re
 import sys
 import warnings as pywarnings
 from collections import defaultdict
@@ -19,8 +18,6 @@ from .nomials import NomialArray
 from .units import Quantity
 from .util.repr_conventions import lineagestr
 from .util.small_classes import DictOfLists, SolverLog, Strings
-
-CONSTRSPLITPATTERN = re.compile(r"([^*]\*[^*])|( \+ )|( >= )|( <= )|( = )")
 
 VALSTR_REPLACES = [
     ("+nan", " nan"),
