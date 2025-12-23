@@ -183,4 +183,5 @@ class SolutionSequence(List[Solution]):
 
     def summary(self, **kwargs):
         "Fall back to SolutionArray.summary"
-        return self.to_solution_array().summary(**kwargs)
+        tables = ("sweeps", "cost", "warnings", "freevariables")
+        return printing_table(self, tables=tables, **kwargs)

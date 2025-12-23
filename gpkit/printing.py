@@ -326,7 +326,17 @@ class SequenceContext:
         for s in self.sols:
             warns = (getattr(s, "meta", None) or {}).get("warnings", {})
             for name, detail in warns.items():
-                for msg, *_ in detail:
+                for msg, pay in detail:
+                    # refactor architecture to avoid these two special cases
+                    if "Unexpectedly Loose Constraints" in name:
+                        _rel_diff, loosevalues, c = pay
+                        lhs, op, rhs = loosevalues
+                        cstr = c.str_without({"units", "lineage"})
+                        msg = f"{lhs:.4g} {op} {rhs:.4g} : {cstr}"
+                    if "Unexpectedly Tight Constraints" in name:
+                        relax_sens, c = pay
+                        cstr = c.str_without({"units", "lineage"})
+                        msg = f"{relax_sens:+6.2g} : {cstr}"
                     counts[(name, msg)] += 1
         items = []
         n = len(self.sols)
