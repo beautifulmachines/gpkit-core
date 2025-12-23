@@ -31,6 +31,7 @@ class SectionSpec:
     filterfun = None
     filter_reduce = staticmethod(any)
     col_sep = " "
+    pm = ""  # sign format prefix (e.g. '+' for sensitivities)
 
     def __init__(self, options: PrintOptions):
         self.options = options
@@ -82,7 +83,7 @@ class SectionSpec:
         assert lines[-1] == ""
         return title_lines + lines[:-1]
 
-    def _fmt_val(self, val, pm="") -> str:
+    def _fmt_val(self, val) -> str:
         n = self.options.vecn
         if np.shape(val):
             flat = np.asarray(val).ravel()
@@ -90,7 +91,7 @@ class SectionSpec:
             body = "  ".join(f"{x:.3g}" for x in shown)
             dots = " ..." if flat.size > n else ""
             return f"[ {body}{dots} ]"
-        return f"{val:{pm}.{self.options.precision}g}"
+        return f"{val:{self.pm}.{self.options.precision}g}"
 
     def _passes_filter(self, item) -> bool:
         # pylint: disable=not-callable
@@ -173,6 +174,7 @@ class Sensitivities(SectionSpec):
     sortkey = staticmethod(lambda x: (-rounded_mag(x[1]), str(x[0])))
     filterfun = staticmethod(lambda x: rounded_mag(x[1]) >= 0.01)
     align = "><<"
+    pm = "+"
 
     def items_from(self, ctx):
         return ctx.variable_sens_items()
@@ -182,19 +184,20 @@ class Sensitivities(SectionSpec):
         key, val = item
         name = key.str_without("lineage")
         label = key.descr.get("label", "")
-        value = self._fmt_val(val, pm="+")
+        value = self._fmt_val(val)
         return [f"{name} :", value, label]
 
 
 class Constraints(SectionSpec):
     sortkey = staticmethod(lambda x: (-rounded_mag(x[1]), str(x[0])))
     col_sep = " : "
+    pm = "+"
 
     def row_from(self, item):
         """Extract [sens, constraint_str] for constraint tables."""
         constraint, sens = item
         constrstr = constraint.str_without({"units", "lineage"})
-        valstr = self._fmt_val(sens, pm="+")
+        valstr = self._fmt_val(sens)
         return [valstr, constrstr]
 
     def items_from(self, ctx):
