@@ -73,9 +73,9 @@ sweeps = {
     V_min: [20.0, 20, 25, 25],
     V: [45.0, 55, 45, 55],
 }
-sweepsol = m.sweep(sweeps, verbosity=0).to_solution_array()
+sweepsol = m.sweep(sweeps, verbosity=0)
 print(sweepsol.summary())
 with open("solution.pkl", "rb") as fil:
     sol_loaded = pickle.load(fil)
 assert sol_loaded.almost_equal(SolutionArray.decompress_file("solution.pgz"))
-print(sweepsol.diff(sol_loaded, absdiff=True, senssdiff=True))
+print(sweepsol.to_solution_array().diff(sol_loaded, absdiff=True, senssdiff=True))
