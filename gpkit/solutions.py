@@ -3,7 +3,8 @@
 from dataclasses import dataclass
 from typing import List, Sequence
 
-from .solution_array import SolutionArray
+from .printing import table as printing_table
+from .solution_array import SolutionArray, bdtable_gen
 from .varkey import VarKey
 from .varmap import VarMap
 
@@ -80,13 +81,30 @@ class Solution:
         "Pass through to SolutionArray.save_compressed"
         self.to_solution_array().save_compressed(*args, **kwargs)
 
-    def summary(self, *args, **kwargs) -> str:
+    def summary(self, **kwargs) -> str:
         "Pass through to SolutionArray.summary"
-        return self.to_solution_array().summary(*args, **kwargs)
+        lines = self.cost_breakdown() + self.model_sens_breakdown() + [""]
+        table = printing_table(self, tables=("warnings", "freevariables"), **kwargs)
+        return "\n".join(lines) + table
 
     def table(self, **kwargs) -> str:
-        "Pass through to SolutionArray.table"
-        return self.to_solution_array().table(**kwargs)
+        "Per legacy, prints breakdowns then Solution.table"
+        lines = []
+        if "tables" not in kwargs:  # don't add breakdowns if tables custom
+            lines += self.cost_breakdown() + self.model_sens_breakdown() + [""]
+        return "\n".join(lines) + printing_table(self, **kwargs)
+
+    def cost_breakdown(self) -> str:
+        "printable visualization of cost breakdown"
+        solarr = self.to_solution_array()
+        solarr.set_necessarylineage()
+        return bdtable_gen("cost")(solarr, set())
+
+    def model_sens_breakdown(self) -> str:
+        "printable visualization of model sensitivity breakdown"
+        solarr = self.to_solution_array()
+        solarr.set_necessarylineage()
+        return bdtable_gen("model sensitivities")(solarr, set())
 
     def to_solution_array(self):
         "Convert this to a SolutionArray"
@@ -155,10 +173,19 @@ class SolutionSequence(List[Solution]):
         (out.modelstr,) = modelstrs
         return out
 
+    def plot(self, var):
+        "Eventual plotting capability"
+        raise NotImplementedError
+
+    def save(self):
+        "Placeholder for saving capability"
+        raise NotImplementedError
+
     def table(self, **kwargs):
-        "Fall back to SolutionArray.table"
-        return self.to_solution_array().table(**kwargs)
+        "Per legacy, prints breakdowns then Solution.table"
+        return printing_table(self, **kwargs)
 
     def summary(self, **kwargs):
         "Fall back to SolutionArray.summary"
-        return self.to_solution_array().summary(**kwargs)
+        tables = ("sweeps", "cost", "warnings", "freevariables")
+        return printing_table(self, tables=tables, **kwargs)

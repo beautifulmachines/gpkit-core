@@ -17,7 +17,7 @@ print(sol.summary())
 assert abs(sol[x] - 0.9) < 1e-6
 
 # full interim solutions are available
-print("x values of each GP solve (note convergence)")
+print("\nx values of each GP solve (note convergence)")
 print(", ".join(f"{sol.primal[x]:.5f}" for sol in m.program.results))
 
 # use x0 to give the solution, reducing number of GPs needed

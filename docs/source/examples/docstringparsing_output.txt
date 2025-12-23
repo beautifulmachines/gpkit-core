@@ -62,24 +62,31 @@ h = self.h = Variable('h', 1, 'm', 'minimum height')  # from 'h     1 [m]    min
        ┃┛      ┛
 
 
+Optimal Cost
+------------
+A : 1.465 [m²]
+
 Free Variables
 --------------
-A : 1.465                             [m²] surface area
-s : [ 0.316     0.316     1        ]  [m]  side length
+Cube
+   A : 1.465               [m²] surface area
+s[:] : [ 0.316  0.316  1 ] [m]  side length
 
 Fixed Variables
 ---------------
-V : 100  [l] minimum volume
-h : 1    [m] minimum height
+Cube
+V : 100 [l] minimum volume
+h : 1   [m] minimum height
 
 Variable Sensitivities
 ----------------------
-V : +0.57  minimum volume
-h : +0.3   minimum height
+Cube
+V : +0.5683 minimum volume
+h : +0.2952 minimum height
 
 Most Sensitive Constraints
 --------------------------
-    +1 : A ≥ 2·(s[0]·s[1] + s[1]·s[2] + s[2]·s[0])
- +0.57 : V ≤ s[:].prod()
-  +0.3 : s[2] ≥ h
-
+Cube
++1      : A ≥ 2·(s[0]·s[1] + s[1]·s[2] + s[2]·s[0])
++0.5683 : V ≤ s[:].prod()
++0.2952 : s[2] ≥ h

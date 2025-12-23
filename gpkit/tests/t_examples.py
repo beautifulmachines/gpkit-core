@@ -192,8 +192,8 @@ class TestExamples(unittest.TestCase):
         sol.save("solution.pkl")
         sol.table()
         with open("solution.pkl", "rb") as fil:
-            sol_loaded = pickle.load(fil)
-        sol_loaded.table()
+            _ = pickle.load(fil)
+        # sol_loaded.table()  # dropped to deprecate SolutionArray printing
         os.remove("solution.pkl")
 
         sweepsol = m.sweep({example.AC.fuse.W: (50, 100, 150)}, verbosity=0)
@@ -201,8 +201,8 @@ class TestExamples(unittest.TestCase):
         sweepsol.to_solution_array().save("sweepsolution.pkl")
         sweepsol.table()
         with open("sweepsolution.pkl", "rb") as fil:
-            sol_loaded = pickle.load(fil)
-        sol_loaded.table()
+            _ = pickle.load(fil)
+        # sol_loaded.table()  # dropped to deprecate SolutionArray printing
         os.remove("sweepsolution.pkl")
 
         # testing savejson

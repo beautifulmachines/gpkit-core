@@ -419,13 +419,13 @@ class GeometricProgram:
             print(f"Result packing took {rpackpct:.2g}%% of solve time.")
             tic = time()
         # solution checking #
-        initsolwarning(result, "Solution Inconsistency")
         try:
             tol = SOLUTION_TOL.get(solver_out.meta["solver"], 1e-5)
             self.data.check_solution(solver_out, tol)
         except Infeasible as chkerror:
             msg = str(chkerror)
             if not ("Dual" in msg and not dual_check):
+                initsolwarning(result, "Solution Inconsistency")
                 appendsolwarning(msg, None, result, "Solution Inconsistency")
                 if verbosity > -4:
                     print(f"Solution check warning: {msg}")

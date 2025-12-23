@@ -16,7 +16,7 @@ m = Model(
 )
 
 # arguments are: model, swept: values, posnomial for y-axis
-sol = m.sweep({x: np.linspace(1, 3, 20)}, verbosity=0).to_solution_array()
+sol = m.sweep({x: np.linspace(1, 3, 20)}, verbosity=0)
 f, ax = sol.plot(y)
 ax.set_title("Manually swept (20 points)")
 f.show()

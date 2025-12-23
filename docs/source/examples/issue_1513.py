@@ -92,7 +92,7 @@ class Cake(Model):
         with Vectorize(3):
             s = Simple()
         c = ConstraintSet([s])
-        self.cost = sum(s.x)
+        self.cost = s.x.sum()
         return c
 
 

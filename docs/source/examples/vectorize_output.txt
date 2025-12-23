@@ -15,8 +15,8 @@ SCALAR
 
 Free Variables
 --------------
+Test
 x : 1
-
 __________
 
 VECTORIZED
@@ -44,5 +44,5 @@ VECTORIZED
 
 Free Variables
 --------------
-x : [ 1         2         1        ]
-
+Test1
+x[:] : [ 1  2  1 ]

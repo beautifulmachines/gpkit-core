@@ -1,46 +1,37 @@
+Swept Variables
+---------------
+V_f_wing : [ 0.1  0.3  0.5 ] [m³] fuel volume in the wing
 
 Optimal Cost
 ------------
- [ 4.63e+03  6.23e+03  7.36e+03  ]
+W_f : [ 4.63e+03  6.23e+03  7.36e+03 ] [N]
 
-~~~~~~~~
 WARNINGS
-~~~~~~~~
-Unexpectedly Loose Constraints in sweep 0
------------------------------------------
+--------
+Unexpectedly Loose Constraints - in 1 of 3 solutions:
 0.5886 >= 0.5775 : V_{f_{avail}} ≥ V_f
-
-Unexpectedly Loose Constraints in sweep 1
------------------------------------------
+Unexpectedly Loose Constraints - in 1 of 3 solutions:
 0.7884 >= 0.7769 : V_{f_{avail}} ≥ V_f
-
-Unexpectedly Loose Constraints in sweep 2
------------------------------------------
+Unexpectedly Loose Constraints - in 1 of 3 solutions:
 0.9585 >= 0.9187 : V_{f_{avail}} ≥ V_f
-~~~~~~~~
-
-Swept Variables
----------------
-V_f_wing : [ 0.1       0.3       0.5      ]  [m³] fuel volume in the wing
 
 Free Variables
 --------------
-       (CDA0) : [ 0.05      0.05      0.05     ]  [m²]  fuselage drag area
-            A : [ 12.4      3.78      2.35     ]        aspect ratio
-          C_D : [ 0.0136    0.011     0.0099   ]        drag coefficient
-          C_L : [ 0.327     0.162     0.121    ]        lift coefficient of wing
-          C_f : [ 0.00343   0.00284   0.00261  ]        skin friction coefficient
-            D : [ 466       774       1e+03    ]  [N]   total drag force
-          L/D : [ 24.1      14.8      12.2     ]        lift-to-drag ratio
-           Re : [ 4.64e+06  1.21e+07  1.83e+07 ]        Reynold's number
-            S : [ 22        29.7      35.6     ]  [m²]  total wing area
-   T_{flight} : [ 16.6      13.4      12.3     ]  [h]   flight time
-            V : [ 50.3      62.1      67.9     ]  [m/s] cruising speed
-          V_f : [ 0.577     0.777     0.919    ]  [m³]  fuel volume
-V_{f_{avail}} : [ 0.589     0.788     0.958    ]  [m³]  fuel volume available
-            W : [ 1.35e+04  1.45e+04  1.59e+04 ]  [N]   total aircraft weight
-          W_f : [ 4.63e+03  6.23e+03  7.36e+03 ]  [N]   fuel weight
-          W_w : [ 2.65e+03  2.05e+03  2.29e+03 ]  [N]   wing weight
-     W_w_strc : [ 1.33e+03  269       151      ]  [N]   wing structural weight
-     W_w_surf : [ 1.32e+03  1.78e+03  2.14e+03 ]  [N]   wing skin weight
-
+       (CDA0) : [ 0.05      0.05      0.05     ] [m²]  fuselage drag area
+            A : [ 12.4      3.78      2.35     ]       aspect ratio
+          C_D : [ 0.0136    0.011     0.0099   ]       drag coefficient
+          C_L : [ 0.327     0.162     0.121    ]       lift coefficient of wing
+          C_f : [ 0.00343   0.00284   0.00261  ]       skin friction coefficient
+            D : [ 466       774       1e+03    ] [N]   total drag force
+          L/D : [ 24.1      14.8      12.2     ]       lift-to-drag ratio
+           Re : [ 4.64e+06  1.21e+07  1.83e+07 ]       Reynold's number
+            S : [ 22        29.7      35.6     ] [m²]  total wing area
+   T_{flight} : [ 16.6      13.4      12.3     ] [h]   flight time
+            V : [ 50.3      62.1      67.9     ] [m/s] cruising speed
+          V_f : [ 0.577     0.777     0.919    ] [m³]  fuel volume
+V_{f_{avail}} : [ 0.589     0.788     0.958    ] [m³]  fuel volume available
+            W : [ 1.35e+04  1.45e+04  1.59e+04 ] [N]   total aircraft weight
+          W_f : [ 4.63e+03  6.23e+03  7.36e+03 ] [N]   fuel weight
+          W_w : [ 2.65e+03  2.05e+03  2.29e+03 ] [N]   wing weight
+     W_w_strc : [ 1.33e+03  269       151      ] [N]   wing structural weight
+     W_w_surf : [ 1.32e+03  1.78e+03  2.14e+03 ] [N]   wing skin weight
