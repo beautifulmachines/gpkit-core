@@ -1,7 +1,7 @@
 "printing functionality for gpkit objects"
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any, Callable, Iterable, List, Sequence, Tuple
 
 import numpy as np
@@ -28,6 +28,7 @@ class SectionSpec:
     group_by_model = True
     sortkey = None
     align = None
+    align_seq = True
     filterfun = None
     filter_reduce = staticmethod(any)
     col_sep = " "
@@ -122,6 +123,7 @@ class Cost(SectionSpec):
 
 class Warnings(SectionSpec):
     title = "WARNINGS"
+    align_seq = False
 
     def row_from(self, item):
         """Extract [warning_type, details] for warning display."""
@@ -432,6 +434,17 @@ def _format_aligned_columns(
     return formatted
 
 
+def _max_val_width(sec: SectionSpec, ctx: SequenceContext):
+    "infer how wide the widest vector element will be"
+    items = [item for item in sec.items_from(ctx) if sec._passes_filter(item)]
+    w = 0
+    p = sec.options.precision
+    for _, v in items:
+        assert np.shape(v)
+        w = max(w, max(len(f"{el:.{p-1}g}") for el in np.asarray(v).ravel()))
+    return w
+
+
 def _unitstr(key) -> str:
     return unitstr(key, into="[%s]", dimless="")
 
@@ -475,9 +488,15 @@ def _table_solution(sol, tables, options: PrintOptions) -> str:
 def _table_sequence(seq, tables, options: PrintOptions) -> str:
     blocks: list[str] = []
     ctx = SequenceContext(seq)
+
     for table_name in tables:
-        section = SECTION_SPECS[table_name](options=options)
-        sec_lines = section.format(ctx)
+        sec = SECTION_SPECS[table_name](options=options)
+        if options.vec_width is None and sec.align_seq:  # auto-infer alignment width
+            width = _max_val_width(sec, ctx)
+            opt_mod = replace(options, vec_width=width)
+            sec = SECTION_SPECS[table_name](options=opt_mod)
+
+        sec_lines = sec.format(ctx)
         if sec_lines:
             blocks.append("\n".join(sec_lines))
 
