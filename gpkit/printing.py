@@ -331,7 +331,7 @@ class SequenceContext:
         items = []
         n = len(self.sols)
         for (name, msg), c in counts.items():
-            items.append((f"{name} - in {c} of {n} solutions:", [msg]))
+            items.append((f"{name} - in {c} of {n} solutions", [msg]))
         return items
 
     def primal_items(self) -> Iterable[Item]:

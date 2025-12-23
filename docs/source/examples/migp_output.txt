@@ -8,7 +8,7 @@ x + numerator/x : [ 1.41  2.14  2.68  3.13  3.52  3.87 ... ]
 
 WARNINGS
 --------
-Freed Choice Variables - in 11 of 11 solutions::
+Freed Choice Variables - in 11 of 11 solutions:
 This model has the discretized choice variables [x], but since the 'cvxopt' solver doesn't support discretization they were treated as continuous variables.
 
 Free Variables
