@@ -173,6 +173,14 @@ class SolutionSequence(List[Solution]):
         (out.modelstr,) = modelstrs
         return out
 
+    def plot(self):
+        "Eventual plotting capability"
+        raise NotImplementedError
+
+    def save(self):
+        "Placeholder for saving capability"
+        raise NotImplementedError
+
     def table(self, **kwargs):
         "Per legacy, prints breakdowns then Solution.table"
         return printing_table(self, **kwargs)
