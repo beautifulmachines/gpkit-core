@@ -85,13 +85,15 @@ class SectionSpec:
 
     def _fmt_val(self, val) -> str:
         n = self.options.vecn
+        p = self.options.precision
+        w = self.options.vec_width or 0
         if np.shape(val):
             flat = np.asarray(val).ravel()
             shown = flat[:n]
-            body = "  ".join(f"{x:.3g}" for x in shown)
+            body = "  ".join(f"{x:.{p-1}g}".rjust(w) for x in shown)
             dots = " ..." if flat.size > n else ""
             return f"[ {body}{dots} ]"
-        return f"{val:{self.pm}.{self.options.precision}g}"
+        return f"{val:{self.pm}.{p}g}"
 
     def _passes_filter(self, item) -> bool:
         # pylint: disable=not-callable
