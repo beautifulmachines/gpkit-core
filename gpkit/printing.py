@@ -22,6 +22,11 @@ class PrintOptions:
     vec_width: int | None = None  # None -> auto-align elements when applicable
 
 
+@dataclass(frozen=True)
+class ItemSource:
+    name: str
+
+
 # pylint: disable=missing-class-docstring
 class SectionSpec:
     title: str = "Untitled Section"
@@ -445,6 +450,23 @@ def _format_aligned_columns(
 
 def _unitstr(key) -> str:
     return unitstr(key, into="[%s]", dimless="")
+
+
+def _resolve_attrpath(obj: Any, path: str) -> Any:
+    """Resolve a dotted attribute path (e.g. 'sens.variables')."""
+    for name in path.split("."):
+        obj = getattr(obj, name)
+    return obj
+
+
+# def rel_diff(new: Any, old: Any) -> Any:
+#     """Relative difference: new/old - 1, NaN on failure."""
+#     if old is None:
+#         return float("nan")
+#     try:
+#         return new / old - 1
+#     except Exception:
+#         return float("nan")
 
 
 def rounded_mag(val, nround=8):
