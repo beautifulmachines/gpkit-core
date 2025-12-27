@@ -147,11 +147,36 @@ class Warnings(SectionSpec):
 
     def row_from(self, item):
         """Extract [warning_type, details] for warning display."""
-        warning_type, warning_detail = item
-        return [f"{warning_type}:\n" + "\n".join(warning_detail)]
+        warning_type, warning_list = item
+        return [f"{warning_type}:\n" + "\n".join(warning_list)]
 
     def items_from(self, ctx):
         return ctx.warning_items()
+
+
+def _warnings_single(sol):
+    "get the warning dict for a single solution, handling any special cases"
+
+    def _special_case(name, payload) -> str:
+        # refactor architecture to avoid these two special cases
+        if "Unexpectedly Loose Constraints" in name:
+            _rel_diff, loosevalues, c = payload
+            lhs, op, rhs = loosevalues
+            cstr = c.str_without({"units", "lineage"})
+            return f"{lhs:.4g} {op} {rhs:.4g} : {cstr}"
+        if "Unexpectedly Tight Constraints" in name:
+            relax_sens, c = payload
+            cstr = c.str_without({"units", "lineage"})
+            return f"{relax_sens:+6.2g} : {cstr}"
+        return ""
+
+    warns = getattr(sol, "meta", {}).get("warnings", {})
+    out = {}
+    for name, detail in warns.items():
+        if not detail:
+            continue
+        out[name] = [_special_case(name, pay) or msg for msg, pay in detail]
+    return out
 
 
 class FreeVariables(SectionSpec):
@@ -266,11 +291,7 @@ class SolutionContext:
 
     def warning_items(self) -> Iterable[tuple[str, list[str]]]:
         """Return flattened warning messages keyed by warning name."""
-        warns = (getattr(self.sol, "meta", None) or {}).get("warnings", {})
-        # printing.py currently flattens warning details into strings
-        return [
-            (name, [x[0] for x in detail]) for name, detail in warns.items() if detail
-        ]
+        return _warnings_single(self.sol).items()
 
 
 @dataclass(frozen=True)
