@@ -301,6 +301,16 @@ class SequenceContext:
     sols: Sequence[Any]  # sequence of Solution-like objects
     align_vec = True
 
+    def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
+        "Items for a given attribute are stacked across self.sols"
+
+        def _items_one_sol(sol):
+            if isinstance(source, ItemSource):
+                return _resolve_attrpath(sol, source.path).items()
+            return source(sol).items()
+
+        return self._stack(_items_one_sol)
+
     def _stack(self, get_items: Callable[[Any], Iterable[Item]]) -> list[Item]:
         """Strict stacking: keys (and their order) must match across all sols."""
         if not self.sols:
@@ -332,16 +342,6 @@ class SequenceContext:
             for w, c in cnt.items():
                 items[name].append(f"{w}  (in {c} of {n} solutions)")
         return items.items()
-
-    def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
-        "Items for a given attribute are stacked across self.sols"
-
-        def _items_one_sol(sol):
-            if isinstance(source, ItemSource):
-                return _resolve_attrpath(sol, source.path).items()
-            return source(sol).items()
-
-        return self._stack(_items_one_sol)
 
 
 def table(
