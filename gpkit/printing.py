@@ -132,15 +132,13 @@ class SectionSpec:
 
 class Cost(SectionSpec):
     title = "Optimal Cost"
+    source = staticmethod(lambda sol: {sol.meta["cost function"]: sol.cost})
 
     def row_from(self, item):
         """Extract [name, value, unit] for cost display."""
         key, val = item
         name = key.str_without("units") if key else "cost"
         return [f"{name} :", self._fmt_val(val), _unitstr(key)]
-
-    def items_from(self, ctx):
-        return ctx.cost_items()
 
 
 class Warnings(SectionSpec):
@@ -186,9 +184,7 @@ class Constants(SectionSpec):
 
 class Sweeps(Constants):
     title = "Swept Variables"
-
-    def items_from(self, ctx):
-        return ctx.swept_items()
+    source = staticmethod(lambda s: getattr(s, "meta", {}).get("sweep_point", {}))
 
 
 class Sensitivities(SectionSpec):
@@ -261,14 +257,12 @@ class SolutionContext:
     sol: Any
     align_vec = False
 
-    def items(self, source: ItemSource) -> Iterable[Item]:
+    def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
         "Get the items associated with a particular attribute (source)"
-        obj = _resolve_attrpath(self.sol, source.path)
-        return getattr(obj, "vector_parent_items", obj.items)()
-
-    def cost_items(self) -> Iterable[Item]:
-        """Return the solution cost as a single keyed item."""
-        return [(self.sol.meta["cost function"], self.sol.cost)]
+        if isinstance(source, ItemSource):
+            obj = _resolve_attrpath(self.sol, source.path)
+            return getattr(obj, "vector_parent_items", obj.items)()
+        return source(self.sol).items()
 
     def warning_items(self) -> Iterable[tuple[str, list[str]]]:
         """Return flattened warning messages keyed by warning name."""
@@ -277,10 +271,6 @@ class SolutionContext:
         return [
             (name, [x[0] for x in detail]) for name, detail in warns.items() if detail
         ]
-
-    def swept_items(self) -> Iterable[Item]:
-        "Return nothing for single Solution case"
-        return []
 
 
 @dataclass(frozen=True)
@@ -307,13 +297,6 @@ class SequenceContext:
                 cols[k].append(v)
 
         return [(k, np.asarray(cols[k])) for k in keys0]
-
-    def _sweep_point(self, s: Any) -> dict[Any, Any]:
-        return (getattr(s, "meta", None) or {}).get("sweep_point", {}) or {}
-
-    def cost_items(self) -> Iterable[Item]:
-        """Return the cost stacked across all solutions."""
-        return self._stack(lambda s: [(s.meta["cost function"], s.cost)])
 
     def warning_items(self) -> Iterable[tuple[str, list[str]]]:
         """Merge warnings from all solutions into a single mapping."""
@@ -344,17 +327,15 @@ class SequenceContext:
             items.append((f"{name} - in {c} of {n} solutions", [msg]))
         return items
 
-    def items(self, source: ItemSource) -> Iterable[Item]:
+    def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
         "Items for a given attribute are stacked across self.sols"
-        return self._stack(lambda s: _resolve_attrpath(s, source.path).items())
 
-    def swept_items(self) -> Iterable[Item]:
-        """Stack swept parameters, enforcing identical sweep keys."""
-        # Strict: sweep keys/order taken from first; must match for all.
-        if not self.sols:
-            return []
-        keys0 = tuple(self._sweep_point(self.sols[0]).keys())
-        return self._stack(lambda s: [(k, self._sweep_point(s)[k]) for k in keys0])
+        def _items_one_sol(sol):
+            if isinstance(source, ItemSource):
+                return _resolve_attrpath(sol, source.path).items()
+            return source(sol).items()
+
+        return self._stack(_items_one_sol)
 
 
 def table(
