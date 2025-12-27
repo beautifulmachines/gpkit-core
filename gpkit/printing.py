@@ -197,9 +197,7 @@ class Sensitivities(SectionSpec):
     filterfun = staticmethod(lambda x: rounded_mag(x[1]) >= 0.01)
     align = "><<"
     pm = "+"
-
-    def items_from(self, ctx):
-        return ctx.variable_sens_items()
+    source = ItemSource("sens.variables")
 
     def row_from(self, item):
         """Extract [name, value, label] (no units!)."""
@@ -214,6 +212,7 @@ class Constraints(SectionSpec):
     sortkey = staticmethod(lambda x: (-rounded_mag(x[1]), str(x[0])))
     col_sep = " : "
     pm = "+"
+    source = ItemSource("sens.constraints")
 
     def row_from(self, item):
         """Extract [sens, constraint_str] for constraint tables."""
@@ -221,9 +220,6 @@ class Constraints(SectionSpec):
         constrstr = constraint.str_without({"units", "lineage"})
         valstr = self._fmt_val(sens)
         return [valstr, constrstr]
-
-    def items_from(self, ctx):
-        return ctx.constraint_sens_items()
 
 
 class TightConstraints(Constraints):
@@ -285,14 +281,6 @@ class SolutionContext:
     def swept_items(self) -> Iterable[Item]:
         "Return nothing for single Solution case"
         return []
-
-    def variable_sens_items(self) -> Iterable[Item]:
-        """Return sensitivities with respect to variables."""
-        return self.sol.sens.variables.vector_parent_items()
-
-    def constraint_sens_items(self) -> Iterable[tuple[Any, Any]]:
-        """Return sensitivities with respect to constraints."""
-        return self.sol.sens.constraints.items()
 
 
 @dataclass(frozen=True)
@@ -367,14 +355,6 @@ class SequenceContext:
             return []
         keys0 = tuple(self._sweep_point(self.sols[0]).keys())
         return self._stack(lambda s: [(k, self._sweep_point(s)[k]) for k in keys0])
-
-    def variable_sens_items(self) -> Iterable[Item]:
-        """Stack variable sensitivities across solutions."""
-        return self._stack(lambda s: s.sens.variables.vector_parent_items())
-
-    def constraint_sens_items(self) -> Iterable[Item]:
-        """Stack constraint sensitivities across solutions."""
-        return self._stack(lambda s: s.sens.constraints.items())
 
 
 def table(

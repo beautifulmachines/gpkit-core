@@ -169,7 +169,9 @@ z[2] : [ 9 ]
 Variable Sensitivities
 ----------------------
 Cake.Simple
-y[:] : [ 0.15  0.5   1.05 ]
+y[2] : [ 1.05 ]
+y[1] : [ 0.5  ]
+y[0] : [ 0.15 ]
 
 Most Sensitive Constraints
 --------------------------
