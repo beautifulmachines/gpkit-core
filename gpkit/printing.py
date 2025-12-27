@@ -25,21 +25,22 @@ class PrintOptions:
 @dataclass(frozen=True)
 class ItemSource:
     "Attribute path to retrieve a Mapping holding Items"
+
     path: str
 
 
 # pylint: disable=missing-class-docstring
 class SectionSpec:
-    title: str = "Untitled Section"
-    group_by_model = True
-    sortkey = None
-    source = None
     align = None
     align_seq = True
+    col_sep = " "
     filterfun = None
     filter_reduce = staticmethod(any)
-    col_sep = " "
+    group_by_model = True
     pm = ""  # sign format prefix (e.g. '+' for sensitivities)
+    sortkey = None
+    source = None
+    title: str = "Untitled Section"
 
     def __init__(self, options: PrintOptions):
         self.options = options
