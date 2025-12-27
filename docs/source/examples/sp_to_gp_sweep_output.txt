@@ -8,12 +8,10 @@ W_f : [ 4.63e+03  6.23e+03  7.36e+03 ] [N]
 
 WARNINGS
 --------
-Unexpectedly Loose Constraints - in 1 of 3 solutions:
-0.5886 >= 0.5775 : V_{f_{avail}} ≥ V_f
-Unexpectedly Loose Constraints - in 1 of 3 solutions:
-0.7884 >= 0.7769 : V_{f_{avail}} ≥ V_f
-Unexpectedly Loose Constraints - in 1 of 3 solutions:
-0.9585 >= 0.9187 : V_{f_{avail}} ≥ V_f
+Unexpectedly Loose Constraints:
+0.5886 >= 0.5775 : V_{f_{avail}} ≥ V_f  (in 1 of 3 solutions)
+0.7884 >= 0.7769 : V_{f_{avail}} ≥ V_f  (in 1 of 3 solutions)
+0.9585 >= 0.9187 : V_{f_{avail}} ≥ V_f  (in 1 of 3 solutions)
 
 Free Variables
 --------------

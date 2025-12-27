@@ -321,32 +321,17 @@ class SequenceContext:
 
     def warning_items(self) -> Iterable[tuple[str, list[str]]]:
         """Merge warnings from all solutions into a single mapping."""
-
-        def _special_case(name, payload) -> str:
-            # refactor architecture to avoid these two special cases
-            if "Unexpectedly Loose Constraints" in name:
-                _rel_diff, loosevalues, c = payload
-                lhs, op, rhs = loosevalues
-                cstr = c.str_without({"units", "lineage"})
-                return f"{lhs:.4g} {op} {rhs:.4g} : {cstr}"
-            if "Unexpectedly Tight Constraints" in name:
-                relax_sens, c = payload
-                cstr = c.str_without({"units", "lineage"})
-                return f"{relax_sens:+6.2g} : {cstr}"
-            return ""
-
-        counts = Counter()
-        for s in self.sols:
-            warns = (getattr(s, "meta", None) or {}).get("warnings", {})
-            for name, detail in warns.items():
-                for msg, pay in detail:
-                    msg = _special_case(name, pay) or msg
-                    counts[(name, msg)] += 1
-        items = []
+        counts = defaultdict(Counter)
         n = len(self.sols)
-        for (name, msg), c in counts.items():
-            items.append((f"{name} - in {c} of {n} solutions", [msg]))
-        return items
+        for s in self.sols:
+            for name, warn_list in _warnings_single(s).items():
+                for entry in warn_list:
+                    counts[name][entry] += 1
+        items = defaultdict(list)
+        for name, cnt in counts.items():
+            for w, c in cnt.items():
+                items[name].append(f"{w}  (in {c} of {n} solutions)")
+        return items.items()
 
     def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
         "Items for a given attribute are stacked across self.sols"
