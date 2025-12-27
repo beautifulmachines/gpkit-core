@@ -22,24 +22,34 @@ class PrintOptions:
     vec_width: int | None = None  # None -> auto-align elements when applicable
 
 
+@dataclass(frozen=True)
+class ItemSource:
+    "Attribute path to retrieve a Mapping holding Items"
+
+    path: str
+
+
 # pylint: disable=missing-class-docstring
 class SectionSpec:
-    title: str = "Untitled Section"
-    group_by_model = True
-    sortkey = None
     align = None
     align_seq = True
+    col_sep = " "
     filterfun = None
     filter_reduce = staticmethod(any)
-    col_sep = " "
+    group_by_model = True
     pm = ""  # sign format prefix (e.g. '+' for sensitivities)
+    sortkey = None
+    source = None
+    title: str = "Untitled Section"
 
     def __init__(self, options: PrintOptions):
         self.options = options
 
     def items_from(self, ctx):
         "Return iterable of items given SolContext. Item defs are section-specific"
-        raise NotImplementedError
+        if self.source is None:
+            raise NotImplementedError
+        return ctx.items(self.source)
 
     def row_from(self, item):
         "Convert a section-specific 'item' to a row, i.e. List[str]"
@@ -122,15 +132,13 @@ class SectionSpec:
 
 class Cost(SectionSpec):
     title = "Optimal Cost"
+    source = staticmethod(lambda sol: {sol.meta["cost function"]: sol.cost})
 
     def row_from(self, item):
         """Extract [name, value, unit] for cost display."""
         key, val = item
         name = key.str_without("units") if key else "cost"
         return [f"{name} :", self._fmt_val(val), _unitstr(key)]
-
-    def items_from(self, ctx):
-        return ctx.cost_items()
 
 
 class Warnings(SectionSpec):
@@ -139,20 +147,43 @@ class Warnings(SectionSpec):
 
     def row_from(self, item):
         """Extract [warning_type, details] for warning display."""
-        warning_type, warning_detail = item
-        return [f"{warning_type}:\n" + "\n".join(warning_detail)]
+        warning_type, warning_list = item
+        return [f"{warning_type}:\n" + "\n".join(warning_list)]
 
     def items_from(self, ctx):
         return ctx.warning_items()
+
+
+def _warnings_single(sol):
+    "get the warning dict for a single solution, handling any special cases"
+
+    def _special_case(name, payload) -> str:
+        # refactor architecture to avoid these two special cases
+        if "Unexpectedly Loose Constraints" in name:
+            _rel_diff, loosevalues, c = payload
+            lhs, op, rhs = loosevalues
+            cstr = c.str_without({"units", "lineage"})
+            return f"{lhs:.4g} {op} {rhs:.4g} : {cstr}"
+        if "Unexpectedly Tight Constraints" in name:
+            relax_sens, c = payload
+            cstr = c.str_without({"units", "lineage"})
+            return f"{relax_sens:+6.2g} : {cstr}"
+        return ""
+
+    warns = getattr(sol, "meta", {}).get("warnings", {})
+    out = {}
+    for name, detail in warns.items():
+        if not detail:
+            continue
+        out[name] = [_special_case(name, pay) or msg for msg, pay in detail]
+    return out
 
 
 class FreeVariables(SectionSpec):
     title = "Free Variables"
     align = "><<<"
     sortkey = staticmethod(lambda x: str(x[0]))
-
-    def items_from(self, ctx):
-        return ctx.primal_items()
+    source = ItemSource("primal")
 
     def row_from(self, item):
         """Extract [name, value, unit, label] for variable tables."""
@@ -166,9 +197,7 @@ class Constants(SectionSpec):
     title = "Fixed Variables"
     align = "><<<"
     sortkey = staticmethod(lambda x: str(x[0]))
-
-    def items_from(self, ctx):
-        return ctx.constant_items()
+    source = ItemSource("constants")
 
     def row_from(self, item):
         """Extract [name, value, unit, label] for variable tables."""
@@ -180,9 +209,7 @@ class Constants(SectionSpec):
 
 class Sweeps(Constants):
     title = "Swept Variables"
-
-    def items_from(self, ctx):
-        return ctx.swept_items()
+    source = staticmethod(lambda s: getattr(s, "meta", {}).get("sweep_point", {}))
 
 
 class Sensitivities(SectionSpec):
@@ -191,9 +218,7 @@ class Sensitivities(SectionSpec):
     filterfun = staticmethod(lambda x: rounded_mag(x[1]) >= 0.01)
     align = "><<"
     pm = "+"
-
-    def items_from(self, ctx):
-        return ctx.variable_sens_items()
+    source = ItemSource("sens.variables")
 
     def row_from(self, item):
         """Extract [name, value, label] (no units!)."""
@@ -208,6 +233,7 @@ class Constraints(SectionSpec):
     sortkey = staticmethod(lambda x: (-rounded_mag(x[1]), str(x[0])))
     col_sep = " : "
     pm = "+"
+    source = ItemSource("sens.constraints")
 
     def row_from(self, item):
         """Extract [sens, constraint_str] for constraint tables."""
@@ -215,9 +241,6 @@ class Constraints(SectionSpec):
         constrstr = constraint.str_without({"units", "lineage"})
         valstr = self._fmt_val(sens)
         return [valstr, constrstr]
-
-    def items_from(self, ctx):
-        return ctx.constraint_sens_items()
 
 
 class TightConstraints(Constraints):
@@ -259,37 +282,16 @@ class SolutionContext:
     sol: Any
     align_vec = False
 
-    def cost_items(self) -> Iterable[Item]:
-        """Return the solution cost as a single keyed item."""
-        return [(self.sol.meta["cost function"], self.sol.cost)]
+    def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
+        "Get the items associated with a particular attribute (source)"
+        if isinstance(source, ItemSource):
+            obj = _resolve_attrpath(self.sol, source.path)
+            return getattr(obj, "vector_parent_items", obj.items)()
+        return source(self.sol).items()
 
     def warning_items(self) -> Iterable[tuple[str, list[str]]]:
         """Return flattened warning messages keyed by warning name."""
-        warns = (getattr(self.sol, "meta", None) or {}).get("warnings", {})
-        # printing.py currently flattens warning details into strings
-        return [
-            (name, [x[0] for x in detail]) for name, detail in warns.items() if detail
-        ]
-
-    def primal_items(self) -> Iterable[Item]:
-        """Return primal variable values grouped by parent."""
-        return self.sol.primal.vector_parent_items()
-
-    def constant_items(self) -> Iterable[Item]:
-        """Return constant values grouped by parent."""
-        return self.sol.constants.vector_parent_items()
-
-    def swept_items(self) -> Iterable[Item]:
-        "Return nothing for single Solution case"
-        return []
-
-    def variable_sens_items(self) -> Iterable[Item]:
-        """Return sensitivities with respect to variables."""
-        return self.sol.sens.variables.vector_parent_items()
-
-    def constraint_sens_items(self) -> Iterable[tuple[Any, Any]]:
-        """Return sensitivities with respect to constraints."""
-        return self.sol.sens.constraints.items()
+        return _warnings_single(self.sol).items()
 
 
 @dataclass(frozen=True)
@@ -298,6 +300,16 @@ class SequenceContext:
 
     sols: Sequence[Any]  # sequence of Solution-like objects
     align_vec = True
+
+    def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
+        "Items for a given attribute are stacked across self.sols"
+
+        def _items_one_sol(sol):
+            if isinstance(source, ItemSource):
+                return _resolve_attrpath(sol, source.path).items()
+            return source(sol).items()
+
+        return self._stack(_items_one_sol)
 
     def _stack(self, get_items: Callable[[Any], Iterable[Item]]) -> list[Item]:
         """Strict stacking: keys (and their order) must match across all sols."""
@@ -317,70 +329,19 @@ class SequenceContext:
 
         return [(k, np.asarray(cols[k])) for k in keys0]
 
-    def _sweep_point(self, s: Any) -> dict[Any, Any]:
-        return (getattr(s, "meta", None) or {}).get("sweep_point", {}) or {}
-
-    def cost_items(self) -> Iterable[Item]:
-        """Return the cost stacked across all solutions."""
-        return self._stack(lambda s: [(s.meta["cost function"], s.cost)])
-
     def warning_items(self) -> Iterable[tuple[str, list[str]]]:
         """Merge warnings from all solutions into a single mapping."""
-
-        def _special_case(name, payload) -> str:
-            # refactor architecture to avoid these two special cases
-            if "Unexpectedly Loose Constraints" in name:
-                _rel_diff, loosevalues, c = payload
-                lhs, op, rhs = loosevalues
-                cstr = c.str_without({"units", "lineage"})
-                return f"{lhs:.4g} {op} {rhs:.4g} : {cstr}"
-            if "Unexpectedly Tight Constraints" in name:
-                relax_sens, c = payload
-                cstr = c.str_without({"units", "lineage"})
-                return f"{relax_sens:+6.2g} : {cstr}"
-            return ""
-
-        counts = Counter()
-        for s in self.sols:
-            warns = (getattr(s, "meta", None) or {}).get("warnings", {})
-            for name, detail in warns.items():
-                for msg, pay in detail:
-                    msg = _special_case(name, pay) or msg
-                    counts[(name, msg)] += 1
-        items = []
+        counts = defaultdict(Counter)
         n = len(self.sols)
-        for (name, msg), c in counts.items():
-            items.append((f"{name} - in {c} of {n} solutions", [msg]))
-        return items
-
-    def primal_items(self) -> Iterable[Item]:
-        """Stack primal variable values across solutions."""
-        return self._stack(lambda s: s.primal.vector_parent_items())
-
-    def swept_items(self) -> Iterable[Item]:
-        """Stack swept parameters, enforcing identical sweep keys."""
-        # Strict: sweep keys/order taken from first; must match for all.
-        if not self.sols:
-            return []
-        keys0 = tuple(self._sweep_point(self.sols[0]).keys())
-        return self._stack(lambda s: [(k, self._sweep_point(s)[k]) for k in keys0])
-
-    def constant_items(self) -> Iterable[Item]:
-        """Stack constants excluding any swept parameters."""
-        swept = set(self._sweep_point(self.sols[0]).keys()) if self.sols else set()
-        return self._stack(
-            lambda s: [
-                (k, v) for k, v in s.constants.vector_parent_items() if k not in swept
-            ]
-        )
-
-    def variable_sens_items(self) -> Iterable[Item]:
-        """Stack variable sensitivities across solutions."""
-        return self._stack(lambda s: s.sens.variables.vector_parent_items())
-
-    def constraint_sens_items(self) -> Iterable[Item]:
-        """Stack constraint sensitivities across solutions."""
-        return self._stack(lambda s: s.sens.constraints.items())
+        for s in self.sols:
+            for name, warn_list in _warnings_single(s).items():
+                for entry in warn_list:
+                    counts[name][entry] += 1
+        items = defaultdict(list)
+        for name, cnt in counts.items():
+            for w, c in cnt.items():
+                items[name].append(f"{w}  (in {c} of {n} solutions)")
+        return items.items()
 
 
 def table(
@@ -445,6 +406,23 @@ def _format_aligned_columns(
 
 def _unitstr(key) -> str:
     return unitstr(key, into="[%s]", dimless="")
+
+
+def _resolve_attrpath(obj: Any, path: str) -> Any:
+    """Resolve a dotted attribute path (e.g. 'sens.variables')."""
+    for name in path.split("."):
+        obj = getattr(obj, name)
+    return obj
+
+
+# def rel_diff(new: Any, old: Any) -> Any:
+#     """Relative difference: new/old - 1, NaN on failure."""
+#     if old is None:
+#         return float("nan")
+#     try:
+#         return new / old - 1
+#     except Exception:
+#         return float("nan")
 
 
 def rounded_mag(val, nround=8):

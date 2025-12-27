@@ -152,18 +152,26 @@ Cake.Simple.x[:].sum() : [ 20 ]
 Free Variables
 --------------
 Cake.Simple
-x[:] : [ 2   6   12 ]
+x[0] : [ 2  ]
+x[1] : [ 6  ]
+x[2] : [ 12 ]
 
 Fixed Variables
 ---------------
 Cake.Simple
-y[:] : [ 1  2  3 ]
-z[:] : [ 1  4  9 ]
+y[0] : [ 1 ]
+y[1] : [ 2 ]
+y[2] : [ 3 ]
+z[0] : [ 1 ]
+z[1] : [ 4 ]
+z[2] : [ 9 ]
 
 Variable Sensitivities
 ----------------------
 Cake.Simple
-y[:] : [ 0.15  0.5   1.05 ]
+y[2] : [ 1.05 ]
+y[1] : [ 0.5  ]
+y[0] : [ 0.15 ]
 
 Most Sensitive Constraints
 --------------------------
