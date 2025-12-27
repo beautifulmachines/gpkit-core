@@ -174,9 +174,7 @@ class Constants(SectionSpec):
     title = "Fixed Variables"
     align = "><<<"
     sortkey = staticmethod(lambda x: str(x[0]))
-
-    def items_from(self, ctx):
-        return ctx.constant_items()
+    source = ItemSource("constants")
 
     def row_from(self, item):
         """Extract [name, value, unit, label] for variable tables."""
@@ -284,10 +282,6 @@ class SolutionContext:
             (name, [x[0] for x in detail]) for name, detail in warns.items() if detail
         ]
 
-    def constant_items(self) -> Iterable[Item]:
-        """Return constant values grouped by parent."""
-        return self.sol.constants.vector_parent_items()
-
     def swept_items(self) -> Iterable[Item]:
         "Return nothing for single Solution case"
         return []
@@ -373,15 +367,6 @@ class SequenceContext:
             return []
         keys0 = tuple(self._sweep_point(self.sols[0]).keys())
         return self._stack(lambda s: [(k, self._sweep_point(s)[k]) for k in keys0])
-
-    def constant_items(self) -> Iterable[Item]:
-        """Stack constants excluding any swept parameters."""
-        swept = set(self._sweep_point(self.sols[0]).keys()) if self.sols else set()
-        return self._stack(
-            lambda s: [
-                (k, v) for k, v in s.constants.vector_parent_items() if k not in swept
-            ]
-        )
 
     def variable_sens_items(self) -> Iterable[Item]:
         """Stack variable sensitivities across solutions."""
