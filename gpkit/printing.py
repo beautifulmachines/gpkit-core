@@ -24,7 +24,8 @@ class PrintOptions:
 
 @dataclass(frozen=True)
 class ItemSource:
-    name: str
+    "Attribute path to retrieve a Mapping holding Items"
+    path: str
 
 
 # pylint: disable=missing-class-docstring
@@ -32,6 +33,7 @@ class SectionSpec:
     title: str = "Untitled Section"
     group_by_model = True
     sortkey = None
+    source = None
     align = None
     align_seq = True
     filterfun = None
@@ -44,7 +46,9 @@ class SectionSpec:
 
     def items_from(self, ctx):
         "Return iterable of items given SolContext. Item defs are section-specific"
-        raise NotImplementedError
+        if self.source is None:
+            raise NotImplementedError
+        return ctx.items(self.source)
 
     def row_from(self, item):
         "Convert a section-specific 'item' to a row, i.e. List[str]"
@@ -155,9 +159,7 @@ class FreeVariables(SectionSpec):
     title = "Free Variables"
     align = "><<<"
     sortkey = staticmethod(lambda x: str(x[0]))
-
-    def items_from(self, ctx):
-        return ctx.primal_items()
+    source = ItemSource("primal")
 
     def row_from(self, item):
         """Extract [name, value, unit, label] for variable tables."""
@@ -264,6 +266,11 @@ class SolutionContext:
     sol: Any
     align_vec = False
 
+    def items(self, source: ItemSource) -> Iterable[Item]:
+        "Get the items associated with a particular attribute (source)"
+        obj = _resolve_attrpath(self.sol, source.path)
+        return getattr(obj, "vector_parent_items", obj.items)()
+
     def cost_items(self) -> Iterable[Item]:
         """Return the solution cost as a single keyed item."""
         return [(self.sol.meta["cost function"], self.sol.cost)]
@@ -275,10 +282,6 @@ class SolutionContext:
         return [
             (name, [x[0] for x in detail]) for name, detail in warns.items() if detail
         ]
-
-    def primal_items(self) -> Iterable[Item]:
-        """Return primal variable values grouped by parent."""
-        return self.sol.primal.vector_parent_items()
 
     def constant_items(self) -> Iterable[Item]:
         """Return constant values grouped by parent."""
@@ -358,9 +361,9 @@ class SequenceContext:
             items.append((f"{name} - in {c} of {n} solutions", [msg]))
         return items
 
-    def primal_items(self) -> Iterable[Item]:
-        """Stack primal variable values across solutions."""
-        return self._stack(lambda s: s.primal.vector_parent_items())
+    def items(self, source: ItemSource) -> Iterable[Item]:
+        "Items for a given attribute are stacked across self.sols"
+        return self._stack(lambda s: _resolve_attrpath(s, source.path).items())
 
     def swept_items(self) -> Iterable[Item]:
         """Stack swept parameters, enforcing identical sweep keys."""
