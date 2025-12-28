@@ -47,16 +47,9 @@ C_f : 0.003599        skin friction coefficient
   W : 7341      [N]   total aircraft weight
 W_w : 2401      [N]   wing weight
 
-Solution Diff
-=============
-(argument is the baseline solution)
-
-** no constraint differences **
-
-Relative Differences |above 1.0%|
----------------------------------
-The largest is +0%.
-
+Cost Change
+-----------
+D : +0% (303.1N vs 303.1N)
 SWEEP
 =====
 Swept Variables
@@ -79,49 +72,18 @@ C_f : [ 0.00333   0.00314   0.00361   0.00342  ]      skin friction coefficient
   S : [ 18.6      17.3      12.1      11.2     ] [m²] total wing area
   W : [ 6.85e+03  6.4e+03   6.97e+03  6.44e+03 ] [N]  total aircraft weight
 W_w : [ 1.91e+03  1.46e+03  2.03e+03  1.5e+03  ] [N]  wing weight
-Solution Diff
-=============
-(argument is the baseline solution)
+Cost Change
+-----------
+D : [ 11.5%   30.7%   -2.9%   7.54%  ]
 
-** no constraint differences **
-
-Relative Differences |above 1.0%|
----------------------------------
-     Re : [  +46.4%    +97.1%     -1.1%    +29.2%  ] Reynold's number
-    C_L : [  -40.6%    -60.2%     -7.2%    -37.9%  ] Lift coefficent of wing
-      V : [  +18.0%    +44.2%    +18.0%    +44.2%  ] cruising speed
-    W_w : [  -20.7%    -39.3%    -15.6%    -37.4%  ] wing weight
-    C_D : [  -29.0%    -40.4%     -5.0%    -23.9%  ] Drag coefficient of wing
-      A : [  -26.7%    -43.6%     +4.5%    -15.3%  ] aspect ratio
-      S : [  +12.8%     +5.5%    -26.5%    -32.0%  ] total wing area
-      D : [  +11.5%    +30.7%     -2.9%     +7.5%  ] total drag force
-V_{min} : [   -9.1%     -9.1%    +13.6%    +13.6%  ] takeoff speed
-      W : [   -6.8%    -12.8%     -5.1%    -12.2%  ] total aircraft weight
-    C_f : [   -7.3%    -12.7%       -       -5.0%  ] skin friction coefficient
-
-Absolute Differences |above 0.1|
---------------------------------
-     Re : [ +1.7e+06  +3.6e+06  -4.1e+04  +1.1e+06 ]        Reynold's number
-      W : [   -5e+02  -9.4e+02  -3.8e+02    -9e+02 ]  [N]   total aircraft weight
-    W_w : [   -5e+02  -9.4e+02  -3.8e+02    -9e+02 ]  [N]   wing weight
-      D : [      +35       +93      -8.8       +23 ]  [N]   total drag force
-      V : [     +6.8       +17      +6.8       +17 ]  [m/s] cruising speed
-      S : [     +2.1      +0.9      -4.4      -5.3 ]  [m²]  total wing area
-V_{min} : [       -2        -2        +3        +3 ]  [m/s] takeoff speed
-      A : [     -2.3      -3.7     +0.38      -1.3 ]        aspect ratio
-    C_L : [     -0.2      -0.3        -      -0.19 ]        Lift coefficent of wing
-
-Sensitivity Differences |above 0.1|
------------------------------------
-                  V : [ +0.59   +0.97   +0.25   +0.75  ] cruising speed
-            V_{min} : [ -0.45   -0.67     -     -0.34  ] takeoff speed
-          C_{L,max} : [ -0.23   -0.34     -     -0.17  ] max CL with flaps down
-                  e : [ +0.15   +0.25     -     +0.19  ] Oswald efficiency factor
-                W_0 : [   -     -0.17     -     -0.16  ] aircraft weight excluding wing
-               \rho : [   -     +0.13     -     +0.19  ] density of air
-(\frac{S}{S_{wet}}) : [ +0.13   +0.20     -     +0.11  ] wetted area ratio
-                  k : [ +0.13   +0.20     -     +0.11  ] form factor
-            N_{ult} : [ -0.11   -0.18     -     -0.14  ] ultimate load factor
-     W_{W_{coeff1}} : [ -0.11   -0.18     -     -0.14  ] Wing Weight Coefficent 1
-               \tau : [ +0.11   +0.18     -     +0.14  ] airfoil thickness to chord ratio
-
+Free Variable Changes
+---------------------
+ Re : [ 46.4%    97.1%    -1.11%   29.2%   ] Reynold's number
+C_L : [ -40.6%   -60.2%   -7.18%   -37.9%  ] Lift coefficent of wing
+  A : [ -26.7%   -43.6%   4.54%    -15.3%  ] aspect ratio
+C_D : [ -29%     -40.4%   -5.01%   -23.9%  ] Drag coefficient of wing
+W_w : [ -20.7%   -39.3%   -15.6%   -37.4%  ] wing weight
+  S : [ 12.8%    5.46%    -26.5%   -32%    ] total wing area
+  D : [ 11.5%    30.7%    -2.9%    7.54%   ] total drag force
+  W : [ -6.76%   -12.8%   -5.12%   -12.2%  ] total aircraft weight
+C_f : [ -7.34%   -12.7%   0.224%   -4.99%  ] skin friction coefficient

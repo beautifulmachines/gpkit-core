@@ -247,14 +247,14 @@ print()
 print(sol.table(tables=["slack constraints"], empty="(none)"))
 
 M.append(MISSION.fs.aircraftp.Wburn >= 0.2 * MISSION.fs.aircraftp.wing_aero.D)
-sol = M.solve(verbosity=0)
-print(sol.diff("solution.pkl", showvars=vars_of_interest, sortbymodel=False))
+sol2 = M.solve(verbosity=0)
+print(sol2.diff(sol))
 
 try:
     from gpkit.interactive.sankey import Sankey
 
-    variablesankey = Sankey(sol, M).diagram(AC.wing.A)
-    sankey = Sankey(sol, M).diagram(width=1200, height=400, maxlinks=30)
+    variablesankey = Sankey(sol2, M).diagram(AC.wing.A)
+    sankey = Sankey(sol2, M).diagram(width=1200, height=400, maxlinks=30)
     # the line below shows an interactive graph if run in jupyter notebook
     sankey  # pylint: disable=pointless-statement
 except (ImportError, ModuleNotFoundError):

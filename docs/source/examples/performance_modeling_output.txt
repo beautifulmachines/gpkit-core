@@ -100,24 +100,27 @@ Re[:] : [ 3.65e+05  3.65e+05  3.65e+05  3.65e+05 ]       Reynold's number
 Insensitive Constraints (below 1e-05)
 -------------------------------------
 (none)
-Solution Diff (for selected variables)
-======================================
-(argument is the baseline solution)
+Cost Change
+-----------
+Mission.FlightSegment.AircraftP.Wfuel[0] : +101.3% (2.196lbf vs 1.091lbf)
 
-Constraint Differences
-**********************
-@@ -31,3 +31,4 @@
-   Wing
-    c = (S/A)^0.5
-    Wing.W ≥ S·Wing.rho
-+ Wburn[:] ≥ 0.2·D[:]
+Free Variable Changes
+---------------------
+Aircraft
+W : +0.2177%  (144.5lbf vs 144.1lbf) weight
 
-**********************
+Aircraft.Wing
+S : +0.711%  (44.45ft² vs 44.14ft²) surface area
+W : +0.711%  (44.45lbf vs 44.14lbf) weight
+c : +0.3549%  (1.283ft vs 1.279ft)  mean chord
 
-Relative Differences |above 1.0%|
----------------------------------
-Wburn : [ +102.1%   +101.6%   +101.1%   +100.5%  ] segment fuel burn
-Wfuel : [ +101.3%   +101.1%   +100.8%   +100.5%  ] fuel weight
-    D : [   +1.1%       -         -         -    ] drag force
+Mission.FlightSegment.AircraftP
+Wburn[:] : [ 102%  102%  101%  101% ] segment fuel burn
+Wfuel[:] : [ 101%  101%  101%  101% ] fuel weight
 
+Mission.FlightSegment.AircraftP.WingAero
+ D[:] : [ 1.06%  0.794%  0.529%  0.266% ]     drag force
+CD[:] : [ 0.349%  0.0828%  -0.181%  -0.442% ] drag coefficient
+Re[:] : [ 0.355%  0.355%  0.355%  0.355% ]    Reynold's number
+CL[:] : [ 0.264%  0.0746%  -0.114%  -0.302% ] lift coefficient
 Making Sankey diagrams requires the ipysankeywidget package
