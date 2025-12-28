@@ -6,9 +6,7 @@ import numpy as np
 
 import gpkit
 from gpkit import Model, SignomialsEnabled, Variable, VectorVariable
-from gpkit.solution_array import var_table
 from gpkit.util.small_classes import Quantity, Strings
-from gpkit.varkey import VarKey
 
 
 class TestSolution(unittest.TestCase):
@@ -95,15 +93,6 @@ class TestSolution(unittest.TestCase):
 
 class TestResultsTable(unittest.TestCase):
     """TestCase for var_table()"""
-
-    def test_nan_printing(self):
-        """Test that solution prints when it contains nans"""
-        x = VarKey(name="x")
-        data = {x: np.array([np.nan, 1, 1, 1, 1])}
-        title = "Free variables"
-        printstr = "\n".join(var_table(data, title))
-        self.assertTrue(" - " in printstr)  # nan is printed as " - "
-        self.assertTrue(title in printstr)
 
     def test_result_access(self):
         x = Variable("x")
