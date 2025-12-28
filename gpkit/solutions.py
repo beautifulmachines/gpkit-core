@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import List, Sequence
 
-from .printing import table as printing_table
+from . import printing
 from .solution_array import SolutionArray, bdtable_gen
 from .varkey import VarKey
 from .varmap import VarMap
@@ -69,9 +69,9 @@ class Solution:
         "Checks for almost-equality between two solutions"
         return self.to_solution_array().almost_equal(other, **kwargs)
 
-    def diff(self, *args, **kwargs):
-        "Pass through to SolutionArray.diff"
-        return self.to_solution_array().diff(*args, **kwargs)
+    def diff(self, baseline, **kwargs):
+        "printable difference table between this and other"
+        return printing.diff(self, baseline, **kwargs)
 
     def save(self, *args, **kwargs):
         "Pass through to SolutionArray.save"
@@ -84,7 +84,7 @@ class Solution:
     def summary(self, **kwargs) -> str:
         "Pass through to SolutionArray.summary"
         lines = self.cost_breakdown() + self.model_sens_breakdown() + [""]
-        table = printing_table(self, tables=("warnings", "freevariables"), **kwargs)
+        table = printing.table(self, tables=("warnings", "freevariables"), **kwargs)
         return "\n".join(lines) + table
 
     def table(self, **kwargs) -> str:
@@ -92,7 +92,7 @@ class Solution:
         lines = []
         if "tables" not in kwargs:  # don't add breakdowns if tables custom
             lines += self.cost_breakdown() + self.model_sens_breakdown() + [""]
-        return "\n".join(lines) + printing_table(self, **kwargs)
+        return "\n".join(lines) + printing.table(self, **kwargs)
 
     def cost_breakdown(self) -> str:
         "printable visualization of cost breakdown"
@@ -177,15 +177,19 @@ class SolutionSequence(List[Solution]):
         "Eventual plotting capability"
         raise NotImplementedError
 
+    def diff(self, baseline, **kwargs):
+        "printable difference table between this and other"
+        return printing.diff(self, baseline, **kwargs)
+
     def save(self):
         "Placeholder for saving capability"
         raise NotImplementedError
 
     def table(self, **kwargs):
         "Per legacy, prints breakdowns then Solution.table"
-        return printing_table(self, **kwargs)
+        return printing.table(self, **kwargs)
 
     def summary(self, **kwargs):
         "Fall back to SolutionArray.summary"
         tables = ("sweeps", "cost", "warnings", "freevariables")
-        return printing_table(self, tables=tables, **kwargs)
+        return printing.table(self, tables=tables, **kwargs)

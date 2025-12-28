@@ -66,7 +66,7 @@ print(sol.summary())
 # save solution to a file and retrieve it
 sol.save("solution.pkl")
 sol.save_compressed("solution.pgz")
-print("\n" + sol.diff("solution.pkl"))
+print("\n" + sol.diff(sol))
 
 print("SWEEP\n=====")
 sweeps = {

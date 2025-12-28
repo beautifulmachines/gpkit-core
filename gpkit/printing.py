@@ -29,6 +29,18 @@ class ItemSource:
     path: str
 
 
+@dataclass(frozen=True)
+class DiffPair:
+    "Difference between new and old"
+
+    new: Any
+    old: Any
+
+    def rel(self):
+        "simple relative difference"
+        return np.asarray(self.new) / np.asarray(self.old) - 1
+
+
 # pylint: disable=missing-class-docstring
 class SectionSpec:
     align = None
@@ -97,17 +109,17 @@ class SectionSpec:
         assert lines[-1] == ""
         return title_lines + lines[:-1]
 
-    def _fmt_val(self, val) -> str:
+    def _fmt_val(self, val, suff="") -> str:
         n = self.options.vecn
         p = self.options.precision
         w = self.options.vec_width or 0
         if np.shape(val):
             flat = np.asarray(val).ravel()
             shown = flat[:n]
-            body = "  ".join(f"{x:.{p-1}g}".ljust(w) for x in shown)
+            body = "  ".join(f"{x:.{p-1}g}{suff}".ljust(w) for x in shown)
             dots = " ..." if flat.size > n else ""
             return f"[ {body}{dots} ]"
-        return f"{val:{self.pm}.{p}g}"
+        return f"{val:{self.pm}.{p}g}{suff}"
 
     def _passes_filter(self, item) -> bool:
         # pylint: disable=not-callable
@@ -263,6 +275,42 @@ class SlackConstraints(Constraints):
         return lambda x: abs(x[1]) <= self.maxsens
 
 
+class DiffCost(SectionSpec):
+    title = "Cost Change"
+    source = staticmethod(Cost.source)
+    pm = "+"
+
+    def row_from(self, item):
+        key, pair = item
+        name = key.str_without("units") if key else "cost"
+        u = unitstr(key, into="%s", dimless="")
+        return [
+            f"{name} :",
+            f"{self._fmt_val(pair.rel() * 100, suff='%')}",
+            f"({pair.new:.4g}{u} vs {pair.old:.4g}{u})",
+        ]
+
+
+class DiffFreeVariables(FreeVariables):
+    title = "Free Variable Changes"
+    pm = "+"  # so _fmt_val shows sign for scalars
+    align = "><<"
+
+    # filter out zero vals
+    filterfun = staticmethod(lambda kv: np.any(kv[1].rel() != 0))
+
+    def row_from(self, item):
+        key, pair = item
+        name = key.str_without("lineage")
+        u = unitstr(key, into="%s", dimless="")
+        label = key.descr.get("label", "")
+        rel = pair.rel()
+        diffstr = f"{self._fmt_val(rel * 100, suff='%')}"
+        if not np.shape(rel):
+            diffstr += f"  ({pair.new:.4g}{u} vs {pair.old:.4g}{u})"
+        return [f"{name} :", diffstr, label]
+
+
 SECTION_SPECS = {
     "cost": Cost,
     "warnings": Warnings,
@@ -272,6 +320,12 @@ SECTION_SPECS = {
     "sensitivities": Sensitivities,
     "tightest constraints": TightConstraints,
     "slack constraints": SlackConstraints,
+}
+
+
+DIFF_SECTION_SPECS = {
+    "cost": DiffCost,
+    "freevariables": DiffFreeVariables,
 }
 
 
@@ -344,6 +398,25 @@ class SequenceContext:
         return items.items()
 
 
+@dataclass(frozen=True)
+class DiffContext:
+    "Adapter that provides (key, DiffPair(new, old)) items."
+
+    new: Any  # SolutionContext or SequenceContext
+    baseline: Any  # Solution-like
+    align_vec: bool = True
+
+    def __post_init__(self):
+        inferred_align = bool(getattr(self.new, "align_vec", False))
+        object.__setattr__(self, "align_vec", inferred_align)
+
+    def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
+        "Items are (key, DiffPair)"
+        new_items = list(self.new.items(source))
+        old_items = dict(SolutionContext(self.baseline).items(source))
+        return [(k, DiffPair(v, old_items.get(k))) for k, v in new_items]
+
+
 def table(
     obj: Any,  # Solution or SolutionSequence
     tables: Tuple[str, ...] = (
@@ -366,6 +439,23 @@ def table(
         sec_lines = sec.format(ctx)
         if sec_lines:
             blocks.append("\n".join(sec_lines))
+    return "\n\n".join(blocks)
+
+
+def diff(obj, baseline, tables=("cost", "freevariables"), **options):
+    "Render text tables of differences between obj and baseline"
+    opt = PrintOptions(**options)
+    new_ctx = (
+        SolutionContext(obj) if _looks_like_solution(obj) else SequenceContext(obj)
+    )
+    ctx = DiffContext(new=new_ctx, baseline=baseline)
+
+    blocks = []
+    for name in tables:
+        sec = DIFF_SECTION_SPECS[name](options=opt)
+        lines = sec.format(ctx)
+        if lines:
+            blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
 
 
@@ -413,16 +503,6 @@ def _resolve_attrpath(obj: Any, path: str) -> Any:
     for name in path.split("."):
         obj = getattr(obj, name)
     return obj
-
-
-# def rel_diff(new: Any, old: Any) -> Any:
-#     """Relative difference: new/old - 1, NaN on failure."""
-#     if old is None:
-#         return float("nan")
-#     try:
-#         return new / old - 1
-#     except Exception:
-#         return float("nan")
 
 
 def rounded_mag(val, nround=8):

@@ -47,16 +47,9 @@ C_f : 0.003599        skin friction coefficient
   W : 7341      [N]   total aircraft weight
 W_w : 2401      [N]   wing weight
 
-Solution Diff
-=============
-(argument is the baseline solution)
-
-** no constraint differences **
-
-Relative Differences |above 1.0%|
----------------------------------
-The largest is +0%.
-
+Cost Change
+-----------
+D : +0% (303.1N vs 303.1N)
 SWEEP
 =====
 Swept Variables
