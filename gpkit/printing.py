@@ -275,7 +275,24 @@ class SlackConstraints(Constraints):
         return lambda x: abs(x[1]) <= self.maxsens
 
 
-class DiffCost(SectionSpec):
+class DiffSection(SectionSpec):
+
+    def row_from(self, item):
+        "still abstract at this level"
+        raise NotImplementedError
+
+    def max_val_width(self, items):
+        "infer how wide the widest vector element will be"
+        w = 0
+        p = self.options.precision
+        for _, v in items:
+            r = v.rel()
+            assert np.shape(r)
+            w = max(w, max(len(f"{el:.{p-1}g}") for el in np.asarray(r).ravel()))
+        return w
+
+
+class DiffCost(DiffSection):
     title = "Cost Change"
     source = staticmethod(Cost.source)
     pm = "+"
@@ -284,16 +301,21 @@ class DiffCost(SectionSpec):
         key, pair = item
         name = key.str_without("units") if key else "cost"
         u = unitstr(key, into="%s", dimless="")
+        vec = np.shape(pair.rel())
         return [
             f"{name} :",
             f"{self._fmt_val(pair.rel() * 100, suff='%')}",
-            f"({pair.new:.4g}{u} vs {pair.old:.4g}{u})",
+            f"({pair.new:.4g}{u} vs {pair.old:.4g}{u})" if not vec else "",
         ]
 
 
-class DiffFreeVariables(FreeVariables):
+class DiffFreeVariables(DiffSection):
     title = "Free Variable Changes"
-    pm = "+"  # so _fmt_val shows sign for scalars
+    source = staticmethod(FreeVariables.source)
+    sortkey = staticmethod(
+        lambda kv: (-rounded_mag(np.max(np.abs(kv[1].rel()))), str(kv[0]))
+    )
+    pm = "+"
     align = "><<"
 
     # filter out zero vals

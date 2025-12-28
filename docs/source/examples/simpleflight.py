@@ -78,4 +78,4 @@ print(sweepsol.summary())
 with open("solution.pkl", "rb") as fil:
     sol_loaded = pickle.load(fil)
 assert sol_loaded.almost_equal(SolutionArray.decompress_file("solution.pgz"))
-print(sweepsol.to_solution_array().diff(sol_loaded, absdiff=True, senssdiff=True))
+print(sweepsol.diff(sol))
