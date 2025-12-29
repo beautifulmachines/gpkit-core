@@ -128,13 +128,6 @@ class SolutionArray(DictOfLists):
     modelstr = ""
     _name_collision_varkeys = None
     _lineageset = False
-    table_titles = {
-        "choicevariables": "Choice Variables",
-        "sweepvariables": "Swept Variables",
-        "freevariables": "Free Variables",
-        "constants": "Fixed Variables",
-        "variables": "Variables",
-    }
 
     def set_necessarylineage(self, clear=False):  # pylint: disable=too-many-branches
         "Returns the set of contained varkeys whose names are not unique"
