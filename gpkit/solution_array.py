@@ -2,10 +2,7 @@
 """Defines SolutionArray class"""
 
 import sys
-import warnings as pywarnings
 from collections import defaultdict
-
-import numpy as np
 
 from .breakdowns import Breakdowns
 from .nomials import NomialArray
@@ -29,23 +26,6 @@ def bdtable_gen(key):
         return lines
 
     return bdtable
-
-
-def cast(function, val1, val2):
-    "Relative difference between val1 and val2 (positive if val2 is larger)"
-    with pywarnings.catch_warnings():  # skip those pesky divide-by-zeros
-        pywarnings.simplefilter("ignore")
-        if hasattr(val1, "shape") and hasattr(val2, "shape"):
-            if val1.ndim == val2.ndim:
-                return function(val1, val2)
-            lessdim, dimmest = sorted([val1, val2], key=lambda v: v.ndim)
-            dimdelta = dimmest.ndim - lessdim.ndim
-            add_axes = (slice(None),) * lessdim.ndim + (np.newaxis,) * dimdelta
-            if dimmest is val1:
-                return function(dimmest, lessdim[add_axes])
-            if dimmest is val2:
-                return function(lessdim[add_axes], dimmest)
-        return function(val1, val2)
 
 
 class SolutionArray(DictOfLists):
@@ -136,21 +116,6 @@ class SolutionArray(DictOfLists):
     def __call__(self, posy):
         posy_subbed = self.subinto(posy)
         return getattr(posy_subbed, "c", posy_subbed)
-
-    def almost_equal(self, other, reltol=1e-3):
-        "Checks for almost-equality between two solutions"
-        if isinstance(other, SolutionArray):
-            svars, ovars = self["variables"], other["variables"]
-        else:
-            svars, ovars = self["freevariables"], other.primal
-        svks, ovks = set(svars), set(ovars)
-        if svks != ovks:
-            return False
-        for key in svks:
-            reldiff = np.max(abs(cast(np.divide, svars[key], ovars[key]) - 1))
-            if reldiff >= reltol:
-                return False
-        return True
 
     def subinto(self, posy):
         "Returns NomialArray of each solution substituted into posy."
