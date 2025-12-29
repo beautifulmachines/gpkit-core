@@ -123,15 +123,11 @@ class Solution:
 
     def cost_breakdown(self) -> str:
         "printable visualization of cost breakdown"
-        solarr = self.to_solution_array()
-        solarr.set_necessarylineage()
-        return bdtable_gen("cost")(solarr, set())
+        return bdtable_gen("cost")(self, set())
 
     def model_sens_breakdown(self) -> str:
         "printable visualization of model sensitivity breakdown"
-        solarr = self.to_solution_array()
-        solarr.set_necessarylineage()
-        return bdtable_gen("model sensitivities")(solarr, set())
+        return bdtable_gen("model sensitivities")(self, set())
 
     def to_solution_array(self):
         "Convert this to a SolutionArray"

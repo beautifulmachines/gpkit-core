@@ -17,6 +17,7 @@ from gpkit.util.repr_conventions import unitstr as get_unitstr
 from gpkit.util.small_classes import FixedScalar, HashVector
 from gpkit.util.small_scripts import mag, try_str_without
 from gpkit.varkey import VarKey
+from gpkit.varmap import VarMap
 
 Tree = namedtuple("Tree", ["key", "value", "branches"])
 Transform = namedtuple("Transform", ["factor", "power", "origkey"])
@@ -32,12 +33,12 @@ def is_power(key):
 
 def get_free_vks(posy, solution):
     "Returns all free vks of a given posynomial for a given solution"
-    return set(vk for vk in posy.vks if vk not in solution["constants"])
+    return set(vk for vk in posy.vks if vk not in solution.constants)
 
 
 def get_model_breakdown(solution):
     breakdowns = {"|sensitivity|": 0}
-    for constraint, senss in solution["sensitivities"]["constraints"].items():
+    for constraint, senss in solution.sens.constraints.items():
         senss = abs(senss)  # for those monomial
         if senss <= 1e-5:
             continue
@@ -59,11 +60,11 @@ def get_model_breakdown(solution):
         if " at 0x" in constrstr:  # don't print memory addresses
             constrstr = constrstr[: constrstr.find(" at 0x")] + ">"
         subbd[constrstr] = {"|sensitivity|": senss}
-    for vk in solution["sensitivities"]["variables"]:
+    for vk in solution.sens.variables:
         # could this be done away with for backwards compatibility?
         if not isinstance(vk, VarKey) or (vk.shape and not vk.index):
             continue
-        senss = abs(solution["sensitivities"]["variables"][vk])
+        senss = abs(solution.sens.variables[vk])
         if hasattr(senss, "shape"):
             senss = np.nansum(senss)
         if senss <= 1e-5:
@@ -119,7 +120,7 @@ def get_breakdowns(basically_fixed_variables, solution):
     """
     breakdowns = defaultdict(list)
     for constraint, senss in sorted(
-        solution["sensitivities"]["constraints"].items(),
+        solution.sens.constraints.items(),
         key=lambda kv: (-abs(float("%.2g" % kv[1])), str(kv[0])),
     ):
         while getattr(constraint, "child", None):
@@ -141,7 +142,8 @@ def get_breakdowns(basically_fixed_variables, solution):
             if (
                 gtvk.name == "C"
                 and gtvk.lineage[0][0] == "RelaxPCCP"
-                and gtvk not in solution["variables"]
+                and gtvk not in solution.constants
+                and gtvk not in solution.primal
             ):
                 lt, gt = lt.sub({gtvk: 1}), gt.sub({gtvk: 1})
         if len(gt.hmap) > 1:
@@ -157,7 +159,7 @@ def get_breakdowns(basically_fixed_variables, solution):
                 constraint = constraint.generated_by
             breakdowns[chosenvk].append((lt, gt, constraint))
     for constraint, senss in sorted(
-        solution["sensitivities"]["constraints"].items(),
+        solution.sens.constraints.items(),
         key=lambda kv: (-abs(float("%.2g" % kv[1])), str(kv[0])),
     ):
         if abs(senss) <= 1e-5:  # only tight-ish ones
@@ -179,7 +181,8 @@ def get_breakdowns(basically_fixed_variables, solution):
             if (
                 gtvk.name == "C"
                 and gtvk.lineage[0][0] == "RelaxPCCP"
-                and gtvk not in solution["variables"]
+                and gtvk not in solution.constants
+                and gtvk not in solution.primal
             ):
                 lt, gt = lt.sub({gtvk: 1}), gt.sub({gtvk: 1})
         if len(gt.hmap) > 1:
@@ -204,7 +207,7 @@ def get_breakdowns(basically_fixed_variables, solution):
             # don't choose something that's already been broken down
             candidatevks = {vk for vk in gt.vks if vk not in breakdowns}
             if candidatevks:
-                vrisk = solution["sensitivities"]["variablerisk"]
+                vrisk = solution.sens.variablerisk
                 chosenvk, *_ = sorted(
                     candidatevks,
                     key=lambda vk: (
@@ -263,7 +266,7 @@ def crawl(
     all_visited_bdkeys=None,
 ):
     "Returns the tree of breakdowns of key in bd, sorting by solution's values"
-    if key != solution["cost function"] and hasattr(key, "key"):
+    if key != solution.meta["cost function"] and hasattr(key, "key"):
         key = key.key  # clear up Variables
     if key in bd:
         # TODO: do multiple if sensitivities are quite close?
@@ -277,10 +280,10 @@ def crawl(
     if visited_bdkeys is None:
         visited_bdkeys = set()
         all_visited_bdkeys = set()
-    if verbosity == 1:
-        already_set = False  # not solution._lineageset TODO
-        if not already_set:
-            solution.set_necessarylineage()
+    # if verbosity == 1:
+    #     already_set = False  # not solution._lineageset TODO
+    #     if not already_set:
+    #         solution.set_necessarylineage()
     if verbosity:
         indent = verbosity - 1  # HACK: a bit of overloading, here
         kvstr = "%s (%s)" % (key, get_valstr(key, solution))
@@ -295,7 +298,7 @@ def crawl(
     visited_bdkeys.add(key)
     all_visited_bdkeys.add(key)
     if keymon is None:
-        scale = solution(key) / basescale
+        scale = solution[key] / basescale
     else:
         if verbosity:
             print(
@@ -303,13 +306,13 @@ def crawl(
                 + "which in: "
                 + constraint.str_without(["units", "lineage"])
                 + " (sensitivity %+.2g)"
-                % solution["sensitivities"]["constraints"][constraint]
+                % solution.sens.constraints[constraint]
             )
         interesting_vks = {key}
         (subkey,) = interesting_vks
         power = keymon.exp[subkey]
         boring_vks = set(keymon.vks) - interesting_vks
-        scale = solution(key) ** power / basescale
+        scale = solution[key] ** power / basescale
         # TODO: make method that can handle both kinds of transforms
         if (
             power != 1 or boring_vks or mag(keymon.c) != 1 or keymon.units != key.units
@@ -331,7 +334,7 @@ def crawl(
                 subhmap.units = units
             freemon = Monomial(subhmap)
             factor = Monomial(keymon / freemon)
-            scale = scale * solution(factor)
+            scale = scale * solution[factor]
             if factor != 1:
                 factor = factor ** (-1 / power)  # invert the transform
                 factor.ast = None
@@ -357,7 +360,7 @@ def crawl(
 
     # TODO: use ast_parsing instead of chop?
     mons = composition.chop()
-    monsols = [solution(mon) for mon in mons]  # ~20% of total last check # TODO: remove
+    monsols = [solution[mon] for mon in mons]  # ~20% of total last check # TODO: remove
     parsed_monsols = [getattr(mon, "value", mon) for mon in monsols]
     monvals = [
         float(mon / scale) for mon in parsed_monsols
@@ -393,12 +396,13 @@ def crawl(
                 interesting_vks = interesting_vks - filter
         # if filters weren't enough and permissivity is high enough, sort!
         if len(interesting_vks) > 1 and permissivity > 1:
-            csenss = solution["sensitivities"]["constraints"]
+            csenss = solution.sens.constraints
             best_vks = sorted(
                 (vk for vk in interesting_vks if vk in bd),
                 key=lambda vk: (
                     -abs(float("%.2g" % (mon.exp[vk] * csenss[bd[vk][0][2]]))),
-                    -float("%.2g" % solution["variables"][vk]),
+                    # -float("%.2g" % solution.variables[vk]),
+                    -float("%.2g" % solution.primal[vk]),
                     str(bd[vk][0][0]),
                 ),
             )  # ~5% of total last check # TODO: remove
@@ -512,9 +516,9 @@ def crawl(
                 )
                 print("  " * indent + keyvalstr)
             subtree.append(Tree(mon, scaledmonval, []))
-    if verbosity == 1:
-        if not already_set:
-            solution.set_necessarylineage(clear=True)
+    # if verbosity == 1:
+    #     if not already_set:
+    #         solution.set_necessarylineage(clear=True)
     return tree
 
 
@@ -760,9 +764,9 @@ def graph(
     showlegend=False,
 ):
     "Prints breakdown"
-    already_set = solution._lineageset
-    if not already_set:
-        solution.set_necessarylineage()
+    # already_set = solution._lineageset
+    # if not already_set:
+    #     solution.set_necessarylineage()
     collapse = not showlegend
     # TODO: set to True while showlegend is True for first approx of receipts;
     # TODO: autoinclude with trace?
@@ -790,7 +794,7 @@ def graph(
     # Format depth=0
     (A_key,) = [key for key, value in legend.items() if value == "A"]
     prefix = ""
-    if A_key is solution["cost function"]:
+    if A_key is solution.meta["cost function"]:
         A_str = "Cost"
     else:
         A_str = get_keystr(A_key, solution)
@@ -903,8 +907,8 @@ def graph(
             ).rstrip()
             print(" " + line)
 
-    if not already_set:
-        solution.set_necessarylineage(clear=True)
+    # if not already_set:
+    #     solution.set_necessarylineage(clear=True)
 
 
 def legend_entry(key, shortname, solution, prefix, basically_fixed_variables):
@@ -943,10 +947,10 @@ def get_valstr(key, solution, into="%s"):
     "Returns formatted string of the value of key in solution."
     # get valuestr
     try:
-        value = solution(key)
-    except (ValueError, TypeError):
+        value = solution[key]
+    except (ValueError, TypeError, KeyError):
         try:
-            value = sum(solution(subkey) for subkey in key)
+            value = sum(solution[subkey] for subkey in key)
         except (ValueError, TypeError, KeyError):
             return " "
     if isinstance(value, FixedScalar):
@@ -967,10 +971,10 @@ def get_valstr(key, solution, into="%s"):
         unitstr = get_unitstr(value)
     if unitstr[:2] == "1/":
         unitstr = "/" + unitstr[2:]
-    if key in solution["constants"] or (
+    if key in solution.constants or (
         hasattr(key, "vks")
         and key.vks
-        and all(vk in solution["constants"] for vk in key.vks)
+        and all(vk in solution.constants for vk in key.vks)
     ):
         unitstr += ", fixed"
     return into % (valuestr + unitstr)
@@ -1071,7 +1075,7 @@ class Breakdowns(object):
                 tree = self.mtree
                 kind = "constraint"
             elif key == "cost":
-                key = self.sol["cost function"]
+                key = self.sol.meta["cost function"]
             elif key in self.mlookup:
                 tree = self.mlookup[key]
                 kind = "constraint"
