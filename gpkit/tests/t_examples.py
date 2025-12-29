@@ -192,17 +192,17 @@ class TestExamples(unittest.TestCase):
         sol.save("solution.pkl")
         sol.table()
         with open("solution.pkl", "rb") as fil:
-            _ = pickle.load(fil)
-        # sol_loaded.table()  # dropped to deprecate SolutionArray printing
+            sol_loaded = pickle.load(fil)
+        self.assertIn("Free Variables", sol_loaded.table())
         os.remove("solution.pkl")
 
         sweepsol = m.sweep({example.AC.fuse.W: (50, 100, 150)}, verbosity=0)
         sweepsol.table()
-        sweepsol.to_solution_array().save("sweepsolution.pkl")
-        sweepsol.table()
+        sweepsol.save("sweepsolution.pkl")
+        self.assertIn("Swept Variables", sweepsol.table())
         with open("sweepsolution.pkl", "rb") as fil:
-            _ = pickle.load(fil)
-        # sol_loaded.table()  # dropped to deprecate SolutionArray printing
+            sol_loaded = pickle.load(fil)
+        self.assertIn("Swept Variables", sol_loaded.table())
         os.remove("sweepsolution.pkl")
 
         # testing savejson
@@ -290,7 +290,7 @@ class TestExamples(unittest.TestCase):
 
     def test_simpleflight(self, example):
         self.assertTrue(example.sol.almost_equal(example.sol_loaded))
-        for sol in [example.sol.to_solution_array(), example.sol_loaded]:
+        for sol in [example.sol, example.sol_loaded]:
             freevarcheck = {
                 "A": 8.46,
                 "C_D": 0.0206,
@@ -317,13 +317,12 @@ class TestExamples(unittest.TestCase):
                 r"\rho": -0.2275,
             }
             for key, val in freevarcheck.items():
-                sol_rat = mag(sol["variables"][key]) / val
+                sol_rat = mag(sol.primal[key]) / val
                 self.assertTrue(abs(1 - sol_rat) < 1e-2)
             for key, val in senscheck.items():
-                sol_rat = sol["sensitivities"]["variables"][key] / val
+                sol_rat = sol.sens.variables[key] / val
                 self.assertTrue(abs(1 - sol_rat) < 1e-2)
         os.remove("solution.pkl")
-        os.remove("solution.pgz")
         os.remove("referencesplot.json")
         os.remove("referencesplot.html")
 
