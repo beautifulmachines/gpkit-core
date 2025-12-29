@@ -21,7 +21,7 @@ f, ax = sol.plot(y)
 ax.set_title("Manually swept (20 points)")
 f.show()
 f.savefig("plot_sweep1d.png")
-sol.save()
+sol.save("solution.pkl")
 
 # arguments are: model, swept: (min, max, optional logtol), posnomial for y-axis
 sol = m.autosweep({x: (1, 3)}, tol=0.001, verbosity=0)
