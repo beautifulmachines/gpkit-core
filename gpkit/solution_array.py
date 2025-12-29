@@ -2,7 +2,6 @@
 """Defines SolutionArray class"""
 
 import gzip
-import json
 import pickle
 import pickletools
 import sys
@@ -230,26 +229,6 @@ class SolutionArray(DictOfLists):
         "Load a gzip-compressed pickle file"
         with gzip.open(file, "rb") as f:
             return pickle.Unpickler(f).load()
-
-    def savejson(self, filename="solution.json", showvars=None):
-        "Saves solution table as a json file"
-        sol_dict = {}
-        if self._lineageset:
-            self.set_necessarylineage(clear=True)
-        data = self["variables"]
-        if showvars:
-            showvars = self._parse_showvars(showvars)
-            data = {k: data[k] for k in showvars if k in data}
-        # add appropriate data for each variable to the dictionary
-        for k, v in data.items():
-            key = str(k)
-            if isinstance(v, np.ndarray):
-                val = {"v": v.tolist(), "u": k.unitstr()}
-            else:
-                val = {"v": v, "u": k.unitstr()}
-            sol_dict[key] = val
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(sol_dict, f)
 
     def subinto(self, posy):
         "Returns NomialArray of each solution substituted into posy."

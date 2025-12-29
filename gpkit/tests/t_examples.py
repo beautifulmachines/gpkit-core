@@ -206,16 +206,13 @@ class TestExamples(unittest.TestCase):
         os.remove("sweepsolution.pkl")
 
         # testing savejson
-        sol = sol.to_solution_array()
         sol.savejson("solution.json")
         json_dict = {}
         with open("solution.json", "r", encoding="utf-8") as rf:
             json_dict = json.load(rf)
         os.remove("solution.json")
-        for var in sol["variables"]:
-            self.assertTrue(
-                np.all(json_dict[str(var.key)]["v"] == sol["variables"][var.key])
-            )
+        for var in sol.primal:
+            self.assertTrue(np.all(json_dict[str(var.key)]["v"] == sol.primal[var.key]))
             self.assertEqual(json_dict[str(var.key)]["u"], var.unitstr())
 
     def test_sp_to_gp_sweep(self, example):

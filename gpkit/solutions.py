@@ -1,5 +1,6 @@
 "Classes for representing solutions"
 
+import json
 from dataclasses import dataclass
 from typing import List, Sequence
 
@@ -76,6 +77,16 @@ class Solution:
     def save(self, *args, **kwargs):
         "Pass through to SolutionArray.save"
         self.to_solution_array().save(*args, **kwargs)
+
+    def savejson(self, filename):
+        "Save primal variables to a json file"
+        # only saving primal is legacy carryover -- eventually add more
+        json_dict = {}
+        for k, v in self.primal.items():
+            val = list(v) if hasattr(v, "__len__") else v
+            json_dict[str(k)] = {"v": val, "u": k.unitstr()}
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(json_dict, f)
 
     def save_compressed(self, *args, **kwargs):
         "Pass through to SolutionArray.save_compressed"
