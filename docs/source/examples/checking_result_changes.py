@@ -26,7 +26,7 @@ sol.save("last_verified.sol")
 # uncomment the line below to verify a new model
 with open("last_verified.sol", mode="rb") as fil:
     last_verified_sol = pickle.load(fil)
-if not sol.almost_equal(last_verified_sol, reltol=1e-3):
+if not sol.almost_equal(last_verified_sol, tol=1e-3):
     print(last_verified_sol.diff(sol))
 
 # Note you can replace the last three lines above with

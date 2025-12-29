@@ -67,9 +67,23 @@ class Solution:
             return getattr(subbed, "c", subbed)
         raise KeyError(f"no variable '{key}' found in the solution")
 
-    def almost_equal(self, other, **kwargs):
-        "Checks for almost-equality between two solutions"
-        return self.to_solution_array().almost_equal(other, **kwargs)
+    def almost_equal(self, other, tol=1e-6):
+        """Checks for almost-equality between two solutions.
+        tol is treated as relative for primal; absolute for sensitivities
+        """
+        if set(self.primal) != set(getattr(other, "primal", ())):
+            return False
+        if set(self.sens.variables) != set(other.sens.variables):
+            return False
+        for key in self.primal:
+            reldiff = abs(self.primal[key] / other.primal[key] - 1)
+            if reldiff > tol:
+                return False
+        for key in self.sens.variables:
+            absdiff = abs(self.sens.variables[key] - other.sens.variables[key])
+            if absdiff > tol:
+                return False
+        return True
 
     def diff(self, baseline, **kwargs):
         "printable difference table between this and other"
