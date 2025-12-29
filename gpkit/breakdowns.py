@@ -2,6 +2,7 @@
 #      add conversions to plotly/sankey
 
 import string
+import sys
 from collections import defaultdict, namedtuple
 
 import numpy as np
@@ -14,13 +15,32 @@ from gpkit.nomials.map import NomialMap
 from gpkit.units import DimensionalityError
 from gpkit.util.repr_conventions import lineagestr
 from gpkit.util.repr_conventions import unitstr as get_unitstr
-from gpkit.util.small_classes import FixedScalar, HashVector
+from gpkit.util.small_classes import FixedScalar, HashVector, SolverLog
 from gpkit.util.small_scripts import mag, try_str_without
 from gpkit.varkey import VarKey
-from gpkit.varmap import VarMap, VarSet
+from gpkit.varmap import VarSet
 
 Tree = namedtuple("Tree", ["key", "value", "branches"])
 Transform = namedtuple("Transform", ["factor", "power", "origkey"])
+
+
+def bdtable_gen(key):
+    "Generator for breakdown tablefns"
+
+    def bdtable(self, _showvars, **_):
+        "Cost breakdown plot"
+        set_necessarylineage(self)
+        bds = Breakdowns(self)
+        original_stdout = sys.stdout
+        try:
+            sys.stdout = SolverLog(original_stdout, verbosity=0)
+            bds.plot(key)
+        finally:
+            lines = sys.stdout.lines()
+            sys.stdout = original_stdout
+        return lines
+
+    return bdtable
 
 
 def is_factor(key):
@@ -349,8 +369,7 @@ def crawl(
                 "  " * indent
                 + "which in: "
                 + constraint.str_without(["units", "lineage"])
-                + " (sensitivity %+.2g)"
-                % solution.sens.constraints[constraint]
+                + " (sensitivity %+.2g)" % solution.sens.constraints[constraint]
             )
         interesting_vks = {key}
         (subkey,) = interesting_vks

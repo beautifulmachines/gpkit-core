@@ -6,7 +6,8 @@ from dataclasses import dataclass
 from typing import List, Sequence
 
 from . import printing
-from .solution_array import SolutionArray, bdtable_gen
+from .breakdowns import bdtable_gen
+from .solution_array import SolutionArray
 from .varkey import VarKey
 from .varmap import VarMap
 
