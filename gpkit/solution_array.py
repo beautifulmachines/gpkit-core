@@ -69,11 +69,3 @@ class SolutionArray(DictOfLists):
             )
 
         return posy.sub(self["variables"], require_positive=False)
-
-    def _parse_showvars(self, showvars):
-        showvars_out = set()
-        for k in showvars:
-            key, _ = self["variables"].item(k)
-            key = getattr(key, "veckey", None) or key
-            showvars_out.add(key)
-        return showvars_out
