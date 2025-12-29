@@ -1,10 +1,6 @@
 # pylint: disable=too-many-lines
 """Defines SolutionArray class"""
 
-import gzip
-import json
-import pickle
-import pickletools
 import sys
 import warnings as pywarnings
 from collections import defaultdict
@@ -15,48 +11,6 @@ from .breakdowns import Breakdowns
 from .nomials import NomialArray
 from .units import Quantity
 from .util.small_classes import DictOfLists, SolverLog
-
-
-class SolSavingEnvironment:
-    """Temporarily removes construction/solve attributes from constraints.
-
-    This approximately halves the size of the pickled solution.
-    """
-
-    def __init__(self, solarray, saveconstraints):
-        self.solarray = solarray
-        self.attrstore = {}
-        self.saveconstraints = saveconstraints
-        self.constraintstore = None
-
-    def __enter__(self):
-        if "sensitivities" not in self.solarray:
-            pass
-        elif self.saveconstraints:
-            for constraint_attr in [
-                "bounded",
-                "meq_bounded",
-                "vks",
-                "v_ss",
-                "unsubbed",
-                "varkeys",
-            ]:
-                store = {}
-                for constraint in self.solarray["sensitivities"]["constraints"]:
-                    if getattr(constraint, constraint_attr, None):
-                        store[constraint] = getattr(constraint, constraint_attr)
-                        delattr(constraint, constraint_attr)
-                self.attrstore[constraint_attr] = store
-        else:
-            self.constraintstore = self.solarray["sensitivities"].pop("constraints")
-
-    def __exit__(self, type_, val, traceback):
-        if self.saveconstraints:
-            for constraint_attr, store in self.attrstore.items():
-                for constraint, value in store.items():
-                    setattr(constraint, constraint_attr, value)
-        elif self.constraintstore:
-            self.solarray["sensitivities"]["constraints"] = self.constraintstore
 
 
 def bdtable_gen(key):
@@ -129,13 +83,6 @@ class SolutionArray(DictOfLists):
     modelstr = ""
     _name_collision_varkeys = None
     _lineageset = False
-    table_titles = {
-        "choicevariables": "Choice Variables",
-        "sweepvariables": "Swept Variables",
-        "freevariables": "Free Variables",
-        "constants": "Fixed Variables",
-        "variables": "Variables",
-    }
 
     def set_necessarylineage(self, clear=False):  # pylint: disable=too-many-branches
         "Returns the set of contained varkeys whose names are not unique"
@@ -204,52 +151,6 @@ class SolutionArray(DictOfLists):
             if reldiff >= reltol:
                 return False
         return True
-
-    def save(self, filename="solution.pkl", *, saveconstraints=True, **pickleargs):
-        """Pickles the solution and saves it to a file.
-
-        Solution can then be loaded with e.g.:
-        >>> import pickle
-        >>> pickle.load(open("solution.pkl"))
-        """
-        with SolSavingEnvironment(self, saveconstraints):
-            with open(filename, "wb") as fil:
-                pickle.dump(self, fil, **pickleargs)
-
-    def save_compressed(
-        self, filename="solution.pgz", *, saveconstraints=True, **cpickleargs
-    ):
-        "Pickle a file and then compress it into a file with extension."
-        with gzip.open(filename, "wb") as f:
-            with SolSavingEnvironment(self, saveconstraints):
-                pickled = pickle.dumps(self, **cpickleargs)
-            f.write(pickletools.optimize(pickled))
-
-    @staticmethod
-    def decompress_file(file):
-        "Load a gzip-compressed pickle file"
-        with gzip.open(file, "rb") as f:
-            return pickle.Unpickler(f).load()
-
-    def savejson(self, filename="solution.json", showvars=None):
-        "Saves solution table as a json file"
-        sol_dict = {}
-        if self._lineageset:
-            self.set_necessarylineage(clear=True)
-        data = self["variables"]
-        if showvars:
-            showvars = self._parse_showvars(showvars)
-            data = {k: data[k] for k in showvars if k in data}
-        # add appropriate data for each variable to the dictionary
-        for k, v in data.items():
-            key = str(k)
-            if isinstance(v, np.ndarray):
-                val = {"v": v.tolist(), "u": k.unitstr()}
-            else:
-                val = {"v": v, "u": k.unitstr()}
-            sol_dict[key] = val
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(sol_dict, f)
 
     def subinto(self, posy):
         "Returns NomialArray of each solution substituted into posy."

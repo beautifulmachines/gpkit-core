@@ -1,5 +1,7 @@
 "Classes for representing solutions"
 
+import json
+import pickle
 from dataclasses import dataclass
 from typing import List, Sequence
 
@@ -73,13 +75,24 @@ class Solution:
         "printable difference table between this and other"
         return printing.diff(self, baseline, **kwargs)
 
-    def save(self, *args, **kwargs):
-        "Pass through to SolutionArray.save"
-        self.to_solution_array().save(*args, **kwargs)
+    def save(self, filename, **pickleargs):
+        """Pickle the solution and save it to a file. Load again with e.g:
+        >>> import pickle
+        >>> with open("solution.pkl") as fil:
+                sol = pickle.load(fil)
+        """
+        with open(filename, "wb") as fil:
+            pickle.dump(self, fil, **pickleargs)
 
-    def save_compressed(self, *args, **kwargs):
-        "Pass through to SolutionArray.save_compressed"
-        self.to_solution_array().save_compressed(*args, **kwargs)
+    def savejson(self, filename):
+        "Save primal variables to a json file"
+        # only saving primal is legacy carryover -- eventually add more
+        json_dict = {}
+        for k, v in self.primal.items():
+            val = list(v) if hasattr(v, "__len__") else v
+            json_dict[str(k)] = {"v": val, "u": k.unitstr()}
+        with open(filename, "w", encoding="utf-8") as f:
+            json.dump(json_dict, f)
 
     def summary(self, **kwargs) -> str:
         "Pass through to SolutionArray.summary"
@@ -181,9 +194,10 @@ class SolutionSequence(List[Solution]):
         "printable difference table between this and other"
         return printing.diff(self, baseline, **kwargs)
 
-    def save(self):
-        "Placeholder for saving capability"
-        raise NotImplementedError
+    def save(self, filename, **pickleargs):
+        "Pickle the SolutionSequence and save it to filename"
+        with open(filename, "wb") as fil:
+            pickle.dump(self, fil, **pickleargs)
 
     def table(self, **kwargs):
         "Per legacy, prints breakdowns then Solution.table"

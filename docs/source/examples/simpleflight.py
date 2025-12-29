@@ -4,7 +4,7 @@ import pickle
 
 import numpy as np
 
-from gpkit import Model, SolutionArray, Variable
+from gpkit import Model, Variable
 
 pi = np.pi
 
@@ -65,7 +65,6 @@ sol = m.solve(verbosity=0)
 print(sol.summary())
 # save solution to a file and retrieve it
 sol.save("solution.pkl")
-sol.save_compressed("solution.pgz")
 print("\n" + sol.diff(sol))
 
 print("SWEEP\n=====")
@@ -77,5 +76,4 @@ sweepsol = m.sweep(sweeps, verbosity=0)
 print(sweepsol.summary())
 with open("solution.pkl", "rb") as fil:
     sol_loaded = pickle.load(fil)
-assert sol_loaded.almost_equal(SolutionArray.decompress_file("solution.pgz"))
-print(sweepsol.diff(sol))
+print(sweepsol.diff(sol_loaded))
