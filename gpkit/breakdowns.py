@@ -17,7 +17,7 @@ from gpkit.util.repr_conventions import unitstr as get_unitstr
 from gpkit.util.small_classes import FixedScalar, HashVector
 from gpkit.util.small_scripts import mag, try_str_without
 from gpkit.varkey import VarKey
-from gpkit.varmap import VarMap
+from gpkit.varmap import VarMap, VarSet
 
 Tree = namedtuple("Tree", ["key", "value", "branches"])
 Transform = namedtuple("Transform", ["factor", "power", "origkey"])
@@ -108,6 +108,49 @@ def divide_out_vk(vk, pow, lt, gt):
     lt, gt = lt / var, gt / var
     lt.ast = gt.ast = None
     return lt, gt
+
+
+def set_necessarylineage(solution, clear=False):
+    # pylint: disable=too-many-branches
+    if "name_collision_varkeys" not in solution.meta:
+        solution.meta["name_collision_varkeys"] = {}
+        varset = VarSet(solution.primal.varset)
+        varset.update(solution.constants)
+        name_collisions = defaultdict(set)
+        for key in varset:
+            if len(varset.by_name(key.name)) == 1:  # unique
+                solution.meta["name_collision_varkeys"][key] = 0
+            else:
+                shortname = key.str_without(["lineage", "vec"])
+                if len(varset.by_name(shortname)) > 1:
+                    name_collisions[shortname].add(key)
+        for varkeys in name_collisions.values():
+            min_namespaced = defaultdict(set)
+            for vk in varkeys:
+                *_, mineage = vk.lineagestr().split(".")
+                min_namespaced[(mineage, 1)].add(vk)
+            while any(len(vks) > 1 for vks in min_namespaced.values()):
+                for key, vks in list(min_namespaced.items()):
+                    if len(vks) <= 1:
+                        continue
+                    del min_namespaced[key]
+                    mineage, idx = key
+                    idx += 1
+                    for vk in vks:
+                        lineages = vk.lineagestr().split(".")
+                        submineage = lineages[-idx] + "." + mineage
+                        min_namespaced[(submineage, idx)].add(vk)
+            for (_, idx), vks in min_namespaced.items():
+                (vk,) = vks
+                solution.meta["name_collision_varkeys"][vk] = idx
+    if clear:
+        solution.meta["lineageset"] = False
+        # for vk in solution.meta["name_collision_varkeys"]:
+        #     del vk.descr["necessarylineage"]
+    else:
+        solution.meta["lineageset"] = True
+        for vk, idx in solution.meta["name_collision_varkeys"].items():
+            vk.descr["necessarylineage"] = idx
 
 
 # @profile
@@ -280,10 +323,10 @@ def crawl(
     if visited_bdkeys is None:
         visited_bdkeys = set()
         all_visited_bdkeys = set()
-    # if verbosity == 1:
-    #     already_set = False  # not solution._lineageset TODO
-    #     if not already_set:
-    #         solution.set_necessarylineage()
+    if verbosity == 1:
+        already_set = False  # not solution._lineageset TODO
+        if not already_set:
+            set_necessarylineage(solution)
     if verbosity:
         indent = verbosity - 1  # HACK: a bit of overloading, here
         kvstr = "%s (%s)" % (key, get_valstr(key, solution))
@@ -516,9 +559,9 @@ def crawl(
                 )
                 print("  " * indent + keyvalstr)
             subtree.append(Tree(mon, scaledmonval, []))
-    # if verbosity == 1:
-    #     if not already_set:
-    #         solution.set_necessarylineage(clear=True)
+    if verbosity == 1:
+        if not already_set:
+            set_necessarylineage(solution, clear=True)
     return tree
 
 
@@ -764,9 +807,9 @@ def graph(
     showlegend=False,
 ):
     "Prints breakdown"
-    # already_set = solution._lineageset
-    # if not already_set:
-    #     solution.set_necessarylineage()
+    already_set = getattr(solution.meta, "lineageset", False)
+    if not already_set:
+        set_necessarylineage(solution)
     collapse = not showlegend
     # TODO: set to True while showlegend is True for first approx of receipts;
     # TODO: autoinclude with trace?
@@ -907,8 +950,8 @@ def graph(
             ).rstrip()
             print(" " + line)
 
-    # if not already_set:
-    #     solution.set_necessarylineage(clear=True)
+    if not already_set:
+        set_necessarylineage(solution, clear=True)
 
 
 def legend_entry(key, shortname, solution, prefix, basically_fixed_variables):
