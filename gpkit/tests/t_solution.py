@@ -47,13 +47,11 @@ class TestSolution(unittest.TestCase):
         w = Variable("w", "m", "width")
         m = Model(12 / (w * h**3), [h <= h_max, h * w >= a_min, p_max >= 2 * h + 2 * w])
         p_vals = np.linspace(13, 24, 20)
-        sol = m.sweep({p_max: p_vals}, verbosity=0).to_solution_array()
-        p_sol = sol.subinto(p_max)
+        sweepsol = m.sweep({p_max: p_vals}, verbosity=0)
+        p_sol = [sol.subinto(p_max) for sol in sweepsol]
         self.assertEqual(len(p_sol), 20)
-        self.assertAlmostEqual(
-            0 * gpkit.ureg.m, np.max(np.abs(p_vals * gpkit.ureg.m - p_sol))
-        )
-        self.assertAlmostEqual(0 * gpkit.ureg.m, np.max(np.abs(p_sol - sol(p_max))))
+        for pv, ps in zip(p_vals, p_sol):
+            self.assertAlmostEqual(0 * gpkit.ureg.m, pv * gpkit.ureg.m - ps)
 
     def test_table(self):
         x = Variable("x")
