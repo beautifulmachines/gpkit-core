@@ -145,8 +145,8 @@ def set_necessarylineage(solution, clear=False):
                 solution.meta["name_collision_varkeys"][vk] = idx
     if clear:
         solution.meta["lineageset"] = False
-        # for vk in solution.meta["name_collision_varkeys"]:
-        #     del vk.descr["necessarylineage"]
+        for vk in solution.meta["name_collision_varkeys"]:
+            del vk.descr["necessarylineage"]
     else:
         solution.meta["lineageset"] = True
         for vk, idx in solution.meta["name_collision_varkeys"].items():
@@ -324,7 +324,8 @@ def crawl(
         visited_bdkeys = set()
         all_visited_bdkeys = set()
     if verbosity == 1:
-        already_set = False  # not solution._lineageset TODO
+        # already_set = False  # not solution._lineageset TODO
+        already_set = solution.meta.get("lineageset", False)
         if not already_set:
             set_necessarylineage(solution)
     if verbosity:
@@ -807,7 +808,7 @@ def graph(
     showlegend=False,
 ):
     "Prints breakdown"
-    already_set = getattr(solution.meta, "lineageset", False)
+    already_set = solution.meta.get("lineageset", False)
     if not already_set:
         set_necessarylineage(solution)
     collapse = not showlegend

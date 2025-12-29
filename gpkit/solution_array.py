@@ -4,7 +4,7 @@
 import sys
 from collections import defaultdict
 
-from .breakdowns import Breakdowns
+from .breakdowns import Breakdowns, set_necessarylineage
 from .nomials import NomialArray
 from .units import Quantity
 from .util.small_classes import DictOfLists, SolverLog
@@ -15,6 +15,7 @@ def bdtable_gen(key):
 
     def bdtable(self, _showvars, **_):
         "Cost breakdown plot"
+        set_necessarylineage(self)
         bds = Breakdowns(self)
         original_stdout = sys.stdout
         try:
