@@ -1,7 +1,5 @@
 """Miscellaneous small classes"""
 
-from collections.abc import MutableMapping
-from dataclasses import fields, is_dataclass
 from functools import reduce
 from operator import xor
 from typing import TypeAlias
@@ -105,93 +103,6 @@ class SolverLog:
 
     def flush(self):
         "Dummy function for I/O api compatibility"
-
-
-class DictOfLists(dict):
-    "A hierarchy of dicionaries, with lists at the bottom."
-
-    def append(self, sol):
-        "Appends a dict (of dicts) of lists to all held lists."
-        if not hasattr(self, "initialized"):
-            _enlist_dict(sol, self)
-            self.initialized = True  # pylint: disable=attribute-defined-outside-init
-        else:
-            _append_dict(sol, self)
-
-    def atindex(self, i):
-        "Indexes into each list independently."
-        return self.__class__(_index_dict(i, self, self.__class__()))
-
-    def to_arrays(self):
-        "Converts all lists into array."
-        _enray(self, self)
-
-
-def _enlist_dict(d_in, d_out):
-    "Recursively copies d_in into d_out, placing non-dict items into lists."
-    if is_dataclass(d_in):
-        for field in fields(d_in):
-            d_out = d_in.__class__(
-                **{
-                    field.name: _enlist_dict(
-                        getattr(d_in, field.name), getattr(d_out, field.name)
-                    )
-                    for field in fields(d_in)
-                }
-            )
-        return d_out
-    for k, v in d_in.items():
-        if isinstance(v, MutableMapping):
-            d_out[k] = _enlist_dict(v, v.__class__())
-        else:
-            d_out[k] = [v]
-    assert set(d_in.keys()) == set(d_out.keys())
-    return d_out
-
-
-def _append_dict(d_in, d_out):
-    "Recursively travels dict d_out and appends items found in d_in."
-    for k, v in d_in.items():
-        if isinstance(v, MutableMapping):
-            d_out[k] = _append_dict(v, d_out[k])
-        else:
-            try:
-                d_out[k].append(v)
-            except KeyError as e:
-                raise RuntimeWarning(
-                    f"Key `{k}` was added after the first sweep."
-                ) from e
-    return d_out
-
-
-def _index_dict(idx, d_in, d_out):
-    "Recursively travels dict d_in, placing items at idx into dict d_out."
-    for k, v in d_in.items():
-        if isinstance(v, MutableMapping):
-            d_out[k] = _index_dict(idx, v, v.__class__())
-        else:
-            try:
-                d_out[k] = v[idx]
-            except (IndexError, TypeError):  # if not an array, return as is
-                d_out[k] = v
-    return d_out
-
-
-def _enray(d_in, d_out):
-    "Recursively turns lists into numpy arrays."
-    for k, v in d_in.items():
-        if isinstance(v, MutableMapping):
-            d_out[k] = _enray(v, v.__class__())
-        else:
-            if len(v) == 1:
-                (v,) = v
-            else:
-                if isinstance(v[0], list):
-                    v = np.array(v, dtype="object")
-                else:
-                    v = np.array(v)
-            d_out[k] = v
-    return d_out
 
 
 class HashVector(dict):
