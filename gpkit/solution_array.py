@@ -1,31 +1,9 @@
 # pylint: disable=too-many-lines
 """Defines SolutionArray class"""
 
-import sys
-from collections import defaultdict
-
-from .breakdowns import Breakdowns
 from .nomials import NomialArray
 from .units import Quantity
-from .util.small_classes import DictOfLists, SolverLog
-
-
-def bdtable_gen(key):
-    "Generator for breakdown tablefns"
-
-    def bdtable(self, _showvars, **_):
-        "Cost breakdown plot"
-        bds = Breakdowns(self)
-        original_stdout = sys.stdout
-        try:
-            sys.stdout = SolverLog(original_stdout, verbosity=0)
-            bds.plot(key)
-        finally:
-            lines = sys.stdout.lines()
-            sys.stdout = original_stdout
-        return lines
-
-    return bdtable
+from .util.small_classes import DictOfLists
 
 
 class SolutionArray(DictOfLists):
@@ -64,47 +42,6 @@ class SolutionArray(DictOfLists):
     _name_collision_varkeys = None
     _lineageset = False
 
-    def set_necessarylineage(self, clear=False):  # pylint: disable=too-many-branches
-        "Returns the set of contained varkeys whose names are not unique"
-        if self._name_collision_varkeys is None:
-            self._name_collision_varkeys = {}
-            varset = self["variables"].varset
-            name_collisions = defaultdict(set)
-            for key in varset:
-                if len(varset.by_name(key.name)) == 1:  # unique
-                    self._name_collision_varkeys[key] = 0
-                else:
-                    shortname = key.str_without(["lineage", "vec"])
-                    if len(varset.by_name(shortname)) > 1:
-                        name_collisions[shortname].add(key)
-            for varkeys in name_collisions.values():
-                min_namespaced = defaultdict(set)
-                for vk in varkeys:
-                    *_, mineage = vk.lineagestr().split(".")
-                    min_namespaced[(mineage, 1)].add(vk)
-                while any(len(vks) > 1 for vks in min_namespaced.values()):
-                    for key, vks in list(min_namespaced.items()):
-                        if len(vks) <= 1:
-                            continue
-                        del min_namespaced[key]
-                        mineage, idx = key
-                        idx += 1
-                        for vk in vks:
-                            lineages = vk.lineagestr().split(".")
-                            submineage = lineages[-idx] + "." + mineage
-                            min_namespaced[(submineage, idx)].add(vk)
-                for (_, idx), vks in min_namespaced.items():
-                    (vk,) = vks
-                    self._name_collision_varkeys[vk] = idx
-        if clear:
-            self._lineageset = False
-            for vk in self._name_collision_varkeys:
-                del vk.descr["necessarylineage"]
-        else:
-            self._lineageset = True
-            for vk, idx in self._name_collision_varkeys.items():
-                vk.descr["necessarylineage"] = idx
-
     def __len__(self):
         try:
             return len(self["cost"])
@@ -132,11 +69,3 @@ class SolutionArray(DictOfLists):
             )
 
         return posy.sub(self["variables"], require_positive=False)
-
-    def _parse_showvars(self, showvars):
-        showvars_out = set()
-        for k in showvars:
-            key, _ = self["variables"].item(k)
-            key = getattr(key, "veckey", None) or key
-            showvars_out.add(key)
-        return showvars_out

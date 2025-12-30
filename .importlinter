@@ -50,7 +50,7 @@ ignore_imports =
     gpkit.units -> gpkit.nomials
     gpkit.nomials.math -> gpkit.constraints
     gpkit.nomials.array -> gpkit.constraints
-    gpkit.solution_array -> gpkit.breakdowns
+    gpkit.solutions -> gpkit.breakdowns
     gpkit.tools.autosweep -> gpkit.interactive.plot_sweep
     gpkit.model -> gpkit.tools.autosweep
     gpkit.constraints.* -> gpkit.globals
