@@ -46,7 +46,3 @@ class SolutionArray(DictOfLists):
             return 1
         except KeyError:
             return 0
-
-    def __call__(self, posy):
-        posy_subbed = self.subinto(posy)
-        return getattr(posy_subbed, "c", posy_subbed)
