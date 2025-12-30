@@ -1,8 +1,6 @@
 # pylint: disable=too-many-lines
 """Defines SolutionArray class"""
 
-from .nomials import NomialArray
-from .units import Quantity
 from .util.small_classes import DictOfLists
 
 
@@ -29,7 +27,6 @@ class SolutionArray(DictOfLists):
     >>> sol = gpkit.Model(x, [x >= x_min]).solve(verbosity=0)
     >>>
     >>> # VALUES
-    >>> values = [sol[x], sol.subinto(x), sol["variables"]["x"]]
     >>> assert all(np.array(values) == 2)
     >>>
     >>> # SENSITIVITIES
@@ -49,23 +46,3 @@ class SolutionArray(DictOfLists):
             return 1
         except KeyError:
             return 0
-
-    def __call__(self, posy):
-        posy_subbed = self.subinto(posy)
-        return getattr(posy_subbed, "c", posy_subbed)
-
-    def subinto(self, posy):
-        "Returns NomialArray of each solution substituted into posy."
-        if posy in self["variables"]:
-            (clean_key, val) = self["variables"].item(posy)
-            return Quantity(val, clean_key.units or "dimensionless")
-
-        if not hasattr(posy, "sub"):
-            raise ValueError(f"no variable '{posy}' found in the solution")
-
-        if len(self) > 1:
-            return NomialArray(
-                [self.atindex(i).subinto(posy) for i in range(len(self))]
-            )
-
-        return posy.sub(self["variables"], require_positive=False)

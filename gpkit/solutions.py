@@ -86,6 +86,20 @@ class Solution:
                 return False
         return True
 
+    def subinto(self, posy):
+        "solution substituted into posy."
+        for target_vmap in (self.primal, self.constants):
+            if posy in target_vmap:
+                return target_vmap.quantity(posy)
+
+        if not hasattr(posy, "sub"):
+            raise ValueError(f"no variable '{posy}' found in the solution")
+
+        variables = VarMap(self.primal)
+        variables.update(self.constants)
+
+        return posy.sub(variables, require_positive=False)
+
     def diff(self, baseline, **kwargs):
         "printable difference table between this and other"
         return printing.diff(self, baseline, **kwargs)
