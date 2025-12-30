@@ -52,7 +52,7 @@ Constraints
 
 Optimal Cost
 ------------
-C : 1.414
+Relax.C : 1.414
 
 WARNINGS
 --------

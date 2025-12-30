@@ -64,7 +64,7 @@ h = self.h = Variable('h', 1, 'm', 'minimum height')  # from 'h     1 [m]    min
 
 Optimal Cost
 ------------
-A : 1.465 [m²]
+Cube.A : 1.465 [m²]
 
 Free Variables
 --------------

@@ -60,7 +60,7 @@ class System2(Model):
         with Vectorize(3):
             self.Fleet2 = Fleet2()
         constraints = [self.Fleet2]
-        self.cost = sum(self.Fleet2.z)
+        self.cost = self.Fleet2.z.sum()
         return constraints
 
 

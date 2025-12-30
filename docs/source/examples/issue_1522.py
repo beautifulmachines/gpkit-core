@@ -43,7 +43,7 @@ class Yum1(Model):
         with Vectorize(5):
             cake = Cake()
         y = cake.y
-        self.cost = sum(y)
+        self.cost = y.sum()
         constraints = ConstraintSet([cake])
         return constraints
 
@@ -60,7 +60,7 @@ class Yum2(Model):
         with Vectorize(1):
             cake = Cake()
         y = cake.y
-        self.cost = sum(y)
+        self.cost = y.sum()
         constraints = ConstraintSet([cake])
         return constraints
 

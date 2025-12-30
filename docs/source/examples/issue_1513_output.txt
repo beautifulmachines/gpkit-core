@@ -26,7 +26,7 @@
 
 Optimal Cost
 ------------
-z[0] : 1
+System.Fleet2.z[0] : 1
 
 Free Variables
 --------------
@@ -103,7 +103,7 @@ System.Fleet2.Vehicle
 
 Optimal Cost
 ------------
-z[0] + z[1] + z[2] : 3
+System2.Fleet2.z[:].sum() : 3
 
 Free Variables
 --------------

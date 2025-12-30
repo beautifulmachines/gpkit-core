@@ -46,7 +46,7 @@
 
 Optimal Cost
 ------------
-y[0] + y[1] + y[2] + y[3] + y[4] : 15
+Yum1.Cake.y[:].sum() : 15
 
 Free Variables
 --------------
@@ -88,7 +88,7 @@ Yum1.Cake
 
 Optimal Cost
 ------------
-y[0] : 3
+Yum2.Cake.y[:].sum() : 3
 
 Free Variables
 --------------
