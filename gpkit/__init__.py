@@ -12,7 +12,6 @@ from .nomials import VectorizableVariable as Variable  # Variable the user sees
 from .nomials import VectorVariable
 from .programs.gp import GeometricProgram
 from .programs.sgp import SequentialGeometricProgram
-from .solution_array import SolutionArray
 from .units import DimensionalityError, units, ureg
 from .util.docstring import parse_variables
 from .varkey import VarKey

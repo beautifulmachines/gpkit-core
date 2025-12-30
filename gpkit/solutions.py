@@ -7,7 +7,6 @@ from typing import List, Sequence
 
 from . import printing
 from .breakdowns import bdtable_gen
-from .solution_array import SolutionArray
 from .varkey import VarKey
 from .varmap import VarMap
 
@@ -124,7 +123,7 @@ class Solution:
             json.dump(json_dict, f)
 
     def summary(self, **kwargs) -> str:
-        "Pass through to SolutionArray.summary"
+        "Print a summary table of this Solution"
         lines = self.cost_breakdown() + self.model_sens_breakdown() + [""]
         table = printing.table(self, tables=("warnings", "freevariables"), **kwargs)
         return "\n".join(lines) + table
@@ -143,30 +142,6 @@ class Solution:
     def model_sens_breakdown(self) -> str:
         "printable visualization of model sensitivity breakdown"
         return bdtable_gen("model sensitivities")(self, set())
-
-    def to_solution_array(self):
-        "Convert this to a SolutionArray"
-        variables = VarMap(self.primal)
-        variables.update(self.constants)
-        sol_array = SolutionArray(
-            {
-                "cost": self.cost,
-                "cost function": self.meta["cost function"],
-                "freevariables": VarMap(self.primal),
-                "constants": VarMap(self.constants),
-                "variables": variables,
-                "soltime": self.meta["soltime"],
-                "warnings": self.meta["warnings"],
-                "sensitivities": {
-                    "constraints": self.sens.constraints,
-                    "variables": self.sens.variables,
-                    "variablerisk": self.sens.variablerisk,
-                    "models": self.sens.models,
-                },
-            }
-        )
-        sol_array.modelstr = self.meta.get("modelstr", None)
-        return sol_array
 
 
 class SolutionSequence(List[Solution]):
@@ -195,22 +170,6 @@ class SolutionSequence(List[Solution]):
             return "SolutionSequence([])"
         return f"SolutionSequence(n={len(self)})"
 
-    def to_solution_array(self) -> SolutionArray:
-        "Convert to SolutionArray"
-        out = SolutionArray()
-        for sol in self:
-            solarray = sol.to_solution_array()
-            if "sweep_point" in sol.meta:
-                solarray["sweepvariables"] = sol.meta["sweep_point"]
-                for sweepvar in sol.meta["sweep_point"]:
-                    if sweepvar in solarray["constants"]:
-                        del solarray["constants"][sweepvar]
-            out.append(solarray)
-        out.to_arrays()
-        modelstrs = {sol.meta["modelstr"] for sol in self}
-        (out.modelstr,) = modelstrs
-        return out
-
     def plot(self, var):
         "Eventual plotting capability"
         raise NotImplementedError
@@ -229,6 +188,6 @@ class SolutionSequence(List[Solution]):
         return printing.table(self, **kwargs)
 
     def summary(self, **kwargs):
-        "Fall back to SolutionArray.summary"
+        "Print a summary table"
         tables = ("sweeps", "cost", "warnings", "freevariables")
         return printing.table(self, tables=tables, **kwargs)

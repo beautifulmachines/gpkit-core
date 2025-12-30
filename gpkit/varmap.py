@@ -186,7 +186,7 @@ class VarMap(MutableMapping):
 
     @property
     def varset(self):
-        "public access to varset. used by SolutionArray.set_necessarylineage"
+        "public access to varset. used by set_necessarylineage in breakdowns"
         return self._varset
 
     def __setitem__(self, key, value):
