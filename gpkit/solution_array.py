@@ -1,8 +1,6 @@
 # pylint: disable=too-many-lines
 """Defines SolutionArray class"""
 
-from .nomials import NomialArray
-from .units import Quantity
 from .util.small_classes import DictOfLists
 
 
