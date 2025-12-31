@@ -11,7 +11,7 @@ from .util.repr_conventions import unitstr
 Item = tuple[Any, Any]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PrintOptions:
     "container for printing options"
 
@@ -22,14 +22,14 @@ class PrintOptions:
     vec_width: int | None = None  # None -> auto-align elements when applicable
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ItemSource:
     "Attribute path to retrieve a Mapping holding Items"
 
     path: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DiffPair:
     "Difference between new and old"
 
@@ -368,7 +368,7 @@ DIFF_SECTION_SPECS = {
 }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SolutionContext:
     """Adapter that exposes a single Solution's printable items."""
 
@@ -386,7 +386,7 @@ class SolutionContext:
         return _warnings_single(self.sol).items()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SequenceContext:
     """Adapter that stacks printable items across a sequence of Solutions."""
 
@@ -435,7 +435,7 @@ class SequenceContext:
         return items.items()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DiffContext:
     "Adapter that provides (key, DiffPair(new, old)) items."
 
