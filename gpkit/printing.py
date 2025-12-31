@@ -40,6 +40,13 @@ class DiffPair:
         "simple relative difference"
         return np.asarray(self.new) / np.asarray(self.old) - 1
 
+    @property
+    def shape(self):
+        s = np.shape(self.new)
+        if np.shape(self.old):
+            assert np.shape(self.old) == s
+        return s
+
 
 # pylint: disable=missing-class-docstring
 class SectionSpec:
@@ -67,6 +74,16 @@ class SectionSpec:
         "Convert a section-specific 'item' to a row, i.e. List[str]"
         raise NotImplementedError
 
+    def _auto_vecwidth_rowspec(self, items, ctx_tmp):
+        "Return a copy of this with vec_width set automatically for items"
+        if ctx_tmp.align_vec and self.align_seq and self.options.vec_width is None:
+            lengths = set(np.shape(v) for _, v in items if np.shape(v))
+            if len(lengths) == 1:
+                width = self.max_val_width(items)
+                newopt = replace(self.options, vec_width=width)
+                return self.__class__(options=newopt)
+        return self
+
     def format(self, ctx) -> List[str]:
         "Output this section's lines given a solution or solution context"
         items = [item for item in self.items_from(ctx) if self._passes_filter(item)]
@@ -75,19 +92,14 @@ class SectionSpec:
         else:
             bymod = {"": items}
 
-        # auto-compute width and replace option, if required
-        rowspec = self
-        if ctx.align_vec and self.align_seq and self.options.vec_width is None:
-            width = self.max_val_width(items)
-            if width:
-                rowspec = self.__class__(options=replace(self.options, vec_width=width))
-
         # process each model group
         lines = []
         for modelname, model_items in sorted(bymod.items()):
             # 1. sort
             if self.sortkey:
                 model_items.sort(key=self.sortkey)
+            # auto-compute width and replace option, if required
+            rowspec = self._auto_vecwidth_rowspec(model_items, ctx)
             # 2. extract rows
             rows = [rowspec.row_from(item) for item in model_items]
             # 3. Align columns
@@ -287,7 +299,8 @@ class DiffSection(SectionSpec):
         p = self.options.precision
         for _, v in items:
             r = v.rel()
-            assert np.shape(r)
+            if not np.shape(r):
+                continue
             w = max(w, max(len(f"{el:.{p-1}g}") for el in np.asarray(r).ravel()))
         return w
 
@@ -427,10 +440,6 @@ class DiffContext:
     new: Any  # SolutionContext or SequenceContext
     baseline: Any  # Solution-like
     align_vec: bool = True
-
-    def __post_init__(self):
-        inferred_align = bool(getattr(self.new, "align_vec", False))
-        object.__setattr__(self, "align_vec", inferred_align)
 
     def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
         "Items are (key, DiffPair)"
