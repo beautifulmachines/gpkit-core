@@ -129,7 +129,10 @@ class SectionSpec:
         if np.shape(val):
             flat = np.asarray(val).ravel()
             shown = flat[:n]
-            body = "  ".join(f"{x:{self.pm}.{p-1}g}{suff}".replace("+nan", "nan").ljust(w) for x in shown)
+            body = "  ".join(
+                f"{x:{self.pm}.{p-1}g}{suff}".replace("+nan", "nan").ljust(w)
+                for x in shown
+            )
             dots = " ..." if flat.size > n else ""
             return f"[ {body}{dots} ]"
         return f"{val:{self.pm}.{p}g}{suff}"
