@@ -12,6 +12,10 @@
        ┃┛
 
 
+Optimal Cost
+------------
+1/x : 1e-30
+
 WARNINGS
 --------
 Arbitrarily Bounded Variables:

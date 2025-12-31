@@ -16,6 +16,10 @@
        ┃┣╸y ≤ 0.1
 
 
+Optimal Cost
+------------
+x : 0.9
+
 Free Variables
 --------------
 x : 0.9

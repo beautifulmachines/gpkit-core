@@ -34,6 +34,10 @@ SINGLE
        ┃┛
 
 
+Optimal Cost
+------------
+D : 303.1 [N]
+
 Free Variables
 --------------
   A : 8.46            aspect ratio

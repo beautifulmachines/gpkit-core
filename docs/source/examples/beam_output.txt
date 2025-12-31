@@ -44,6 +44,10 @@
        ┃┛      ┛
 
 
+Optimal Cost
+------------
+Beam.w[5] : 1.621 [m]
+
 Free Variables
 --------------
 Beam

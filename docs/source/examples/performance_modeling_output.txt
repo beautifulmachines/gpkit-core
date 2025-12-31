@@ -77,6 +77,10 @@ Constraints
        ┃┛          ┛          ┛
 
 
+Optimal Cost
+------------
+Mission.FlightSegment.AircraftP.Wfuel[0] : 1.091 [lbf]
+
 Free Variables
 --------------
 Aircraft

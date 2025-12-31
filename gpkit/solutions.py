@@ -42,6 +42,9 @@ class Sensitivities:
         raise NotImplementedError
 
 
+SUMMARY_TABLES = ("sweeps", "cost", "warnings", "freevariables")
+
+
 @dataclass(frozen=True, slots=True)
 class Solution:
     "A single GP solution, with mappings back to variables and constraints"
@@ -125,7 +128,7 @@ class Solution:
     def summary(self, **kwargs) -> str:
         "Print a summary table of this Solution"
         lines = self.cost_breakdown() + self.model_sens_breakdown() + [""]
-        table = printing.table(self, tables=("warnings", "freevariables"), **kwargs)
+        table = printing.table(self, tables=SUMMARY_TABLES, **kwargs)
         return "\n".join(lines) + table
 
     def table(self, **kwargs) -> str:
@@ -189,5 +192,4 @@ class SolutionSequence(List[Solution]):
 
     def summary(self, **kwargs):
         "Print a summary table"
-        tables = ("sweeps", "cost", "warnings", "freevariables")
-        return printing.table(self, tables=tables, **kwargs)
+        return printing.table(self, tables=SUMMARY_TABLES, **kwargs)
