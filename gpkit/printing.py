@@ -11,7 +11,7 @@ from .util.repr_conventions import unitstr
 Item = tuple[Any, Any]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class PrintOptions:
     "container for printing options"
 
@@ -22,14 +22,14 @@ class PrintOptions:
     vec_width: int | None = None  # None -> auto-align elements when applicable
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class ItemSource:
     "Attribute path to retrieve a Mapping holding Items"
 
     path: str
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DiffPair:
     "Difference between new and old"
 
@@ -40,11 +40,19 @@ class DiffPair:
         "simple relative difference"
         return np.asarray(self.new) / np.asarray(self.old) - 1
 
+    @property
+    def shape(self):
+        "shape is inferred from new (old must match or be scalar)"
+        s = np.shape(self.new)
+        if np.shape(self.old):
+            assert np.shape(self.old) == s
+        return s
+
 
 # pylint: disable=missing-class-docstring
 class SectionSpec:
     align = None
-    align_seq = True
+    align_vecs = True  # aligns vectors if all same length
     col_sep = " "
     filterfun = None
     filter_reduce = staticmethod(any)
@@ -67,6 +75,16 @@ class SectionSpec:
         "Convert a section-specific 'item' to a row, i.e. List[str]"
         raise NotImplementedError
 
+    def _auto_vecwidth_rowspec(self, items):
+        "Return a copy of this with vec_width set automatically for items"
+        if self.align_vecs and self.options.vec_width is None:
+            lengths = set(np.shape(v) for _, v in items if np.shape(v))
+            if len(lengths) == 1:
+                width = self._max_val_width(items)
+                newopt = replace(self.options, vec_width=width)
+                return self.__class__(options=newopt)
+        return self
+
     def format(self, ctx) -> List[str]:
         "Output this section's lines given a solution or solution context"
         items = [item for item in self.items_from(ctx) if self._passes_filter(item)]
@@ -75,19 +93,14 @@ class SectionSpec:
         else:
             bymod = {"": items}
 
-        # auto-compute width and replace option, if required
-        rowspec = self
-        if ctx.align_vec and self.align_seq and self.options.vec_width is None:
-            width = self.max_val_width(items)
-            if width:
-                rowspec = self.__class__(options=replace(self.options, vec_width=width))
-
         # process each model group
         lines = []
         for modelname, model_items in sorted(bymod.items()):
             # 1. sort
             if self.sortkey:
                 model_items.sort(key=self.sortkey)
+            # auto-compute width and replace option, if required
+            rowspec = self._auto_vecwidth_rowspec(model_items)
             # 2. extract rows
             rows = [rowspec.row_from(item) for item in model_items]
             # 3. Align columns
@@ -116,7 +129,10 @@ class SectionSpec:
         if np.shape(val):
             flat = np.asarray(val).ravel()
             shown = flat[:n]
-            body = "  ".join(f"{x:.{p-1}g}{suff}".ljust(w) for x in shown)
+            body = "  ".join(
+                f"{x:{self.pm}.{p-1}g}{suff}".replace("+nan", "nan").ljust(w)
+                for x in shown
+            )
             dots = " ..." if flat.size > n else ""
             return f"[ {body}{dots} ]"
         return f"{val:{self.pm}.{p}g}{suff}"
@@ -132,13 +148,20 @@ class SectionSpec:
         flags = (bool(self.filterfun((k, vi))) for vi in arr)
         return self.filter_reduce(flags)  # vector case
 
-    def max_val_width(self, items):
+    def _width_array(self, v):
+        "Hook for subclasses: array-like value used for width inference."
+        return v
+
+    def _max_val_width(self, items):
         "infer how wide the widest vector element will be"
         w = 0
         p = self.options.precision
         for _, v in items:
-            assert np.shape(v)
-            w = max(w, max(len(f"{el:.{p-1}g}") for el in np.asarray(v).ravel()))
+            arr = self._width_array(v)
+            if not np.shape(arr):
+                continue
+            flat = np.asarray(arr).ravel()
+            w = max(w, max(len(f"{el:{self.pm}.{p-1}g}") for el in flat))
         return w
 
 
@@ -155,7 +178,7 @@ class Cost(SectionSpec):
 
 class Warnings(SectionSpec):
     title = "WARNINGS"
-    align_seq = False
+    align_vecs = False
 
     def row_from(self, item):
         """Extract [warning_type, details] for warning display."""
@@ -281,15 +304,9 @@ class DiffSection(SectionSpec):
         "still abstract at this level"
         raise NotImplementedError
 
-    def max_val_width(self, items):
-        "infer how wide the widest vector element will be"
-        w = 0
-        p = self.options.precision
-        for _, v in items:
-            r = v.rel()
-            assert np.shape(r)
-            w = max(w, max(len(f"{el:.{p-1}g}") for el in np.asarray(r).ravel()))
-        return w
+    def _width_array(self, v):
+        "Use relative change when inferring widths for diff-style sections."
+        return v.rel()
 
 
 class DiffCost(DiffSection):
@@ -351,12 +368,11 @@ DIFF_SECTION_SPECS = {
 }
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SolutionContext:
     """Adapter that exposes a single Solution's printable items."""
 
     sol: Any
-    align_vec = False
 
     def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
         "Get the items associated with a particular attribute (source)"
@@ -370,12 +386,11 @@ class SolutionContext:
         return _warnings_single(self.sol).items()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class SequenceContext:
     """Adapter that stacks printable items across a sequence of Solutions."""
 
     sols: Sequence[Any]  # sequence of Solution-like objects
-    align_vec = True
 
     def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
         "Items for a given attribute are stacked across self.sols"
@@ -420,17 +435,12 @@ class SequenceContext:
         return items.items()
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, slots=True)
 class DiffContext:
     "Adapter that provides (key, DiffPair(new, old)) items."
 
     new: Any  # SolutionContext or SequenceContext
     baseline: Any  # Solution-like
-    align_vec: bool = True
-
-    def __post_init__(self):
-        inferred_align = bool(getattr(self.new, "align_vec", False))
-        object.__setattr__(self, "align_vec", inferred_align)
 
     def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
         "Items are (key, DiffPair)"
@@ -529,8 +539,6 @@ def _resolve_attrpath(obj: Any, path: str) -> Any:
 
 def rounded_mag(val, nround=8):
     "get the magnitude of a (vector or scalar) for stable sorting purposes"
-    # if np.shape(val) and np.isnan(val).all():
-    #     raise ValueError("all-nan-slice")
     return round(np.nanmax(np.absolute(val)), nround)
 
 

@@ -33,6 +33,10 @@ Infeasible monomial equality: Cannot convert from 'V [m³]' to 'M [kg]'
        ┃┛
 
 
+Optimal Cost
+------------
+A : 1.293 [m²]
+
 Free Variables
 --------------
    A : 1.293                   [m²] Surface Area of the Tank

@@ -34,6 +34,10 @@ SINGLE
        ┃┛
 
 
+Optimal Cost
+------------
+D : 303.1 [N]
+
 Free Variables
 --------------
   A : 8.46            aspect ratio
@@ -74,16 +78,16 @@ C_f : [ 0.00333   0.00314   0.00361   0.00342  ]      skin friction coefficient
 W_w : [ 1.91e+03  1.46e+03  2.03e+03  1.5e+03  ] [N]  wing weight
 Cost Change
 -----------
-D : [ 11.5%   30.7%   -2.9%   7.54%  ]
+D : [ +11.5%   +30.7%   -2.9%    +7.54%  ]
 
 Free Variable Changes
 ---------------------
- Re : [ 46.4%    97.1%    -1.11%   29.2%   ] Reynold's number
-C_L : [ -40.6%   -60.2%   -7.18%   -37.9%  ] Lift coefficent of wing
-  A : [ -26.7%   -43.6%   4.54%    -15.3%  ] aspect ratio
-C_D : [ -29%     -40.4%   -5.01%   -23.9%  ] Drag coefficient of wing
-W_w : [ -20.7%   -39.3%   -15.6%   -37.4%  ] wing weight
-  S : [ 12.8%    5.46%    -26.5%   -32%    ] total wing area
-  D : [ 11.5%    30.7%    -2.9%    7.54%   ] total drag force
-  W : [ -6.76%   -12.8%   -5.12%   -12.2%  ] total aircraft weight
-C_f : [ -7.34%   -12.7%   0.224%   -4.99%  ] skin friction coefficient
+ Re : [ +46.4%    +97.1%    -1.11%    +29.2%   ] Reynold's number
+C_L : [ -40.6%    -60.2%    -7.18%    -37.9%   ] Lift coefficent of wing
+  A : [ -26.7%    -43.6%    +4.54%    -15.3%   ] aspect ratio
+C_D : [ -29%      -40.4%    -5.01%    -23.9%   ] Drag coefficient of wing
+W_w : [ -20.7%    -39.3%    -15.6%    -37.4%   ] wing weight
+  S : [ +12.8%    +5.46%    -26.5%    -32%     ] total wing area
+  D : [ +11.5%    +30.7%    -2.9%     +7.54%   ] total drag force
+  W : [ -6.76%    -12.8%    -5.12%    -12.2%   ] total aircraft weight
+C_f : [ -7.34%    -12.7%    +0.224%   -4.99%   ] skin friction coefficient

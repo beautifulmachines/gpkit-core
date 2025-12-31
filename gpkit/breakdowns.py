@@ -38,6 +38,7 @@ def bdtable_gen(key):
         finally:
             lines = sys.stdout.lines()
             sys.stdout = original_stdout
+            set_necessarylineage(self, clear=True)
         return lines
 
     return bdtable

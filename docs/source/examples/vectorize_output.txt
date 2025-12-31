@@ -13,6 +13,10 @@ SCALAR
        ┃┛
 
 
+Optimal Cost
+------------
+Test.x : 1
+
 Free Variables
 --------------
 Test
@@ -41,6 +45,10 @@ VECTORIZED
        ┃┣╸x[1] ≥ 2
        ┃┛
 
+
+Optimal Cost
+------------
+Test1.x[:].prod() : 2
 
 Free Variables
 --------------

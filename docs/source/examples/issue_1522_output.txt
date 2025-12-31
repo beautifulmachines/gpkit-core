@@ -46,7 +46,7 @@
 
 Optimal Cost
 ------------
-y[0] + y[1] + y[2] + y[3] + y[4] : 15
+Yum1.Cake.y[:].sum() : 15
 
 Free Variables
 --------------
@@ -62,7 +62,7 @@ z[:] : [ 1  1  1  1  1  1 ... ]
 Variable Sensitivities
 ----------------------
 Yum1.Cake.Pie
-x[:] : [ 7.12e-07  7.12e-07  7.12e-07  7.12e-07  7.12e-07  0.2 ... ]
+x[:] : [ +7.12e-07  +7.12e-07  +7.12e-07  +7.12e-07  +7.12e-07  +0.2      ... ]
 
 Most Sensitive Constraints
 --------------------------
@@ -88,7 +88,7 @@ Yum1.Cake
 
 Optimal Cost
 ------------
-y[0] : 3
+Yum2.Cake.y[:].sum() : 3
 
 Free Variables
 --------------
@@ -104,7 +104,7 @@ z[:] : [ 1  1 ]
 Variable Sensitivities
 ----------------------
 Yum2.Cake.Pie
-x[:] : [ 8.37e-08  1 ]
+x[:] : [ +8.37e-08  +1        ]
 
 Most Sensitive Constraints
 --------------------------
