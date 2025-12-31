@@ -89,12 +89,12 @@ c : 1.279 [ft]  mean chord
 
 Mission.FlightSegment.AircraftP
 Wburn[:] : [ 0.274  0.273  0.272  0.272 ] [lbf] segment fuel burn
-Wfuel[:] : [ 1.09  0.817  0.544  0.272 ]  [lbf] fuel weight
+Wfuel[:] : [ 1.09   0.817  0.544  0.272 ] [lbf] fuel weight
 
 Mission.FlightSegment.AircraftP.WingAero
-CD[:] : [ 0.019  0.0189  0.0189  0.0188 ]                drag coefficient
-CL[:] : [ 1.01  1  1  1 ]                                lift coefficient
- D[:] : [ 2.74  2.73  2.72  2.72 ]                 [lbf] drag force
+CD[:] : [ 0.019     0.0189    0.0189    0.0188   ]       drag coefficient
+CL[:] : [ 1.01      1         1         1        ]       lift coefficient
+ D[:] : [ 2.74      2.73      2.72      2.72     ] [lbf] drag force
 Re[:] : [ 3.65e+05  3.65e+05  3.65e+05  3.65e+05 ]       Reynold's number
 
 Insensitive Constraints (below 1e-05)

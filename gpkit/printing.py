@@ -149,7 +149,8 @@ class SectionSpec:
         w = 0
         p = self.options.precision
         for _, v in items:
-            assert np.shape(v)
+            if not np.shape(v):
+                continue
             w = max(w, max(len(f"{el:.{p-1}g}") for el in np.asarray(v).ravel()))
         return w
 
@@ -369,7 +370,7 @@ class SolutionContext:
     """Adapter that exposes a single Solution's printable items."""
 
     sol: Any
-    align_vec = False
+    align_vec = True
 
     def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
         "Get the items associated with a particular attribute (source)"
