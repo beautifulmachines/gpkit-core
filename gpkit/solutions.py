@@ -22,6 +22,17 @@ class RawSolution:
     status: str
     meta: dict
 
+    def __post_init__(self):
+        self.validate()
+
+    def validate(self):
+        "Run basic validation"
+        for vec, name in ((self.x, "x"), (self.nu, "nu"), (self.la, "la")):
+            s = vec.shape
+            if len(s) != 1:
+                raise ValueError(f"Expected 1-D {name}; got shape {s}")
+        _ = float(self.cost)
+
 
 @dataclass(frozen=True, slots=True)
 class Sensitivities:
