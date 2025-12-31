@@ -536,8 +536,6 @@ def _resolve_attrpath(obj: Any, path: str) -> Any:
 
 def rounded_mag(val, nround=8):
     "get the magnitude of a (vector or scalar) for stable sorting purposes"
-    # if np.shape(val) and np.isnan(val).all():
-    #     raise ValueError("all-nan-slice")
     return round(np.nanmax(np.absolute(val)), nround)
 
 
