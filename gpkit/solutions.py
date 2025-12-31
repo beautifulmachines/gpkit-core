@@ -32,6 +32,7 @@ class RawSolution:
             if len(s) != 1:
                 raise ValueError(f"Expected 1-D {name}; got shape {s}")
         _ = float(self.cost)
+        assert len(self.nu) >= len(self.la)
 
 
 @dataclass(frozen=True, slots=True)
