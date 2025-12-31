@@ -119,12 +119,12 @@ W : +0.711%  (44.45lbf vs 44.14lbf) weight
 c : +0.3549%  (1.283ft vs 1.279ft)  mean chord
 
 Mission.FlightSegment.AircraftP
-Wburn[:] : [ 102%  102%  101%  101% ] segment fuel burn
-Wfuel[:] : [ 101%  101%  101%  101% ] fuel weight
+Wburn[:] : [ +102%  +102%  +101%  +101% ] segment fuel burn
+Wfuel[:] : [ +101%  +101%  +101%  +101% ] fuel weight
 
 Mission.FlightSegment.AircraftP.WingAero
- D[:] : [ 1.06%     0.794%    0.529%    0.266%   ] drag force
-CD[:] : [ 0.349%    0.0828%   -0.181%   -0.442%  ] drag coefficient
-Re[:] : [ 0.355%    0.355%    0.355%    0.355%   ] Reynold's number
-CL[:] : [ 0.264%    0.0746%   -0.114%   -0.302%  ] lift coefficient
+ D[:] : [ +1.06%     +0.794%    +0.529%    +0.266%   ] drag force
+CD[:] : [ +0.349%    +0.0828%   -0.181%    -0.442%   ] drag coefficient
+Re[:] : [ +0.355%    +0.355%    +0.355%    +0.355%   ] Reynold's number
+CL[:] : [ +0.264%    +0.0746%   -0.114%    -0.302%   ] lift coefficient
 Making Sankey diagrams requires the ipysankeywidget package
