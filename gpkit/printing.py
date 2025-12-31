@@ -51,7 +51,7 @@ class DiffPair:
 # pylint: disable=missing-class-docstring
 class SectionSpec:
     align = None
-    align_seq = True
+    align_vecs = True  # aligns vectors if all same length
     col_sep = " "
     filterfun = None
     filter_reduce = staticmethod(any)
@@ -76,7 +76,7 @@ class SectionSpec:
 
     def _auto_vecwidth_rowspec(self, items, ctx_tmp):
         "Return a copy of this with vec_width set automatically for items"
-        if ctx_tmp.align_vec and self.align_seq and self.options.vec_width is None:
+        if self.align_vecs and self.options.vec_width is None:
             lengths = set(np.shape(v) for _, v in items if np.shape(v))
             if len(lengths) == 1:
                 width = self.max_val_width(items)
@@ -168,7 +168,7 @@ class Cost(SectionSpec):
 
 class Warnings(SectionSpec):
     title = "WARNINGS"
-    align_seq = False
+    align_vecs = False
 
     def row_from(self, item):
         """Extract [warning_type, details] for warning display."""
@@ -370,7 +370,6 @@ class SolutionContext:
     """Adapter that exposes a single Solution's printable items."""
 
     sol: Any
-    align_vec = True
 
     def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
         "Get the items associated with a particular attribute (source)"
@@ -389,7 +388,6 @@ class SequenceContext:
     """Adapter that stacks printable items across a sequence of Solutions."""
 
     sols: Sequence[Any]  # sequence of Solution-like objects
-    align_vec = True
 
     def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
         "Items for a given attribute are stacked across self.sols"
@@ -440,7 +438,6 @@ class DiffContext:
 
     new: Any  # SolutionContext or SequenceContext
     baseline: Any  # Solution-like
-    align_vec: bool = True
 
     def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
         "Items are (key, DiffPair)"
