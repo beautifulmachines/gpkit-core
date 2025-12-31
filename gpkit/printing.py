@@ -42,6 +42,7 @@ class DiffPair:
 
     @property
     def shape(self):
+        "shape is inferred from new (old must match or be scalar)"
         s = np.shape(self.new)
         if np.shape(self.old):
             assert np.shape(self.old) == s
@@ -74,12 +75,12 @@ class SectionSpec:
         "Convert a section-specific 'item' to a row, i.e. List[str]"
         raise NotImplementedError
 
-    def _auto_vecwidth_rowspec(self, items, ctx_tmp):
+    def _auto_vecwidth_rowspec(self, items):
         "Return a copy of this with vec_width set automatically for items"
         if self.align_vecs and self.options.vec_width is None:
             lengths = set(np.shape(v) for _, v in items if np.shape(v))
             if len(lengths) == 1:
-                width = self.max_val_width(items)
+                width = self._max_val_width(items)
                 newopt = replace(self.options, vec_width=width)
                 return self.__class__(options=newopt)
         return self
@@ -99,7 +100,7 @@ class SectionSpec:
             if self.sortkey:
                 model_items.sort(key=self.sortkey)
             # auto-compute width and replace option, if required
-            rowspec = self._auto_vecwidth_rowspec(model_items, ctx)
+            rowspec = self._auto_vecwidth_rowspec(model_items)
             # 2. extract rows
             rows = [rowspec.row_from(item) for item in model_items]
             # 3. Align columns
@@ -144,14 +145,20 @@ class SectionSpec:
         flags = (bool(self.filterfun((k, vi))) for vi in arr)
         return self.filter_reduce(flags)  # vector case
 
-    def max_val_width(self, items):
+    def _width_array(self, v):
+        "Hook for subclasses: array-like value used for width inference."
+        return v
+
+    def _max_val_width(self, items):
         "infer how wide the widest vector element will be"
         w = 0
         p = self.options.precision
         for _, v in items:
-            if not np.shape(v):
+            arr = self._width_array(v)
+            if not np.shape(arr):
                 continue
-            w = max(w, max(len(f"{el:.{p-1}g}") for el in np.asarray(v).ravel()))
+            flat = np.asarray(arr).ravel()
+            w = max(w, max(len(f"{el:.{p-1}g}") for el in flat))
         return w
 
 
@@ -294,16 +301,9 @@ class DiffSection(SectionSpec):
         "still abstract at this level"
         raise NotImplementedError
 
-    def max_val_width(self, items):
-        "infer how wide the widest vector element will be"
-        w = 0
-        p = self.options.precision
-        for _, v in items:
-            r = v.rel()
-            if not np.shape(r):
-                continue
-            w = max(w, max(len(f"{el:.{p-1}g}") for el in np.asarray(r).ravel()))
-        return w
+    def _width_array(self, v):
+        "Use relative change when inferring widths for diff-style sections."
+        return v.rel()
 
 
 class DiffCost(DiffSection):
