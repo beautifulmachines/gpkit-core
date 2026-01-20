@@ -73,15 +73,13 @@ class parse_variables:  # pylint:disable=invalid-name
         self.string = string
         self.scopevars = scopevars
         if scopevars is None:
-            raise DeprecationWarning(
-                """
+            raise DeprecationWarning("""
 parse_variables is no longer used directly with exec, but as a decorator:
 
     @parse_variables(__doc__, globals())
     def setup(...):
 
-"""
-            )
+""")
 
     def __call__(self, function):  # pylint:disable=too-many-locals
         orig_lines, lineno = inspect.getsourcelines(function)

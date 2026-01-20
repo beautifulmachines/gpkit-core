@@ -138,8 +138,7 @@ def modelcontrolpanel(model, showvars=(), fns_of_sol=None, **solvekwargs):
         link((box, "visible"), (cb, "value"))
         sliderboxes.append(box)
 
-    widgets_css = widgets.HTML(
-        """<style>
+    widgets_css = widgets.HTML("""<style>
     [style="font-size: 1.16em;"] { padding-top: 0.25em; }
     [style="width: 3ex; font-size: 1.165em;"] { padding-top: 0.2em; }
     .widget-numeric-text { width: auto; }
@@ -148,8 +147,7 @@ def modelcontrolpanel(model, showvars=(), fns_of_sol=None, **solvekwargs):
     .widget-slider .widget-label { width: 20ex; }
     .widget-checkbox .widget-label { width: 15ex; }
     .form-control { border: none; box-shadow: none; }
-    </style>"""
-    )
+    </style>""")
     settings = [widgets_css]
     for sliderbox in sliderboxes:
         settings.append(create_settings(sliderbox))

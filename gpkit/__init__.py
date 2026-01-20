@@ -17,8 +17,7 @@ from .util.docstring import parse_variables
 from .varkey import VarKey
 
 if "just built!" in settings:  # pragma: no cover
-    print(
-        f"""
+    print(f"""
 GPkit is now installed with solver(s) {settings['installed_solvers']}
 To incorporate new solvers at a later date, run `gpkit.build()`.
 
@@ -30,5 +29,4 @@ engineering-design models (https://github.com/beautifulmachines/gpkit-models/)
 useful for your own applications.
 
 Enjoy!
-"""
-    )
+""")

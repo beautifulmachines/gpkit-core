@@ -31,8 +31,7 @@ def load_settings(path=None, trybuild=True):
         if settings_["installed_solvers"] != [""]:
             settings_["just built!"] = True
         else:
-            print(
-                """
+            print("""
 =============
 Build failed!  :(
 =============
@@ -46,8 +45,7 @@ to gpkit@mit.edu or https://github.com/convexengineering/gpkit/issues/new
 so we can prevent others from having to see this message.
 
         Thanks!  :)
-"""
-            )
+""")
     settings_["default_solver"] = settings_["installed_solvers"][0]
     return settings_
 
