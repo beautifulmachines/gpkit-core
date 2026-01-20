@@ -305,7 +305,7 @@ class TestPosynomial(unittest.TestCase):
         hmap = NomialMap({exp1: 0.5, exp2: 1})
         hmap.units_of_product(None)
         p = Posynomial(hmap)
-        (m, g, h, v) = (VarKey(s) for s in ("m", "g", "h", "v"))
+        m, g, h, v = (VarKey(s) for s in ("m", "g", "h", "v"))
         self.assertTrue(all(isinstance(x, float) for x in p.cs))
         self.assertEqual(len(p.exps), 2)
         self.assertEqual(set(p.vks), set([m, g, h, v]))

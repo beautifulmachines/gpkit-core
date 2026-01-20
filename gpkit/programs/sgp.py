@@ -64,13 +64,11 @@ class SequentialGeometricProgram:
         self.cost = cost
         self.pccp_penalty = pccp_penalty
         if cost.any_nonpositive_cs:
-            raise InvalidPosynomial(
-                """an SGP's cost must be Posynomial
+            raise InvalidPosynomial("""an SGP's cost must be Posynomial
 
     The equivalent of a Signomial objective can be constructed by constraining
     a dummy variable `z` to be greater than the desired Signomial objective `s`
-    (z >= s) and then minimizing that dummy variable."""
-            )
+    (z >= s) and then minimizing that dummy variable.""")
         self.gpconstraints, self.sgpconstraints = [], []
         if not use_pccp:
             self.slack = 1
@@ -98,13 +96,11 @@ class SequentialGeometricProgram:
                     self.approxconstraints.append(constraint)
                     self.sgpvks.update(constraint.vks)
         if not self.sgpconstraints:
-            raise UnnecessarySGP(
-                """Model valid as a Geometric Program.
+            raise UnnecessarySGP("""Model valid as a Geometric Program.
 
 SequentialGeometricPrograms should only be created with Models containing
 Signomial Constraints, since Models without Signomials have global
-solutions and can be solved with 'Model.solve()'."""
-            )
+solutions and can be solved with 'Model.solve()'.""")
         self._gp = GeometricProgram(
             cost, self.approxconstraints + self.gpconstraints, substitutions, **kwargs
         )
