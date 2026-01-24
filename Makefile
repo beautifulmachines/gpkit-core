@@ -45,7 +45,7 @@ release:
 	@if [ -z "$(BUMP)" ]; then echo "Usage: make release BUMP=patch|minor|major"; exit 1; fi
 	@if [ -n "$$(git status --porcelain)" ]; then echo "Error: working directory not clean"; exit 1; fi
 	uvx hatch version $(BUMP)
-	$(eval VERSION := $(shell python -c "import re; print(re.search(r'\"(.+?)\"', open('gpkit/__init__.py').read()).group(1))"))
+	$(eval VERSION := $(shell python -c "import re; print(re.search(r'__version__\s*=\s*\"(.+?)\"', open('gpkit/__init__.py').read()).group(1))"))
 	git add gpkit/__init__.py
 	git commit -m "bump version to $(VERSION)"
 	git tag v$(VERSION)
