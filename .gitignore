@@ -79,3 +79,6 @@ test_reports_nounits/
 
 # Development environment
 .idea/
+
+# uv
+uv.lock
