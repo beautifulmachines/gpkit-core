@@ -33,9 +33,9 @@ jobs:
       run: |
         make test-unittest
 
-    - name: Run tests via pytest
+    - name: Run tests with coverage
       run: |
-        make test-pytest
+        make coverage
 
     - name: Check for file changes
       run: |
