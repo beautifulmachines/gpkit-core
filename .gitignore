@@ -31,51 +31,27 @@ var/
 .installed.cfg
 *.egg
 
-# Installer logs
-pip-log.txt
-pip-delete-this-directory.txt
-
 # Unit test / coverage reports
 htmlcov/
-.tox/
 .coverage
 .cache
-nosetests.xml
 coverage.xml
 
 # Translations
 *.mo
 
-# Mr Developer
-.mr.developer.cfg
-.project
-.pydevproject
-
-# Rope
-.ropeproject
-
-# Django stuff:
-*.log
-*.pot
-
 # Sphinx documentation
 docs/_build/
-
-# MATLAB autosave
-*.asv
 
 # CI test xmloutput
 test_reports/
 test_reports_nounits/
 
 # MacOSX
-*.DS_Store
+.DS_Store
 
 # vim
 *.swp
-
-# OSX
-.DS_Store
 
 # Development environment
 .idea/
