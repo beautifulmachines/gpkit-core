@@ -22,13 +22,7 @@ jobs:
         python-version: "3.11"
     - name: Install
       run: uv sync --group lint
-    - name: Check code formatting
-      run: |
-        make format
     - name: Lint with pylint
       run: |
         make pylint
-    - name: Check for file changes
-      run: |
-        make check-clean
       

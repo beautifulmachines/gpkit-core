@@ -1,4 +1,4 @@
-# This workflow runs varous code formatting and linting checks
+# This workflow runs code formatting and linting checks via pre-commit
 
 name: Lint
 
@@ -11,8 +11,6 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
 
     steps:
     - uses: actions/checkout@v4
@@ -22,16 +20,5 @@ jobs:
         python-version: "3.11"
     - name: Install
       run: uv sync --group lint
-    - name: Check code formatting
-      run: |
-        make format
-    - name: Lint with flake8
-      run: |
-        make lint
-    - name: Lint imports
-      run: |
-        uv run lint-imports
-    - name: Check for file changes
-      run: |
-        make check-clean
-      
+    - name: Lint
+      run: uv run pre-commit run --all-files

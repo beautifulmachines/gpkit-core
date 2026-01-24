@@ -38,6 +38,7 @@ lint = [
     "flake8>=7.0.0",
     "pylint>=4.0.0",
     "import-linter>=2.3",
+    "pre-commit>=4.0.0",
 ]
 test = [
     "pytest>=8.0.0",
@@ -51,6 +52,9 @@ path = "gpkit/__init__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["gpkit"]
+
+[tool.isort]
+profile = "black"
 
 [tool.pytest.ini_options]
 testpaths = ["gpkit/tests"]

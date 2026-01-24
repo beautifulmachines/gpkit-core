@@ -51,6 +51,16 @@ Thank you for your interest in contributing to gpkit-core! This guide will help 
    python -c "import gpkit; print(gpkit.__version__)"
    ```
 
+### Git Hooks (recommended)
+
+```bash
+uv sync
+uv run pre-commit install
+```
+
+This runs formatting and linting automatically on each commit.
+You can also run checks manually: `make format && make lint`
+
 ## Development Workflow
 
 ### Code Style
