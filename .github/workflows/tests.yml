@@ -27,7 +27,7 @@ jobs:
         python-version: ${{ matrix.python-version }}
 
     - name: Install
-      run: make sync-test
+      run: uv sync --group test
 
     - name: Run tests via original runner
       run: |

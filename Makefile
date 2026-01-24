@@ -1,14 +1,4 @@
-.PHONY: sync sync-lint sync-test clean check-clean test test-unittest test-pytest lint pylint format
-
-# Development environment setup
-sync:
-	uv sync --all-extras
-
-sync-lint:
-	uv sync --extra lint
-
-sync-test:
-	uv sync --extra test
+.PHONY: clean check-clean test test-unittest test-pytest lint pylint format
 
 # Code quality
 lint:
@@ -53,9 +43,6 @@ check-clean:
 # Help
 help:
 	@echo "Available commands:"
-	@echo "  sync              Sync all extras for local development"
-	@echo "  sync-lint         Sync with linting tools for CI"
-	@echo "  sync-test         Sync with testing tools for CI"
 	@echo "  lint              Run fast lint checks"
 	@echo "  pylint            Run pylint (slow)"
 	@echo "  format            Format code with isort and black"
