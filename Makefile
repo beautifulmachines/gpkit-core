@@ -1,4 +1,4 @@
-.PHONY: clean check-clean test test-unittest test-pytest lint pylint format
+.PHONY: clean check-clean test test-unittest test-pytest lint pylint format release
 
 # Code quality
 lint:
@@ -40,6 +40,18 @@ check-clean:
 	fi
 
 
+# Releasing (usage: make release BUMP=patch|minor|major)
+release:
+	@if [ -z "$(BUMP)" ]; then echo "Usage: make release BUMP=patch|minor|major"; exit 1; fi
+	@if [ -n "$$(git status --porcelain)" ]; then echo "Error: working directory not clean"; exit 1; fi
+	uvx hatch version $(BUMP)
+	$(eval VERSION := $(shell python -c "import re; print(re.search(r'\"(.+?)\"', open('gpkit/__init__.py').read()).group(1))"))
+	git add gpkit/__init__.py
+	git commit -m "bump version to $(VERSION)"
+	git tag v$(VERSION)
+	git push origin main --tags
+	gh release create v$(VERSION) --generate-notes --title "v$(VERSION)"
+
 # Help
 help:
 	@echo "Available commands:"
@@ -51,4 +63,5 @@ help:
 	@echo "  test-pytest       Run tests with pytest"
 	@echo "  clean             Clean build artifacts"
 	@echo "  check-clean       Check no uncommitted changes"
+	@echo "  release           Create a release (BUMP=patch|minor|major)"
 	@echo "  help              Show this help message"

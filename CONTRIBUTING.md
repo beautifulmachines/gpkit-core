@@ -125,6 +125,22 @@ pytest gpkit/tests/test_specific_file.py
 3. Update documentation if necessary
 4. Wait for review and address any feedback
 
+## Releasing
+
+To create a new release, run:
+```bash
+make release BUMP=patch  # or minor, or major
+```
+
+This single command will:
+1. Bump the version in `gpkit/__init__.py` using hatch
+2. Commit the version bump
+3. Create a git tag (`vX.Y.Z`)
+4. Push the commit and tag to `origin main`
+5. Create a GitHub release with auto-generated notes
+
+Release notes are automatically categorized by PR labels (see `.github/release.yml`). To get well-organized release notes, label your PRs with: `breaking`, `enhancement`/`feature`, `bug`/`fix`.
+
 ## Documentation
 
 - Code should be documented using docstrings (Google style)
