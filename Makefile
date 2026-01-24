@@ -1,36 +1,26 @@
-.PHONY: install-dev install-lint install-test clean check-clean test test-unittest test-pytest lint pylint format
-
-# Development environment setup
-install-dev:
-	pip install -e .[lint,test]
-
-install-lint:
-	pip install .[lint]
-
-install-test:
-	pip install .[test]
+.PHONY: clean check-clean test test-unittest test-pytest lint pylint format
 
 # Code quality
 lint:
-	flake8 --max-line-length=88 --ignore=E203,W503,F821 --per-file-ignores="__init__.py:F401" gpkit docs
+	uv run flake8 --max-line-length=88 --ignore=E203,W503,F821 --per-file-ignores="__init__.py:F401" gpkit docs
 
 pylint:
-	pylint --rcfile=.pylintrc gpkit/
-	pylint --rcfile=.pylintrc.docs docs/
+	uv run pylint --rcfile=.pylintrc gpkit/
+	uv run pylint --rcfile=.pylintrc.docs docs/
 
 # Code formatting
 format:
-	isort --profile black gpkit docs
-	black gpkit docs
+	uv run isort --profile black gpkit docs
+	uv run black gpkit docs
 
 # Testing
 test: test-unittest test-pytest  # Run both test runners
 
 test-unittest:  # Run tests using the original test runner
-	python -c "import gpkit.tests; gpkit.tests.run()"
+	uv run python -c "import gpkit.tests; gpkit.tests.run()"
 
 test-pytest:  # Run tests with pytest
-	pytest gpkit/tests -v
+	uv run pytest gpkit/tests -v
 
 # Cleanup
 clean:
@@ -53,9 +43,6 @@ check-clean:
 # Help
 help:
 	@echo "Available commands:"
-	@echo "  install-dev       Editable install for local development"
-	@echo "  install-lint      Install with linting tools for CI"
-	@echo "  install-test      Install with testing tools for CI"
 	@echo "  lint              Run fast lint checks"
 	@echo "  pylint            Run pylint (slow)"
 	@echo "  format            Format code with isort and black"

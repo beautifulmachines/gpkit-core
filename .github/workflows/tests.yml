@@ -16,20 +16,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11"]
+        python-version: ["3.10", "3.12"]
 
     steps:
     - uses: actions/checkout@v4
 
-    - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v4
       with:
         python-version: ${{ matrix.python-version }}
 
     - name: Install
-      run: |
-        python -m pip install --upgrade pip
-        make install-test
+      run: uv sync --group test
 
     - name: Run tests via original runner
       run: |
