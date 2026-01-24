@@ -2,7 +2,7 @@
 
 # Code quality
 lint:
-	uv run flake8 --max-line-length=88 --ignore=E203,W503,F821 --per-file-ignores="__init__.py:F401" gpkit docs
+	uv run flake8 gpkit docs
 
 pylint:
 	uv run pylint --rcfile=.pylintrc gpkit/
@@ -10,7 +10,7 @@ pylint:
 
 # Code formatting
 format:
-	uv run isort --profile black gpkit docs
+	uv run isort gpkit docs
 	uv run black gpkit docs
 
 # Testing
