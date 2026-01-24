@@ -1,4 +1,4 @@
-.PHONY: clean check-clean test test-unittest test-pytest lint pylint format
+.PHONY: clean check-clean test test-unittest test-pytest test-coverage lint pylint format
 
 # Code quality
 lint:
@@ -21,6 +21,9 @@ test-unittest:  # Run tests using the original test runner
 
 test-pytest:  # Run tests with pytest
 	uv run pytest gpkit/tests -v
+
+test-coverage:  # Run tests with coverage reporting
+	uv run pytest gpkit/tests --cov=gpkit --cov-report=term-missing
 
 # Cleanup
 clean:
@@ -49,6 +52,7 @@ help:
 	@echo "  test              Run both unittest and pytest"
 	@echo "  test-unittest     Run tests using the original test runner"
 	@echo "  test-pytest       Run tests with pytest"
+	@echo "  test-coverage     Run tests with coverage reporting"
 	@echo "  clean             Clean build artifacts"
 	@echo "  check-clean       Check no uncommitted changes"
 	@echo "  help              Show this help message"

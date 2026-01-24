@@ -37,6 +37,10 @@ jobs:
       run: |
         make test-pytest
 
+    - name: Run tests with coverage
+      run: |
+        make test-coverage
+
     - name: Check for file changes
       run: |
         make check-clean
