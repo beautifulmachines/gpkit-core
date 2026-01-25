@@ -1,8 +1,7 @@
 "Unit tests for Constraint, MonomialEquality and SignomialInequality"
 
-import unittest
-
 import numpy as np
+import pytest
 
 from gpkit import (
     ConstraintSet,
@@ -27,7 +26,7 @@ from gpkit.nomials import MonomialEquality, PosynomialInequality, SignomialInequ
 from gpkit.units import DimensionalityError
 
 
-class TestConstraint(unittest.TestCase):
+class TestConstraint:
     "Tests for Constraint class"
 
     def test_uninited_element(self):
@@ -39,15 +38,16 @@ class TestConstraint(unittest.TestCase):
             def setup(self):
                 ConstraintSet([self, x <= 1])
 
-        self.assertRaises(ValueError, SelfPass)
+        with pytest.raises(ValueError):
+            SelfPass()
 
     def test_bad_elements(self):
         x = Variable("x")
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             _ = Model(x, [x == "A"])
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             _ = Model(x, [x >= 1, x == "A"])
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             _ = Model(
                 x,
                 [
@@ -56,14 +56,14 @@ class TestConstraint(unittest.TestCase):
                     x >= 1,
                 ],
             )
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             _ = Model(x, [x == "A", x >= 1])
         v = VectorVariable(2, "v")
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             _ = Model(x, [v == "A"])
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             _ = Model(x, [v <= ["A", "B"]])
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             _ = Model(x, [v >= ["A", "B"]])
 
     def test_evalfn(self):
@@ -72,7 +72,7 @@ class TestConstraint(unittest.TestCase):
         m = Model(x, [x >= 2])
         m.unique_varkeys = set([x2.key])
         sol = m.solve(verbosity=0)
-        self.assertAlmostEqual(sol[x2], sol[x] ** 2)
+        assert sol[x2] == pytest.approx(sol[x] ** 2)
 
     def test_relax_list(self):
         x = Variable("x")
@@ -94,29 +94,29 @@ class TestConstraint(unittest.TestCase):
         include_min = ConstantsRelaxed(constraints, include_only=["x_min"])
         NamedVariables.reset_modelnumbers()
         exclude_max = ConstantsRelaxed(constraints, exclude=["x_max"])
-        self.assertEqual(str(include_min), str(exclude_max))
+        assert str(include_min) == str(exclude_max)
 
     def test_equality_relaxation(self):
         x = Variable("x")
         m = Model(x, [x == 3, x == 4])
         rc = ConstraintsRelaxed(m)
         m2 = Model(rc.relaxvars.prod() * x**0.01, rc)
-        self.assertAlmostEqual(m2.solve(verbosity=0)[x], 3, places=3)
+        assert m2.solve(verbosity=0)[x] == pytest.approx(3, abs=1e-3)
 
     def test_constraintget(self):
         x = Variable("x")
         x_ = Variable("x", lineage=[("_", 0)])
         xv = VectorVariable(2, "x")
         xv_ = VectorVariable(2, "x", lineage=[("_", 0)])
-        self.assertEqual(Model(x, [x >= 1])["x"], x)
-        with self.assertRaises(ValueError):
+        assert Model(x, [x >= 1])["x"] == x
+        with pytest.raises(ValueError):
             _ = Model(x, [x >= 1, x_ >= 1])["x"]
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             _ = Model(x, [x >= 1, xv >= 1])["x"]
-        self.assertTrue(all(Model(xv.prod(), [xv >= 1])["x"] == xv))
-        with self.assertRaises(ValueError):
+        assert all(Model(xv.prod(), [xv >= 1])["x"] == xv)
+        with pytest.raises(ValueError):
             _ = Model(xv.prod(), [xv >= 1, xv_ >= 1])["x"]
-        with self.assertRaises(ValueError):
+        with pytest.raises(ValueError):
             _ = Model(xv.prod(), [xv >= 1, x_ >= 1])["x"]
 
     def test_additive_scalar(self):
@@ -124,47 +124,44 @@ class TestConstraint(unittest.TestCase):
         x = Variable("x")
         c1 = 1 >= 10 * x
         c2 = 1 >= 5 * x + 0.5
-        self.assertEqual(type(c1), PosynomialInequality)
-        self.assertEqual(type(c2), PosynomialInequality)
+        assert isinstance(c1, PosynomialInequality)
+        assert isinstance(c2, PosynomialInequality)
         (c1hmap,) = c1.as_hmapslt1({})
         (c2hmap,) = c2.as_hmapslt1({})
-        self.assertEqual(c1hmap, c2hmap)
+        assert c1hmap == c2hmap
 
     def test_additive_scalar_gt1(self):
         "1 can't be greater than (1 + something positive)"
         x = Variable("x")
 
-        def constr():
-            "method that should raise a ValueError"
-            return 1 >= 5 * x + 1.1
-
-        self.assertRaises(PrimalInfeasible, constr)
+        with pytest.raises(PrimalInfeasible):
+            _ = 1 >= 5 * x + 1.1
 
     def test_init(self):
         "Test Constraint __init__"
         x = Variable("x")
         y = Variable("y")
         c = PosynomialInequality(x, ">=", y**2)
-        self.assertEqual(c.as_hmapslt1({}), [(y**2 / x).hmap])
-        self.assertEqual(c.left, x)
-        self.assertEqual(c.right, y**2)
+        assert c.as_hmapslt1({}) == [(y**2 / x).hmap]
+        assert c.left == x
+        assert c.right == y**2
         c = PosynomialInequality(x, "<=", y**2)
-        self.assertEqual(c.as_hmapslt1({}), [(x / y**2).hmap])
-        self.assertEqual(c.left, x)
-        self.assertEqual(c.right, y**2)
-        self.assertEqual(type((1 >= x).latex()), str)
+        assert c.as_hmapslt1({}) == [(x / y**2).hmap]
+        assert c.left == x
+        assert c.right == y**2
+        assert isinstance((1 >= x).latex(), str)
 
     def test_oper_overload(self):
         "Test Constraint initialization by operator overloading"
         x = Variable("x")
         y = Variable("y")
         c = y >= 1 + x**2
-        self.assertEqual(c.as_hmapslt1({}), [(1 / y + x**2 / y).hmap])
-        self.assertEqual(c.left, y)
-        self.assertEqual(c.right, 1 + x**2)
+        assert c.as_hmapslt1({}) == [(1 / y + x**2 / y).hmap]
+        assert c.left == y
+        assert c.right == 1 + x**2
         # same constraint, switched operator direction
         c2 = 1 + x**2 <= y  # same as c
-        self.assertEqual(c2.as_hmapslt1({}), c.as_hmapslt1({}))
+        assert c2.as_hmapslt1({}) == c.as_hmapslt1({})
 
     def test_sub_tol(self):
         "Test PosyIneq feasibility tolerance under substitutions"
@@ -173,21 +170,23 @@ class TestConstraint(unittest.TestCase):
         z = Variable("z")
         PosynomialInequality.feastol = 1e-5
         m = Model(z, [x == z, x >= y], {x: 1, y: 1.0001})
-        self.assertRaises(PrimalInfeasible, m.solve, verbosity=0)
+        with pytest.raises(PrimalInfeasible):
+            m.solve(verbosity=0)
         PosynomialInequality.feastol = 1e-3
-        self.assertEqual(m.substitutions["x"], m.solve(verbosity=0)["x"])
+        assert m.substitutions["x"] == m.solve(verbosity=0)["x"]
 
 
-class TestCostedConstraint(unittest.TestCase):
+class TestCostedConstraint:
     "Tests for Costed Constraint class"
 
     def test_vector_cost(self):
         x = VectorVariable(2, "x")
-        self.assertRaises(ValueError, CostedConstraintSet, x, [])
+        with pytest.raises(ValueError):
+            CostedConstraintSet(x, [])
         _ = CostedConstraintSet(np.array(x[0]), [])
 
 
-class TestMonomialEquality(unittest.TestCase):
+class TestMonomialEquality:
     "Test monomial equality constraint class"
 
     def test_init(self):
@@ -199,18 +198,20 @@ class TestMonomialEquality(unittest.TestCase):
         mec = x == y**2
         # __init__
         mec2 = MonomialEquality(x, y**2)
-        self.assertTrue(mono.hmap in mec.as_hmapslt1({}))
-        self.assertTrue(mono.hmap in mec2.as_hmapslt1({}))
+        assert mono.hmap in mec.as_hmapslt1({})
+        assert mono.hmap in mec2.as_hmapslt1({})
         x = Variable("x", "ft")
         y = Variable("y")
-        self.assertRaises(DimensionalityError, MonomialEquality, x, y)
-        self.assertRaises(DimensionalityError, MonomialEquality, y, x)
+        with pytest.raises(DimensionalityError):
+            MonomialEquality(x, y)
+        with pytest.raises(DimensionalityError):
+            MonomialEquality(y, x)
 
     def test_vector(self):
         "Monomial Equalities with VectorVariables"
         x = VectorVariable(3, "x")
-        self.assertFalse(x == 3)
-        self.assertTrue(x == x)  # pylint: disable=comparison-with-itself
+        assert not (x == 3)
+        assert x == x  # pylint: disable=comparison-with-itself
 
     def test_inheritance(self):
         "Make sure MonomialEquality inherits from the right things"
@@ -218,35 +219,32 @@ class TestMonomialEquality(unittest.TestCase):
         m = Variable("m")
         a = Variable("a")
         mec = f == m * a
-        self.assertTrue(isinstance(mec, MonomialEquality))
+        assert isinstance(mec, MonomialEquality)
 
     def test_non_monomial(self):
         "Try to initialize a MonomialEquality with non-monomial args"
         x = Variable("x")
         y = Variable("y")
 
-        def constr():
-            "method that should raise a TypeError"
+        with pytest.raises(TypeError):
             MonomialEquality(x * y, x + y)
-
-        self.assertRaises(TypeError, constr)
 
     def test_str(self):
         "Test that MonomialEquality.__str__ returns a string"
         x = Variable("x")
         y = Variable("y")
         mec = x == y
-        self.assertEqual(type(mec.str_without()), str)
+        assert isinstance(mec.str_without(), str)
 
     def test_united_dimensionless(self):
         "Check dimensionless unit-ed variables work"
         x = Variable("x")
         y = Variable("y", "hr/day")
         c = MonomialEquality(x, y)
-        self.assertTrue(isinstance(c, MonomialEquality))
+        assert isinstance(c, MonomialEquality)
 
 
-class TestSignomialInequality(unittest.TestCase):
+class TestSignomialInequality:
     "Test Signomial constraints"
 
     def test_becomes_posy_sensitivities(self):
@@ -267,10 +265,10 @@ class TestSignomialInequality(unittest.TestCase):
                 ],
             )
         var_senss = m.solve(verbosity=0).sens.variables
-        self.assertAlmostEqual(var_senss[Dp], -0.16, 2)
-        self.assertAlmostEqual(var_senss[fBLI], -0.16, 2)
-        self.assertAlmostEqual(var_senss[fsurf], 0.19, 2)
-        self.assertAlmostEqual(var_senss[mdot], -0.17, 2)
+        assert var_senss[Dp] == pytest.approx(-0.16, abs=1e-2)
+        assert var_senss[fBLI] == pytest.approx(-0.16, abs=1e-2)
+        assert var_senss[fsurf] == pytest.approx(0.19, abs=1e-2)
+        assert var_senss[mdot] == pytest.approx(-0.17, abs=1e-2)
 
         # Linked variable
         Dp = Variable("Dp", 0.662)
@@ -286,10 +284,10 @@ class TestSignomialInequality(unittest.TestCase):
             ],
         )
         var_senss = m.solve(verbosity=0).sens.variables
-        self.assertAlmostEqual(var_senss[Dp], -0.16, 2)
-        self.assertAlmostEqual(var_senss[fBLI], -0.16, 2)
-        self.assertAlmostEqual(var_senss[fsurf], 0.19, 2)
-        self.assertAlmostEqual(var_senss[mdot], -0.17, 2)
+        assert var_senss[Dp] == pytest.approx(-0.16, abs=1e-2)
+        assert var_senss[fBLI] == pytest.approx(-0.16, abs=1e-2)
+        assert var_senss[fsurf] == pytest.approx(0.19, abs=1e-2)
+        assert var_senss[mdot] == pytest.approx(-0.17, abs=1e-2)
 
         # fixed negative variable
         Dp = Variable("Dp", 0.662)
@@ -305,21 +303,21 @@ class TestSignomialInequality(unittest.TestCase):
             ],
         )
         var_senss = m.solve(verbosity=0).sens.variables
-        self.assertAlmostEqual(var_senss[Dp] + var_senss[mDp], -0.16, 2)
-        self.assertAlmostEqual(var_senss[fBLI], -0.16, 2)
-        self.assertAlmostEqual(var_senss[fsurf], 0.19, 2)
-        self.assertAlmostEqual(var_senss[mdot], -0.17, 2)
+        assert var_senss[Dp] + var_senss[mDp] == pytest.approx(-0.16, abs=1e-2)
+        assert var_senss[fBLI] == pytest.approx(-0.16, abs=1e-2)
+        assert var_senss[fsurf] == pytest.approx(0.19, abs=1e-2)
+        assert var_senss[mdot] == pytest.approx(-0.17, abs=1e-2)
 
     def test_init(self):
         "Test initialization and types"
         drag = Variable("drag", units="N")
         x1, x2, x3 = (Variable(f"x_{i}", units="N") for i in range(3))
-        with self.assertRaises(TypeError):
+        with pytest.raises(TypeError):
             sc = drag >= x1 + x2 - x3
         with SignomialsEnabled():
             sc = drag >= x1 + x2 - x3
-        self.assertTrue(isinstance(sc, SignomialInequality))
-        self.assertFalse(isinstance(sc, Posynomial))
+        assert isinstance(sc, SignomialInequality)
+        assert not isinstance(sc, Posynomial)
 
     def test_posyslt1(self):
         x = Variable("x")
@@ -327,11 +325,11 @@ class TestSignomialInequality(unittest.TestCase):
         with SignomialsEnabled():
             sc = x + y >= x * y
         # make sure that the error type doesn't change on our users
-        with self.assertRaises(InvalidGPConstraint):
+        with pytest.raises(InvalidGPConstraint):
             _ = sc.as_hmapslt1({})
 
 
-class TestLoose(unittest.TestCase):
+class TestLoose:
     "Test loose constraint set"
 
     def test_raiseerror(self):
@@ -339,7 +337,8 @@ class TestLoose(unittest.TestCase):
         x_min = Variable("x_{min}", 2)
         m = Model(x, [Loose([x >= x_min]), x >= 1])
         Loose.raiseerror = True
-        self.assertRaises(RuntimeWarning, m.solve, verbosity=0)
+        with pytest.raises(RuntimeWarning):
+            m.solve(verbosity=0)
         Loose.raiseerror = False
 
     def test_posyconstr_in_gp(self):
@@ -349,10 +348,10 @@ class TestLoose(unittest.TestCase):
         m = Model(x, [Loose([x >= x_min]), x >= 1])
         sol = m.solve(verbosity=0)
         warndata = sol.meta["warnings"]["Unexpectedly Tight Constraints"][0][1]
-        self.assertIs(warndata[-1], m[0][0])
-        self.assertAlmostEqual(warndata[0], +1, 3)
+        assert warndata[-1] is m[0][0]
+        assert warndata[0] == pytest.approx(+1, abs=1e-3)
         m.substitutions[x_min] = 0.5
-        self.assertAlmostEqual(m.solve(verbosity=0).cost, 1)
+        assert m.solve(verbosity=0).cost == pytest.approx(1)
 
     def test_posyconstr_in_sp(self):
         x = Variable("x")
@@ -364,14 +363,14 @@ class TestLoose(unittest.TestCase):
         m = Model(x * y, [Loose([x >= y]), x >= x_min, y >= y_min, sig_constraint])
         sol = m.localsolve(verbosity=0)
         warndata = sol.meta["warnings"]["Unexpectedly Tight Constraints"][0][1]
-        self.assertIs(warndata[-1], m[0][0])
-        self.assertAlmostEqual(warndata[0], +1, 3)
+        assert warndata[-1] is m[0][0]
+        assert warndata[0] == pytest.approx(+1, abs=1e-3)
         m.substitutions[x_min] = 2
         m.substitutions[y_min] = 1
-        self.assertAlmostEqual(m.localsolve(verbosity=0).cost, 2.5, 5)
+        assert m.localsolve(verbosity=0).cost == pytest.approx(2.5, abs=1e-5)
 
 
-class TestTight(unittest.TestCase):
+class TestTight:
     "Test tight constraint set"
 
     def test_posyconstr_in_gp(self):
@@ -381,10 +380,10 @@ class TestTight(unittest.TestCase):
         m = Model(x, [Tight([x >= 1]), x >= x_min])
         sol = m.solve(verbosity=0)
         warndata = sol.meta["warnings"]["Unexpectedly Loose Constraints"][0][1]
-        self.assertIs(warndata[-1], m[0][0])
-        self.assertAlmostEqual(warndata[0], 1, 3)
+        assert warndata[-1] is m[0][0]
+        assert warndata[0] == pytest.approx(1, abs=1e-3)
         m.substitutions[x_min] = 0.5
-        self.assertAlmostEqual(m.solve(verbosity=0).cost, 1)
+        assert m.solve(verbosity=0).cost == pytest.approx(1)
 
     def test_posyconstr_in_sp(self):
         x = Variable("x")
@@ -394,10 +393,10 @@ class TestTight(unittest.TestCase):
         m = Model(x * y, [Tight([x >= y]), x >= 2, y >= 1, sig_constraint])
         sol = m.localsolve(verbosity=0)
         warndata = sol.meta["warnings"]["Unexpectedly Loose Constraints"][0][1]
-        self.assertIs(warndata[-1], m[0][0])
-        self.assertAlmostEqual(warndata[0], 1, 3)
+        assert warndata[-1] is m[0][0]
+        assert warndata[0] == pytest.approx(1, abs=1e-3)
         m.pop(1)
-        self.assertAlmostEqual(m.localsolve(verbosity=0).cost, 1, 5)
+        assert m.localsolve(verbosity=0).cost == pytest.approx(1, abs=1e-5)
 
     def test_sigconstr_in_sp(self):
         "Tests tight constraint set with localsolve()"
@@ -409,13 +408,13 @@ class TestTight(unittest.TestCase):
             m = Model(x, [Tight([x + y >= 1]), x >= x_min, y <= y_max])
         sol = m.localsolve(verbosity=0)
         warndata = sol.meta["warnings"]["Unexpectedly Loose Constraints"][0][1]
-        self.assertIs(warndata[-1], m[0][0])
-        self.assertGreater(warndata[0], 0.5)
+        assert warndata[-1] is m[0][0]
+        assert warndata[0] > 0.5
         m.substitutions[x_min] = 0.5
-        self.assertAlmostEqual(m.localsolve(verbosity=0).cost, 0.5, 5)
+        assert m.localsolve(verbosity=0).cost == pytest.approx(0.5, abs=1e-5)
 
 
-class TestBounded(unittest.TestCase):
+class TestBounded:
     "Test bounded constraint set"
 
     def test_substitution_issue905(self):
@@ -424,10 +423,10 @@ class TestBounded(unittest.TestCase):
         m = Model(x, [x >= y], {"y": 1})
         bm = Model(m.cost, Bounded(m))
         sol = bm.solve(verbosity=0)
-        self.assertAlmostEqual(sol.cost, 1.0)
+        assert sol.cost == pytest.approx(1.0)
         bm = Model(m.cost, Bounded(m, lower=1e-10))
         sol = bm.solve(verbosity=0)
-        self.assertAlmostEqual(sol.cost, 1.0)
+        assert sol.cost == pytest.approx(1.0)
         bm = Model(m.cost, Bounded(m, upper=1e10))
         sol = bm.solve(verbosity=0)
-        self.assertAlmostEqual(sol.cost, 1.0)
+        assert sol.cost == pytest.approx(1.0)
