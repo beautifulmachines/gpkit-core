@@ -253,7 +253,7 @@ class TestGP:
         assert gp1.data.A == CootMatrix(row=[0, 1, 2], col=[0, 0, 0], data=[-1, 1, -1])
         assert gp2.data.A == CootMatrix(row=[0, 1], col=[0, 0], data=[-1, 1])
         assert gp3.data.A == CootMatrix(row=[0, 1, 2], col=[0, 0, 0], data=[-1, 1, -1])
-        assert (gp3.data.A.todense() == np.matrix([-1, 1, -1]).T).all()
+        assert (gp3.data.A.todense() == np.array([[-1, 1, -1]]).T).all()
         assert sol1[Mdd] == pytest.approx(sol2[Mdd])
         assert sol1[Mdd] == pytest.approx(sol3[Mdd])
         assert sol2[Mdd] == pytest.approx(sol3[Mdd])
