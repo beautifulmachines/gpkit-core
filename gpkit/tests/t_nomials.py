@@ -416,14 +416,3 @@ class TestPosynomial(unittest.TestCase):
         p = d * h**2 + h * d**2
         m = p.mono_lower_bound({d: 1, h: 1})
         self.assertEqual(m, 2 * (d * h) ** 1.5)
-
-
-# test substitution
-
-TESTS = [TestPosynomial, TestMonomial, TestSignomial]
-
-if __name__ == "__main__":  # pragma: no cover
-    # pylint: disable=wrong-import-position
-    from gpkit.tests.helpers import run_tests
-
-    run_tests(TESTS)

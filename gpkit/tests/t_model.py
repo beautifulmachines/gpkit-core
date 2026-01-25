@@ -848,10 +848,8 @@ class TestModelNoSolve(unittest.TestCase):
         self.assertEqual(len(w.varkeys.keys("m")), 2)
 
 
-TESTS = [TestModelSolverSpecific, TestModelNoSolve]
-MULTI_SOLVER_TESTS = [TestGP, TestSP]
-
-for _testcase in MULTI_SOLVER_TESTS:
+# Create solver-specific test classes (e.g., TestGP_cvxopt, TestSP_cvxopt)
+for _testcase in [TestGP, TestSP]:
     for _solver in settings["installed_solvers"]:
         if _solver:
             _test = type(
@@ -861,12 +859,5 @@ for _testcase in MULTI_SOLVER_TESTS:
             )
             setattr(_test, "solver", _solver)
             setattr(_test, "ndig", get_ndig(_solver))
-            TESTS.append(_test)
             globals()[_test.__name__] = _test
 del _testcase, _solver, _test
-
-if __name__ == "__main__":  # pragma: no cover
-    # pylint: disable=wrong-import-position
-    from gpkit.tests.helpers import run_tests
-
-    run_tests(TESTS, verbosity=0)

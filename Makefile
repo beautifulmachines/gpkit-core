@@ -14,12 +14,7 @@ format:
 	uv run black gpkit docs
 
 # Testing
-test: test-unittest test-pytest  # Run both test runners
-
-test-unittest:  # Run tests using the original test runner
-	uv run python -c "import gpkit.tests; gpkit.tests.run()"
-
-test-pytest:  # Run tests with pytest
+test:  # Run tests with pytest
 	uv run pytest gpkit/tests -v
 
 coverage:  # Run tests with coverage reporting
@@ -49,10 +44,8 @@ help:
 	@echo "  lint              Run fast lint checks"
 	@echo "  pylint            Run pylint (slow)"
 	@echo "  format            Format code with isort and black"
-	@echo "  test              Run both unittest and pytest"
-	@echo "  test-unittest     Run tests using the original test runner"
-	@echo "  test-pytest       Run tests with pytest"
-	@echo "  coverage     Run tests with coverage reporting"
+	@echo "  test              Run tests with pytest"
+	@echo "  coverage          Run tests with coverage reporting"
 	@echo "  clean             Clean build artifacts"
 	@echo "  check-clean       Check no uncommitted changes"
 	@echo "  help              Show this help message"

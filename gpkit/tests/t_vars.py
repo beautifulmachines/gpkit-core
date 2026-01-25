@@ -293,12 +293,3 @@ class TestVectorize(unittest.TestCase):
         self.assertEqual(y.shape, (5, 3))
         self.assertEqual(x.shape, (2, 5, 3))
         self.assertEqual(z.shape, (7, 3))
-
-
-TESTS = [TestVarKey, TestVariable, TestVectorVariable, TestArrayVariable, TestVectorize]
-
-if __name__ == "__main__":  # pragma: no cover
-    # pylint: disable=wrong-import-position
-    from gpkit.tests.helpers import run_tests
-
-    run_tests(TESTS)

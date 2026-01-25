@@ -24,7 +24,6 @@ from gpkit.constraints.tight import Tight
 from gpkit.exceptions import InvalidGPConstraint, PrimalInfeasible
 from gpkit.globals import NamedVariables
 from gpkit.nomials import MonomialEquality, PosynomialInequality, SignomialInequality
-from gpkit.tests.helpers import run_tests
 from gpkit.units import DimensionalityError
 
 
@@ -432,17 +431,3 @@ class TestBounded(unittest.TestCase):
         bm = Model(m.cost, Bounded(m, upper=1e10))
         sol = bm.solve(verbosity=0)
         self.assertAlmostEqual(sol.cost, 1.0)
-
-
-TESTS = [
-    TestConstraint,
-    TestMonomialEquality,
-    TestSignomialInequality,
-    TestTight,
-    TestLoose,
-    TestBounded,
-    TestCostedConstraint,
-]
-
-if __name__ == "__main__":  # pragma: no cover
-    run_tests(TESTS)

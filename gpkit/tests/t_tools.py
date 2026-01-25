@@ -102,13 +102,3 @@ class TestTools(unittest.TestCase):
         self.assertEqual(y, VectorVariable(3, "y"))
         with self.assertRaises(NotImplementedError):
             _ = te_tangent(x, 16)
-
-
-TESTS = [TestTools]
-
-
-if __name__ == "__main__":  # pragma: no cover
-    # pylint: disable=wrong-import-position
-    from gpkit.tests.helpers import run_tests
-
-    run_tests(TESTS)

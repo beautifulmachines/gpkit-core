@@ -336,14 +336,7 @@ class TestExamples(unittest.TestCase):
 FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 EXAMPLE_DIR = os.path.abspath(FILE_DIR + "../../../docs/source/examples")
 SOLVERS = settings["installed_solvers"]
-TESTS = (
+
+# Mutate TestExamples to add solver-specific test methods for each example
+if os.path.isdir(EXAMPLE_DIR):
     generate_example_tests(EXAMPLE_DIR, [TestExamples], SOLVERS)
-    if os.path.isdir(EXAMPLE_DIR)
-    else []
-)
-
-if __name__ == "__main__":  # pragma: no cover
-    # pylint:disable=wrong-import-position
-    from gpkit.tests.helpers import run_tests
-
-    run_tests(TESTS)
