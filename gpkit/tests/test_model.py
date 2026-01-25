@@ -15,6 +15,7 @@ from gpkit import (
     Variable,
     VectorVariable,
     parse_variables,
+    settings,
     units,
 )
 from gpkit.constraints.bounded import Bounded
@@ -276,10 +277,14 @@ class TestGP:
         assert sol.cost == pytest.approx(0.1, abs=10 ** (-get_ndig(solver)))
         assert sol.almost_equal(sol)
 
+    @pytest.mark.parametrize(
+        "solver", [s for s in settings["installed_solvers"] if s != "cvxopt"]
+    )
     def test_singular(self, solver):
-        "Create and solve GP with a singular A matrix"
-        if solver == "cvxopt":
-            pytest.skip("cvxopt cannot solve singular problems")
+        """Create and solve GP with a singular A matrix.
+
+        cvxopt cannot solve singular problems.
+        """
         x = Variable("x")
         y = Variable("y")
         m = Model(y * x, [y * x >= 12])
@@ -326,13 +331,13 @@ class TestGP:
         assert sol[1][A] / A.units == pytest.approx(0.785398165)
         assert m.substitutions == {d.key: 6}
 
+    @pytest.mark.parametrize(
+        "solver", [s for s in settings["installed_solvers"] if s == "cvxopt"]
+    )
     def test_cvxopt_kwargs(self, solver):
-        "Test that kwargs can be passed to cvxopt solver"
-        if solver != "cvxopt":
-            pytest.skip("cvxopt-specific test")
+        """Test that kwargs can be passed to cvxopt solver."""
         x = Variable("x")
         m = Model(x, [x >= 12])
-        # make sure it's possible to pass the kktsolver option to cvxopt
         sol = m.solve(solver=solver, verbosity=0, kktsolver="ldl")
         assert sol.cost == pytest.approx(12.0, abs=10 ** (-get_ndig(solver)))
 
