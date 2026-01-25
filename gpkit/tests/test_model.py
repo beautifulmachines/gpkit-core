@@ -15,7 +15,6 @@ from gpkit import (
     Variable,
     VectorVariable,
     parse_variables,
-    settings,
     units,
 )
 from gpkit.constraints.bounded import Bounded
@@ -261,7 +260,7 @@ class TestGP:
     def test_additive_constants(self, solver):
         x = Variable("x")
         m = Model(1 / x, [1 >= 5 * x + 0.5, 1 >= 5 * x])
-        m.solve(verbosity=0)
+        m.solve(solver=solver, verbosity=0)
         # pylint: disable=no-member
         gp = m.program  # created by solve()
         assert gp.data.c[1] == 2 * gp.data.c[2]
@@ -277,12 +276,10 @@ class TestGP:
         assert sol.cost == pytest.approx(0.1, abs=10 ** (-get_ndig(solver)))
         assert sol.almost_equal(sol)
 
-    @pytest.mark.skipif(
-        settings["default_solver"] == "cvxopt",
-        reason="cvxopt cannot solve singular problems",
-    )
-    def test_singular(self, solver):  # pragma: no cover
+    def test_singular(self, solver):
         "Create and solve GP with a singular A matrix"
+        if solver == "cvxopt":
+            pytest.skip("cvxopt cannot solve singular problems")
         x = Variable("x")
         y = Variable("y")
         m = Model(y * x, [y * x >= 12])
@@ -316,21 +313,8 @@ class TestGP:
         "issue 407"
         x = Variable("x")
         m = Model(x, [x >= 1])
-        m.solve(verbosity=0)
+        m.solve(solver=solver, verbosity=0)
         assert isinstance(m.program.cost.exps, tuple)
-
-    def test_posy_simplification(self, solver):
-        "issue 525"
-        D = Variable("D")
-        mi = Variable("m_i")
-        V = Variable("V", 1)
-        m1 = Model(D + V, [V >= mi + 0.4, mi >= 0.1, D >= mi**2])
-        m2 = Model(D + 1, [1 >= mi + 0.4, mi >= 0.1, D >= mi**2])
-        gp1 = m1.gp()
-        gp2 = m2.gp()
-        # pylint: disable=no-member
-        assert gp1.data.A == gp2.data.A
-        assert gp1.data.c == gp2.data.c
 
     def test_sweep_not_modify_subs(self, solver):
         "make sure sweeping does not modify substitutions"
@@ -338,9 +322,19 @@ class TestGP:
         d = Variable("d", 6, "in")
         m = Model(A, [A >= np.pi / 4 * d**2])
         assert m.substitutions == {d.key: 6}
-        sol = m.sweep({d: [3, 12, 36]}, verbosity=0)
+        sol = m.sweep({d: [3, 12, 36]}, solver=solver, verbosity=0)
         assert sol[1][A] / A.units == pytest.approx(0.785398165)
         assert m.substitutions == {d.key: 6}
+
+    def test_cvxopt_kwargs(self, solver):
+        "Test that kwargs can be passed to cvxopt solver"
+        if solver != "cvxopt":
+            pytest.skip("cvxopt-specific test")
+        x = Variable("x")
+        m = Model(x, [x >= 12])
+        # make sure it's possible to pass the kktsolver option to cvxopt
+        sol = m.solve(solver=solver, verbosity=0, kktsolver="ldl")
+        assert sol.cost == pytest.approx(12.0, abs=10 ** (-get_ndig(solver)))
 
 
 class TestSP:
@@ -651,16 +645,6 @@ class TestSP:
             with pytest.raises(InvalidPosynomial):
                 m.localsolve(verbosity=0, solver=solver)
 
-    def test_partial_sub_signomial(self, solver):
-        "Test SP partial x0 initialization"
-        x = Variable("x")
-        y = Variable("y")
-        with SignomialsEnabled():
-            m = Model(x, [x + y >= 1, y <= 0.5])
-        gp = m.sp().gp(x0={x: 0.5})  # pylint: disable=no-member
-        (first_gp_constr_posy_exp,) = gp.hmaps[1]  # first after cost
-        assert first_gp_constr_posy_exp[x.key] == -1.0 / 3
-
     def test_becomes_signomial(self, solver):
         "Test that a GP does not become an SP after substitutions"
         x = Variable("x")
@@ -707,19 +691,6 @@ class TestSP:
             assert y.key in bounds["sensitive to upper bound of 1e+30"]
         else:  # pragma: no cover
             assert x.key in bounds["sensitive to lower bound of 1e-30"]
-
-
-class TestModelSolverSpecific:
-    "test cases run only for specific solvers"
-
-    def test_cvxopt_kwargs(self):  # pragma: no cover
-        if "cvxopt" not in settings["installed_solvers"]:
-            return
-        x = Variable("x")
-        m = Model(x, [x >= 12])
-        # make sure it"s possible to pass the kktsolver option to cvxopt
-        sol = m.solve(solver="cvxopt", verbosity=0, kktsolver="ldl")
-        assert sol.cost == pytest.approx(12.0, abs=10 ** (-NDIGS["cvxopt"]))
 
 
 class Thing(Model):
@@ -836,3 +807,26 @@ class TestModelNoSolve:
         assert w.subB["m"].key in m_vbn_keys
         # dig a level deeper, into the keymap
         assert len(w.varkeys.keys("m")) == 2
+
+    def test_posy_simplification(self):
+        "issue 525"
+        D = Variable("D")
+        mi = Variable("m_i")
+        V = Variable("V", 1)
+        m1 = Model(D + V, [V >= mi + 0.4, mi >= 0.1, D >= mi**2])
+        m2 = Model(D + 1, [1 >= mi + 0.4, mi >= 0.1, D >= mi**2])
+        gp1 = m1.gp()
+        gp2 = m2.gp()
+        # pylint: disable=no-member
+        assert gp1.data.A == gp2.data.A
+        assert gp1.data.c == gp2.data.c
+
+    def test_partial_sub_signomial(self):
+        "Test SP partial x0 initialization"
+        x = Variable("x")
+        y = Variable("y")
+        with SignomialsEnabled():
+            m = Model(x, [x + y >= 1, y <= 0.5])
+        gp = m.sp().gp(x0={x: 0.5})  # pylint: disable=no-member
+        (first_gp_constr_posy_exp,) = gp.hmaps[1]  # first after cost
+        assert first_gp_constr_posy_exp[x.key] == -1.0 / 3
