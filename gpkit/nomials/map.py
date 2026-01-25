@@ -165,7 +165,7 @@ class NomialMap(HashVector):
         return pmap
 
 
-# pylint: disable=invalid-name,too-many-arguments,too-many-positional-arguments
+# pylint: disable=too-many-arguments,too-many-positional-arguments
 def subinplace(cp, exp, o_exp, vk, cval, squished):
     "Modifies cp by substituing cval/expval for vk in exp"
     x = exp[vk]

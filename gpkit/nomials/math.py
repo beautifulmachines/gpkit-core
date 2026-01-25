@@ -40,7 +40,7 @@ class Signomial(Nomial):
     Monomial   (if the input has one term and only positive cs)
     """
 
-    _c = _exp = None  # pylint: disable=invalid-name
+    _c = _exp = None
 
     __hash__ = Nomial.__hash__
 
@@ -324,12 +324,10 @@ class Monomial(Posynomial):
         return self._exp
 
     @property
-    def c(self):  # pylint: disable=invalid-name
+    def c(self):
         "Creates c or returns a cached c"
         if not self._c:
-            (self._c,) = (
-                self.cs
-            )  # pylint: disable=attribute-defined-outside-init, invalid-name
+            (self._c,) = self.cs  # pylint: disable=attribute-defined-outside-init
         return self._c
 
     def __rtruediv__(self, other):
