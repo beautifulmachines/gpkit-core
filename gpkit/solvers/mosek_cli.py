@@ -10,6 +10,7 @@ import errno
 import os
 import shutil
 import stat
+import sys
 import tempfile
 from subprocess import CalledProcessError, check_output
 
@@ -23,12 +24,27 @@ from ..globals import settings
 from ..solutions import RawSolution
 
 
-def remove_read_only(func, path, exc):  # pragma: no cover
-    "If we can't remove a file/directory, change permissions and try again."
-    if func in (os.rmdir, os.remove) and exc[1].errno == errno.EACCES:
+def _handle_remove_readonly(func, path, exc_or_exc_info):  # pragma: no cover
+    """Handle rmtree errors by changing permissions and retrying.
+
+    Works with both onerror (Python < 3.12) and onexc (Python >= 3.12).
+    """
+    # onerror passes (exc_type, exc_value, exc_tb) tuple
+    # onexc passes the exception directly
+    exc = exc_or_exc_info[1] if isinstance(exc_or_exc_info, tuple) else exc_or_exc_info
+    if func in (os.rmdir, os.remove) and getattr(exc, "errno", None) == errno.EACCES:
         # change the file to be readable,writable,executable: 0777
         os.chmod(path, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
         func(path)  # try again
+
+
+def _safe_rmtree(path):  # pragma: no cover
+    """Remove directory tree, handling read-only files."""
+    if sys.version_info >= (3, 12):
+        shutil.rmtree(path, onexc=_handle_remove_readonly)
+    else:
+        # pylint: disable-next=deprecated-argument
+        shutil.rmtree(path, ignore_errors=False, onerror=_handle_remove_readonly)
 
 
 def optimize_generator(path=None, **_):
@@ -124,7 +140,7 @@ def optimize_generator(path=None, **_):
             dual_vals = read_vals(f)
 
         if tmpdir:
-            shutil.rmtree(path, ignore_errors=False, onerror=remove_read_only)
+            _safe_rmtree(path)
 
         return RawSolution(
             status=solsta[:-1],
