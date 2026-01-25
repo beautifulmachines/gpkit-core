@@ -1,22 +1,21 @@
 """Tests for Solution class"""
 
-import unittest
-
 import numpy as np
+import pytest
 
 import gpkit
 from gpkit import Model, SignomialsEnabled, Variable, VectorVariable
 from gpkit.util.small_classes import Quantity, Strings
 
 
-class TestSolution(unittest.TestCase):
+class TestSolution:
     """Unit tests for the Solution class"""
 
     def test_getitem(self):
         A = Variable("A", "-", "Test Variable")
         prob = Model(A, [A >= 1])
         sol = prob.solve(verbosity=0)
-        self.assertAlmostEqual(sol[A], 1.0, 8)
+        assert sol[A] == pytest.approx(1.0, abs=1e-8)
 
     def test_getitem_units(self):
         # test from issue541
@@ -24,8 +23,8 @@ class TestSolution(unittest.TestCase):
         y = Variable("y", "m")
         m = Model(y, [y >= x])
         sol = m.solve(verbosity=0)
-        self.assertAlmostEqual(sol["y"] / sol["x"], 1.0, 6)
-        self.assertAlmostEqual(sol[x] / sol[y], 1.0, 6)
+        assert sol["y"] / sol["x"] == pytest.approx(1.0, abs=1e-6)
+        assert sol[x] / sol[y] == pytest.approx(1.0, abs=1e-6)
 
     def test_call_vector(self):
         n = 5
@@ -33,11 +32,11 @@ class TestSolution(unittest.TestCase):
         prob = Model(sum(x), [x >= 2.5])
         sol = prob.solve(verbosity=0)
         solx = sol[x]
-        self.assertEqual(type(solx), Quantity)
-        self.assertEqual(type(solx.magnitude), np.ndarray)
-        self.assertEqual(solx.shape, (n,))
+        assert isinstance(solx, Quantity)
+        assert isinstance(solx.magnitude, np.ndarray)
+        assert solx.shape == (n,)
         for i in range(n):
-            self.assertAlmostEqual(solx[i], 2.5, places=4)
+            assert solx[i] == pytest.approx(2.5, abs=1e-4)
 
     def test_subinto(self):
         h_max = Variable("h_max", 10, "m", "Length")
@@ -49,16 +48,16 @@ class TestSolution(unittest.TestCase):
         p_vals = np.linspace(13, 24, 20)
         sweepsol = m.sweep({p_max: p_vals}, verbosity=0)
         p_sol = [sol.subinto(p_max) for sol in sweepsol]
-        self.assertEqual(len(p_sol), 20)
+        assert len(p_sol) == 20
         for pv, ps in zip(p_vals, p_sol):
-            self.assertAlmostEqual(0 * gpkit.ureg.m, pv * gpkit.ureg.m - ps)
+            assert 0 * gpkit.ureg.m == pytest.approx(pv * gpkit.ureg.m - ps)
 
     def test_table(self):
         x = Variable("x")
         gp = Model(x, [x >= 12])
         sol = gp.solve(verbosity=0)
         tab = sol.table()
-        self.assertTrue(isinstance(tab, Strings))
+        assert isinstance(tab, Strings)
 
     def test_units_sub(self):
         # issue 809
@@ -68,9 +67,9 @@ class TestSolution(unittest.TestCase):
         tminsub = 1000 * gpkit.ureg.lbf
         m.substitutions.update({tmin: tminsub})
         sol = m.solve(verbosity=0)
-        self.assertAlmostEqual(sol[tmin], tminsub)
-        self.assertFalse(
-            "1000N" in sol.table().replace(" ", "").replace("[", "").replace("]", "")
+        assert round(sol[tmin] - tminsub, 7) == 0
+        assert "1000N" not in sol.table().replace(" ", "").replace("[", "").replace(
+            "]", ""
         )
 
     def test_key_options(self):
@@ -82,25 +81,20 @@ class TestSolution(unittest.TestCase):
         msol = m.localsolve(verbosity=0)
         spsol = m.sp().localsolve(verbosity=0)  # pylint: disable=no-member
         gpsol = m.program.gps[-1].solve(verbosity=0)
-        self.assertEqual(msol[x], msol["x"])
-        self.assertEqual(spsol[x], spsol["x"])
-        self.assertEqual(gpsol[x], gpsol["x"])
-        self.assertEqual(msol[x], spsol[x])
-        self.assertEqual(msol[x], gpsol[x])
-
-
-class TestResultsTable(unittest.TestCase):
-    """TestCase for var_table()"""
+        assert msol[x] == msol["x"]
+        assert spsol[x] == spsol["x"]
+        assert gpsol[x] == gpsol["x"]
+        assert msol[x] == spsol[x]
+        assert msol[x] == gpsol[x]
 
     def test_result_access(self):
+        """Test result table access from SP solution"""
         x = Variable("x")
         y = Variable("y")
         with SignomialsEnabled():
             sig = y + 6 * x >= 13 + x**2
         m = Model(y, [sig])
         sol = m.localsolve(verbosity=0)
-        self.assertTrue(
-            all((isinstance(gp.result.table(), Strings) for gp in m.program.gps))
-        )
-        self.assertAlmostEqual(sol.cost / 4.0, 1.0, 5)
-        self.assertAlmostEqual(sol["x"] / 3.0, 1.0, 3)
+        assert all(isinstance(gp.result.table(), Strings) for gp in m.program.gps)
+        assert sol.cost / 4.0 == pytest.approx(1.0, abs=1e-5)
+        assert sol["x"] / 3.0 == pytest.approx(1.0, abs=1e-3)
