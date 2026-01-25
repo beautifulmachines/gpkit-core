@@ -849,9 +849,9 @@ class TestModelNoSolve(unittest.TestCase):
 
 
 # Create solver-specific test classes (e.g., TestGP_cvxopt, TestSP_cvxopt)
+_testcase, _solver, _test = None, None, None
 for _testcase in [TestGP, TestSP]:
-    for _solver in settings["installed_solvers"] or (None,):
-        _test = None
+    for _solver in settings["installed_solvers"]:
         if _solver:
             _test = type(
                 str(_testcase.__name__ + "_" + _solver),
