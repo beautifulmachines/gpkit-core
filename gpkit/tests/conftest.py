@@ -25,74 +25,72 @@ _FILE_DIR = os.path.dirname(os.path.realpath(__file__))
 _EXAMPLE_DIR = os.path.abspath(_FILE_DIR + "../../../docs/source/examples")
 
 
-@pytest.fixture
-def example(request, solver):
-    """
-    Fixture that imports an example module and passes it to the test.
-
-    The example name is derived from the test function name:
-    test_autosweep -> autosweep.py
-
-    The first time an example is imported (for the first solver), its output
-    is captured to a golden file. Subsequent runs reload the module.
-
-    To ensure each example's output file contains ONLY that example's output
-    (not its dependencies), we:
-    1. First import the module with output suppressed (populates sys.modules
-       with the full dependency graph)
-    2. Then reload the module with output captured (dependencies already cached,
-       so only this module's code runs and produces output)
-    """
-    # Extract example name from test function name (test_foo -> foo)
-    # Use originalname to avoid parameter suffix (e.g., test_foo[cvxopt] -> test_foo)
-    test_name = request.node.originalname
-    if test_name.startswith("test_"):
-        example_name = test_name[5:]
-    else:
-        example_name = test_name
-
-    # Add example directory to path if needed
-    if os.path.isdir(_EXAMPLE_DIR) and _EXAMPLE_DIR not in sys.path:
-        sys.path.insert(0, _EXAMPLE_DIR)
-
-    with NewDefaultSolver(solver):
-        if example_name not in _example_imports:
-            # First time this test runs - capture output to file.
-            # Import first with suppressed output to populate dependency graph,
-            # then reload with capture so only this module's output is captured.
-            with StdoutCaptured():  # Suppress output during initial import
-                if example_name in sys.modules:
-                    importlib.reload(sys.modules[example_name])
-                else:
-                    importlib.import_module(example_name)
-
-            # Reset model numbers so the captured reload has clean state
-            gpkit.globals.NamedVariables.reset_modelnumbers()
-
-            filepath = os.path.join(_EXAMPLE_DIR, f"{example_name}_output.txt")
-            with StdoutCaptured(logfilepath=filepath):
-                _example_imports[example_name] = importlib.reload(
-                    sys.modules[example_name]
-                )
-        else:
-            with StdoutCaptured():  # No file capture on reload
-                importlib.reload(_example_imports[example_name])
-
-        yield _example_imports[example_name]
-
-    # Reset global state after test
-    gpkit.globals.NamedVariables.reset_modelnumbers()
-
-    # Verify global state is clean
-    for globname, global_thing in [
+def _verify_clean_global_state():
+    """Verify gpkit global state is reset after test."""
+    for name, value in [
         ("model numbers", gpkit.globals.NamedVariables.modelnums),
         ("lineage", gpkit.NamedVariables.lineage),
         ("signomials enabled", gpkit.SignomialsEnabled),
         ("vectorization", gpkit.Vectorize.vectorization),
         ("namedvars", gpkit.NamedVariables.namedvars),
     ]:
-        if global_thing:  # pragma: no cover
+        if value:  # pragma: no cover
             raise ValueError(
-                f"global attribute {globname} should have been"
-                f" falsy after the test, but was instead {global_thing}"
+                f"global attribute {name} should be falsy after test, was {value}"
             )
+
+
+def _import_example(name):
+    """
+    Import or reload an example module.
+
+    On first import, uses two-pass approach to isolate output:
+    1. Import with suppressed output (populates sys.modules with dependencies)
+    2. Reload with captured output (only this module's output goes to file)
+
+    This ensures each example's *_output.txt contains only that example's
+    output, not output from any dependencies it imports.
+    """
+    if name not in _example_imports:
+        # First time: two-pass to isolate this example's output
+        with StdoutCaptured():  # Suppress during initial import
+            if name in sys.modules:
+                importlib.reload(sys.modules[name])
+            else:
+                importlib.import_module(name)
+
+        # Reset model numbers so captured reload has clean state
+        gpkit.globals.NamedVariables.reset_modelnumbers()
+
+        filepath = os.path.join(_EXAMPLE_DIR, f"{name}_output.txt")
+        with StdoutCaptured(logfilepath=filepath):
+            _example_imports[name] = importlib.reload(sys.modules[name])
+    else:
+        # Already imported: just reload with suppressed output
+        with StdoutCaptured():
+            importlib.reload(_example_imports[name])
+
+    return _example_imports[name]
+
+
+@pytest.fixture
+def example(request, solver):
+    """
+    Fixture that imports an example module and yields it for testing.
+
+    Example name derived from test function: test_autosweep -> autosweep.py
+    First run captures output to *_output.txt for documentation.
+    """
+    # Extract example name from test function (use originalname to strip params)
+    test_name = request.node.originalname
+    example_name = test_name[5:] if test_name.startswith("test_") else test_name
+
+    if os.path.isdir(_EXAMPLE_DIR) and _EXAMPLE_DIR not in sys.path:
+        sys.path.insert(0, _EXAMPLE_DIR)
+
+    with NewDefaultSolver(solver):
+        mod = _import_example(example_name)
+        yield mod
+
+    gpkit.globals.NamedVariables.reset_modelnumbers()
+    _verify_clean_global_state()
