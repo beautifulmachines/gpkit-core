@@ -1,6 +1,6 @@
 [MESSAGES CONTROL]
 
-disable=cyclic-import,duplicate-code
+disable=cyclic-import
 
 [BASIC]
 
