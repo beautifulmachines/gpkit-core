@@ -59,7 +59,7 @@ profile = "black"
 
 [tool.pytest.ini_options]
 testpaths = ["gpkit/tests"]
-python_files = ["test_*.py", "t_*.py"]
+python_files = ["test_*.py"]
 addopts = "-v --tb=short"
 markers = [
     "solver: marks tests that require a solver",

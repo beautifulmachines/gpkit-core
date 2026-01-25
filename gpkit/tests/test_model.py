@@ -53,6 +53,7 @@ class TestGP(unittest.TestCase):
     This TestCase gets run once for each installed solver.
     """
 
+    __test__ = False  # Only run solver-specific subclasses (e.g., TestGP_cvxopt)
     name = "TestGP_"
     # solver and ndig get set in loop at bottom this file, a bit hacky
     solver = None
@@ -346,6 +347,7 @@ class TestGP(unittest.TestCase):
 class TestSP(unittest.TestCase):
     "test case for SP class -- gets run for each installed solver"
 
+    __test__ = False  # Only run solver-specific subclasses (e.g., TestSP_cvxopt)
     name = "TestSP_"
     solver = None
     ndig = None
@@ -846,19 +848,17 @@ class TestModelNoSolve(unittest.TestCase):
         self.assertEqual(len(w.varkeys.keys("m")), 2)
 
 
-TESTS = [TestModelSolverSpecific, TestModelNoSolve]
-MULTI_SOLVER_TESTS = [TestGP, TestSP]
-
-for testcase in MULTI_SOLVER_TESTS:
-    for solver in settings["installed_solvers"]:
-        if solver:
-            test = type(str(testcase.__name__ + "_" + solver), (testcase,), {})
-            setattr(test, "solver", solver)
-            setattr(test, "ndig", get_ndig(solver))
-            TESTS.append(test)
-
-if __name__ == "__main__":  # pragma: no cover
-    # pylint: disable=wrong-import-position
-    from gpkit.tests.helpers import run_tests
-
-    run_tests(TESTS, verbosity=0)
+# Create solver-specific test classes (e.g., TestGP_cvxopt, TestSP_cvxopt)
+_testcase, _solver, _test = None, None, None
+for _testcase in [TestGP, TestSP]:
+    for _solver in settings["installed_solvers"]:
+        if _solver:
+            _test = type(
+                str(_testcase.__name__ + "_" + _solver),
+                (_testcase,),
+                {"__test__": True},
+            )
+            setattr(_test, "solver", _solver)
+            setattr(_test, "ndig", get_ndig(_solver))
+            globals()[_test.__name__] = _test
+del _testcase, _solver, _test

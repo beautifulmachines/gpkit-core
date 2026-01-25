@@ -140,13 +140,3 @@ class TestSmallScripts(unittest.TestCase):
         # test for https://github.com/hgrecco/pint/issues/366
         self.assertIn(unitstr(units("nautical_mile")), ("nmi", "nautical_mile"))
         self.assertEqual(units("nautical_mile"), units("nmi"))
-
-
-TESTS = [TestDocstring, TestHashVector, TestSmallScripts]
-
-
-if __name__ == "__main__":  # pragma: no cover
-    # pylint: disable=wrong-import-position
-    from gpkit.tests.helpers import run_tests
-
-    run_tests(TESTS)

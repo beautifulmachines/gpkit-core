@@ -17,7 +17,6 @@ from gpkit import (
     VectorVariable,
 )
 from gpkit.exceptions import UnboundedGP
-from gpkit.tests.helpers import run_tests
 from gpkit.units import DimensionalityError
 from gpkit.util.small_scripts import mag
 
@@ -440,9 +439,3 @@ class TestNomialMapSubs(unittest.TestCase):
         p = 2 * w + z * w + 2
 
         self.assertEqual(p.sub({z: -2}), 2)
-
-
-TESTS = [TestNomialSubs, TestModelSubs, TestNomialMapSubs]
-
-if __name__ == "__main__":  # pragma: no cover
-    run_tests(TESTS)

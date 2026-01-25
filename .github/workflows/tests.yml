@@ -29,10 +29,6 @@ jobs:
     - name: Install
       run: uv sync --group test
 
-    - name: Run tests via original runner
-      run: |
-        make test-unittest
-
     - name: Run tests with coverage
       run: |
         make coverage

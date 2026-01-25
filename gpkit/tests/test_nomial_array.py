@@ -150,12 +150,3 @@ class TestNomialArray(unittest.TestCase):
         self.assertRaises(ValueError, empty_posy_array.prod)
         self.assertEqual(len(empty_posy_array), 0)
         self.assertEqual(empty_posy_array.ndim, 1)
-
-
-TESTS = [TestNomialArray]
-
-if __name__ == "__main__":  # pragma: no cover
-    # pylint: disable=wrong-import-position
-    from gpkit.tests.helpers import run_tests
-
-    run_tests(TESTS)

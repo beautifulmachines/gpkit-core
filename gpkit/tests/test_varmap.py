@@ -5,7 +5,6 @@ import unittest
 import numpy as np
 
 from gpkit import Variable, VectorVariable, ureg
-from gpkit.tests.helpers import run_tests
 from gpkit.varkey import VarKey
 from gpkit.varmap import VarMap
 
@@ -167,10 +166,3 @@ class TestVarMap(unittest.TestCase):
         self.vm[x] = 1
         self.assertIn(x, self.vm)
         self.assertEqual(set(self.vm), set([x.key]))
-
-
-TESTS = [TestVarMap]
-
-
-if __name__ == "__main__":  # pragma: no cover
-    run_tests(TESTS)

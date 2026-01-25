@@ -104,12 +104,3 @@ class TestResultsTable(unittest.TestCase):
         )
         self.assertAlmostEqual(sol.cost / 4.0, 1.0, 5)
         self.assertAlmostEqual(sol["x"] / 3.0, 1.0, 3)
-
-
-TESTS = [TestSolution, TestResultsTable]
-
-if __name__ == "__main__":  # pragma: no cover
-    # pylint: disable=wrong-import-position
-    from gpkit.tests.helpers import run_tests
-
-    run_tests(TESTS)
