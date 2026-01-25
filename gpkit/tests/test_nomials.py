@@ -20,7 +20,7 @@ from gpkit.exceptions import InvalidPosynomial
 from gpkit.nomials import NomialMap
 
 
-class TestMonomial:
+class TestMonomial:  # pylint: disable=unnecessary-negation,comparison-with-itself
     """TestCase for the Monomial class"""
 
     def test_init(self):
@@ -113,14 +113,14 @@ class TestMonomial:
         x = Variable("x")
         y = Variable("y")
         assert x != y
-        assert not (x == y)
+        assert not x == y
 
         xx = Variable("x")
         assert x == xx
-        assert not (x != xx)
+        assert not x != xx
 
         assert x == x
-        assert not (x != x)  # pylint: disable=comparison-with-itself
+        assert not x != x
 
         m = Monomial({}, 1)
         assert m == 1
@@ -319,9 +319,10 @@ class TestPosynomial:
         x = Variable("x")
         y = Variable("y")
         assert (1 + x) == (1 + x)
-        assert not ((1 + x) == 2 * (1 + x))
-        assert not ((1 + x) == 0.5 * (1 + x))
-        assert not ((1 + x) == (1 + y))
+        # pylint: disable=unnecessary-negation  # testing __eq__ returns False
+        assert not (1 + x) == 2 * (1 + x)
+        assert not (1 + x) == 0.5 * (1 + x)
+        assert not (1 + x) == (1 + y)
         x = Variable("x", value=3)
         y = Variable("y", value=2)
         assert (1 + x**2).value == (4 + y + y**2).value
@@ -333,7 +334,8 @@ class TestPosynomial:
         p2u = Variable("x", units="m") + Variable("y", units="m")
         assert p1 == p2
         assert p1u == p2u
-        assert not (p1 == p1u)
+        # pylint: disable=unnecessary-negation  # testing __eq__ returns False
+        assert not p1 == p1u
         assert p1 != p1u
 
     def test_simplification(self):

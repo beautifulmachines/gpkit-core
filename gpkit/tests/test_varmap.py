@@ -8,160 +8,173 @@ from gpkit.varkey import VarKey
 from gpkit.varmap import VarMap
 
 
+@pytest.fixture(name="vm")
+def fixture_vm():
+    """Fresh VarMap for each test."""
+    return VarMap()
+
+
+@pytest.fixture(name="x")
+def fixture_x():
+    """VarKey named 'x'."""
+    return VarKey("x")
+
+
+@pytest.fixture(name="y")
+def fixture_y():
+    """VarKey named 'y'."""
+    return VarKey("y")
+
+
 class TestVarMap:
     "TestCase for the VarMap class"
 
-    def setup_method(self):
-        self.x = VarKey("x")
-        self.y = VarKey("y")
-        self.vm = VarMap()
-
-    def test_set_and_get(self):
-        self.vm[self.x] = 1
-        self.vm[self.y] = 2
-        assert self.vm[self.x] == 1
-        assert self.vm[self.y] == 2
+    def test_set_and_get(self, vm, x, y):
+        vm[x] = 1
+        vm[y] = 2
+        assert vm[x] == 1
+        assert vm[y] == 2
         # get by string -- TBD if this should be allowed
-        assert self.vm["x"] == 1
-        assert self.vm["y"] == 2
+        assert vm["x"] == 1
+        assert vm["y"] == 2
 
-    def test_contains(self):
-        self.vm[self.x] = 1
-        assert self.x in self.vm
-        assert "x" in self.vm
-        assert self.y not in self.vm
-        assert "y" not in self.vm
+    def test_contains(self, vm, x, y):
+        vm[x] = 1
+        assert x in vm
+        assert "x" in vm
+        assert y not in vm
+        assert "y" not in vm
 
-    def test_getitem(self):
+    def test_getitem(self, vm):
         x = Variable("x", lineage=[("Motor", 0)])
-        self.vm[x] = 52
-        assert self.vm[x] == 52
-        assert self.vm[x.key] == 52
-        assert self.vm["x"] == 52
-        # assert self.vm["Motor.x"] == 52
-        assert "Someothermodelname.x" not in self.vm
+        vm[x] = 52
+        assert vm[x] == 52
+        assert vm[x.key] == 52
+        assert vm["x"] == 52
+        # assert vm["Motor.x"] == 52
+        assert "Someothermodelname.x" not in vm
 
-    def test_failed_getitem(self):
+    def test_failed_getitem(self, vm):
         with pytest.raises(KeyError):
-            _ = self.vm["waldo"]
+            _ = vm["waldo"]
             # issue 893: failed __getitem__ caused state change
-        assert "waldo" not in self.vm
-        self.vm.update({Variable("waldo"): 5})
-        assert self.vm["waldo"] == 5
-        assert "waldo" in self.vm
+        assert "waldo" not in vm
+        vm.update({Variable("waldo"): 5})
+        assert vm["waldo"] == 5
+        assert "waldo" in vm
 
-    def test_keys_by_name(self):
+    def test_keys_by_name(self, vm, x):
         x2 = VarKey(name="x", units="ft")
-        self.vm[self.x] = 1
-        self.vm[x2] = 3
-        vks = self.vm.varset.by_name("x")
-        assert self.x in vks
+        vm[x] = 1
+        vm[x2] = 3
+        vks = vm.varset.by_name("x")
+        assert x in vks
         assert x2 in vks
         assert len(vks) == 2
 
-    def test_multiple_varkeys_same_name(self):
-        self.vm[self.x] = 1
-        self.vm[VarKey(name="x", units="ft")] = 3
+    def test_multiple_varkeys_same_name(self, vm, x):
+        vm[x] = 1
+        vm[VarKey(name="x", units="ft")] = 3
         with pytest.raises(KeyError):
-            _ = self.vm["x"]  # Ambiguous
+            _ = vm["x"]  # Ambiguous
 
-    def test_delitem(self):
-        self.vm[self.x] = 1
-        del self.vm[self.x]
-        assert self.x not in self.vm
-        assert "x" not in self.vm
+    def test_delitem(self, vm, x):
+        vm[x] = 1
+        del vm[x]
+        assert x not in vm
+        assert "x" not in vm
         # Add two, delete one
         x2 = VarKey(name="x", units="ft")
-        self.vm[self.x] = 1
-        self.vm[x2] = 2
-        del self.vm[self.x]
-        assert x2 in self.vm
-        assert "x" in self.vm
+        vm[x] = 1
+        vm[x2] = 2
+        del vm[x]
+        assert x2 in vm
+        assert "x" in vm
         # now delete the second
-        del self.vm[x2]
-        assert "x" not in self.vm
+        del vm[x2]
+        assert "x" not in vm
 
-    def test_vector(self):
+    def test_vector(self, vm):
         x = VectorVariable(3, "x", "ft")
         vks = [v.key for v in x]
         vals = [4, 5, 6]
         for vk, val in zip(vks, vals):
-            self.vm[vk] = val
+            vm[vk] = val
         for vk, expected in zip(vks, vals):
-            assert self.vm[vk] == expected
-        assert self.vm[x] == [4, 5, 6]
-        assert self.vm["x"] == [4, 5, 6]
+            assert vm[vk] == expected
+        assert vm[x] == [4, 5, 6]
+        assert vm["x"] == [4, 5, 6]
 
-    def test_vector_partial(self):
+    def test_vector_partial(self, vm):
         v = VectorVariable(3, "v")
         with pytest.raises(NotImplementedError):
             # can't set by vector if keys not known
-            self.vm[v] = np.array([2, 3, 4])
+            vm[v] = np.array([2, 3, 4])
         assert v[0].key.idx == (0,)  # legacy; belongs elsewhere
-        self.vm[v[0]] = 6
-        assert self.vm[v][0] == self.vm[v[0]]
-        assert self.vm[v][0] == 6
-        assert np.isnan(self.vm[v][1])
-        del self.vm[v[0]]
+        vm[v[0]] = 6
+        assert vm[v][0] == vm[v[0]]
+        assert vm[v][0] == 6
+        assert np.isnan(vm[v][1])
+        del vm[v[0]]
         with pytest.raises(KeyError):
-            _ = self.vm[v]
+            _ = vm[v]
 
-    def test_vector_delitem(self):
+    def test_vector_delitem(self, vm):
         x = VectorVariable(3, "x", "ft")
-        self.vm[x[0].key] = 1
-        self.vm[x[1].key] = 2
-        self.vm[x[2].key] = 3
+        vm[x[0].key] = 1
+        vm[x[1].key] = 2
+        vm[x[2].key] = 3
         y = Variable("y", "kg")
-        self.vm[y.key] = 5
-        assert self.vm[x] == [1, 2, 3]
+        vm[y.key] = 5
+        assert vm[x] == [1, 2, 3]
         nan = float("nan")
-        del self.vm[x[1].key]
-        np.testing.assert_equal(self.vm[x], [1, nan, 3])
-        del self.vm[x[0].key]
-        np.testing.assert_equal(self.vm[x], [nan, nan, 3])
-        del self.vm[x[2].key]
-        assert x not in self.vm
-        assert y in self.vm
+        del vm[x[1].key]
+        np.testing.assert_equal(vm[x], [1, nan, 3])
+        del vm[x[0].key]
+        np.testing.assert_equal(vm[x], [nan, nan, 3])
+        del vm[x[2].key]
+        assert x not in vm
+        assert y in vm
 
-    def test_register_keys(self):
-        self.vm[self.x] = 1
-        self.vm.register_keys({self.y})
-        assert "y" in self.vm
+    def test_register_keys(self, vm, x, y):
+        vm[x] = 1
+        vm.register_keys({y})
+        assert "y" in vm
         with pytest.raises(KeyError):
-            _ = self.vm[self.y]
+            _ = vm[y]
         with pytest.raises(KeyError):
-            _ = self.vm["y"]
-        self.vm["y"] = 6
-        assert self.vm["y"] == 6
-        assert self.vm[self.y] == 6
+            _ = vm["y"]
+        vm["y"] = 6
+        assert vm["y"] == 6
+        assert vm[y] == 6
 
-    def test_setitem_variable(self):
+    def test_setitem_variable(self, vm):
         x = Variable("x")
-        self.vm[x] = 6
-        assert x in self.vm
-        assert x.key in self.vm
-        assert self.vm[x] == 6
-        assert self.vm[x.key] == 6
+        vm[x] = 6
+        assert x in vm
+        assert x.key in vm
+        assert vm[x] == 6
+        assert vm[x.key] == 6
 
-    def test_setitem_unit(self):
+    def test_setitem_unit(self, vm):
         x = Variable("h", "inch")
-        self.vm[x] = 8.0
-        assert self.vm[x] == 8.0
-        assert str(self.vm.quantity(x)) == "8.0 inch"
-        self.vm[x] = 6 * ureg.ft
-        assert self.vm[x] == 72
-        assert str(self.vm.quantity(x)) == "72.0 inch"
+        vm[x] = 8.0
+        assert vm[x] == 8.0
+        assert str(vm.quantity(x)) == "8.0 inch"
+        vm[x] = 6 * ureg.ft
+        assert vm[x] == 72
+        assert str(vm.quantity(x)) == "72.0 inch"
 
-    def test_nonnumeric(self):
+    def test_nonnumeric(self, vm):
         x = VectorVariable(2, "x")
-        self.vm[x[1]] = "2"
-        assert np.isnan(self.vm[x][0])
-        assert self.vm[x[1]] == "2"
-        assert x[0] not in self.vm
-        assert x[1] in self.vm
+        vm[x[1]] = "2"
+        assert np.isnan(vm[x][0])
+        assert vm[x[1]] == "2"
+        assert x[0] not in vm
+        assert x[1] in vm
 
-    def test_setitem_lineage(self):
+    def test_setitem_lineage(self, vm):
         x = Variable("x", lineage=(("test", 0),))
-        self.vm[x] = 1
-        assert x in self.vm
-        assert set(self.vm) == set([x.key])
+        vm[x] = 1
+        assert x in vm
+        assert set(vm) == set([x.key])

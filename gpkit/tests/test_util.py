@@ -82,7 +82,7 @@ class TestHashVector:
         assert isinstance(hv, dict)
         assert hv == {2: 3, 1: 10, "dog": "woof"}
         # no args
-        assert HashVector() == {}
+        assert not HashVector()
         # creation from dict
         assert HashVector({"x": 7}) == {"x": 7}
 

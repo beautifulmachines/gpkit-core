@@ -30,10 +30,10 @@ class TestVarKey:
             _ = ArrayVariable(1, idx=5)
         # test type
         x = VarKey("x")
-        assert type(x) is VarKey
+        assert isinstance(x, VarKey)
         # test no args
         x = VarKey()
-        assert type(x) is VarKey
+        assert isinstance(x, VarKey)
         y = VarKey(**x.descr)
         assert x == y
         # test special 'name' keyword overwriting behavior
@@ -115,13 +115,15 @@ class TestVarKey:
         vk1 = VarKey()
         vk2 = VarKey()
         assert vk1 != vk2
-        assert not (vk1 == vk2)
-        assert vk1 == vk1
+        # pylint: disable=unnecessary-negation  # testing __eq__ returns False
+        assert not vk1 == vk2
+        assert vk1 == vk1  # pylint: disable=comparison-with-itself
         v = VarKey("v")
         vel = VarKey("v")
         assert v == vel
-        assert not (v != vel)
-        assert vel == vel
+        # pylint: disable=unnecessary-negation  # testing __ne__ returns False
+        assert not v != vel
+        assert vel == vel  # pylint: disable=comparison-with-itself
         x1 = Variable("x", 3, "m")
         x2 = Variable("x", 2, "ft")
         x3 = Variable("x", 2, "m")
@@ -212,8 +214,9 @@ class TestVariable:
         w = Variable("W", 5, "lbf", "weight of 1 bag of sugar")
         assert w != w.key
         assert w.key != w
-        assert not (w == w.key)
-        assert not (w.key == w)
+        # pylint: disable=unnecessary-negation  # testing __eq__ both operand orders
+        assert not w == w.key
+        assert not w.key == w
 
 
 class TestVectorVariable:
@@ -234,7 +237,7 @@ class TestVectorVariable:
             assert isinstance(v_mult[i], Monomial)
             assert not isinstance(v_mult[i], PlainVariable)
 
-        # test 2
+    def test_nomial_array_comp(self):
         x = VectorVariable(3, "x", label="dummy variable")
         x_0 = Variable("x", idx=(0,), shape=(3,), label="dummy variable")
         x_1 = Variable("x", idx=(1,), shape=(3,), label="dummy variable")
@@ -242,7 +245,7 @@ class TestVectorVariable:
         x2 = NomialArray([x_0, x_1, x_2])
         assert x == x2
 
-        # test inspired by issue 137
+    def test_issue_137(self):
         n = 20
         x_arr = np.arange(0, 5, 5 / n) + 1e-6
         x = VectorVariable(n, "x", x_arr, "m", "Beam Location")
@@ -259,6 +262,17 @@ class TestVectorVariable:
             assert x[1, 0].value == x[1, 1].value
             assert x[2, 0].value == x[2, 1].value
 
+    def test_vectorize_shapes(self):
+        with gpkit.Vectorize(3):
+            with gpkit.Vectorize(5):
+                y = gpkit.Variable("y")
+                x = gpkit.VectorVariable(2, "x")
+            z = gpkit.VectorVariable(7, "z")
+
+        assert y.shape == (5, 3)
+        assert x.shape == (2, 5, 3)
+        assert z.shape == (7, 3)
+
 
 class TestArrayVariable:
     """TestCase for the ArrayVariable class"""
@@ -274,18 +288,3 @@ class TestArrayVariable:
         """Make sure string looks something like a numpy array"""
         x = ArrayVariable((2, 4), "x")
         assert str(x) == "x[:]"
-
-
-class TestVectorize:
-    """TestCase for gpkit.vectorize"""
-
-    def test_shapes(self):
-        with gpkit.Vectorize(3):
-            with gpkit.Vectorize(5):
-                y = gpkit.Variable("y")
-                x = gpkit.VectorVariable(2, "x")
-            z = gpkit.VectorVariable(7, "z")
-
-        assert y.shape == (5, 3)
-        assert x.shape == (2, 5, 3)
-        assert z.shape == (7, 3)

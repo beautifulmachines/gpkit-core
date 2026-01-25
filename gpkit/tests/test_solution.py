@@ -87,11 +87,8 @@ class TestSolution:
         assert msol[x] == spsol[x]
         assert msol[x] == gpsol[x]
 
-
-class TestResultsTable:
-    """TestCase for var_table()"""
-
     def test_result_access(self):
+        """Test result table access from SP solution"""
         x = Variable("x")
         y = Variable("y")
         with SignomialsEnabled():

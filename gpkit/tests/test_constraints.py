@@ -185,6 +185,10 @@ class TestCostedConstraint:
             CostedConstraintSet(x, [])
         _ = CostedConstraintSet(np.array(x[0]), [])
 
+    def test_cost(self):
+        v = Variable("v")
+        assert CostedConstraintSet(v, []).cost == v
+
 
 class TestMonomialEquality:
     "Test monomial equality constraint class"
@@ -210,7 +214,7 @@ class TestMonomialEquality:
     def test_vector(self):
         "Monomial Equalities with VectorVariables"
         x = VectorVariable(3, "x")
-        assert not (x == 3)
+        assert not x == 3  # pylint: disable=unnecessary-negation
         assert x == x  # pylint: disable=comparison-with-itself
 
     def test_inheritance(self):
@@ -414,7 +418,7 @@ class TestTight:
         assert m.localsolve(verbosity=0).cost == pytest.approx(0.5, abs=1e-5)
 
 
-class TestBounded:
+class TestBounded:  # pylint: disable=too-few-public-methods
     "Test bounded constraint set"
 
     def test_substitution_issue905(self):
