@@ -132,7 +132,7 @@ def parse_varstring(string):
     consts = check_and_parse_flag(string, "Constants\n", constant_declare)
     variables = check_and_parse_flag(string, "Variables\n")
     vecvars = check_and_parse_flag(string, "Variables of length", vv_declare)
-    out = ["# " + line for line in string.split("\n")]
+    out = ["# " + line.strip() for line in string.split("\n")]
     # imports, to be updated if more things are parsed above
     out[0] = "from gpkit import Variable, VectorVariable" + "  " + out[0]
     for lines, indexs in (consts, variables, vecvars):
