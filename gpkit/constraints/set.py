@@ -99,7 +99,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
                 try:
                     for subconstraint in flatiter(constraint, "vks"):
                         self._update(subconstraint)
-                except Exception as e:
+                except (TypeError, AttributeError) as e:
                     raise badelement(self, i, constraint) from e
             elif isinstance(constraint, ConstraintSet):
                 raise badelement(

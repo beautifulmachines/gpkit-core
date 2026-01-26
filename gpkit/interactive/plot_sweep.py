@@ -48,7 +48,7 @@ def format_and_label_axes(var, posys, axes, ylabel=True):
     xlabel = (
         var.key.descr.get("label", var.key.name) + f" [{var.key.unitstr(dimless='-')}]"
     )
-    ax.set_xlabel(xlabel)  # pylint: disable=undefined-loop-variable
+    axes[-1].set_xlabel(xlabel)
     plt.locator_params(nbins=4)
     plt.subplots_adjust(wspace=0.15)
 

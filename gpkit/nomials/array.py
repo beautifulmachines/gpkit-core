@@ -7,7 +7,7 @@ Example
 
 """
 
-from functools import reduce  # pylint: disable=redefined-builtin
+from functools import reduce
 from operator import eq, ge, le, xor
 
 import numpy as np

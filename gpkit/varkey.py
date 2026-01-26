@@ -103,7 +103,6 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
 
     __repr__ = str_without
 
-    # pylint: disable=multiple-statements
     def __hash__(self):
         return self.hashvalue
 
