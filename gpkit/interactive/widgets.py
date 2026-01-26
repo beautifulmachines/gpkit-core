@@ -56,8 +56,8 @@ def modelinteract(model, fns_of_sol, ranges=None, **solvekwargs):
                 model.substitutions.update({k: v})
             vmin, vmax = v / 2.0, v * 2.0
             if is_sweepvar(v):
-                vmin = min(vmin, min(sweep))  # pylint: disable=nested-min-max
-                vmax = max(vmax, min(sweep))  # pylint: disable=nested-min-max
+                vmin = min(vmin, *sweep)
+                vmax = max(vmax, *sweep)
             if ranges and ranges[k]:
                 vmin, vmax = ranges[k]
             vstep = (vmax - vmin) / 24.0

@@ -146,10 +146,6 @@ class HashVector(dict):
 
         If the other object inherits from dict, multiplication is element-wise
         and their key's intersection will form the new keys."""
-        # try:
-        #     return self.__class__({k: v * other for (k, v) in self.items()})
-        # except:  # pylint: disable=bare-except
-        #     return NotImplemented
         if isinstance(other, (Numbers, dict)):
             return self.__class__({k: v * other for (k, v) in self.items()})
         return NotImplemented
@@ -176,7 +172,6 @@ class HashVector(dict):
             return sums
         return NotImplemented
 
-    # pylint: disable=multiple-statements
     def __neg__(self):
         return -1 * self
 
