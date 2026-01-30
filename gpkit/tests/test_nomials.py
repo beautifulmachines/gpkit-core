@@ -85,6 +85,15 @@ class TestMonomial:  # pylint: disable=unnecessary-negation,comparison-with-itse
         if sys.platform[:3] != "win":
             assert r == "gpkit.Monomial(5·x²/y)"
 
+    def test_pow_ast_exponent(self):
+        "Signomial.__pow__ should record the correct exponent in the AST"
+        x = Variable("x")
+        p = x**3 + x + 5
+        p2_str = str(p**2)
+        assert "^0" not in p2_str
+        assert "^2" in p2_str
+        assert p2_str == "gpkit.Posynomial((x³ + x + 5)^2)"
+
     def test_latex(self):
         "Test latex string creation"
         x = Variable("x")
