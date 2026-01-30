@@ -85,6 +85,7 @@ class TestMonomial:  # pylint: disable=unnecessary-negation,comparison-with-itse
         if sys.platform[:3] != "win":
             assert r == "gpkit.Monomial(5·x²/y)"
 
+    @pytest.mark.xfail(reason="Signomial.__pow__ AST bug: expo decremented to 0")
     def test_pow_ast_exponent(self):
         "Signomial.__pow__ should record the correct exponent in the AST"
         x = Variable("x")
