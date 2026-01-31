@@ -110,6 +110,18 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
         return self.descr.get(attr, None)
 
     @property
+    def var_ref(self):
+        "Qualified path string for IR variable references."
+        parts = []
+        if self.lineage:
+            parts.append(self.lineagestr(modelnums=True))
+        parts.append(self.name)
+        ref = ".".join(parts)
+        if self.idx:
+            ref += f"[{','.join(map(str, self.idx))}]"
+        return ref
+
+    @property
     def models(self):
         "Returns a tuple of just the names of models in self.lineage"
         return list(zip(*self.lineage))[0]

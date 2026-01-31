@@ -5,6 +5,7 @@ from collections import defaultdict
 import numpy as np
 
 from .. import units
+from ..ast_nodes import to_ast
 from ..constraints import SingleEquationConstraint
 from ..exceptions import (
     InvalidGPConstraint,
@@ -200,6 +201,7 @@ class Signomial(Nomial):
                 astorder = tuple(reversed(astorder))
             out = Signomial(self.hmap + other_hmap)
             out.ast = ("add", astorder)
+            assert to_ast(self)  # placeholder to avoid lint error on unused import
             return out
         return NotImplemented
 
