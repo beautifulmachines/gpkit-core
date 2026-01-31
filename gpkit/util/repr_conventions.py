@@ -90,6 +90,80 @@ def parenthesize(string, addi=True, mult=True):
     return string
 
 
+def _render_ast_node(node, excluded):  # pylint: disable=too-many-branches
+    "Renders an ExprNode as a string.  Called by ExprNode.str_without()."
+    op = node.op
+    children = node.children
+    if op == "add":
+        left = strify(children[0], excluded)
+        right = strify(children[1], excluded)
+        if right[0] == "-":
+            return f"{left} - {right[1:]}"
+        return f"{left} + {right}"
+    if op == "mul":
+        left = parenthesize(strify(children[0], excluded), mult=False)
+        right = parenthesize(strify(children[1], excluded), mult=False)
+        if left == "1":
+            return right
+        if right == "1":
+            return left
+        return f"{left}{MUL}{right}"
+    if op == "div":
+        left = parenthesize(strify(children[0], excluded), mult=False)
+        right = parenthesize(strify(children[1], excluded))
+        if right == "1":
+            return left
+        return f"{left}/{right}"
+    if op == "neg":
+        val = parenthesize(strify(children[0], excluded), mult=False)
+        return f"-{val}"
+    if op == "pow":
+        left = parenthesize(strify(children[0], excluded))
+        x = children[1]
+        if left == "1":
+            return "1"
+        if (
+            UNICODE_EXPONENTS
+            and not getattr(x, "shape", None)
+            and int(x) == x
+            and 2 <= x <= 9
+        ):
+            x = int(x)
+            if x in (2, 3):
+                return f"{left}{chr(176 + x)}"
+            return f"{left}{chr(8304 + x)}"
+        return f"{left}^{x}"
+    if op == "prod":
+        val = parenthesize(strify(children[0], excluded))
+        return f"{val}.prod()"
+    if op == "sum":
+        val = parenthesize(strify(children[0], excluded))
+        return f"{val}.sum()"
+    if op == "index":
+        left = parenthesize(strify(children[0], excluded))
+        idx = children[1]
+        if left[-3:] == "[:]":  # pure variable access
+            left = left[:-3]
+        if isinstance(idx, tuple):
+            elstrs = []
+            for el in idx:
+                if isinstance(el, slice):
+                    start = el.start or ""
+                    stop = el.stop if el.stop and el.stop < sys.maxsize else ""
+                    step = f":{el.step}" if el.step is not None else ""
+                    elstrs.append(f"{start}:{stop}{step}")
+                elif isinstance(el, Numbers):
+                    elstrs.append(str(el))
+            idx = ",".join(elstrs)
+        elif isinstance(idx, slice):
+            start = idx.start or ""
+            stop = idx.stop if idx.stop and idx.stop < 1e6 else ""
+            step = f":{idx.step}" if idx.step is not None else ""
+            idx = f"{start}:{stop}{step}"
+        return f"{left}[{idx}]"
+    raise ValueError(op)
+
+
 class ReprMixin:
     "This class combines various printing methods for easier adoption."
 
@@ -100,7 +174,6 @@ class ReprMixin:
     cached_strs = None
     ast = None
 
-    # pylint: disable=too-many-branches, too-many-statements
     def parse_ast(self, excluded=()):
         "Turns the AST of this object's construction into a faithful string"
         excluded = frozenset({"units"}.union(excluded))
@@ -108,40 +181,46 @@ class ReprMixin:
             self.cached_strs = {}
         elif excluded in self.cached_strs:
             return self.cached_strs[excluded]
-        oper, values = self.ast  # pylint: disable=unpacking-non-sequence
+        if hasattr(self.ast, "str_without"):
+            aststr = self.ast.str_without(excluded)
+        else:
+            aststr = self._parse_ast_legacy(excluded)
+        self.cached_strs[excluded] = aststr
+        return aststr
 
+    # pylint: disable=too-many-branches, too-many-statements
+    def _parse_ast_legacy(self, excluded):
+        "Fallback parser for legacy tuple-format ASTs"
+        oper, values = self.ast  # pylint: disable=unpacking-non-sequence
         if oper == "add":
             left = strify(values[0], excluded)
             right = strify(values[1], excluded)
             if right[0] == "-":
-                aststr = f"{left} - {right[1:]}"
-            else:
-                aststr = f"{left} + {right}"
-        elif oper == "mul":
+                return f"{left} - {right[1:]}"
+            return f"{left} + {right}"
+        if oper == "mul":
             left = parenthesize(strify(values[0], excluded), mult=False)
             right = parenthesize(strify(values[1], excluded), mult=False)
             if left == "1":
-                aststr = right
-            elif right == "1":
-                aststr = left
-            else:
-                aststr = f"{left}{MUL}{right}"
-        elif oper == "div":
+                return right
+            if right == "1":
+                return left
+            return f"{left}{MUL}{right}"
+        if oper == "div":
             left = parenthesize(strify(values[0], excluded), mult=False)
             right = parenthesize(strify(values[1], excluded))
             if right == "1":
-                aststr = left
-            else:
-                aststr = f"{left}/{right}"
-        elif oper == "neg":
+                return left
+            return f"{left}/{right}"
+        if oper == "neg":
             val = parenthesize(strify(values, excluded), mult=False)
-            aststr = f"-{val}"
-        elif oper == "pow":
+            return f"-{val}"
+        if oper == "pow":
             left = parenthesize(strify(values[0], excluded))
             x = values[1]
             if left == "1":
-                aststr = "1"
-            elif (
+                return "1"
+            if (
                 UNICODE_EXPONENTS
                 and not getattr(x, "shape", None)
                 and int(x) == x
@@ -149,22 +228,19 @@ class ReprMixin:
             ):
                 x = int(x)
                 if x in (2, 3):
-                    aststr = f"{left}{chr(176 + x)}"
-                elif x in (4, 5, 6, 7, 8, 9):
-                    aststr = f"{left}{chr(8304 + x)}"
-            else:
-                aststr = f"{left}^{x}"
-        # pylint: disable=fixme
-        elif oper == "prod":  # TODO: only do if it makes a shorter string
+                    return f"{left}{chr(176 + x)}"
+                return f"{left}{chr(8304 + x)}"
+            return f"{left}^{x}"
+        if oper == "prod":
             val = parenthesize(strify(values[0], excluded))
-            aststr = f"{val}.prod()"
-        elif oper == "sum":  # TODO: only do if it makes a shorter string
+            return f"{val}.prod()"
+        if oper == "sum":
             val = parenthesize(strify(values[0], excluded))
-            aststr = f"{val}.sum()"
-        elif oper == "index":  # TODO: label vectorization idxs
+            return f"{val}.sum()"
+        if oper == "index":
             left = parenthesize(strify(values[0], excluded))
             idx = values[1]
-            if left[-3:] == "[:]":  # pure variable access
+            if left[-3:] == "[:]":
                 left = left[:-3]
             if isinstance(idx, tuple):
                 elstrs = []
@@ -182,12 +258,8 @@ class ReprMixin:
                 stop = idx.stop if idx.stop and idx.stop < 1e6 else ""
                 step = f":{idx.step}" if idx.step is not None else ""
                 idx = f"{start}:{stop}{step}"
-            aststr = f"{left}[{idx}]"
-        else:
-            raise ValueError(oper)
-        # pylint: disable=possibly-used-before-assignment
-        self.cached_strs[excluded] = aststr
-        return aststr
+            return f"{left}[{idx}]"
+        raise ValueError(oper)
 
     def __repr__(self):
         "Returns namespaced string."

@@ -12,6 +12,7 @@ from operator import eq, ge, le, xor
 
 import numpy as np
 
+from ..ast_nodes import ExprNode, to_ast
 from ..constraints import ArrayConstraint
 from ..util.repr_conventions import ReprMixin
 from ..util.small_classes import EMPTY_HV, HashVector
@@ -56,23 +57,23 @@ class NomialArray(ReprMixin, np.ndarray):
     def __mul__(self, other, *, reverse_order=False):
         astorder = (self, other) if not reverse_order else (other, self)
         out = NomialArray(np.ndarray.__mul__(self, other))
-        out.ast = ("mul", astorder)
+        out.ast = ExprNode("mul", tuple(to_ast(x) for x in astorder))
         return out
 
     def __truediv__(self, other):
         out = NomialArray(np.ndarray.__truediv__(self, other))
-        out.ast = ("div", (self, other))
+        out.ast = ExprNode("div", (to_ast(self), to_ast(other)))
         return out
 
     def __rtruediv__(self, other):
         out = np.ndarray.__mul__(self**-1, other)
-        out.ast = ("div", (other, self))
+        out.ast = ExprNode("div", (to_ast(other), to_ast(self)))
         return out
 
     def __add__(self, other, *, reverse_order=False):
         astorder = (self, other) if not reverse_order else (other, self)
         out = np.ndarray.__add__(self, other)
-        out.ast = ("add", astorder)
+        out.ast = ExprNode("add", tuple(to_ast(x) for x in astorder))
         return out
 
     # pylint: disable=multiple-statements
@@ -84,19 +85,19 @@ class NomialArray(ReprMixin, np.ndarray):
 
     def __pow__(self, expo):  # pylint: disable=arguments-differ
         out = np.ndarray.__pow__(self, expo)  # pylint: disable=too-many-function-args
-        out.ast = ("pow", (self, expo))
+        out.ast = ExprNode("pow", (to_ast(self), expo))
         return out
 
     def __neg__(self):
         out = np.ndarray.__neg__(self)
-        out.ast = ("neg", self)
+        out.ast = ExprNode("neg", (to_ast(self),))
         return out
 
     def __getitem__(self, idxs):
         out = np.ndarray.__getitem__(self, idxs)
         if not getattr(out, "shape", None):
             return out
-        out.ast = ("index", (self, idxs))
+        out.ast = ExprNode("index", (to_ast(self), idxs))
         return out
 
     def str_without(self, excluded=()):
@@ -183,7 +184,7 @@ class NomialArray(ReprMixin, np.ndarray):
                     p /= float(hmap.units)
                 hmap[EMPTY_HV] = p + hmap.get(EMPTY_HV, 0)
         out = Signomial(hmap)
-        out.ast = ("sum", (self, None))
+        out.ast = ExprNode("sum", (to_ast(self),))
         return out
 
     def prod(self, *args, **kwargs):  # pylint: disable=arguments-differ
@@ -205,7 +206,7 @@ class NomialArray(ReprMixin, np.ndarray):
                 hmap.units = (hmap.units or 1) * m.units
         hmap[exp] = c
         out = Signomial(hmap)
-        out.ast = ("prod", (self, None))
+        out.ast = ExprNode("prod", (to_ast(self),))
         return out
 
 
