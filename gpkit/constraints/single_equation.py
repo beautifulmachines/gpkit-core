@@ -30,6 +30,14 @@ class SingleEquationConstraint(ReprMixin):
             oper = self.oper
         return " ".join((leftstr, oper, rightstr))
 
+    def to_ir(self):
+        "Serialize the common constraint structure to an IR dict."
+        return {
+            "oper": self.oper,
+            "left": self.left.to_ir(),
+            "right": self.right.to_ir(),
+        }
+
     def latex(self, excluded="units"):
         "Latex representation without attributes in excluded list"
         return " ".join(

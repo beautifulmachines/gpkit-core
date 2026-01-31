@@ -22,6 +22,10 @@ class ArrayConstraint(SingleEquationConstraint, list):
         "Returns lines for indentation in hierarchical printing."
         return self.str_without(excluded).split("\n")
 
+    def to_ir(self):
+        "Serialize as a list of element constraint IR dicts."
+        return [c.to_ir() for c in self.constraints.flat]
+
     def __bool__(self):
         "Allows the use of '=' NomialArrays as truth elements."
         return False if self.oper != "=" else bool(self.constraints.all())

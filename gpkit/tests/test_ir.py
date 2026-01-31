@@ -2,6 +2,7 @@
 
 Phase 1: AST node dataclasses and VarKey.var_ref
 Phase 2: Core to_ir() / from_ir() for VarKey, NomialMap, Nomial
+Phase 3: Constraint to_ir() / from_ir()
 """
 
 import json
@@ -11,7 +12,15 @@ import pytest
 
 from gpkit import SignomialsEnabled, Variable, VarKey, VectorVariable
 from gpkit.ast_nodes import ConstNode, ExprNode, VarNode, ast_from_ir, to_ast
+from gpkit.constraints.array import ArrayConstraint
+from gpkit.ir import constraint_from_ir
 from gpkit.nomials.map import NomialMap
+from gpkit.nomials.math import (
+    MonomialEquality,
+    PosynomialInequality,
+    SignomialInequality,
+    SingleSignomialEquality,
+)
 from gpkit.util.small_classes import EMPTY_HV, HashVector
 
 
@@ -438,3 +447,214 @@ class TestNomialIR:
         assert ir["type"] == "Monomial"
         m2 = Signomial.from_ir(ir, {})
         assert m2.cs[0] == 5.0
+
+
+# ── Phase 3: Constraint to_ir() / from_ir() ─────────────────────────
+
+
+class TestConstraintIR:
+    """Tests for constraint to_ir() / from_ir() round-trips."""
+
+    def _registry(self, constraint):
+        "Build var_registry from a constraint's varkeys."
+        return {vk.var_ref: vk for vk in constraint.vks}
+
+    def test_posy_inequality_roundtrip(self):
+        """PosynomialInequality: x >= y + 1"""
+        x = Variable("x")
+        y = Variable("y")
+        c = x >= y + 1
+        assert isinstance(c, PosynomialInequality)
+
+        ir = c.to_ir()
+        assert ir["type"] == "PosynomialInequality"
+        assert ir["oper"] == ">="
+        assert "left" in ir
+        assert "right" in ir
+
+        registry = self._registry(c)
+        c2 = PosynomialInequality.from_ir(ir, registry)
+        assert isinstance(c2, PosynomialInequality)
+        assert c2.oper == ">="
+        assert len(c2.unsubbed) == len(c.unsubbed)
+
+    def test_posy_inequality_leq(self):
+        """PosynomialInequality with <= operator.
+
+        Note: x + y <= 2*x*y triggers Monomial.__ge__ (subclass reflected
+        method) so the stored oper is '>=' with swapped left/right.
+        """
+        x = Variable("x")
+        y = Variable("y")
+        c = x + y <= 2 * x * y
+        assert isinstance(c, PosynomialInequality)
+
+        ir = c.to_ir()
+        assert ir["oper"] in ("<=", ">=")
+        registry = self._registry(c)
+        c2 = PosynomialInequality.from_ir(ir, registry)
+        assert c2.oper == c.oper
+
+    def test_monomial_equality_roundtrip(self):
+        """MonomialEquality: x == y"""
+        x = Variable("x")
+        y = Variable("y")
+        c = x == y
+        assert isinstance(c, MonomialEquality)
+
+        ir = c.to_ir()
+        assert ir["type"] == "MonomialEquality"
+        assert ir["oper"] == "="
+
+        registry = self._registry(c)
+        c2 = MonomialEquality.from_ir(ir, registry)
+        assert isinstance(c2, MonomialEquality)
+        assert c2.oper == "="
+        assert len(c2.unsubbed) == len(c.unsubbed)
+
+    def test_signomial_inequality_roundtrip(self):
+        """SignomialInequality: x >= 1 - y (requires SignomialsEnabled).
+
+        Note: Monomial >= Signomial triggers Signomial.__le__ (subclass
+        reflected method) so the stored oper may be '<=' with swapped sides.
+        """
+        x = Variable("x")
+        y = Variable("y")
+        with SignomialsEnabled():
+            c = x >= 1 - y
+        assert isinstance(c, SignomialInequality)
+
+        ir = c.to_ir()
+        assert ir["type"] == "SignomialInequality"
+        assert ir["oper"] in ("<=", ">=")
+
+        registry = self._registry(c)
+        c2 = SignomialInequality.from_ir(ir, registry)
+        assert isinstance(c2, SignomialInequality)
+        assert c2.oper == c.oper
+
+    def test_single_signomial_equality_roundtrip(self):
+        """SingleSignomialEquality round-trip.
+
+        Constructed directly since Posynomial == Signomial doesn't produce
+        a constraint via operator overloading.
+        """
+        x = Variable("x")
+        y = Variable("y")
+        z = Variable("z")
+        with SignomialsEnabled():
+            c = SingleSignomialEquality(x + y, 1 - z)
+        assert isinstance(c, SingleSignomialEquality)
+
+        ir = c.to_ir()
+        assert ir["type"] == "SingleSignomialEquality"
+        assert ir["oper"] == "="
+
+        registry = self._registry(c)
+        c2 = SingleSignomialEquality.from_ir(ir, registry)
+        assert isinstance(c2, SingleSignomialEquality)
+        assert c2.oper == "="
+
+    def test_array_constraint_to_ir(self):
+        """ArrayConstraint serializes as list of element constraints."""
+        x = VectorVariable(3, "x")
+        y = VectorVariable(3, "y")
+        c = x >= y
+        assert isinstance(c, ArrayConstraint)
+
+        ir_list = c.to_ir()
+        assert isinstance(ir_list, list)
+        assert len(ir_list) == 3
+        for ir_dict in ir_list:
+            assert ir_dict["type"] == "PosynomialInequality"
+            assert ir_dict["oper"] == ">="
+
+    def test_constraint_from_ir_dispatch(self):
+        """constraint_from_ir dispatches to the correct class."""
+        x = Variable("x")
+        y = Variable("y")
+
+        c = x >= y + 1
+        ir = c.to_ir()
+        registry = self._registry(c)
+        c2 = constraint_from_ir(ir, registry)
+        assert isinstance(c2, PosynomialInequality)
+
+    def test_constraint_from_ir_dispatch_meq(self):
+        """constraint_from_ir dispatches MonomialEquality."""
+        x = Variable("x")
+        y = Variable("y")
+        c = x == y
+        ir = c.to_ir()
+        registry = self._registry(c)
+        c2 = constraint_from_ir(ir, registry)
+        assert isinstance(c2, MonomialEquality)
+
+    def test_constraint_from_ir_dispatch_signomial(self):
+        """constraint_from_ir dispatches SignomialInequality."""
+        x = Variable("x")
+        y = Variable("y")
+        with SignomialsEnabled():
+            c = x >= 1 - y
+        ir = c.to_ir()
+        registry = self._registry(c)
+        c2 = constraint_from_ir(ir, registry)
+        assert isinstance(c2, SignomialInequality)
+
+    def test_constraint_lineage(self):
+        """Lineage metadata survives round-trip."""
+        x = Variable("x")
+        y = Variable("y")
+        c = x >= y + 1
+        c.lineage = (("Aircraft", 0), ("Wing", 0))
+
+        ir = c.to_ir()
+        assert ir["lineage"] == [["Aircraft", 0], ["Wing", 0]]
+
+        registry = self._registry(c)
+        c2 = PosynomialInequality.from_ir(ir, registry)
+        assert c2.lineage == (("Aircraft", 0), ("Wing", 0))
+
+    def test_constraint_no_lineage(self):
+        """Constraint without lineage omits lineage key."""
+        x = Variable("x")
+        y = Variable("y")
+        c = x >= y + 1
+        c.lineage = ()
+
+        ir = c.to_ir()
+        assert "lineage" not in ir
+
+    def test_constraint_json_roundtrip(self):
+        """Constraint IR is JSON-serializable and survives round-trip."""
+        x = Variable("x")
+        y = Variable("y")
+        c = x >= y + 1
+
+        ir = c.to_ir()
+        json_str = json.dumps(ir)
+        ir2 = json.loads(json_str)
+
+        registry = self._registry(c)
+        c2 = constraint_from_ir(ir2, registry)
+        assert isinstance(c2, PosynomialInequality)
+        assert c2.oper == ">="
+
+    def test_signomial_json_roundtrip(self):
+        """SignomialInequality IR survives JSON round-trip."""
+        x = Variable("x")
+        y = Variable("y")
+        with SignomialsEnabled():
+            c = x >= 1 - y
+        ir = c.to_ir()
+        json_str = json.dumps(ir)
+        ir2 = json.loads(json_str)
+
+        registry = self._registry(c)
+        c2 = constraint_from_ir(ir2, registry)
+        assert isinstance(c2, SignomialInequality)
+
+    def test_constraint_from_ir_unknown_type(self):
+        """constraint_from_ir raises on unknown type."""
+        with pytest.raises(ValueError, match="Unknown constraint type"):
+            constraint_from_ir({"type": "BogusConstraint"}, {})
