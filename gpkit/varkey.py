@@ -114,7 +114,9 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
         "Qualified path string for IR variable references."
         parts = []
         if self.lineage:
-            parts.append(self.lineagestr(modelnums=True))
+            # Always include model numbers (even 0) for unique identification.
+            # Can't use lineagestr() because it suppresses 0 model numbers.
+            parts.extend(f"{name}{num}" for name, num in self.lineage)
         parts.append(self.name)
         ref = ".".join(parts)
         if self.idx:
