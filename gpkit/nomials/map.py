@@ -6,6 +6,7 @@ import numpy as np
 
 from .. import units
 from ..units import DimensionalityError, qty
+from ..util.repr_conventions import unitstr
 from ..util.small_classes import EMPTY_HV, HashVector, Strings
 from .substitution import parse_subs
 
@@ -25,6 +26,46 @@ class NomialMap(HashVector):
     units = None
     expmap = None  # used for monomial-mapping postsubstitution; see .mmap()
     csmap = None  # used for monomial-mapping postsubstitution; see .mmap()
+
+    def to_ir(self):
+        "Serialize this NomialMap to an IR dict."
+        terms = []
+        for exp_hv, coeff in self.items():
+            term = {"coeff": float(coeff)}
+            if exp_hv:  # non-empty exponent vector (not a constant)
+                term["exps"] = {
+                    vk.var_ref: int(x) if x == int(x) else float(x)
+                    for vk, x in exp_hv.items()
+                }
+            terms.append(term)
+        ir = {"terms": terms}
+        if self.units:
+            ir["units"] = unitstr(self, "%s", ":~")
+        return ir
+
+    @classmethod
+    def from_ir(cls, ir_dict, var_registry):
+        """Reconstruct a NomialMap from an IR dict.
+
+        Parameters
+        ----------
+        ir_dict : dict
+            IR with "terms" and optional "units".
+        var_registry : dict
+            Mapping from var_ref strings to VarKey objects.
+        """
+        hmap = cls()
+        for term in ir_dict["terms"]:
+            if "exps" in term and term["exps"]:
+                exp = HashVector(
+                    {var_registry[ref]: x for ref, x in term["exps"].items()}
+                )
+            else:
+                exp = EMPTY_HV
+            hmap[exp] = term["coeff"]
+        if "units" in ir_dict:
+            hmap.units = qty(ir_dict["units"])
+        return hmap
 
     def copy(self):
         "Return a copy of this"

@@ -5,6 +5,7 @@ from collections import defaultdict
 import numpy as np
 
 from .. import units
+from ..ast_nodes import ExprNode, to_ast
 from ..constraints import SingleEquationConstraint
 from ..exceptions import (
     InvalidGPConstraint,
@@ -73,6 +74,34 @@ class Signomial(Nomial):
             self.__class__ = Monomial
         else:
             self.__class__ = Posynomial
+
+    def to_ir(self):
+        "Serialize this nomial to an IR dict."
+        ir = self.hmap.to_ir()
+        ir["type"] = self.__class__.__name__
+        if self.ast is not None and hasattr(self.ast, "to_ir"):
+            ir["ast"] = self.ast.to_ir()
+        return ir
+
+    @classmethod
+    def from_ir(cls, ir_dict, var_registry):
+        """Reconstruct a nomial from an IR dict.
+
+        Parameters
+        ----------
+        ir_dict : dict
+            IR with "terms", optional "units", "type", "ast".
+        var_registry : dict
+            Mapping from var_ref strings to VarKey objects.
+        """
+        from ..ast_nodes import ast_from_ir
+
+        hmap = NomialMap.from_ir(ir_dict, var_registry)
+        nomial_type = ir_dict.get("type", "Signomial")
+        result = cls(hmap, require_positive=(nomial_type != "Signomial"))
+        if "ast" in ir_dict:
+            result.ast = ast_from_ir(ir_dict["ast"], var_registry)
+        return result
 
     def diff(self, var):
         """Derivative of this with respect to a Variable
@@ -199,7 +228,7 @@ class Signomial(Nomial):
             if rev:
                 astorder = tuple(reversed(astorder))
             out = Signomial(self.hmap + other_hmap)
-            out.ast = ("add", astorder)
+            out.ast = ExprNode("add", tuple(to_ast(x) for x in astorder))
             return out
         return NotImplemented
 
@@ -219,7 +248,7 @@ class Signomial(Nomial):
             hmap = mag(other) * self.hmap
             hmap.units_of_product(self.hmap.units, other)
             out = Signomial(hmap)
-            out.ast = ("mul", astorder)
+            out.ast = ExprNode("mul", tuple(to_ast(x) for x in astorder))
             return out
         if isinstance(other, Signomial):
             hmap = NomialMap()
@@ -233,7 +262,7 @@ class Signomial(Nomial):
                         del hmap[exp]
             hmap.units_of_product(self.hmap.units, other.hmap.units)
             out = Signomial(hmap)
-            out.ast = ("mul", astorder)
+            out.ast = ExprNode("mul", tuple(to_ast(x) for x in astorder))
             return out
         return NotImplemented
 
@@ -241,7 +270,7 @@ class Signomial(Nomial):
         "Support the / operator in Python 2.x"
         if isinstance(other, Numbers):
             out = self * other**-1
-            out.ast = ("div", (self, other))
+            out.ast = ExprNode("div", (to_ast(self), other))
             return out
         if isinstance(other, Monomial):
             return other.__rtruediv__(self)
@@ -249,18 +278,19 @@ class Signomial(Nomial):
 
     def __pow__(self, expo):
         if isinstance(expo, int) and expo >= 0:
+            original_expo = expo
             p = 1
             while expo > 0:
                 p *= self
                 expo -= 1
-            p.ast = ("pow", (self, expo))
+            p.ast = ExprNode("pow", (to_ast(self), original_expo))
             return p
         return NotImplemented
 
     def __neg__(self):
         if SignomialsEnabled:  # pylint: disable=using-constant-test
             out = -1 * self
-            out.ast = ("neg", self)
+            out.ast = ExprNode("neg", (to_ast(self),))
             return out
         return NotImplemented
 
@@ -334,7 +364,7 @@ class Monomial(Posynomial):
         "Divide other by this Monomial"
         if isinstance(other, Numbers | Signomial):
             out = other * self**-1
-            out.ast = ("div", (other, self))
+            out.ast = ExprNode("div", (to_ast(other), to_ast(self)))
             return out
         return NotImplemented
 
@@ -348,7 +378,7 @@ class Monomial(Posynomial):
             else:
                 hmap.units = None
             out = Monomial(hmap)
-            out.ast = ("pow", (self, expo))
+            out.ast = ExprNode("pow", (to_ast(self), expo))
             return out
         return NotImplemented
 
