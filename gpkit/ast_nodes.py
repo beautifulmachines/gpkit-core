@@ -17,6 +17,10 @@ class ASTNode:
         "Render this node as a string, for integration with strify/parse_ast."
         raise NotImplementedError
 
+    def to_ir(self):
+        "Serialize this AST node to an IR dict."
+        raise NotImplementedError
+
 
 @dataclass(frozen=True)
 class VarNode(ASTNode):
@@ -32,6 +36,9 @@ class VarNode(ASTNode):
     def str_without(self, excluded=()):
         return self.varkey.str_without(excluded)
 
+    def to_ir(self):
+        return {"node": "var", "ref": self.ref}
+
 
 @dataclass(frozen=True)
 class ConstNode(ASTNode):
@@ -41,6 +48,9 @@ class ConstNode(ASTNode):
 
     def str_without(self, excluded=()):
         return f"{self.value:.3g}"
+
+    def to_ir(self):
+        return {"node": "const", "value": self.value}
 
 
 @dataclass(frozen=True)
@@ -65,6 +75,56 @@ class ExprNode(ASTNode):
         from .util.repr_conventions import _render_ast_node  # noqa: C0415
 
         return _render_ast_node(self, excluded)
+
+    def to_ir(self):
+        return {
+            "node": "expr",
+            "op": self.op,
+            "children": [_child_to_ir(c) for c in self.children],
+        }
+
+
+def _child_to_ir(child):
+    "Serialize an AST child (node or raw value) to IR."
+    if isinstance(child, ASTNode):
+        return child.to_ir()
+    if isinstance(child, (int, float)):
+        return child
+    # numpy scalars and similar numeric types
+    try:
+        return float(child)
+    except (TypeError, ValueError):
+        raise TypeError(
+            f"Cannot serialize AST child of type {type(child).__name__}: {child!r}"
+        )
+
+
+def ast_from_ir(ir_dict, var_registry):
+    """Reconstruct an AST node from its IR dict.
+
+    Parameters
+    ----------
+    ir_dict : dict or number
+        The IR representation of an AST node.
+    var_registry : dict
+        Mapping from var_ref strings to VarKey objects.
+    """
+    if not isinstance(ir_dict, dict):
+        return ir_dict  # raw number passthrough (e.g., exponent in pow)
+    node = ir_dict["node"]
+    if node == "var":
+        return VarNode(var_registry[ir_dict["ref"]])
+    if node == "const":
+        return ConstNode(ir_dict["value"])
+    if node == "expr":
+        children = []
+        for c in ir_dict["children"]:
+            if isinstance(c, dict):
+                children.append(ast_from_ir(c, var_registry))
+            else:
+                children.append(c)  # raw number
+        return ExprNode(ir_dict["op"], tuple(children))
+    raise ValueError(f"Unknown AST IR node type: {node}")
 
 
 def to_ast(obj):

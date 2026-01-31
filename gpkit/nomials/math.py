@@ -75,6 +75,34 @@ class Signomial(Nomial):
         else:
             self.__class__ = Posynomial
 
+    def to_ir(self):
+        "Serialize this nomial to an IR dict."
+        ir = self.hmap.to_ir()
+        ir["type"] = self.__class__.__name__
+        if self.ast is not None and hasattr(self.ast, "to_ir"):
+            ir["ast"] = self.ast.to_ir()
+        return ir
+
+    @classmethod
+    def from_ir(cls, ir_dict, var_registry):
+        """Reconstruct a nomial from an IR dict.
+
+        Parameters
+        ----------
+        ir_dict : dict
+            IR with "terms", optional "units", "type", "ast".
+        var_registry : dict
+            Mapping from var_ref strings to VarKey objects.
+        """
+        from ..ast_nodes import ast_from_ir
+
+        hmap = NomialMap.from_ir(ir_dict, var_registry)
+        nomial_type = ir_dict.get("type", "Signomial")
+        result = cls(hmap, require_positive=(nomial_type != "Signomial"))
+        if "ast" in ir_dict:
+            result.ast = ast_from_ir(ir_dict["ast"], var_registry)
+        return result
+
     def diff(self, var):
         """Derivative of this with respect to a Variable
 

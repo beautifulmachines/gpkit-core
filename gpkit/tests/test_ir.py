@@ -1,14 +1,18 @@
 """Tests for the IR (Intermediate Representation) infrastructure.
 
 Phase 1: AST node dataclasses and VarKey.var_ref
+Phase 2: Core to_ir() / from_ir() for VarKey, NomialMap, Nomial
 """
 
+import json
 import sys
 
 import pytest
 
 from gpkit import SignomialsEnabled, Variable, VarKey, VectorVariable
-from gpkit.ast_nodes import ConstNode, ExprNode, VarNode, to_ast
+from gpkit.ast_nodes import ConstNode, ExprNode, VarNode, ast_from_ir, to_ast
+from gpkit.nomials.map import NomialMap
+from gpkit.util.small_classes import EMPTY_HV, HashVector
 
 
 class TestASTNodes:
@@ -142,3 +146,295 @@ class TestVarRef:
     def test_lineage_and_index(self):
         vk = VarKey("c_l", lineage=(("Wing", 0),), idx=(1,), shape=(3,))
         assert vk.var_ref == "Wing0.c_l[1]"
+
+
+# ── Phase 2: Core to_ir() / from_ir() ───────────────────────────────
+
+
+class TestVarKeyIR:
+    """Tests for VarKey.to_ir() / VarKey.from_ir() round-trip."""
+
+    def test_plain(self):
+        vk = VarKey("x")
+        ir = vk.to_ir()
+        assert ir["name"] == "x"
+        assert "lineage" not in ir
+        assert "units" not in ir
+        vk2 = VarKey.from_ir(ir)
+        assert vk2 == vk
+
+    def test_with_units(self):
+        vk = VarKey("S", unitrepr="m^2")
+        ir = vk.to_ir()
+        assert ir["units"] == "m^2"
+        vk2 = VarKey.from_ir(ir)
+        assert vk2 == vk
+        assert vk2.unitrepr == "m^2"
+
+    def test_with_lineage(self):
+        vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 0)))
+        ir = vk.to_ir()
+        assert ir["lineage"] == [["Aircraft", 0], ["Wing", 0]]
+        vk2 = VarKey.from_ir(ir)
+        assert vk2 == vk
+        assert vk2.lineage == (("Aircraft", 0), ("Wing", 0))
+
+    def test_with_idx(self):
+        vk = VarKey("c_l", idx=(1,), shape=(3,))
+        ir = vk.to_ir()
+        assert ir["idx"] == [1]
+        assert ir["shape"] == [3]
+        vk2 = VarKey.from_ir(ir)
+        assert vk2 == vk
+
+    def test_with_label(self):
+        vk = VarKey("W", label="total weight")
+        ir = vk.to_ir()
+        assert ir["label"] == "total weight"
+        vk2 = VarKey.from_ir(ir)
+        assert vk2.label == "total weight"
+
+    def test_json_serializable(self):
+        vk = VarKey("S", lineage=(("Wing", 0),), unitrepr="m^2", label="area")
+        ir = vk.to_ir()
+        json_str = json.dumps(ir)
+        ir2 = json.loads(json_str)
+        vk2 = VarKey.from_ir(ir2)
+        assert vk2 == vk
+
+    def test_dimensionless_omits_units(self):
+        vk = VarKey("x")
+        ir = vk.to_ir()
+        assert "units" not in ir
+
+
+class TestASTNodeIR:
+    """Tests for AST node to_ir() / ast_from_ir() round-trip."""
+
+    def _var_registry(self, *variables):
+        "Build var_registry from Variables."
+        return {v.key.var_ref: v.key for v in variables}
+
+    def test_varnode(self):
+        x = Variable("x")
+        node = VarNode(x.key)
+        ir = node.to_ir()
+        assert ir == {"node": "var", "ref": "x"}
+        registry = self._var_registry(x)
+        node2 = ast_from_ir(ir, registry)
+        assert isinstance(node2, VarNode)
+        assert node2.varkey == x.key
+
+    def test_constnode(self):
+        node = ConstNode(3.14)
+        ir = node.to_ir()
+        assert ir == {"node": "const", "value": 3.14}
+        node2 = ast_from_ir(ir, {})
+        assert isinstance(node2, ConstNode)
+        assert node2.value == 3.14
+
+    def test_exprnode_add(self):
+        x = Variable("x")
+        y = Variable("y")
+        result = x + y
+        ir = result.ast.to_ir()
+        assert ir["node"] == "expr"
+        assert ir["op"] == "add"
+        assert len(ir["children"]) == 2
+        registry = self._var_registry(x, y)
+        ast2 = ast_from_ir(ir, registry)
+        assert isinstance(ast2, ExprNode)
+        assert ast2.op == "add"
+
+    def test_exprnode_pow_preserves_exponent(self):
+        x = Variable("x")
+        result = x**3
+        ir = result.ast.to_ir()
+        assert ir["op"] == "pow"
+        # exponent is a raw number, not a const node
+        assert ir["children"][1] == 3
+        registry = self._var_registry(x)
+        ast2 = ast_from_ir(ir, registry)
+        assert ast2.children[1] == 3
+
+    def test_nested_ast_roundtrip(self):
+        x = Variable("x")
+        y = Variable("y")
+        result = (x + y) * x
+        ir = result.ast.to_ir()
+        registry = self._var_registry(x, y)
+        ast2 = ast_from_ir(ir, registry)
+        assert ast2.op == "mul"
+        assert ast2.children[0].op == "add"
+
+    def test_json_roundtrip(self):
+        x = Variable("x")
+        y = Variable("y")
+        result = x * y + x**2
+        ir = result.ast.to_ir()
+        json_str = json.dumps(ir)
+        ir2 = json.loads(json_str)
+        registry = self._var_registry(x, y)
+        ast2 = ast_from_ir(ir2, registry)
+        assert ast2.str_without() == result.ast.str_without()
+
+
+class TestNomialMapIR:
+    """Tests for NomialMap.to_ir() / NomialMap.from_ir() round-trip."""
+
+    def test_monomial(self):
+        """Single-term NomialMap (monomial)."""
+        x = Variable("x")
+        hmap = NomialMap({HashVector({x.key: 2}): 3.0})
+        ir = hmap.to_ir()
+        assert len(ir["terms"]) == 1
+        assert ir["terms"][0]["coeff"] == 3.0
+        assert ir["terms"][0]["exps"]["x"] == 2
+        registry = {x.key.var_ref: x.key}
+        hmap2 = NomialMap.from_ir(ir, registry)
+        assert len(hmap2) == 1
+        ((exp, coeff),) = hmap2.items()
+        assert coeff == 3.0
+        assert exp[x.key] == 2
+
+    def test_posynomial(self):
+        """Multi-term NomialMap (posynomial)."""
+        x = Variable("x")
+        y = Variable("y")
+        hmap = NomialMap(
+            {
+                HashVector({x.key: 1}): 2.0,
+                HashVector({y.key: 1}): 3.0,
+            }
+        )
+        ir = hmap.to_ir()
+        assert len(ir["terms"]) == 2
+        registry = {x.key.var_ref: x.key, y.key.var_ref: y.key}
+        hmap2 = NomialMap.from_ir(ir, registry)
+        assert len(hmap2) == 2
+
+    def test_constant_term(self):
+        """Constant term uses EMPTY_HV, no exps key."""
+        hmap = NomialMap({EMPTY_HV: 5.0})
+        ir = hmap.to_ir()
+        assert len(ir["terms"]) == 1
+        assert "exps" not in ir["terms"][0]
+        assert ir["terms"][0]["coeff"] == 5.0
+        hmap2 = NomialMap.from_ir(ir, {})
+        assert hmap2[EMPTY_HV] == 5.0
+
+    def test_with_units(self):
+        """Units survive round-trip."""
+        from gpkit.units import qty
+
+        x = Variable("x", unitrepr="m")
+        hmap = NomialMap({HashVector({x.key: 1}): 1.0})
+        hmap.units = qty("m")
+        ir = hmap.to_ir()
+        assert "units" in ir
+        registry = {x.key.var_ref: x.key}
+        hmap2 = NomialMap.from_ir(ir, registry)
+        assert hmap2.units is not None
+
+    def test_json_serializable(self):
+        """NomialMap IR is JSON-serializable."""
+        x = Variable("x")
+        hmap = NomialMap({HashVector({x.key: 1}): 2.5})
+        ir = hmap.to_ir()
+        json_str = json.dumps(ir)
+        ir2 = json.loads(json_str)
+        registry = {x.key.var_ref: x.key}
+        hmap2 = NomialMap.from_ir(ir2, registry)
+        assert len(hmap2) == 1
+
+
+class TestNomialIR:
+    """Tests for Signomial.to_ir() / Signomial.from_ir() round-trip."""
+
+    def _registry(self, nomial):
+        "Build var_registry from a nomial's varkeys."
+        return {vk.var_ref: vk for vk in nomial.vks}
+
+    def test_monomial_roundtrip(self):
+        x = Variable("x")
+        m = 2 * x**3
+        ir = m.to_ir()
+        assert ir["type"] == "Monomial"
+        from gpkit.nomials.math import Monomial, Signomial
+
+        m2 = Signomial.from_ir(ir, self._registry(m))
+        assert isinstance(m2, Monomial)
+        assert len(m2.hmap) == 1
+        ((exp, coeff),) = m2.hmap.items()
+        assert coeff == 2.0
+        assert exp[x.key] == 3
+
+    def test_posynomial_roundtrip(self):
+        x = Variable("x")
+        y = Variable("y")
+        p = x + 2 * y
+        ir = p.to_ir()
+        assert ir["type"] == "Posynomial"
+        from gpkit.nomials.math import Posynomial, Signomial
+
+        p2 = Signomial.from_ir(ir, self._registry(p))
+        assert isinstance(p2, Posynomial)
+        assert len(p2.hmap) == 2
+
+    def test_signomial_roundtrip(self):
+        x = Variable("x")
+        y = Variable("y")
+        with SignomialsEnabled():
+            s = x - y
+        ir = s.to_ir()
+        assert ir["type"] == "Signomial"
+        from gpkit.nomials.math import Signomial
+
+        s2 = Signomial.from_ir(ir, self._registry(s))
+        assert isinstance(s2, Signomial)
+        assert s2.any_nonpositive_cs
+
+    def test_ast_survives_roundtrip(self):
+        x = Variable("x")
+        y = Variable("y")
+        p = x + 2 * y
+        ir = p.to_ir()
+        assert "ast" in ir
+        from gpkit.nomials.math import Signomial
+
+        p2 = Signomial.from_ir(ir, self._registry(p))
+        assert p2.ast is not None
+        assert p2.ast.str_without() == p.ast.str_without()
+
+    def test_units_survive_roundtrip(self):
+        x = Variable("x", unitrepr="m")
+        y = Variable("y", unitrepr="m")
+        p = x + y
+        ir = p.to_ir()
+        assert "units" in ir
+        from gpkit.nomials.math import Signomial
+
+        p2 = Signomial.from_ir(ir, self._registry(p))
+        assert p2.units is not None
+
+    def test_json_roundtrip(self):
+        x = Variable("x")
+        y = Variable("y")
+        p = x + 2 * y
+        ir = p.to_ir()
+        json_str = json.dumps(ir)
+        ir2 = json.loads(json_str)
+        from gpkit.nomials.math import Signomial
+
+        p2 = Signomial.from_ir(ir2, self._registry(p))
+        assert len(p2.hmap) == len(p.hmap)
+
+    def test_constant_nomial(self):
+        """A nomial with only a constant term."""
+        from gpkit.nomials.math import Signomial
+
+        m = Signomial(5.0)
+        ir = m.to_ir()
+        assert ir["type"] == "Monomial"
+        m2 = Signomial.from_ir(ir, {})
+        assert m2.cs[0] == 5.0

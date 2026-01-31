@@ -123,6 +123,38 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
             ref += f"[{','.join(map(str, self.idx))}]"
         return ref
 
+    def to_ir(self):
+        "Serialize this VarKey to an IR dict."
+        ir = {"name": self.name}
+        if self.lineage:
+            ir["lineage"] = [list(pair) for pair in self.lineage]
+        if self.unitrepr and self.unitrepr != "-":
+            ir["units"] = self.unitrepr
+        if self.label:
+            ir["label"] = self.label
+        if self.idx is not None:
+            ir["idx"] = list(self.idx)
+        if self.shape:
+            ir["shape"] = list(self.shape)
+        return ir
+
+    @classmethod
+    def from_ir(cls, ir_dict):
+        "Reconstruct a VarKey from an IR dict."
+        name = ir_dict["name"]
+        descr = {}
+        if "lineage" in ir_dict:
+            descr["lineage"] = tuple(tuple(pair) for pair in ir_dict["lineage"])
+        if "units" in ir_dict:
+            descr["unitrepr"] = ir_dict["units"]
+        if "label" in ir_dict:
+            descr["label"] = ir_dict["label"]
+        if "idx" in ir_dict:
+            descr["idx"] = tuple(ir_dict["idx"])
+        if "shape" in ir_dict:
+            descr["shape"] = tuple(ir_dict["shape"])
+        return cls(name, **descr)
+
     @property
     def models(self):
         "Returns a tuple of just the names of models in self.lineage"
