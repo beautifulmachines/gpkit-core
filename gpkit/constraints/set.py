@@ -315,6 +315,97 @@ def collect_flat_constraints_ir(constraint_set):
     return ir_list
 
 
+def build_model_tree(model, ir_variables):
+    """Build model_tree structure from a Model's constraint hierarchy.
+
+    Walks the constraint tree in the same depth-first order as
+    collect_flat_constraints_ir, tracking which flat constraint indices
+    belong to which model node.
+
+    Parameters
+    ----------
+    model : Model (CostedConstraintSet)
+        The top-level model.
+    ir_variables : dict
+        The variables dict from the IR document (var_ref -> ir_dict).
+
+    Returns
+    -------
+    dict
+        model_tree with class, instance_id, variables, constraint_indices,
+        and children for each model node.
+    """
+    counter = [0]  # mutable flat constraint index
+    all_claimed_vars = set()  # vars claimed by any node
+
+    def _walk(cset):
+        "Build tree node for a model/sub-model ConstraintSet."
+        lineage = getattr(cset, "lineage", None) or ()
+        if lineage:
+            class_name = lineage[-1][0]
+            instance_id = ".".join(f"{n}{i}" for n, i in lineage)
+        else:
+            class_name = type(cset).__name__
+            instance_id = ""
+
+        constraint_indices = []
+        children = []
+
+        _collect(cset, constraint_indices, children)
+
+        owned_vars = sorted(
+            vk.var_ref for vk in getattr(cset, "unique_varkeys", frozenset())
+        )
+        all_claimed_vars.update(owned_vars)
+
+        return {
+            "class": class_name,
+            "instance_id": instance_id,
+            "variables": owned_vars,
+            "constraint_indices": constraint_indices,
+            "children": children,
+        }
+
+    def _collect(iterable, constraint_indices, children):
+        """Walk items, mirroring flatiter's traversal order."""
+        if isinstance(iterable, dict):
+            _, iterable = sort_constraints_dict(iterable)
+
+        for item in iterable:
+            if isinstance(item, ConstraintSet) and getattr(item, "lineage", None):
+                # Sub-model: create child node
+                children.append(_walk(item))
+            elif not hasattr(item, "__iter__"):
+                # Leaf constraint (non-iterable)
+                constraint_indices.append(counter[0])
+                counter[0] += 1
+            else:
+                # Iterable: numpy array, list, ArrayConstraint, or
+                # ConstraintSet without lineage
+                try:
+                    flat_items = item.flat
+                    if callable(flat_items):
+                        # ConstraintSet.flat is flatiter (a bound method);
+                        # recurse into the ConstraintSet's items directly
+                        _collect(item, constraint_indices, children)
+                    else:
+                        # numpy flatiter: process each element
+                        _collect(flat_items, constraint_indices, children)
+                except AttributeError:
+                    # list, dict, ArrayConstraint, etc.
+                    _collect(item, constraint_indices, children)
+
+    tree = _walk(model)
+
+    # Assign unclaimed variables to the root node (handles flat models
+    # without setup() where unique_varkeys is empty)
+    unclaimed = sorted(ref for ref in ir_variables if ref not in all_claimed_vars)
+    if unclaimed:
+        tree["variables"] = sorted(set(tree["variables"]) | set(unclaimed))
+
+    return tree
+
+
 def recursively_line(iterable, excluded):
     "Generates lines in a recursive tree-like fashion, the better to indent."
     named_constraints = {}

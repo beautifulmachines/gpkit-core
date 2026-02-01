@@ -5,7 +5,11 @@ from time import time
 import numpy as np
 
 from .constraints.costed import CostedConstraintSet
-from .constraints.set import add_meq_bounds, collect_flat_constraints_ir
+from .constraints.set import (
+    add_meq_bounds,
+    build_model_tree,
+    collect_flat_constraints_ir,
+)
 from .exceptions import Infeasible, InvalidGPConstraint
 from .globals import NamedVariables
 from .nomials import Monomial
@@ -111,6 +115,10 @@ class Model(CostedConstraintSet):
         }
         if subs_ir:
             ir["substitutions"] = subs_ir
+
+        # Phase 5: structural metadata for nested/composable models
+        ir["model_tree"] = build_model_tree(self, variables)
+
         return ir
 
     @classmethod
