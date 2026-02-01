@@ -70,6 +70,35 @@ class Widget(Model):
         return [s1, s2]
 
 
+class Spar(Model):
+    """SKIP VERIFICATION"""
+
+    def setup(self):
+        t = Variable("t", label="spar thickness")
+        self.cost = t
+        return [t >= 0.01]
+
+
+class SparredWing(Model):
+    """SKIP VERIFICATION"""
+
+    def setup(self):
+        S = Variable("S", label="wing area")
+        spar = Spar()
+        self.cost = S + spar.cost
+        return [S >= 1, spar]
+
+
+class SparredAircraft(Model):
+    """SKIP VERIFICATION"""
+
+    def setup(self):
+        W = Variable("W", label="total weight")
+        wing = SparredWing()
+        self.cost = W
+        return [W >= wing.cost * 1.2, wing]
+
+
 class TestASTNodes:
     """Tests for AST node dataclass hierarchy."""
 
@@ -908,42 +937,15 @@ class TestModelTree:
 
     def test_two_level_nesting(self):
         """Aircraft > Wing > Spar: tree has nested children."""
-
-        class Spar(Model):
-            """SKIP VERIFICATION"""
-
-            def setup(self):
-                t = Variable("t", label="spar thickness")
-                self.cost = t
-                return [t >= 0.01]
-
-        class Wing(Model):
-            """SKIP VERIFICATION"""
-
-            def setup(self):
-                S = Variable("S", label="wing area")
-                spar = Spar()
-                self.cost = S + spar.cost
-                return [S >= 1, spar]
-
-        class Aircraft(Model):
-            """SKIP VERIFICATION"""
-
-            def setup(self):
-                W = Variable("W", label="total weight")
-                wing = Wing()
-                self.cost = W
-                return [W >= wing.cost * 1.2, wing]
-
-        ac = Aircraft()
+        ac = SparredAircraft()
         ir = ac.to_ir()
         tree = ir["model_tree"]
 
-        assert tree["class"] == "Aircraft"
+        assert tree["class"] == "SparredAircraft"
         assert len(tree["children"]) == 1
 
         wing = tree["children"][0]
-        assert wing["class"] == "Wing"
+        assert wing["class"] == "SparredWing"
         assert len(wing["children"]) == 1
 
         spar = wing["children"][0]
@@ -974,14 +976,6 @@ class TestModelTree:
     def test_constraint_ownership(self):
         """Constraint indices correctly map to the flat constraint list."""
 
-        class Sub(Model):
-            """SKIP VERIFICATION"""
-
-            def setup(self):
-                x = Variable("x")
-                self.cost = x
-                return [x >= 1]
-
         class Top(Model):
             """SKIP VERIFICATION"""
 
@@ -995,7 +989,7 @@ class TestModelTree:
         ir = m.to_ir()
         tree = ir["model_tree"]
 
-        # Top owns constraint 0 (y >= 2), Sub owns constraint 1 (x >= 1)
+        # Top owns constraint 0 (y >= 2), Sub owns constraint 1 (m >= 1)
         assert tree["constraint_indices"] == [0]
         sub_tree = tree["children"][0]
         assert sub_tree["constraint_indices"] == [0 + 1]  # == [1]
@@ -1029,24 +1023,6 @@ class TestModelTree:
 
     def test_model_tree_json_serializable(self):
         """model_tree survives JSON round-trip."""
-
-        class Wing(Model):
-            """SKIP VERIFICATION"""
-
-            def setup(self):
-                S = Variable("S", 100, label="wing area")
-                self.cost = S
-                return [S >= 1]
-
-        class Aircraft(Model):
-            """SKIP VERIFICATION"""
-
-            def setup(self):
-                W = Variable("W", label="total weight")
-                wing = Wing()
-                self.cost = W
-                return [W >= wing.cost, wing]
-
         ac = Aircraft()
         ir = ac.to_ir()
         json_str = json.dumps(ir)
