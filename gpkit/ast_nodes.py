@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from .util.repr_conventions import _render_ast_node
+
 if TYPE_CHECKING:
     from .varkey import VarKey
 
@@ -70,10 +72,6 @@ class ExprNode(ASTNode):
     children: tuple
 
     def str_without(self, excluded=()):
-        # Lazy import to break circular dependency: repr_conventions imports
-        # from ast_nodes (to dispatch on node types), and we import back.
-        from .util.repr_conventions import _render_ast_node  # noqa: C0415
-
         return _render_ast_node(self, excluded)
 
     def to_ir(self):
@@ -93,10 +91,10 @@ def _child_to_ir(child):
     # numpy scalars and similar numeric types
     try:
         return float(child)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError) as exc:
         raise TypeError(
             f"Cannot serialize AST child of type {type(child).__name__}: {child!r}"
-        )
+        ) from exc
 
 
 def ast_from_ir(ir_dict, var_registry):

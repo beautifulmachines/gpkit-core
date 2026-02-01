@@ -5,7 +5,7 @@ from collections import defaultdict
 import numpy as np
 
 from .. import units
-from ..ast_nodes import ExprNode, to_ast
+from ..ast_nodes import ExprNode, ast_from_ir, to_ast
 from ..constraints import SingleEquationConstraint
 from ..exceptions import (
     InvalidGPConstraint,
@@ -94,11 +94,9 @@ class Signomial(Nomial):
         var_registry : dict
             Mapping from var_ref strings to VarKey objects.
         """
-        from ..ast_nodes import ast_from_ir
-
         hmap = NomialMap.from_ir(ir_dict, var_registry)
         nomial_type = ir_dict.get("type", "Signomial")
-        result = cls(hmap, require_positive=(nomial_type != "Signomial"))
+        result = cls(hmap, require_positive=nomial_type != "Signomial")
         if "ast" in ir_dict:
             result.ast = ast_from_ir(ir_dict["ast"], var_registry)
         return result

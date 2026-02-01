@@ -3,6 +3,14 @@
 import json
 from pathlib import Path
 
+from .model import Model
+from .nomials.math import (
+    MonomialEquality,
+    PosynomialInequality,
+    SignomialInequality,
+    SingleSignomialEquality,
+)
+
 
 def to_json(model, path=None):
     """Serialize a Model to JSON.
@@ -22,7 +30,7 @@ def to_json(model, path=None):
     ir = model.to_ir()
     json_str = json.dumps(ir, indent=2)
     if path is not None:
-        Path(path).write_text(json_str)
+        Path(path).write_text(json_str, encoding="utf-8")
         return None
     return json_str
 
@@ -40,15 +48,13 @@ def from_json(json_str_or_path):
     gpkit.Model
         A solvable Model reconstructed from the IR.
     """
-    from .model import Model
-
     if isinstance(json_str_or_path, Path):
-        ir_doc = json.loads(json_str_or_path.read_text())
+        ir_doc = json.loads(json_str_or_path.read_text(encoding="utf-8"))
     else:
         path = Path(json_str_or_path)
         try:
             if path.exists():
-                ir_doc = json.loads(path.read_text())
+                ir_doc = json.loads(path.read_text(encoding="utf-8"))
             else:
                 ir_doc = json.loads(json_str_or_path)
         except OSError:
@@ -71,13 +77,6 @@ def constraint_from_ir(ir_dict, var_registry):
     -------
     constraint : ScalarSingleEquationConstraint
     """
-    from .nomials.math import (
-        MonomialEquality,
-        PosynomialInequality,
-        SignomialInequality,
-        SingleSignomialEquality,
-    )
-
     type_map = {
         "PosynomialInequality": PosynomialInequality,
         "MonomialEquality": MonomialEquality,

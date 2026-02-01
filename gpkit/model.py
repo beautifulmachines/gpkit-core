@@ -12,13 +12,14 @@ from .constraints.set import (
 )
 from .exceptions import Infeasible, InvalidGPConstraint
 from .globals import NamedVariables
-from .nomials import Monomial
+from .nomials import Monomial, Signomial
 from .programs.gp import GeometricProgram
 from .programs.prog_factories import progify, solvify
 from .programs.sgp import SequentialGeometricProgram
 from .solutions import SolutionSequence
 from .tools.autosweep import autosweep_1d
 from .util.docstring import expected_unbounded
+from .varkey import VarKey
 from .varmap import VarMap
 
 
@@ -136,9 +137,8 @@ class Model(CostedConstraintSet):
         Model
             A flat Model (no nested sub-models) that can be solved.
         """
-        from .ir import constraint_from_ir
-        from .nomials.math import Signomial
-        from .varkey import VarKey
+        # ir imports model at top level, so this must stay lazy to avoid a cycle
+        from .ir import constraint_from_ir  # pylint: disable=import-outside-toplevel
 
         # 1. Reconstruct var_registry
         var_registry = {}

@@ -90,7 +90,9 @@ def parenthesize(string, addi=True, mult=True):
     return string
 
 
-def _render_ast_node(node, excluded):  # pylint: disable=too-many-branches
+def _render_ast_node(
+    node, excluded
+):  # pylint: disable=too-many-branches,too-many-return-statements
     "Renders an ExprNode as a string.  Called by ExprNode.str_without()."
     op = node.op
     children = node.children
@@ -188,7 +190,7 @@ class ReprMixin:
         self.cached_strs[excluded] = aststr
         return aststr
 
-    # pylint: disable=too-many-branches, too-many-statements
+    # pylint: disable=too-many-branches, too-many-statements, too-many-return-statements
     def _parse_ast_legacy(self, excluded):
         "Fallback parser for legacy tuple-format ASTs"
         oper, values = self.ast  # pylint: disable=unpacking-non-sequence
