@@ -4,10 +4,19 @@ import importlib
 import os
 import sys
 
+import numpy as np
 import pytest
 
 import gpkit
 from gpkit import settings
+from gpkit.util.small_scripts import mag
+
+
+def assert_logtol(first, second, logtol=1e-6):
+    "Asserts that the logs of two arrays have a given abstol"
+    np.testing.assert_allclose(
+        np.log(mag(first)), np.log(mag(second)), atol=logtol, rtol=0
+    )
 
 
 class NullFile:
