@@ -303,6 +303,18 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         return "\n".join(lines)
 
 
+def collect_flat_constraints_ir(constraint_set):
+    "Walk a ConstraintSet and return a flat list of constraint IR dicts."
+    ir_list = []
+    for constraint in flatiter(constraint_set):
+        ir = constraint.to_ir()
+        if isinstance(ir, list):  # ArrayConstraint returns a list
+            ir_list.extend(ir)
+        else:
+            ir_list.append(ir)
+    return ir_list
+
+
 def recursively_line(iterable, excluded):
     "Generates lines in a recursive tree-like fashion, the better to indent."
     named_constraints = {}

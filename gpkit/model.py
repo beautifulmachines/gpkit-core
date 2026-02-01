@@ -5,7 +5,7 @@ from time import time
 import numpy as np
 
 from .constraints.costed import CostedConstraintSet
-from .constraints.set import add_meq_bounds
+from .constraints.set import add_meq_bounds, collect_flat_constraints_ir
 from .exceptions import Infeasible, InvalidGPConstraint
 from .globals import NamedVariables
 from .nomials import Monomial
@@ -78,6 +78,83 @@ class Model(CostedConstraintSet):
         if self.lineage and docstr and "SKIP VERIFICATION" not in docstr:
             if "Unbounded" in docstr or "Bounded by" in docstr:
                 self.verify_docstring()
+
+    def to_ir(self):
+        "Serialize this Model to a complete IR document dict."
+        # Collect all variables (including veckeys for vector variables)
+        all_vks = set(self.vks)
+        all_vks.update(self.cost.vks)
+        variables = {}
+        for vk in sorted(all_vks, key=lambda v: v.var_ref):
+            variables[vk.var_ref] = vk.to_ir()
+            if vk.veckey and vk.veckey.var_ref not in variables:
+                variables[vk.veckey.var_ref] = vk.veckey.to_ir()
+
+        # Serialize cost
+        cost_ir = self.cost.to_ir()
+
+        # Collect flat constraint list
+        constraints_ir = collect_flat_constraints_ir(self)
+
+        # Serialize substitutions (skip callables)
+        subs_ir = {}
+        for vk, val in self.substitutions.items():
+            if callable(val):
+                continue
+            subs_ir[vk.var_ref] = float(val)
+
+        ir = {
+            "gpkit_ir_version": "1.0",
+            "variables": variables,
+            "cost": cost_ir,
+            "constraints": constraints_ir,
+        }
+        if subs_ir:
+            ir["substitutions"] = subs_ir
+        return ir
+
+    @classmethod
+    def from_ir(cls, ir_doc):
+        """Reconstruct a solvable Model from an IR document dict.
+
+        Parameters
+        ----------
+        ir_doc : dict
+            Complete IR document with variables, cost, constraints, and
+            optional substitutions.
+
+        Returns
+        -------
+        Model
+            A flat Model (no nested sub-models) that can be solved.
+        """
+        from .ir import constraint_from_ir
+        from .nomials.math import Signomial
+        from .varkey import VarKey
+
+        # 1. Reconstruct var_registry
+        var_registry = {}
+        for ref, vk_ir in ir_doc["variables"].items():
+            vk = VarKey.from_ir(vk_ir)
+            var_registry[ref] = vk
+
+        # 2. Reconstruct cost
+        cost = Signomial.from_ir(ir_doc["cost"], var_registry)
+
+        # 3. Reconstruct constraints
+        constraints = [
+            constraint_from_ir(c_ir, var_registry) for c_ir in ir_doc["constraints"]
+        ]
+
+        # 4. Reconstruct substitutions
+        subs = None
+        if "substitutions" in ir_doc:
+            subs = {}
+            for ref, val in ir_doc["substitutions"].items():
+                if ref in var_registry:
+                    subs[var_registry[ref]] = val
+
+        return cls(cost, constraints, substitutions=subs)
 
     gp = progify(GeometricProgram)
     solve = solvify(progify(GeometricProgram, "solve"))

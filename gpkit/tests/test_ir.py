@@ -10,10 +10,10 @@ import sys
 
 import pytest
 
-from gpkit import SignomialsEnabled, Variable, VarKey, VectorVariable
+from gpkit import Model, SignomialsEnabled, Variable, VarKey, VectorVariable
 from gpkit.ast_nodes import ConstNode, ExprNode, VarNode, ast_from_ir, to_ast
 from gpkit.constraints.array import ArrayConstraint
-from gpkit.ir import constraint_from_ir
+from gpkit.ir import constraint_from_ir, from_json, to_json
 from gpkit.nomials.map import NomialMap
 from gpkit.nomials.math import (
     MonomialEquality,
@@ -658,3 +658,222 @@ class TestConstraintIR:
         """constraint_from_ir raises on unknown type."""
         with pytest.raises(ValueError, match="Unknown constraint type"):
             constraint_from_ir({"type": "BogusConstraint"}, {})
+
+
+# ── Phase 4: Model to_ir() / from_ir() ──────────────────────────────
+
+
+class TestModelIR:
+    """Tests for Model.to_ir() / Model.from_ir() round-trips."""
+
+    def test_ir_document_structure(self):
+        """IR document has required top-level keys."""
+        x = Variable("x")
+        y = Variable("y")
+        m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
+        ir = m.to_ir()
+        assert ir["gpkit_ir_version"] == "1.0"
+        assert "variables" in ir
+        assert "cost" in ir
+        assert "constraints" in ir
+        assert len(ir["variables"]) == 2
+        assert len(ir["constraints"]) == 2
+
+    def test_simple_gp_roundtrip(self):
+        """Simple GP round-trip: solve both, compare costs."""
+        x = Variable("x")
+        y = Variable("y")
+        m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
+        sol = m.solve(verbosity=0)
+
+        ir = m.to_ir()
+        m2 = Model.from_ir(ir)
+        sol2 = m2.solve(verbosity=0)
+
+        assert abs(sol.cost - sol2.cost) < 1e-4
+
+    def test_substitutions_roundtrip(self):
+        """Substitutions survive round-trip."""
+        x = Variable("x")
+        y = Variable("y")
+        m = Model(x, [x >= y], substitutions={y: 3})
+        ir = m.to_ir()
+        assert "substitutions" in ir
+        assert ir["substitutions"]["y"] == 3.0
+
+        m2 = Model.from_ir(ir)
+        sol = m.solve(verbosity=0)
+        sol2 = m2.solve(verbosity=0)
+        assert abs(sol.cost - sol2.cost) < 1e-4
+
+    def test_no_substitutions(self):
+        """Model without substitutions omits substitutions key."""
+        x = Variable("x")
+        y = Variable("y")
+        m = Model(x + y, [x * y >= 1])
+        ir = m.to_ir()
+        assert "substitutions" not in ir
+
+    def test_units_roundtrip(self):
+        """Model with pint units round-trips with matching costs."""
+        x = Variable("x", unitrepr="m")
+        y = Variable("y", unitrepr="m")
+        m = Model(x + y, [x * y >= 1 * Variable("u", unitrepr="m^2")])
+        m.substitutions[m["u"]] = 1
+        sol = m.solve(verbosity=0)
+
+        ir = m.to_ir()
+        m2 = Model.from_ir(ir)
+        sol2 = m2.solve(verbosity=0)
+
+        assert abs(sol.cost - sol2.cost) < 1e-4
+
+    def test_nested_model_roundtrip(self):
+        """Nested model: lineage appears in IR variables."""
+
+        class Wing(Model):
+            """SKIP VERIFICATION"""
+
+            def setup(self):
+                S = Variable("S", 100, label="wing area")
+                W = Variable("W", label="wing weight")
+                self.cost = W
+                return [W >= S * 0.1]
+
+        class Aircraft(Model):
+            """SKIP VERIFICATION"""
+
+            def setup(self):
+                W = Variable("W", label="total weight")
+                wing = Wing()
+                self.cost = W
+                return [W >= wing.cost * 1.2, wing]
+
+        ac = Aircraft()
+        ir = ac.to_ir()
+
+        # Verify lineage in variable refs
+        assert "Aircraft0.W" in ir["variables"]
+        assert "Aircraft0.Wing0.W" in ir["variables"]
+        assert "Aircraft0.Wing0.S" in ir["variables"]
+
+        # Verify lineage metadata
+        wing_s = ir["variables"]["Aircraft0.Wing0.S"]
+        assert wing_s["lineage"] == [["Aircraft", 0], ["Wing", 0]]
+
+        # Round-trip solve
+        sol = ac.solve(verbosity=0)
+        ac2 = Model.from_ir(ir)
+        sol2 = ac2.solve(verbosity=0)
+        assert abs(sol.cost - sol2.cost) < 1e-4
+
+    def test_reused_submodel(self):
+        """Reused sub-model: both instances appear with distinct var_refs."""
+
+        class Sub(Model):
+            """SKIP VERIFICATION"""
+
+            def setup(self):
+                m = Variable("m")
+                self.cost = m
+                return [m >= 1]
+
+        class Widget(Model):
+            """SKIP VERIFICATION"""
+
+            def setup(self):
+                s1 = Sub()
+                s2 = Sub()
+                self.cost = s1.cost + s2.cost
+                return [s1, s2]
+
+        w = Widget()
+        ir = w.to_ir()
+
+        # Both Sub instances should be present
+        assert "Widget0.Sub0.m" in ir["variables"]
+        assert "Widget0.Sub1.m" in ir["variables"]
+
+        # Round-trip solve
+        sol = w.solve(verbosity=0)
+        w2 = Model.from_ir(ir)
+        sol2 = w2.solve(verbosity=0)
+        assert abs(sol.cost - sol2.cost) < 1e-4
+
+    def test_sp_roundtrip(self):
+        """SP round-trip with localsolve."""
+        x = Variable("x")
+        y = Variable("y")
+        with SignomialsEnabled():
+            m = Model(x, [x >= 1 - y, y <= 0.5])
+        sol = m.localsolve(verbosity=0)
+
+        ir = m.to_ir()
+        m2 = Model.from_ir(ir)
+        sol2 = m2.localsolve(verbosity=0)
+        assert abs(sol.cost - sol2.cost) < 1e-4
+
+    def test_vector_variable_roundtrip(self):
+        """VectorVariable round-trip."""
+        x = VectorVariable(3, "x")
+        m = Model(x.prod(), [x >= 1])
+        sol = m.solve(verbosity=0)
+
+        ir = m.to_ir()
+        # Indexed variables should appear
+        assert "x[0]" in ir["variables"]
+        assert "x[1]" in ir["variables"]
+        assert "x[2]" in ir["variables"]
+
+        m2 = Model.from_ir(ir)
+        sol2 = m2.solve(verbosity=0)
+        assert abs(sol.cost - sol2.cost) < 1e-4
+
+    def test_json_serialization(self):
+        """json.dumps(model.to_ir()) succeeds."""
+        x = Variable("x")
+        y = Variable("y")
+        m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
+        ir = m.to_ir()
+        json_str = json.dumps(ir)
+        ir2 = json.loads(json_str)
+        m2 = Model.from_ir(ir2)
+        sol = m.solve(verbosity=0)
+        sol2 = m2.solve(verbosity=0)
+        assert abs(sol.cost - sol2.cost) < 1e-4
+
+    def test_to_json_string(self):
+        """to_json returns valid JSON string."""
+        x = Variable("x")
+        y = Variable("y")
+        m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
+        json_str = to_json(m)
+        assert isinstance(json_str, str)
+        ir = json.loads(json_str)
+        assert ir["gpkit_ir_version"] == "1.0"
+
+    def test_to_json_file(self, tmp_path):
+        """to_json writes to file when path given."""
+        x = Variable("x")
+        y = Variable("y")
+        m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
+        filepath = tmp_path / "model.json"
+        result = to_json(m, filepath)
+        assert result is None
+        assert filepath.exists()
+
+        m2 = from_json(filepath)
+        sol = m.solve(verbosity=0)
+        sol2 = m2.solve(verbosity=0)
+        assert abs(sol.cost - sol2.cost) < 1e-4
+
+    def test_from_json_string(self):
+        """from_json accepts a JSON string."""
+        x = Variable("x")
+        y = Variable("y")
+        m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
+        json_str = to_json(m)
+        m2 = from_json(json_str)
+        sol = m.solve(verbosity=0)
+        sol2 = m2.solve(verbosity=0)
+        assert abs(sol.cost - sol2.cost) < 1e-4
