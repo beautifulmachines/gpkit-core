@@ -9,6 +9,7 @@ from .constraints.set import add_meq_bounds, build_model_tree, flatiter
 from .exceptions import Infeasible, InvalidGPConstraint
 from .globals import NamedVariables
 from .nomials import Monomial, Signomial
+from .nomials.math import constraint_from_ir
 from .programs.gp import GeometricProgram
 from .programs.prog_factories import progify, solvify
 from .programs.sgp import SequentialGeometricProgram
@@ -133,9 +134,6 @@ class Model(CostedConstraintSet):
         Model
             A flat Model (no nested sub-models) that can be solved.
         """
-        # ir imports model at top level, so this must stay lazy to avoid a cycle
-        from .ir import constraint_from_ir  # pylint: disable=import-outside-toplevel
-
         # 1. Reconstruct var_registry
         var_registry = {}
         for ref, vk_ir in ir_doc["variables"].items():

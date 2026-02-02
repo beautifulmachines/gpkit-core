@@ -9,7 +9,7 @@ import pytest
 from gpkit import Model, SignomialsEnabled, Variable, VarKey, VectorVariable
 from gpkit.ast_nodes import ConstNode, ExprNode, VarNode, ast_from_ir, to_ast
 from gpkit.constraints.array import ArrayConstraint
-from gpkit.ir import constraint_from_ir, from_json, to_json
+from gpkit.ir import from_json, to_json
 from gpkit.nomials.map import NomialMap
 from gpkit.nomials.math import (
     Monomial,
@@ -19,6 +19,7 @@ from gpkit.nomials.math import (
     Signomial,
     SignomialInequality,
     SingleSignomialEquality,
+    constraint_from_ir,
 )
 from gpkit.units import qty
 from gpkit.util.small_classes import EMPTY_HV, HashVector
