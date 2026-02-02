@@ -1,9 +1,4 @@
-"""Tests for the IR (Intermediate Representation) infrastructure.
-
-Phase 1: AST node dataclasses and VarKey.var_ref
-Phase 2: Core to_ir() / from_ir() for VarKey, NomialMap, Nomial
-Phase 3: Constraint to_ir() / from_ir()
-"""
+"""Tests for the IR (Intermediate Representation) infrastructure."""
 
 # pylint: disable=invalid-name,too-many-lines
 
@@ -220,9 +215,6 @@ class TestVarRef:
     def test_lineage_and_index(self):
         vk = VarKey("c_l", lineage=(("Wing", 0),), idx=(1,), shape=(3,))
         assert vk.var_ref == "Wing0.c_l[1]"
-
-
-# ── Phase 2: Core to_ir() / from_ir() ───────────────────────────────
 
 
 class TestVarKeyIR:
@@ -498,9 +490,6 @@ class TestNomialIR:
         assert m2.cs[0] == 5.0
 
 
-# ── Phase 3: Constraint to_ir() / from_ir() ─────────────────────────
-
-
 class TestConstraintIR:
     """Tests for constraint to_ir() / from_ir() round-trips."""
 
@@ -709,9 +698,6 @@ class TestConstraintIR:
             constraint_from_ir({"type": "BogusConstraint"}, {})
 
 
-# ── Phase 4: Model to_ir() / from_ir() ──────────────────────────────
-
-
 class TestModelIR:
     """Tests for Model.to_ir() / Model.from_ir() round-trips."""
 
@@ -891,9 +877,6 @@ class TestModelIR:
         assert abs(sol.cost - sol2.cost) < 1e-4
 
 
-# ── Phase 5: model_tree structural metadata ──────────────────────────
-
-
 class TestModelTree:
     """Tests for model_tree structural metadata in the IR."""
 
@@ -1031,8 +1014,8 @@ class TestModelTree:
         assert ir2["model_tree"]["class"] == "Aircraft"
         assert len(ir2["model_tree"]["children"]) == 1
 
-    def test_phase4_tests_still_pass_with_model_tree(self):
-        """model_tree is additive: Phase 4 round-trip still works."""
+    def test_prev_tests_still_pass_with_model_tree(self):
+        """model_tree is additive: previous round-trip still works."""
         x = Variable("x")
         y = Variable("y")
         m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
