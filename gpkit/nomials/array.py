@@ -56,25 +56,27 @@ class NomialArray(ReprMixin, np.ndarray):
 
     def __mul__(self, other, *, reverse_order=False):
         astorder = (self, other) if not reverse_order else (other, self)
-        out = NomialArray(np.ndarray.__mul__(self, other))
-        out.ast = ExprNode("mul", tuple(to_ast(x) for x in astorder))
-        return out
+        return NomialArray(
+            np.ndarray.__mul__(self, other),
+            ast=ExprNode("mul", tuple(to_ast(x) for x in astorder)),
+        )
 
     def __truediv__(self, other):
-        out = NomialArray(np.ndarray.__truediv__(self, other))
-        out.ast = ExprNode("div", (to_ast(self), to_ast(other)))
-        return out
+        return NomialArray(
+            np.ndarray.__truediv__(self, other),
+            ast=ExprNode("div", (to_ast(self), to_ast(other))),
+        )
 
     def __rtruediv__(self, other):
-        out = np.ndarray.__mul__(self**-1, other)
-        out.ast = ExprNode("div", (to_ast(other), to_ast(self)))
-        return out
+        result = np.ndarray.__mul__(self**-1, other)
+        return NomialArray(result, ast=ExprNode("div", (to_ast(other), to_ast(self))))
 
     def __add__(self, other, *, reverse_order=False):
         astorder = (self, other) if not reverse_order else (other, self)
-        out = np.ndarray.__add__(self, other)
-        out.ast = ExprNode("add", tuple(to_ast(x) for x in astorder))
-        return out
+        result = np.ndarray.__add__(self, other)
+        return NomialArray(
+            result, ast=ExprNode("add", tuple(to_ast(x) for x in astorder))
+        )
 
     # pylint: disable=multiple-statements
     def __rmul__(self, other):
@@ -84,21 +86,20 @@ class NomialArray(ReprMixin, np.ndarray):
         return self.__add__(other, reverse_order=True)
 
     def __pow__(self, expo):  # pylint: disable=arguments-differ
-        out = np.ndarray.__pow__(self, expo)  # pylint: disable=too-many-function-args
-        out.ast = ExprNode("pow", (to_ast(self), expo))
-        return out
+        result = np.ndarray.__pow__(
+            self, expo
+        )  # pylint: disable=too-many-function-args
+        return NomialArray(result, ast=ExprNode("pow", (to_ast(self), expo)))
 
     def __neg__(self):
-        out = np.ndarray.__neg__(self)
-        out.ast = ExprNode("neg", (to_ast(self),))
-        return out
+        result = np.ndarray.__neg__(self)
+        return NomialArray(result, ast=ExprNode("neg", (to_ast(self),)))
 
     def __getitem__(self, idxs):
         out = np.ndarray.__getitem__(self, idxs)
         if not getattr(out, "shape", None):
             return out
-        out.ast = ExprNode("index", (to_ast(self), idxs))
-        return out
+        return NomialArray(out, ast=ExprNode("index", (to_ast(self), idxs)))
 
     def str_without(self, excluded=()):
         "Returns string without certain fields (such as 'lineage')."
@@ -127,10 +128,13 @@ class NomialArray(ReprMixin, np.ndarray):
     def __hash__(self):
         return reduce(xor, map(hash, self.flat), 0)
 
-    def __new__(cls, input_array):
+    def __new__(cls, input_array, *, ast=None):
         "Constructor. Required for objects inheriting from np.ndarray."
         # Input is an already formed ndarray instance cast to our class type
-        return np.asarray(input_array).view(cls)
+        obj = np.asarray(input_array).view(cls)
+        if ast is not None:
+            obj.ast = ast
+        return obj
 
     def __array_finalize__(self, obj):
         "Finalizer. Required for objects inheriting from np.ndarray."
@@ -183,9 +187,7 @@ class NomialArray(ReprMixin, np.ndarray):
                 elif hmap.units and p and not np.isnan(p):
                     p /= float(hmap.units)
                 hmap[EMPTY_HV] = p + hmap.get(EMPTY_HV, 0)
-        out = Signomial(hmap)
-        out.ast = ExprNode("sum", (to_ast(self),))
-        return out
+        return Signomial(hmap, ast=ExprNode("sum", (to_ast(self),)))
 
     def prod(self, *args, **kwargs):  # pylint: disable=arguments-differ
         "Returns a product. O(N) if no arguments and only contains monomials."
@@ -205,9 +207,7 @@ class NomialArray(ReprMixin, np.ndarray):
             if m.units:
                 hmap.units = (hmap.units or 1) * m.units
         hmap[exp] = c
-        out = Signomial(hmap)
-        out.ast = ExprNode("prod", (to_ast(self),))
-        return out
+        return Signomial(hmap, ast=ExprNode("prod", (to_ast(self),)))
 
 
 # pylint: disable=wrong-import-position

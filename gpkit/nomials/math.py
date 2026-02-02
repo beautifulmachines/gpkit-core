@@ -46,7 +46,7 @@ class Signomial(Nomial):
     __hash__ = Nomial.__hash__
 
     def __init__(
-        self, hmap=None, cs=1, require_positive=True
+        self, hmap=None, cs=1, require_positive=True, *, ast=None
     ):  # pylint: disable=too-many-statements,too-many-branches
         if not isinstance(hmap, NomialMap):
             if hasattr(hmap, "hmap"):
@@ -74,6 +74,8 @@ class Signomial(Nomial):
             self.__class__ = Monomial
         else:
             self.__class__ = Posynomial
+        if ast is not None:
+            self.ast = ast
 
     def to_ir(self):
         "Serialize this nomial to an IR dict."
@@ -96,10 +98,10 @@ class Signomial(Nomial):
         """
         hmap = NomialMap.from_ir(ir_dict, var_registry)
         nomial_type = ir_dict.get("type", "Signomial")
-        result = cls(hmap, require_positive=nomial_type != "Signomial")
+        ast_node = None
         if "ast" in ir_dict:
-            result.ast = ast_from_ir(ir_dict["ast"], var_registry)
-        return result
+            ast_node = ast_from_ir(ir_dict["ast"], var_registry)
+        return cls(hmap, require_positive=nomial_type != "Signomial", ast=ast_node)
 
     def diff(self, var):
         """Derivative of this with respect to a Variable
@@ -225,9 +227,10 @@ class Signomial(Nomial):
             astorder = (self, other)
             if rev:
                 astorder = tuple(reversed(astorder))
-            out = Signomial(self.hmap + other_hmap)
-            out.ast = ExprNode("add", tuple(to_ast(x) for x in astorder))
-            return out
+            return Signomial(
+                self.hmap + other_hmap,
+                ast=ExprNode("add", tuple(to_ast(x) for x in astorder)),
+            )
         return NotImplemented
 
     def __mul__(self, other, rev=False):
@@ -237,17 +240,15 @@ class Signomial(Nomial):
         if isinstance(other, np.ndarray):
             from .array import NomialArray  # pylint: disable=import-outside-toplevel
 
-            s = NomialArray(self)
-            s.ast = self.ast
-            return s * other
+            return NomialArray(self, ast=self.ast) * other
         if isinstance(other, Numbers):
             if not other:  # other is zero
                 return other
             hmap = mag(other) * self.hmap
             hmap.units_of_product(self.hmap.units, other)
-            out = Signomial(hmap)
-            out.ast = ExprNode("mul", tuple(to_ast(x) for x in astorder))
-            return out
+            return Signomial(
+                hmap, ast=ExprNode("mul", tuple(to_ast(x) for x in astorder))
+            )
         if isinstance(other, Signomial):
             hmap = NomialMap()
             for exp_s, c_s in self.hmap.items():
@@ -259,17 +260,16 @@ class Signomial(Nomial):
                     elif accumulated:
                         del hmap[exp]
             hmap.units_of_product(self.hmap.units, other.hmap.units)
-            out = Signomial(hmap)
-            out.ast = ExprNode("mul", tuple(to_ast(x) for x in astorder))
-            return out
+            return Signomial(
+                hmap, ast=ExprNode("mul", tuple(to_ast(x) for x in astorder))
+            )
         return NotImplemented
 
     def __truediv__(self, other):
         "Support the / operator in Python 2.x"
         if isinstance(other, Numbers):
             out = self * other**-1
-            out.ast = ExprNode("div", (to_ast(self), other))
-            return out
+            return Signomial(out.hmap, ast=ExprNode("div", (to_ast(self), other)))
         if isinstance(other, Monomial):
             return other.__rtruediv__(self)
         return NotImplemented
@@ -281,15 +281,13 @@ class Signomial(Nomial):
             while expo > 0:
                 p *= self
                 expo -= 1
-            p.ast = ExprNode("pow", (to_ast(self), original_expo))
-            return p
+            return Signomial(p.hmap, ast=ExprNode("pow", (to_ast(self), original_expo)))
         return NotImplemented
 
     def __neg__(self):
         if SignomialsEnabled:  # pylint: disable=using-constant-test
             out = -1 * self
-            out.ast = ExprNode("neg", (to_ast(self),))
-            return out
+            return Signomial(out.hmap, ast=ExprNode("neg", (to_ast(self),)))
         return NotImplemented
 
     def __sub__(self, other):
@@ -362,8 +360,9 @@ class Monomial(Posynomial):
         "Divide other by this Monomial"
         if isinstance(other, Numbers | Signomial):
             out = other * self**-1
-            out.ast = ExprNode("div", (to_ast(other), to_ast(self)))
-            return out
+            return Signomial(
+                out.hmap, ast=ExprNode("div", (to_ast(other), to_ast(self)))
+            )
         return NotImplemented
 
     def __pow__(self, expo):
@@ -375,9 +374,7 @@ class Monomial(Posynomial):
                 hmap.units = self.hmap.units**expo
             else:
                 hmap.units = None
-            out = Monomial(hmap)
-            out.ast = ExprNode("pow", (to_ast(self), expo))
-            return out
+            return Monomial(hmap, ast=ExprNode("pow", (to_ast(self), expo)))
         return NotImplemented
 
     def __eq__(self, other):
