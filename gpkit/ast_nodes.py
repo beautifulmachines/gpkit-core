@@ -108,6 +108,7 @@ def ast_from_ir(ir_dict, var_registry):
         Mapping from var_ref strings to VarKey objects.
     """
     if not isinstance(ir_dict, dict):
+        assert var_registry is None
         return ir_dict  # raw number passthrough (e.g., exponent in pow)
     node = ir_dict["node"]
     if node == "var":
