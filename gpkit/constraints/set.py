@@ -305,14 +305,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
 
 def collect_flat_constraints_ir(constraint_set):
     "Walk a ConstraintSet and return a flat list of constraint IR dicts."
-    ir_list = []
-    for constraint in flatiter(constraint_set):
-        ir = constraint.to_ir()
-        if isinstance(ir, list):  # ArrayConstraint returns a list
-            ir_list.extend(ir)
-        else:
-            ir_list.append(ir)
-    return ir_list
+    return [c.to_ir() for c in flatiter(constraint_set)]
 
 
 def build_model_tree(model, ir_variables):
