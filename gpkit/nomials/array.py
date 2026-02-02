@@ -86,9 +86,9 @@ class NomialArray(ReprMixin, np.ndarray):
         return self.__add__(other, reverse_order=True)
 
     def __pow__(self, expo):  # pylint: disable=arguments-differ
-        result = np.ndarray.__pow__(
+        result = np.ndarray.__pow__(  # pylint: disable=too-many-function-args
             self, expo
-        )  # pylint: disable=too-many-function-args
+        )
         return NomialArray(result, ast=ExprNode("pow", (to_ast(self), expo)))
 
     def __neg__(self):
