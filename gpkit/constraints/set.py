@@ -303,7 +303,7 @@ def build_model_tree(model, ir_variables):
         model_tree with class, instance_id, variables, constraint_indices,
         and children for each model node.
     """
-    counter = [0]  # mutable flat constraint index
+    counter = 0  # flat constraint index
     all_claimed_vars = set()  # vars claimed by any node
 
     def _walk(cset):
@@ -337,6 +337,7 @@ def build_model_tree(model, ir_variables):
 
     def _collect(iterable, constraint_indices, children):
         """Walk items, mirroring flatiter's traversal order."""
+        nonlocal counter
         if isinstance(iterable, dict):
             iterable = iterable.values()
 
@@ -346,8 +347,8 @@ def build_model_tree(model, ir_variables):
                 children.append(_walk(item))
             elif not hasattr(item, "__iter__"):
                 # Leaf constraint (non-iterable)
-                constraint_indices.append(counter[0])
-                counter[0] += 1
+                constraint_indices.append(counter)
+                counter += 1
             else:
                 # Iterable: numpy array, list, ArrayConstraint, or
                 # ConstraintSet without lineage
