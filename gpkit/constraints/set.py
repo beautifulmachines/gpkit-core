@@ -303,11 +303,6 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         return "\n".join(lines)
 
 
-def collect_flat_constraints_ir(constraint_set):
-    "Walk a ConstraintSet and return a flat list of constraint IR dicts."
-    return [c.to_ir() for c in flatiter(constraint_set)]
-
-
 def build_model_tree(model, ir_variables):
     """Build model_tree structure from a Model's constraint hierarchy.
 
@@ -317,8 +312,8 @@ def build_model_tree(model, ir_variables):
 
     Parameters
     ----------
-    model : Model (CostedConstraintSet)
-        The top-level model.
+    model : ConstraintSet
+        The top-level constraint set (typically a Model).
     ir_variables : dict
         The variables dict from the IR document (var_ref -> ir_dict).
 

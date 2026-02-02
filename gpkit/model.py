@@ -5,11 +5,7 @@ from time import time
 import numpy as np
 
 from .constraints.costed import CostedConstraintSet
-from .constraints.set import (
-    add_meq_bounds,
-    build_model_tree,
-    collect_flat_constraints_ir,
-)
+from .constraints.set import add_meq_bounds, build_model_tree, flatiter
 from .exceptions import Infeasible, InvalidGPConstraint
 from .globals import NamedVariables
 from .nomials import Monomial, Signomial
@@ -99,7 +95,7 @@ class Model(CostedConstraintSet):
         cost_ir = self.cost.to_ir()
 
         # Collect flat constraint list
-        constraints_ir = collect_flat_constraints_ir(self)
+        constraints_ir = [c.to_ir() for c in flatiter(self)]
 
         # Serialize substitutions (skip callables)
         subs_ir = {}
