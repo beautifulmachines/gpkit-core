@@ -20,6 +20,7 @@ from gpkit.nomials.math import (
     SignomialInequality,
     SingleSignomialEquality,
     constraint_from_ir,
+    nomial_from_ir,
 )
 from gpkit.units import qty
 from gpkit.util.small_classes import EMPTY_HV, HashVector
@@ -489,6 +490,41 @@ class TestNomialIR:
         assert ir["type"] == "Monomial"
         m2 = Signomial.from_ir(ir, {})
         assert m2.cs[0] == 5.0
+
+
+class TestNomialFromIR:
+    """Tests for the nomial_from_ir dispatcher function."""
+
+    def _registry(self, nomial):
+        "Build var_registry from a nomial's varkeys."
+        return {vk.var_ref: vk for vk in nomial.vks}
+
+    def test_monomial(self):
+        x = Variable("x")
+        m = 2 * x**3
+        ir = m.to_ir()
+        m2 = nomial_from_ir(ir, self._registry(m))
+        assert isinstance(m2, Monomial)
+        assert len(m2.hmap) == 1
+
+    def test_posynomial(self):
+        x = Variable("x")
+        y = Variable("y")
+        p = x + 2 * y
+        ir = p.to_ir()
+        p2 = nomial_from_ir(ir, self._registry(p))
+        assert isinstance(p2, Posynomial)
+        assert len(p2.hmap) == 2
+
+    def test_signomial(self):
+        x = Variable("x")
+        y = Variable("y")
+        with SignomialsEnabled():
+            s = x - y
+        ir = s.to_ir()
+        s2 = nomial_from_ir(ir, self._registry(s))
+        assert isinstance(s2, Signomial)
+        assert s2.any_nonpositive_cs
 
 
 class TestConstraintIR:

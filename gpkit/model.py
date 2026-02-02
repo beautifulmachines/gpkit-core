@@ -8,8 +8,8 @@ from .constraints.costed import CostedConstraintSet
 from .constraints.set import add_meq_bounds, build_model_tree, flatiter
 from .exceptions import Infeasible, InvalidGPConstraint
 from .globals import NamedVariables
-from .nomials import Monomial, Signomial
-from .nomials.math import constraint_from_ir
+from .nomials import Monomial
+from .nomials.math import constraint_from_ir, nomial_from_ir
 from .programs.gp import GeometricProgram
 from .programs.prog_factories import progify, solvify
 from .programs.sgp import SequentialGeometricProgram
@@ -140,7 +140,7 @@ class Model(CostedConstraintSet):
             var_registry[ref] = vk
 
         # 2. Reconstruct cost
-        cost = Signomial.from_ir(ir_doc["cost"], var_registry)
+        cost = nomial_from_ir(ir_doc["cost"], var_registry)
 
         # 3. Reconstruct constraints
         constraints = [

@@ -835,3 +835,20 @@ def constraint_from_ir(ir_dict, var_registry):
         raise ValueError(f"Unknown constraint type: {constraint_type}")
     cls = type_map[constraint_type]
     return cls.from_ir(ir_dict, var_registry)
+
+
+def nomial_from_ir(ir_dict, var_registry):
+    """Reconstruct a nomial from its IR dict.
+
+    Parameters
+    ----------
+    ir_dict : dict
+        IR dict with "terms", optional "units", "type", "ast".
+    var_registry : dict
+        Mapping from var_ref strings to VarKey objects.
+
+    Returns
+    -------
+    Signomial, Posynomial, or Monomial
+    """
+    return Signomial.from_ir(ir_dict, var_registry)
