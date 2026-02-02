@@ -28,7 +28,7 @@ from gpkit.util.small_classes import EMPTY_HV, HashVector
 
 
 class Wing(Model):
-    """SKIP VERIFICATION"""
+    """simple wing with weight proportional to area"""
 
     def setup(self):
         S = Variable("S", 100, label="wing area")
@@ -38,7 +38,7 @@ class Wing(Model):
 
 
 class Aircraft(Model):
-    """SKIP VERIFICATION"""
+    """Single-wing aircraft for IR nesting tests."""
 
     def setup(self):
         W = Variable("W", label="total weight")
@@ -48,7 +48,7 @@ class Aircraft(Model):
 
 
 class Sub(Model):
-    """SKIP VERIFICATION"""
+    """Minimal sub-model with one free variable."""
 
     def setup(self):
         m = Variable("m")
@@ -57,7 +57,7 @@ class Sub(Model):
 
 
 class Widget(Model):
-    """SKIP VERIFICATION"""
+    """Model composing two Sub instances."""
 
     def setup(self):
         s1 = Sub()
@@ -67,7 +67,7 @@ class Widget(Model):
 
 
 class Spar(Model):
-    """SKIP VERIFICATION"""
+    """Simple spar with a thickness variable."""
 
     def setup(self):
         t = Variable("t", label="spar thickness")
@@ -76,7 +76,7 @@ class Spar(Model):
 
 
 class SparredWing(Model):
-    """SKIP VERIFICATION"""
+    """Wing sub-model containing a Spar child."""
 
     def setup(self):
         S = Variable("S", label="wing area")
@@ -86,7 +86,7 @@ class SparredWing(Model):
 
 
 class SparredAircraft(Model):
-    """SKIP VERIFICATION"""
+    """Aircraft with two-level nesting (wing + spar)."""
 
     def setup(self):
         W = Variable("W", label="total weight")
@@ -961,7 +961,7 @@ class TestModelTree:
         """Constraint indices correctly map to the flat constraint list."""
 
         class Top(Model):
-            """SKIP VERIFICATION"""
+            """Top-level model for constraint ownership tests."""
 
             def setup(self):
                 y = Variable("y")
