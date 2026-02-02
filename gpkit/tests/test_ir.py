@@ -9,7 +9,6 @@ import pytest
 from gpkit import Model, SignomialsEnabled, Variable, VarKey, VectorVariable
 from gpkit.ast_nodes import ConstNode, ExprNode, VarNode, ast_from_ir, to_ast
 from gpkit.constraints.array import ArrayConstraint
-from gpkit.ir import from_json, to_json
 from gpkit.nomials.map import NomialMap
 from gpkit.nomials.math import (
     Monomial,
@@ -877,38 +876,16 @@ class TestModelIR:
         sol2 = m2.solve(verbosity=0)
         assert abs(sol.cost - sol2.cost) < 1e-4
 
-    def test_to_json_string(self):
-        """to_json returns valid JSON string."""
-        x = Variable("x")
-        y = Variable("y")
-        m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
-        json_str = to_json(m)
-        assert isinstance(json_str, str)
-        ir = json.loads(json_str)
-        assert ir["gpkit_ir_version"] == "1.0"
-
-    def test_to_json_file(self, tmp_path):
-        """to_json writes to file when path given."""
+    def test_save_load(self, tmp_path):
+        """Model.save writes JSON; Model.load reconstructs and solves."""
         x = Variable("x")
         y = Variable("y")
         m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
         filepath = tmp_path / "model.json"
-        result = to_json(m, filepath)
-        assert result is None
+        m.save(filepath)
         assert filepath.exists()
 
-        m2 = from_json(filepath)
-        sol = m.solve(verbosity=0)
-        sol2 = m2.solve(verbosity=0)
-        assert abs(sol.cost - sol2.cost) < 1e-4
-
-    def test_from_json_string(self):
-        """from_json accepts a JSON string."""
-        x = Variable("x")
-        y = Variable("y")
-        m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
-        json_str = to_json(m)
-        m2 = from_json(json_str)
+        m2 = Model.load(filepath)
         sol = m.solve(verbosity=0)
         sol2 = m2.solve(verbosity=0)
         assert abs(sol.cost - sol2.cost) < 1e-4

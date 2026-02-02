@@ -90,80 +90,109 @@ def parenthesize(string, addi=True, mult=True):
     return string
 
 
-def _render_ast_node(
-    node, excluded
-):  # pylint: disable=too-many-branches,too-many-return-statements
+def _render_add(children, excluded):
+    left = strify(children[0], excluded)
+    right = strify(children[1], excluded)
+    if right[0] == "-":
+        return f"{left} - {right[1:]}"
+    return f"{left} + {right}"
+
+
+def _render_mul(children, excluded):
+    left = parenthesize(strify(children[0], excluded), mult=False)
+    right = parenthesize(strify(children[1], excluded), mult=False)
+    if left == "1":
+        return right
+    if right == "1":
+        return left
+    return f"{left}{MUL}{right}"
+
+
+def _render_div(children, excluded):
+    left = parenthesize(strify(children[0], excluded), mult=False)
+    right = parenthesize(strify(children[1], excluded))
+    if right == "1":
+        return left
+    return f"{left}/{right}"
+
+
+def _render_neg(children, excluded):
+    val = parenthesize(strify(children[0], excluded), mult=False)
+    return f"-{val}"
+
+
+def _render_pow(children, excluded):
+    left = parenthesize(strify(children[0], excluded))
+    x = children[1]
+    if left == "1":
+        return "1"
+    if (
+        UNICODE_EXPONENTS
+        and not getattr(x, "shape", None)
+        and int(x) == x
+        and 2 <= x <= 9
+    ):
+        x = int(x)
+        if x in (2, 3):
+            return f"{left}{chr(176 + x)}"
+        return f"{left}{chr(8304 + x)}"
+    return f"{left}^{x}"
+
+
+def _render_prod(children, excluded):
+    val = parenthesize(strify(children[0], excluded))
+    return f"{val}.prod()"
+
+
+def _render_sum(children, excluded):
+    val = parenthesize(strify(children[0], excluded))
+    return f"{val}.sum()"
+
+
+def _fmt_slice(s):
+    "Format a slice object as a string."
+    start = s.start or ""
+    stop = s.stop if s.stop and s.stop < sys.maxsize else ""
+    step = f":{s.step}" if s.step is not None else ""
+    return f"{start}:{stop}{step}"
+
+
+def _render_index(children, excluded):
+    left = parenthesize(strify(children[0], excluded))
+    idx = children[1]
+    if left[-3:] == "[:]":  # pure variable access
+        left = left[:-3]
+    if isinstance(idx, tuple):
+        elstrs = []
+        for el in idx:
+            if isinstance(el, slice):
+                elstrs.append(_fmt_slice(el))
+            elif isinstance(el, Numbers):
+                elstrs.append(str(el))
+        idx = ",".join(elstrs)
+    elif isinstance(idx, slice):
+        idx = _fmt_slice(idx)
+    return f"{left}[{idx}]"
+
+
+_AST_RENDERERS = {
+    "add": _render_add,
+    "mul": _render_mul,
+    "div": _render_div,
+    "neg": _render_neg,
+    "pow": _render_pow,
+    "prod": _render_prod,
+    "sum": _render_sum,
+    "index": _render_index,
+}
+
+
+def _render_ast_node(node, excluded):
     "Renders an ExprNode as a string.  Called by ExprNode.str_without()."
-    op = node.op
-    children = node.children
-    if op == "add":
-        left = strify(children[0], excluded)
-        right = strify(children[1], excluded)
-        if right[0] == "-":
-            return f"{left} - {right[1:]}"
-        return f"{left} + {right}"
-    if op == "mul":
-        left = parenthesize(strify(children[0], excluded), mult=False)
-        right = parenthesize(strify(children[1], excluded), mult=False)
-        if left == "1":
-            return right
-        if right == "1":
-            return left
-        return f"{left}{MUL}{right}"
-    if op == "div":
-        left = parenthesize(strify(children[0], excluded), mult=False)
-        right = parenthesize(strify(children[1], excluded))
-        if right == "1":
-            return left
-        return f"{left}/{right}"
-    if op == "neg":
-        val = parenthesize(strify(children[0], excluded), mult=False)
-        return f"-{val}"
-    if op == "pow":
-        left = parenthesize(strify(children[0], excluded))
-        x = children[1]
-        if left == "1":
-            return "1"
-        if (
-            UNICODE_EXPONENTS
-            and not getattr(x, "shape", None)
-            and int(x) == x
-            and 2 <= x <= 9
-        ):
-            x = int(x)
-            if x in (2, 3):
-                return f"{left}{chr(176 + x)}"
-            return f"{left}{chr(8304 + x)}"
-        return f"{left}^{x}"
-    if op == "prod":
-        val = parenthesize(strify(children[0], excluded))
-        return f"{val}.prod()"
-    if op == "sum":
-        val = parenthesize(strify(children[0], excluded))
-        return f"{val}.sum()"
-    if op == "index":
-        left = parenthesize(strify(children[0], excluded))
-        idx = children[1]
-        if left[-3:] == "[:]":  # pure variable access
-            left = left[:-3]
-        if isinstance(idx, tuple):
-            elstrs = []
-            for el in idx:
-                if isinstance(el, slice):
-                    start = el.start or ""
-                    stop = el.stop if el.stop and el.stop < sys.maxsize else ""
-                    step = f":{el.step}" if el.step is not None else ""
-                    elstrs.append(f"{start}:{stop}{step}")
-                elif isinstance(el, Numbers):
-                    elstrs.append(str(el))
-            idx = ",".join(elstrs)
-        elif isinstance(idx, slice):
-            start = idx.start or ""
-            stop = idx.stop if idx.stop and idx.stop < 1e6 else ""
-            step = f":{idx.step}" if idx.step is not None else ""
-            idx = f"{start}:{stop}{step}"
-        return f"{left}[{idx}]"
-    raise ValueError(op)
+    renderer = _AST_RENDERERS.get(node.op)
+    if renderer is None:
+        raise ValueError(f"Unknown AST op: {node.op}")
+    return renderer(node.children, excluded)
 
 
 class ReprMixin:
@@ -183,85 +212,9 @@ class ReprMixin:
             self.cached_strs = {}
         elif excluded in self.cached_strs:
             return self.cached_strs[excluded]
-        if hasattr(self.ast, "str_without"):
-            aststr = self.ast.str_without(excluded)
-        else:
-            aststr = self._parse_ast_legacy(excluded)
+        aststr = self.ast.str_without(excluded)
         self.cached_strs[excluded] = aststr
         return aststr
-
-    # pylint: disable=too-many-branches, too-many-statements, too-many-return-statements
-    def _parse_ast_legacy(self, excluded):
-        "Fallback parser for legacy tuple-format ASTs"
-        oper, values = self.ast  # pylint: disable=unpacking-non-sequence
-        if oper == "add":
-            left = strify(values[0], excluded)
-            right = strify(values[1], excluded)
-            if right[0] == "-":
-                return f"{left} - {right[1:]}"
-            return f"{left} + {right}"
-        if oper == "mul":
-            left = parenthesize(strify(values[0], excluded), mult=False)
-            right = parenthesize(strify(values[1], excluded), mult=False)
-            if left == "1":
-                return right
-            if right == "1":
-                return left
-            return f"{left}{MUL}{right}"
-        if oper == "div":
-            left = parenthesize(strify(values[0], excluded), mult=False)
-            right = parenthesize(strify(values[1], excluded))
-            if right == "1":
-                return left
-            return f"{left}/{right}"
-        if oper == "neg":
-            val = parenthesize(strify(values, excluded), mult=False)
-            return f"-{val}"
-        if oper == "pow":
-            left = parenthesize(strify(values[0], excluded))
-            x = values[1]
-            if left == "1":
-                return "1"
-            if (
-                UNICODE_EXPONENTS
-                and not getattr(x, "shape", None)
-                and int(x) == x
-                and 2 <= x <= 9
-            ):
-                x = int(x)
-                if x in (2, 3):
-                    return f"{left}{chr(176 + x)}"
-                return f"{left}{chr(8304 + x)}"
-            return f"{left}^{x}"
-        if oper == "prod":
-            val = parenthesize(strify(values[0], excluded))
-            return f"{val}.prod()"
-        if oper == "sum":
-            val = parenthesize(strify(values[0], excluded))
-            return f"{val}.sum()"
-        if oper == "index":
-            left = parenthesize(strify(values[0], excluded))
-            idx = values[1]
-            if left[-3:] == "[:]":
-                left = left[:-3]
-            if isinstance(idx, tuple):
-                elstrs = []
-                for el in idx:
-                    if isinstance(el, slice):
-                        start = el.start or ""
-                        stop = el.stop if el.stop and el.stop < sys.maxsize else ""
-                        step = f":{el.step}" if el.step is not None else ""
-                        elstrs.append(f"{start}:{stop}{step}")
-                    elif isinstance(el, Numbers):
-                        elstrs.append(str(el))
-                idx = ",".join(elstrs)
-            elif isinstance(idx, slice):
-                start = idx.start or ""
-                stop = idx.stop if idx.stop and idx.stop < 1e6 else ""
-                step = f":{idx.step}" if idx.step is not None else ""
-                idx = f"{start}:{stop}{step}"
-            return f"{left}[{idx}]"
-        raise ValueError(oper)
 
     def __repr__(self):
         "Returns namespaced string."

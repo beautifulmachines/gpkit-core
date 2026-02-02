@@ -1,5 +1,7 @@
 "Implements Model"
 
+import json
+from pathlib import Path
 from time import time
 
 import numpy as np
@@ -156,6 +158,16 @@ class Model(CostedConstraintSet):
                     subs[var_registry[ref]] = val
 
         return cls(cost, constraints, substitutions=subs)
+
+    def save(self, path):
+        """Write this Model's IR to a JSON file."""
+        Path(path).write_text(json.dumps(self.to_ir(), indent=2), encoding="utf-8")
+
+    @classmethod
+    def load(cls, path):
+        """Load a Model from a JSON IR file."""
+        ir_doc = json.loads(Path(path).read_text(encoding="utf-8"))
+        return cls.from_ir(ir_doc)
 
     gp = progify(GeometricProgram)
     solve = solvify(progify(GeometricProgram, "solve"))
