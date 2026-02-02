@@ -332,6 +332,7 @@ def build_model_tree(model, ir_variables):
         if lineage:
             class_name, _ = lineage[-1]
             instance_id = ".".join(f"{n}{i}" for n, i in lineage)
+            # e.g. "Aircraft0.Wing0"
         else:
             class_name = type(cset).__name__
             instance_id = ""
