@@ -85,7 +85,6 @@ class Model(CostedConstraintSet):
         "Serialize this Model to a complete IR document dict."
         # Collect all variables (including veckeys for vector variables)
         all_vks = set(self.vks)
-        all_vks.update(self.cost.vks)
         variables = {}
         for vk in sorted(all_vks, key=lambda v: v.var_ref):
             variables[vk.var_ref] = vk.to_ir()
