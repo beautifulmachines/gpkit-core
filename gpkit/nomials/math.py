@@ -431,6 +431,14 @@ class ScalarSingleEquationConstraint(SingleEquationConstraint):
             ]
         raise ValueError(f"Constraint {self} had unknown operator {self.oper}.")
 
+    def to_ir(self):
+        "Serialize this constraint to an IR dict."
+        ir = super().to_ir()
+        ir["type"] = self.__class__.__name__
+        if self.lineage:
+            ir["lineage"] = [[name, num] for name, num in self.lineage]
+        return ir
+
 
 # pylint: disable=too-many-instance-attributes, invalid-unary-operand-type
 class PosynomialInequality(ScalarSingleEquationConstraint):
@@ -522,14 +530,6 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
                 hmap.parent = self
                 out.append(hmap)
         return out
-
-    def to_ir(self):
-        "Serialize this constraint to an IR dict."
-        ir = super().to_ir()
-        ir["type"] = self.__class__.__name__
-        if self.lineage:
-            ir["lineage"] = [[name, num] for name, num in self.lineage]
-        return ir
 
     @classmethod
     def from_ir(cls, ir_dict, var_registry):
@@ -656,14 +656,6 @@ class SignomialInequality(ScalarSingleEquationConstraint):
             raise ValueError(f"operator {self.oper} is not supported.")
         self.unsubbed = [plt - pgt]
         self.bounded = self.as_gpconstr({}).bounded
-
-    def to_ir(self):
-        "Serialize this constraint to an IR dict."
-        ir = super().to_ir()
-        ir["type"] = self.__class__.__name__
-        if self.lineage:
-            ir["lineage"] = [[name, num] for name, num in self.lineage]
-        return ir
 
     @classmethod
     def from_ir(cls, ir_dict, var_registry):
