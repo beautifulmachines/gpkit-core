@@ -330,7 +330,7 @@ def build_model_tree(model, ir_variables):
         "Build tree node for a model/sub-model ConstraintSet."
         lineage = getattr(cset, "lineage", None) or ()
         if lineage:
-            class_name = lineage[-1][0]
+            class_name, _ = lineage[-1]
             instance_id = ".".join(f"{n}{i}" for n, i in lineage)
         else:
             class_name = type(cset).__name__
