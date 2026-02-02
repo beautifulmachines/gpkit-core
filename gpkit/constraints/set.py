@@ -1,7 +1,6 @@
 "Implements ConstraintSet"
 
-import sys
-from collections import OrderedDict, defaultdict
+from collections import defaultdict
 from itertools import chain
 
 import numpy as np
@@ -10,7 +9,6 @@ from ..nomials import NomialArray, Variable
 from ..util.repr_conventions import ReprMixin
 from ..util.small_scripts import try_str_without
 from ..varmap import VarMap, VarSet
-from .single_equation import SingleEquationConstraint
 
 
 # pylint: disable=fixme
@@ -31,28 +29,10 @@ def add_meq_bounds(bounded, meq_bounded):  # TODO: collapse with GP version?
                     break
 
 
-def _sort_constraints(item):
-    "return tuple for Constraint sorting"
-    label, constraint = item
-    return (
-        not isinstance(constraint, SingleEquationConstraint),
-        bool(getattr(constraint, "lineage", None)),
-        label,
-    )
-
-
-def sort_constraints_dict(iterable):
-    "Sort a dictionary of {k: constraint} and return its keys and values"
-    if sys.version_info >= (3, 7) or isinstance(iterable, OrderedDict):
-        return iterable.keys(), iterable.values()
-    items = sorted(list(iterable.items()), key=_sort_constraints)
-    return (item[0] for item in items), (item[1] for item in items)
-
-
 def flatiter(iterable, yield_if_hasattr=None):
     "Yields contained constraints, optionally including constraintsets."
     if isinstance(iterable, dict):
-        _, iterable = sort_constraints_dict(iterable)
+        iterable = iterable.values()
     for constraint in iterable:
         if not hasattr(constraint, "__iter__") or (
             yield_if_hasattr and hasattr(constraint, yield_if_hasattr)
@@ -79,7 +59,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         self, constraints, substitutions=None, *, bonusvks=None
     ):  # pylint: disable=too-many-branches,too-many-statements
         if isinstance(constraints, dict):
-            keys, constraints = sort_constraints_dict(constraints)
+            keys, constraints = constraints.keys(), constraints.values()
             self.idxlookup = {k: i for i, k in enumerate(keys)}
         elif isinstance(constraints, ConstraintSet):
             constraints = [constraints]  # put it one level down
@@ -303,11 +283,104 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         return "\n".join(lines)
 
 
+def build_model_tree(model, ir_variables):
+    """Build model_tree structure from a Model's constraint hierarchy.
+
+    Walks the constraint tree in the same depth-first order as
+    collect_flat_constraints_ir, tracking which flat constraint indices
+    belong to which model node.
+
+    Parameters
+    ----------
+    model : ConstraintSet
+        The top-level constraint set (typically a Model).
+    ir_variables : dict
+        The variables dict from the IR document (var_ref -> ir_dict).
+
+    Returns
+    -------
+    dict
+        model_tree with class, instance_id, variables, constraint_indices,
+        and children for each model node.
+    """
+    counter = 0  # flat constraint index
+    all_claimed_vars = set()  # vars claimed by any node
+
+    def _walk(cset):
+        "Build tree node for a model/sub-model ConstraintSet."
+        lineage = getattr(cset, "lineage", None) or ()
+        if lineage:
+            class_name, _ = lineage[-1]
+            instance_id = ".".join(f"{n}{i}" for n, i in lineage)
+            # e.g. "Aircraft0.Wing0"
+        else:
+            class_name = type(cset).__name__
+            instance_id = ""
+
+        constraint_indices = []
+        children = []
+
+        _collect(cset, constraint_indices, children)
+
+        owned_vars = sorted(
+            vk.var_ref for vk in getattr(cset, "unique_varkeys", frozenset())
+        )
+        all_claimed_vars.update(owned_vars)
+
+        return {
+            "class": class_name,
+            "instance_id": instance_id,
+            "variables": owned_vars,
+            "constraint_indices": constraint_indices,
+            "children": children,
+        }
+
+    def _collect(iterable, constraint_indices, children):
+        """Walk items, mirroring flatiter's traversal order."""
+        nonlocal counter
+        if isinstance(iterable, dict):
+            iterable = iterable.values()
+
+        for item in iterable:
+            if isinstance(item, ConstraintSet) and getattr(item, "lineage", None):
+                # Sub-model: create child node
+                children.append(_walk(item))
+            elif not hasattr(item, "__iter__"):
+                # Leaf constraint (non-iterable)
+                constraint_indices.append(counter)
+                counter += 1
+            else:
+                # Iterable: numpy array, list, ArrayConstraint, or
+                # ConstraintSet without lineage
+                try:
+                    flat_items = item.flat
+                    if callable(flat_items):
+                        # ConstraintSet.flat is flatiter (a bound method);
+                        # recurse into the ConstraintSet's items directly
+                        _collect(item, constraint_indices, children)
+                    else:
+                        # numpy flatiter: process each element
+                        _collect(flat_items, constraint_indices, children)
+                except AttributeError:
+                    # list, dict, ArrayConstraint, etc.
+                    _collect(item, constraint_indices, children)
+
+    tree = _walk(model)
+
+    # Assign unclaimed variables to the root node (handles flat models
+    # without setup() where unique_varkeys is empty)
+    unclaimed = sorted(ref for ref in ir_variables if ref not in all_claimed_vars)
+    if unclaimed:
+        tree["variables"] = sorted(set(tree["variables"]) | set(unclaimed))
+
+    return tree
+
+
 def recursively_line(iterable, excluded):
     "Generates lines in a recursive tree-like fashion, the better to indent."
     named_constraints = {}
     if isinstance(iterable, dict):
-        keys, iterable = sort_constraints_dict(iterable)
+        keys, iterable = iterable.keys(), iterable.values()
         named_constraints = dict(enumerate(keys))
     elif hasattr(iterable, "idxlookup"):
         named_constraints = {i: k for k, i in iterable.idxlookup.items()}

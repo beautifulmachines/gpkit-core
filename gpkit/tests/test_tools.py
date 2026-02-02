@@ -2,18 +2,12 @@
 
 import numpy as np
 import pytest
-from numpy import log
 
 from gpkit import Model, Variable, VectorVariable
 from gpkit.solutions import Solution
+from gpkit.tests.conftest import assert_logtol
 from gpkit.tools.autosweep import BinarySweepTree
 from gpkit.tools.tools import te_exp_minus1, te_secant, te_tangent
-from gpkit.util.small_scripts import mag
-
-
-def assert_logtol(first, second, logtol=1e-6):
-    "Asserts that the logs of two arrays have a given abstol"
-    np.testing.assert_allclose(log(mag(first)), log(mag(second)), atol=logtol, rtol=0)
 
 
 class TestTools:

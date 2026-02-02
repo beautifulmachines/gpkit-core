@@ -15,15 +15,9 @@ from gpkit.exceptions import (
     UnboundedGP,
     UnknownInfeasible,
 )
+from gpkit.tests.conftest import assert_logtol
 from gpkit.util.small_classes import Quantity
 from gpkit.util.small_scripts import mag
-
-
-def assert_logtol(first, second, logtol=1e-6):
-    "Asserts that the logs of two arrays have a given abstol"
-    np.testing.assert_allclose(
-        np.log(mag(first)), np.log(mag(second)), atol=logtol, rtol=0
-    )
 
 
 # pylint: disable=too-many-public-methods

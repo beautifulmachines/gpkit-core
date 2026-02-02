@@ -1,20 +1,24 @@
 "Implements Model"
 
+import json
+from pathlib import Path
 from time import time
 
 import numpy as np
 
 from .constraints.costed import CostedConstraintSet
-from .constraints.set import add_meq_bounds
+from .constraints.set import add_meq_bounds, build_model_tree, flatiter
 from .exceptions import Infeasible, InvalidGPConstraint
 from .globals import NamedVariables
 from .nomials import Monomial
+from .nomials.math import constraint_from_ir, nomial_from_ir
 from .programs.gp import GeometricProgram
 from .programs.prog_factories import progify, solvify
 from .programs.sgp import SequentialGeometricProgram
 from .solutions import SolutionSequence
 from .tools.autosweep import autosweep_1d
 from .util.docstring import expected_unbounded
+from .varkey import VarKey
 from .varmap import VarMap
 
 
@@ -78,6 +82,92 @@ class Model(CostedConstraintSet):
         if self.lineage and docstr and "SKIP VERIFICATION" not in docstr:
             if "Unbounded" in docstr or "Bounded by" in docstr:
                 self.verify_docstring()
+
+    def to_ir(self):
+        "Serialize this Model to a complete IR document dict."
+        # Collect all variables (including veckeys for vector variables)
+        all_vks = set(self.vks)
+        variables = {}
+        for vk in sorted(all_vks, key=lambda v: v.var_ref):
+            variables[vk.var_ref] = vk.to_ir()
+            if vk.veckey and vk.veckey.var_ref not in variables:
+                variables[vk.veckey.var_ref] = vk.veckey.to_ir()
+
+        # Serialize cost
+        cost_ir = self.cost.to_ir()
+
+        # Collect flat constraint list
+        constraints_ir = [c.to_ir() for c in flatiter(self)]
+
+        # Serialize substitutions (skip callables)
+        subs_ir = {}
+        for vk, val in self.substitutions.items():
+            if callable(val):
+                continue
+            subs_ir[vk.var_ref] = float(val)
+
+        ir = {
+            "gpkit_ir_version": "1.0",
+            "variables": variables,
+            "cost": cost_ir,
+            "constraints": constraints_ir,
+        }
+        if subs_ir:
+            ir["substitutions"] = subs_ir
+
+        # Phase 5: structural metadata for nested/composable models
+        ir["model_tree"] = build_model_tree(self, variables)
+
+        return ir
+
+    @classmethod
+    def from_ir(cls, ir_doc):
+        """Reconstruct a solvable Model from an IR document dict.
+
+        Parameters
+        ----------
+        ir_doc : dict
+            Complete IR document with variables, cost, constraints, and
+            optional substitutions.
+
+        Returns
+        -------
+        Model
+            A flat Model (no nested sub-models) that can be solved.
+        """
+        # 1. Reconstruct var_registry
+        var_registry = {}
+        for ref, vk_ir in ir_doc["variables"].items():
+            vk = VarKey.from_ir(vk_ir)
+            var_registry[ref] = vk
+
+        # 2. Reconstruct cost
+        cost = nomial_from_ir(ir_doc["cost"], var_registry)
+
+        # 3. Reconstruct constraints
+        constraints = [
+            constraint_from_ir(c_ir, var_registry) for c_ir in ir_doc["constraints"]
+        ]
+
+        # 4. Reconstruct substitutions
+        subs = None
+        if "substitutions" in ir_doc:
+            subs = {}
+            for ref, val in ir_doc["substitutions"].items():
+                if ref in var_registry:
+                    subs[var_registry[ref]] = val
+
+        return cls(cost, constraints, substitutions=subs)
+
+    def save(self, path):
+        """Write this Model's IR to a JSON file."""
+        Path(path).write_text(json.dumps(self.to_ir(), indent=2), encoding="utf-8")
+
+    @classmethod
+    def load(cls, path):
+        """Load a Model from a JSON IR file."""
+        ir_doc = json.loads(Path(path).read_text(encoding="utf-8"))
+        return cls.from_ir(ir_doc)
 
     gp = progify(GeometricProgram)
     solve = solvify(progify(GeometricProgram, "solve"))
