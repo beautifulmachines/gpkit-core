@@ -152,6 +152,22 @@ class TestVarKey:
         for vk in (VarKey(), x, VarKey(**x.descr), VarKey(units="m")):
             assert "units" in vk.descr
 
+    def test_getattr_raises(self):
+        """Regression: __getattr__ raises AttributeError for unknown attrs."""
+        x = VarKey("x")
+        with pytest.raises(AttributeError):
+            _ = x.nonexistent_attr
+
+    def test_models_empty_lineage(self):
+        """Regression: models property returns () for no lineage."""
+        x = VarKey("x")
+        assert x.models == ()
+
+    def test_models_with_lineage(self):
+        """models property extracts model names from lineage tuples."""
+        vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 1)))
+        assert vk.models == ("Aircraft", "Wing")
+
     def test_hash_vector(self):
         """Make sure different vector keys don't have hash collisions"""
         t = VarKey("t")
@@ -164,6 +180,58 @@ class TestVarKey:
         assert hash(el3) != hash(vec3)
         assert hash(el3) != hash(el2)
         assert hash(t) != hash(el2)
+
+
+class TestRef:
+    """Tests for VarKey.ref identity string."""
+
+    def test_plain_variable(self):
+        vk = VarKey("x")
+        assert vk.ref == "x"
+
+    def test_with_units(self):
+        vk = VarKey("x", unitrepr="m")
+        assert vk.ref == "x|m"
+
+    def test_with_lineage(self):
+        vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 0)))
+        assert vk.ref == "Aircraft0.Wing0.S"
+
+    def test_with_lineage_nonzero_num(self):
+        vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 1)))
+        assert vk.ref == "Aircraft0.Wing1.S"
+
+    def test_with_lineage_and_units(self):
+        vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 0)), unitrepr="m^2")
+        assert vk.ref == "Aircraft0.Wing0.S|m^2"
+
+    def test_indexed(self):
+        x = VectorVariable(3, "x")
+        assert x[0].key.ref == "x[0]#3"
+        assert x[2].key.ref == "x[2]#3"
+
+    def test_lineage_and_index(self):
+        vk = VarKey("c_l", lineage=(("Wing", 0),), idx=(1,), shape=(3,))
+        assert vk.ref == "Wing0.c_l[1]#3"
+
+    def test_with_shape_only(self):
+        vk = VarKey("t", shape=(3,))
+        assert vk.ref == "t#3"
+
+    def test_identity_via_ref(self):
+        """Two VarKeys with same identity fields are equal."""
+        vk1 = VarKey("x", unitrepr="m")
+        vk2 = VarKey("x", unitrepr="m")
+        assert vk1 == vk2
+        assert hash(vk1) == hash(vk2)
+        assert vk1.ref == vk2.ref
+
+    def test_different_units_not_equal(self):
+        """Different units means different ref, different identity."""
+        vk1 = VarKey("x", unitrepr="m")
+        vk2 = VarKey("x", unitrepr="ft")
+        assert vk1 != vk2
+        assert vk1.ref != vk2.ref
 
 
 class TestVariable:
