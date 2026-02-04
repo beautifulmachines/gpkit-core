@@ -203,7 +203,7 @@ class ConstantsRelaxed(ConstraintSet):
 
         self._derelax_map = {}
         relaxvars, self.freedvars, relaxation_constraints = [], [], {}
-        for const, val in sorted(constants.items(), key=lambda i: i[0].eqstr):
+        for const, val in sorted(constants.items(), key=lambda i: i[0].ref):
             if val == 0:
                 substitutions[const] = 0
                 continue
@@ -212,11 +212,13 @@ class ConstantsRelaxed(ConstraintSet):
             if const.name in exclude:
                 continue
             # set up the lineage
-            const.descr.pop("gradients", None)  # nothing wants an old gradient
+            const.descr["gradients"] = None  # nothing wants an old gradient
             newconstd = const.descr.copy()
-            newconstd.pop("veckey", None)  # only const wants an old veckey
+            newconstd["veckey"] = None  # only const wants an old veckey
             # everything but const wants a new lineage, to distinguish them
-            newconstd["lineage"] = newconstd.pop("lineage", ()) + (self.lineage[-1],)
+            newconstd["lineage"] = (newconstd.pop("lineage") or ()) + (
+                self.lineage[-1],
+            )
             # make the relaxation variable, free to get as large as it needs
             relaxedd = newconstd.copy()
             relaxedd["unitrepr"] = "-"  # and unitless, importantly

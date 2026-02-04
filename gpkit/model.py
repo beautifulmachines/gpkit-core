@@ -88,10 +88,10 @@ class Model(CostedConstraintSet):
         # Collect all variables (including veckeys for vector variables)
         all_vks = set(self.vks)
         variables = {}
-        for vk in sorted(all_vks, key=lambda v: v.var_ref):
-            variables[vk.var_ref] = vk.to_ir()
-            if vk.veckey and vk.veckey.var_ref not in variables:
-                variables[vk.veckey.var_ref] = vk.veckey.to_ir()
+        for vk in sorted(all_vks, key=lambda v: v.ref):
+            variables[vk.ref] = vk.to_ir()
+            if vk.veckey and vk.veckey.ref not in variables:
+                variables[vk.veckey.ref] = vk.veckey.to_ir()
 
         # Serialize cost
         cost_ir = self.cost.to_ir()
@@ -104,7 +104,7 @@ class Model(CostedConstraintSet):
         for vk, val in self.substitutions.items():
             if callable(val):
                 continue
-            subs_ir[vk.var_ref] = float(val)
+            subs_ir[vk.ref] = float(val)
 
         ir = {
             "gpkit_ir_version": "1.0",

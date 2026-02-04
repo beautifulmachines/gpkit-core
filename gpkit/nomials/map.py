@@ -34,7 +34,7 @@ class NomialMap(HashVector):
             term = {"coeff": float(coeff)}
             if exp_hv:  # non-empty exponent vector (not a constant)
                 term["exps"] = {
-                    vk.var_ref: int(x) if x == int(x) else float(x)
+                    vk.ref: int(x) if x == int(x) else float(x)
                     for vk, x in exp_hv.items()
                 }
             terms.append(term)
@@ -52,7 +52,7 @@ class NomialMap(HashVector):
         ir_dict : dict
             IR with "terms" and optional "units".
         var_registry : dict
-            Mapping from var_ref strings to VarKey objects.
+            Mapping from ref strings to VarKey objects.
         """
         hmap = cls()
         for term in ir_dict["terms"]:
@@ -170,11 +170,13 @@ class NomialMap(HashVector):
         for vk in varlocs:
             exps, cval = varlocs[vk], fixed[vk]
             if hasattr(cval, "hmap"):
-                if cval.hmap is None or any(cval.hmap.keys()):
+                if any(cval.hmap.keys()):
                     raise ValueError("Monomial substitutions are not supported.")
                 (cval,) = cval.hmap.to(vk.units or DIMLESS_QUANTITY).values()
             elif hasattr(cval, "to"):
                 cval = cval.to(vk.units or DIMLESS_QUANTITY).magnitude
+            elif not isinstance(cval, (int, float, np.number)):
+                raise ValueError("Monomial substitutions are not supported.")
             for o_exp, exp in exps:
                 subinplace(cp, exp, o_exp, vk, cval, squished)
         return cp

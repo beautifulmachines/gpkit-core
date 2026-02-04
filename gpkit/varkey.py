@@ -24,11 +24,30 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
     unique_id = Count().next
     subscripts = ("lineage", "idx")
 
+    _DESCR_DEFAULTS = {
+        **dict.fromkeys(
+            [
+                "lineage",
+                "value",
+                "constant",
+                "evalfn",
+                "vecfn",
+                "idx",
+                "shape",
+                "veckey",
+                "necessarylineage",
+                "choices",
+                "gradients",
+            ]
+        ),
+        "label": "",
+    }
+
     def __init__(self, name=None, **descr):
         # NOTE: Python arg handling guarantees 'name' won't appear in descr
-        self.descr = descr
+        self.descr = {**self._DESCR_DEFAULTS, **descr}
         self.descr["name"] = name or "\\fbox{%s}" % VarKey.unique_id()
-        unitrepr = self.unitrepr or self.units
+        unitrepr = self.descr.get("unitrepr") or self.descr.get("units")
         if unitrepr in ["", "-", None]:  # dimensionless
             self.descr["units"] = None
             self.descr["unitrepr"] = "-"
@@ -37,16 +56,15 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
             self.descr["unitrepr"] = unitrepr
 
         self.key = self
+        self.ref = self._compute_ref()
+        self._hashvalue = hash(self.ref)
         fullstr = self.str_without({"hiddenlineage", "modelnums", "vec"})
-        self.eqstr = fullstr + str(self.lineage) + self.unitrepr
-        self.eqstr += str(self.shape)  # hotfix for issue 52
-        self.hashvalue = hash(self.eqstr)
         self.keys = set((self.name, fullstr))
 
-        if "idx" in self.descr:
-            if "veckey" not in self.descr:
+        if self.descr["idx"] is not None:
+            if self.descr["veckey"] is None:
                 vecdescr = self.descr.copy()
-                del vecdescr["idx"]
+                vecdescr["idx"] = None
                 self.veckey = VarKey(**vecdescr)
             else:
                 self.keys.add(self.veckey)
@@ -103,25 +121,30 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
 
     __repr__ = str_without
 
-    def __hash__(self):
-        return self.hashvalue
-
-    def __getattr__(self, attr):
-        return self.descr.get(attr, None)
-
-    @property
-    def var_ref(self):
-        "Qualified path string for IR variable references."
+    def _compute_ref(self):
+        "Canonical identity string: [lineage.]name[idx][#shape][|units]"
         parts = []
         if self.lineage:
-            # Always include model numbers (even 0) for unique identification.
-            # Can't use lineagestr() because it suppresses 0 model numbers.
             parts.extend(f"{name}{num}" for name, num in self.lineage)
         parts.append(self.name)
         ref = ".".join(parts)
         if self.idx:
             ref += f"[{','.join(map(str, self.idx))}]"
+        if self.shape:
+            ref += f"#{','.join(map(str, self.shape))}"
+        if self.unitrepr != "-":
+            ref += f"|{self.unitrepr}"
         return ref
+
+    def __hash__(self):
+        return self._hashvalue
+
+    def __getattr__(self, attr):
+        if attr in self.descr:
+            return self.descr[attr]
+        raise AttributeError(
+            f"'{type(self).__name__}' object has no attribute '{attr}'"
+        )
 
     def to_ir(self):
         "Serialize this VarKey to an IR dict."
@@ -158,7 +181,9 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
     @property
     def models(self):
         "Returns a tuple of just the names of models in self.lineage"
-        return list(zip(*self.lineage))[0]
+        if not self.lineage:
+            return ()
+        return tuple(zip(*self.lineage))[0]
 
     def latex(self, excluded=()):
         "Returns latex representation."
@@ -172,6 +197,6 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
         return name
 
     def __eq__(self, other):
-        if not hasattr(other, "descr"):
+        if not isinstance(other, VarKey):
             return False
-        return self.eqstr == other.eqstr
+        return self.ref == other.ref

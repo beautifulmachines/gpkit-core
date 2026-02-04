@@ -111,7 +111,7 @@ class Nomial(NomialData):
         if isinstance(self, FixedScalar):
             return self.cs[0]
         p = self.sub(  # pylint: disable=not-callable
-            {k: k.value for k in self.vks if "value" in k.descr}
+            {k: k.value for k in self.vks if k.value is not None}
         )
         return p.cs[0] if isinstance(p, FixedScalar) else p
 

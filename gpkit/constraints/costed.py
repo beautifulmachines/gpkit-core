@@ -23,7 +23,7 @@ class CostedConstraintSet(ConstraintSet):
         self.cost = maybe_flatten(cost)
         if isinstance(self.cost, np.ndarray):  # if it's still a vector
             raise ValueError("Cost must be scalar, not the vector {cost}.")
-        subs = {k: k.value for k in self.cost.vks if "value" in k.descr}
+        subs = {k: k.value for k in self.cost.vks if k.value is not None}
         if substitutions:
             subs.update(substitutions)
         ConstraintSet.__init__(self, constraints, subs, bonusvks=self.cost.vks)

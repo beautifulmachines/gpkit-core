@@ -66,7 +66,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         list.__init__(self, constraints)
         self.vks = VarSet(self.unique_varkeys)
         self.substitutions = VarMap(
-            {k: k.value for k in self.unique_varkeys if "value" in k.descr}
+            {k: k.value for k in self.unique_varkeys if k.value is not None}
         )
         self.substitutions.register_keys(self.vks)
         self.bounded, self.meq_bounded = set(), defaultdict(set)
@@ -95,9 +95,9 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
             self.bounded.add((key, "upper"))
             self.bounded.add((key, "lower"))
             if key.value is not None and not key.constant:
-                del key.descr["value"]
+                key.descr["value"] = None  # TODO(PR2): eliminate mutation
                 if key.veckey and key.veckey.value is not None:
-                    del key.veckey.descr["value"]
+                    key.veckey.descr["value"] = None
         add_meq_bounds(self.bounded, self.meq_bounded)
 
     def _update(self, constraint):
@@ -108,7 +108,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
             self.substitutions.update(constraint.substitutions)
         else:
             self.substitutions.update(
-                {k: k.value for k in constraint.vks if "value" in k.descr}
+                {k: k.value for k in constraint.vks if k.value is not None}
             )
         self.bounded.update(constraint.bounded)
         for bound, solutionset in constraint.meq_bounded.items():
@@ -239,7 +239,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         if clear:
             self._lineageset = False
             for vk in self._name_collision_varkeys:
-                del vk.descr["necessarylineage"]
+                vk.descr["necessarylineage"] = None
         else:
             self._lineageset = True
             for vk, idx in self._name_collision_varkeys.items():
@@ -295,7 +295,7 @@ def build_model_tree(model, ir_variables):
     model : ConstraintSet
         The top-level constraint set (typically a Model).
     ir_variables : dict
-        The variables dict from the IR document (var_ref -> ir_dict).
+        The variables dict from the IR document (ref -> ir_dict).
 
     Returns
     -------
@@ -323,7 +323,7 @@ def build_model_tree(model, ir_variables):
         _collect(cset, constraint_indices, children)
 
         owned_vars = sorted(
-            vk.var_ref for vk in getattr(cset, "unique_varkeys", frozenset())
+            vk.ref for vk in getattr(cset, "unique_varkeys", frozenset())
         )
         all_claimed_vars.update(owned_vars)
 

@@ -207,6 +207,8 @@ class ReprMixin:
 
     def parse_ast(self, excluded=()):
         "Turns the AST of this object's construction into a faithful string"
+        if self.ast is None:
+            return self.str_without(excluded)  # pylint: disable=no-member
         excluded = frozenset({"units"}.union(excluded))
         if self.cached_strs is None:
             self.cached_strs = {}

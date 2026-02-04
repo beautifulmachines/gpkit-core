@@ -94,7 +94,7 @@ class Signomial(Nomial):
         ir_dict : dict
             IR with "terms", optional "units", "type", "ast".
         var_registry : dict
-            Mapping from var_ref strings to VarKey objects.
+            Mapping from ref strings to VarKey objects.
         """
         hmap = NomialMap.from_ir(ir_dict, var_registry)
         nomial_type = ir_dict.get("type", "Signomial")
@@ -809,7 +809,7 @@ def constraint_from_ir(ir_dict, var_registry):
     ir_dict : dict
         IR dict with "type", "oper", "left", "right", and optional "lineage".
     var_registry : dict
-        Mapping from var_ref strings to VarKey objects.
+        Mapping from ref strings to VarKey objects.
 
     Returns
     -------
@@ -837,7 +837,7 @@ def nomial_from_ir(ir_dict, var_registry):
     ir_dict : dict
         IR dict with "terms", optional "units", "type", "ast".
     var_registry : dict
-        Mapping from var_ref strings to VarKey objects.
+        Mapping from ref strings to VarKey objects.
 
     Returns
     -------

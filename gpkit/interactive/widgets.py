@@ -249,7 +249,7 @@ def create_settings(box):
     units.width = "6ex"
     units.font_size = "1.165em"
     link((sl_units, "value"), (units, "value"))
-    descr = widgets.HTML(text_html + slider.varkey.descr.get("label", ""))
+    descr = widgets.HTML(text_html + slider.varkey.label)
     descr.width = "40ex"
 
     return widgets.HBox(
