@@ -295,7 +295,7 @@ def build_model_tree(model, ir_variables):
     model : ConstraintSet
         The top-level constraint set (typically a Model).
     ir_variables : dict
-        The variables dict from the IR document (var_ref -> ir_dict).
+        The variables dict from the IR document (ref -> ir_dict).
 
     Returns
     -------
@@ -323,7 +323,7 @@ def build_model_tree(model, ir_variables):
         _collect(cset, constraint_indices, children)
 
         owned_vars = sorted(
-            vk.var_ref for vk in getattr(cset, "unique_varkeys", frozenset())
+            vk.ref for vk in getattr(cset, "unique_varkeys", frozenset())
         )
         all_claimed_vars.update(owned_vars)
 

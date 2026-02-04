@@ -192,30 +192,57 @@ class TestASTNodes:
             node.op = "mul"
 
 
-class TestVarRef:
-    """Tests for VarKey.var_ref property."""
+class TestRef:
+    """Tests for VarKey.ref identity string."""
 
     def test_plain_variable(self):
         vk = VarKey("x")
-        assert vk.var_ref == "x"
+        assert vk.ref == "x"
+
+    def test_with_units(self):
+        vk = VarKey("x", unitrepr="m")
+        assert vk.ref == "x|m"
 
     def test_with_lineage(self):
         vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 0)))
-        assert vk.var_ref == "Aircraft0.Wing0.S"
+        assert vk.ref == "Aircraft0.Wing0.S"
 
     def test_with_lineage_nonzero_num(self):
         vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 1)))
-        assert vk.var_ref == "Aircraft0.Wing1.S"
+        assert vk.ref == "Aircraft0.Wing1.S"
+
+    def test_with_lineage_and_units(self):
+        vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 0)), unitrepr="m^2")
+        assert vk.ref == "Aircraft0.Wing0.S|m^2"
 
     def test_indexed(self):
         x = VectorVariable(3, "x")
-        # VectorVariable creates element VarKeys with idx
-        assert x[0].key.var_ref == "x[0]"
-        assert x[2].key.var_ref == "x[2]"
+        # VectorVariable creates element VarKeys with idx and shape
+        assert x[0].key.ref == "x[0]#3"
+        assert x[2].key.ref == "x[2]#3"
 
     def test_lineage_and_index(self):
         vk = VarKey("c_l", lineage=(("Wing", 0),), idx=(1,), shape=(3,))
-        assert vk.var_ref == "Wing0.c_l[1]"
+        assert vk.ref == "Wing0.c_l[1]#3"
+
+    def test_with_shape_only(self):
+        vk = VarKey("t", shape=(3,))
+        assert vk.ref == "t#3"
+
+    def test_identity_via_ref(self):
+        """Two VarKeys with same identity fields are equal."""
+        vk1 = VarKey("x", unitrepr="m")
+        vk2 = VarKey("x", unitrepr="m")
+        assert vk1 == vk2
+        assert hash(vk1) == hash(vk2)
+        assert vk1.ref == vk2.ref
+
+    def test_different_units_not_equal(self):
+        """Different units means different ref, different identity."""
+        vk1 = VarKey("x", unitrepr="m")
+        vk2 = VarKey("x", unitrepr="ft")
+        assert vk1 != vk2
+        assert vk1.ref != vk2.ref
 
 
 class TestVarKeyIR:
@@ -280,7 +307,7 @@ class TestASTNodeIR:
 
     def _var_registry(self, *variables):
         "Build var_registry from Variables."
-        return {v.key.var_ref: v.key for v in variables}
+        return {v.key.ref: v.key for v in variables}
 
     def test_varnode(self):
         x = Variable("x")
@@ -357,7 +384,7 @@ class TestNomialMapIR:
         assert len(ir["terms"]) == 1
         assert ir["terms"][0]["coeff"] == 3.0
         assert ir["terms"][0]["exps"]["x"] == 2
-        registry = {x.key.var_ref: x.key}
+        registry = {x.key.ref: x.key}
         hmap2 = NomialMap.from_ir(ir, registry)
         assert len(hmap2) == 1
         ((exp, coeff),) = hmap2.items()
@@ -376,7 +403,7 @@ class TestNomialMapIR:
         )
         ir = hmap.to_ir()
         assert len(ir["terms"]) == 2
-        registry = {x.key.var_ref: x.key, y.key.var_ref: y.key}
+        registry = {x.key.ref: x.key, y.key.ref: y.key}
         hmap2 = NomialMap.from_ir(ir, registry)
         assert len(hmap2) == 2
 
@@ -397,7 +424,7 @@ class TestNomialMapIR:
         hmap.units = qty("m")
         ir = hmap.to_ir()
         assert "units" in ir
-        registry = {x.key.var_ref: x.key}
+        registry = {x.key.ref: x.key}
         hmap2 = NomialMap.from_ir(ir, registry)
         assert hmap2.units is not None
 
@@ -408,7 +435,7 @@ class TestNomialMapIR:
         ir = hmap.to_ir()
         json_str = json.dumps(ir)
         ir2 = json.loads(json_str)
-        registry = {x.key.var_ref: x.key}
+        registry = {x.key.ref: x.key}
         hmap2 = NomialMap.from_ir(ir2, registry)
         assert len(hmap2) == 1
 
@@ -418,7 +445,7 @@ class TestNomialIR:
 
     def _registry(self, nomial):
         "Build var_registry from a nomial's varkeys."
-        return {vk.var_ref: vk for vk in nomial.vks}
+        return {vk.ref: vk for vk in nomial.vks}
 
     def test_monomial_roundtrip(self):
         x = Variable("x")
@@ -496,7 +523,7 @@ class TestNomialFromIR:
 
     def _registry(self, nomial):
         "Build var_registry from a nomial's varkeys."
-        return {vk.var_ref: vk for vk in nomial.vks}
+        return {vk.ref: vk for vk in nomial.vks}
 
     def test_monomial(self):
         x = Variable("x")
@@ -531,7 +558,7 @@ class TestConstraintIR:
 
     def _registry(self, constraint):
         "Build var_registry from a constraint's varkeys."
-        return {vk.var_ref: vk for vk in constraint.vks}
+        return {vk.ref: vk for vk in constraint.vks}
 
     def test_posy_inequality_roundtrip(self):
         """PosynomialInequality: x >= y + 1"""
@@ -820,7 +847,7 @@ class TestModelIR:
         assert abs(sol.cost - sol2.cost) < 1e-4
 
     def test_reused_submodel(self):
-        """Reused sub-model: both instances appear with distinct var_refs."""
+        """Reused sub-model: both instances appear with distinct refs."""
         w = Widget()
         ir = w.to_ir()
 
@@ -854,10 +881,10 @@ class TestModelIR:
         sol = m.solve(verbosity=0)
 
         ir = m.to_ir()
-        # Indexed variables should appear
-        assert "x[0]" in ir["variables"]
-        assert "x[1]" in ir["variables"]
-        assert "x[2]" in ir["variables"]
+        # Indexed variables should appear (ref includes #shape)
+        assert "x[0]#3" in ir["variables"]
+        assert "x[1]#3" in ir["variables"]
+        assert "x[2]#3" in ir["variables"]
 
         m2 = Model.from_ir(ir)
         sol2 = m2.solve(verbosity=0)

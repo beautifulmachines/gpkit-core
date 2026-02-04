@@ -34,7 +34,7 @@ class NomialMap(HashVector):
             term = {"coeff": float(coeff)}
             if exp_hv:  # non-empty exponent vector (not a constant)
                 term["exps"] = {
-                    vk.var_ref: int(x) if x == int(x) else float(x)
+                    vk.ref: int(x) if x == int(x) else float(x)
                     for vk, x in exp_hv.items()
                 }
             terms.append(term)
@@ -52,7 +52,7 @@ class NomialMap(HashVector):
         ir_dict : dict
             IR with "terms" and optional "units".
         var_registry : dict
-            Mapping from var_ref strings to VarKey objects.
+            Mapping from ref strings to VarKey objects.
         """
         hmap = cls()
         for term in ir_dict["terms"]:

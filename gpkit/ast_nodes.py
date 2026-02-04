@@ -33,7 +33,7 @@ class VarNode(ASTNode):
     @property
     def ref(self):
         "Qualified path string for IR serialization."
-        return self.varkey.var_ref
+        return self.varkey.ref
 
     def str_without(self, excluded=()):
         return self.varkey.str_without(excluded)
@@ -105,7 +105,7 @@ def ast_from_ir(ir_dict, var_registry):
     ir_dict : dict or number
         The IR representation of an AST node.
     var_registry : dict
-        Mapping from var_ref strings to VarKey objects.
+        Mapping from ref strings to VarKey objects.
     """
     if not isinstance(ir_dict, dict):
         assert var_registry is None

@@ -203,7 +203,7 @@ class ConstantsRelaxed(ConstraintSet):
 
         self._derelax_map = {}
         relaxvars, self.freedvars, relaxation_constraints = [], [], {}
-        for const, val in sorted(constants.items(), key=lambda i: i[0].eqstr):
+        for const, val in sorted(constants.items(), key=lambda i: i[0].ref):
             if val == 0:
                 substitutions[const] = 0
                 continue
