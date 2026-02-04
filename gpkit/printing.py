@@ -224,7 +224,7 @@ class FreeVariables(SectionSpec):
         """Extract [name, value, unit, label] for variable tables."""
         key, val = item
         name = key.str_without("lineage")
-        label = key.descr.get("label", "")
+        label = key.label
         return [f"{name} :", self._fmt_val(val), _unitstr(key), label]
 
 
@@ -238,7 +238,7 @@ class Constants(SectionSpec):
         """Extract [name, value, unit, label] for variable tables."""
         key, val = item
         name = key.str_without("lineage")
-        label = key.descr.get("label", "")
+        label = key.label
         return [f"{name} :", self._fmt_val(val), _unitstr(key), label]
 
 
@@ -259,7 +259,7 @@ class Sensitivities(SectionSpec):
         """Extract [name, value, label] (no units!)."""
         key, val = item
         name = key.str_without("lineage")
-        label = key.descr.get("label", "")
+        label = key.label
         value = self._fmt_val(val)
         return [f"{name} :", value, label]
 
@@ -342,7 +342,7 @@ class DiffFreeVariables(DiffSection):
         key, pair = item
         name = key.str_without("lineage")
         u = unitstr(key, into="%s", dimless="")
-        label = key.descr.get("label", "")
+        label = key.label
         rel = pair.rel()
         diffstr = f"{self._fmt_val(rel * 100, suff='%')}"
         if not np.shape(rel):

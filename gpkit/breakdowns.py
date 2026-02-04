@@ -83,7 +83,7 @@ def get_model_breakdown(solution):
         subbd[constrstr] = {"|sensitivity|": senss}
     for vk in solution.sens.variables:
         # could this be done away with for backwards compatibility?
-        if not isinstance(vk, VarKey) or (vk.shape and not vk.index):
+        if not isinstance(vk, VarKey) or (vk.shape and not vk.idx):
             continue
         senss = abs(solution.sens.variables[vk])
         if hasattr(senss, "shape"):
@@ -167,7 +167,7 @@ def set_necessarylineage(solution, clear=False):
     if clear:
         solution.meta["lineageset"] = False
         for vk in solution.meta["name_collision_varkeys"]:
-            del vk.descr["necessarylineage"]
+            vk.descr["necessarylineage"] = None
     else:
         solution.meta["lineageset"] = True
         for vk, idx in solution.meta["name_collision_varkeys"].items():

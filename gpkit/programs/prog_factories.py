@@ -19,7 +19,7 @@ def evaluate_linked(constants, linked):
     kdc_plain = None
     array_calulated = {}
     for key in constants:  # remove gradients from constants
-        key.descr.pop("gradients", None)
+        key.descr["gradients"] = None
     for v, f in linked.items():
         try:
             if v.veckey and v.veckey.vecfn:
@@ -59,7 +59,7 @@ def evaluate_linked(constants, linked):
             if kdc_plain is None:
                 kdc_plain = VarMap(constants)
             constants[v] = f(kdc_plain)
-            v.descr.pop("gradients", None)
+            v.descr["gradients"] = None
             print(
                 "Warning: skipped auto-differentiation of linked variable"
                 f" {v} because {exception!r} was raised. Set `gpkit.settings"

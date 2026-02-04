@@ -59,10 +59,10 @@ class NomialData(ReprMixin):
 
     def __eq__(self, other):
         "Equality test"
-        if not hasattr(other, "hmap"):
-            return NotImplemented
         if isinstance(other, VarKey):
             return False
+        if not hasattr(other, "hmap"):
+            return NotImplemented
         if self.hmap != other.hmap:
             return False
         if self.units != other.units:

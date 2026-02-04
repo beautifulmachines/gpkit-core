@@ -59,12 +59,13 @@ Constraints
        ┃┃         ┃               ┃
        ┃┃         ┃               ┃
        ┃┃         ┃               ┃
-       ┃┃         ┣╸FlightSegment ┣╸AircraftP╶⎨
+       ┃┃         ┃               ┣╸AircraftP╶⎨
+       ┃┃         ┣╸FlightSegment ┃
        ┃┃         ┃               ┃
-       ┃┣╸Mission ┃               ┃
-       ┃┃         ┃               ┃
-       ┃┃         ┛               ┛
- Model╺┫┃         ┣╸Wfuel[0] ≥ Wfuel[1] + Wburn[0]
+       ┃┣╸Mission ┃               ┛
+       ┃┃         ┃               ┣╸FlightState╶⎨
+ Model╺┫┃         ┛               ┛
+       ┃┃         ┣╸Wfuel[0] ≥ Wfuel[1] + Wburn[0]
        ┃┃         ┛
        ┃┃         ┣╸Wfuel[1] ≥ Wfuel[2] + Wburn[1]
        ┃┛         ┣╸Wfuel[2] ≥ Wfuel[3] + Wburn[2]
@@ -73,8 +74,7 @@ Constraints
        ┃┃          ┛
        ┃┣╸Aircraft ┣╸W ≥ Fuselage.W + Wing.W
        ┃┃          ┛
-       ┃┃          ┣╸Fuselage ┣╸W = 100lbf
-       ┃┛          ┛          ┛
+       ┃┛          ┣╸Fuselage╶⎨
 
 
 Optimal Cost

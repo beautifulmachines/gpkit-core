@@ -170,11 +170,13 @@ class NomialMap(HashVector):
         for vk in varlocs:
             exps, cval = varlocs[vk], fixed[vk]
             if hasattr(cval, "hmap"):
-                if cval.hmap is None or any(cval.hmap.keys()):
+                if any(cval.hmap.keys()):
                     raise ValueError("Monomial substitutions are not supported.")
                 (cval,) = cval.hmap.to(vk.units or DIMLESS_QUANTITY).values()
             elif hasattr(cval, "to"):
                 cval = cval.to(vk.units or DIMLESS_QUANTITY).magnitude
+            elif not isinstance(cval, (int, float, np.number)):
+                raise ValueError("Monomial substitutions are not supported.")
             for o_exp, exp in exps:
                 subinplace(cp, exp, o_exp, vk, cval, squished)
         return cp

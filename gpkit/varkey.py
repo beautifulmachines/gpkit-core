@@ -24,11 +24,30 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
     unique_id = Count().next
     subscripts = ("lineage", "idx")
 
+    _DESCR_DEFAULTS = {
+        **dict.fromkeys(
+            [
+                "lineage",
+                "value",
+                "constant",
+                "evalfn",
+                "vecfn",
+                "idx",
+                "shape",
+                "veckey",
+                "necessarylineage",
+                "choices",
+                "gradients",
+            ]
+        ),
+        "label": "",
+    }
+
     def __init__(self, name=None, **descr):
         # NOTE: Python arg handling guarantees 'name' won't appear in descr
-        self.descr = descr
+        self.descr = {**self._DESCR_DEFAULTS, **descr}
         self.descr["name"] = name or "\\fbox{%s}" % VarKey.unique_id()
-        unitrepr = self.unitrepr or self.units
+        unitrepr = self.descr.get("unitrepr") or self.descr.get("units")
         if unitrepr in ["", "-", None]:  # dimensionless
             self.descr["units"] = None
             self.descr["unitrepr"] = "-"
@@ -43,10 +62,10 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
         self.hashvalue = hash(self.eqstr)
         self.keys = set((self.name, fullstr))
 
-        if "idx" in self.descr:
-            if "veckey" not in self.descr:
+        if self.descr["idx"] is not None:
+            if self.descr["veckey"] is None:
                 vecdescr = self.descr.copy()
-                del vecdescr["idx"]
+                vecdescr["idx"] = None
                 self.veckey = VarKey(**vecdescr)
             else:
                 self.keys.add(self.veckey)
@@ -107,7 +126,11 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
         return self.hashvalue
 
     def __getattr__(self, attr):
-        return self.descr.get(attr, None)
+        if attr in self.descr:
+            return self.descr[attr]
+        raise AttributeError(
+            f"'{type(self).__name__}' object has no attribute '{attr}'"
+        )
 
     @property
     def var_ref(self):
@@ -158,7 +181,9 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
     @property
     def models(self):
         "Returns a tuple of just the names of models in self.lineage"
-        return list(zip(*self.lineage))[0]
+        if not self.lineage:
+            return ()
+        return tuple(zip(*self.lineage))[0]
 
     def latex(self, excluded=()):
         "Returns latex representation."
