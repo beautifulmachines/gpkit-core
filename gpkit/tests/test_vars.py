@@ -159,9 +159,18 @@ class TestVarKey:
             _ = x.nonexistent_attr
 
     def test_models_empty_lineage(self):
-        """Regression: models property returns () for no lineage."""
+        """Regression: models property returns () for no lineage.
+        Previously crashed with TypeError: zip() argument after * must be
+        an iterable, not NoneType."""
         x = VarKey("x")
         assert x.models == ()
+
+    def test_parse_ast_no_ast(self):
+        """Regression: parse_ast on a bare VarKey (ast is None).
+        Previously crashed with TypeError: cannot unpack non-iterable
+        NoneType object."""
+        x = VarKey("x")
+        assert x.parse_ast() == "x"
 
     def test_models_with_lineage(self):
         """models property extracts model names from lineage tuples."""
