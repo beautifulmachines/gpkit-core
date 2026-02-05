@@ -212,7 +212,6 @@ class ConstantsRelaxed(ConstraintSet):
             if const.name in exclude:
                 continue
             # set up the lineage
-            const.descr["gradients"] = None  # nothing wants an old gradient
             newconstd = const.descr.copy()
             newconstd["veckey"] = None  # only const wants an old veckey
             newconstd["value"] = None  # derived variables are free

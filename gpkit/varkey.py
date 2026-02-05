@@ -56,7 +56,6 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
                 "shape",
                 "veckey",
                 "choices",
-                "gradients",
             ]
         ),
         "label": "",

@@ -239,8 +239,18 @@ class GeometricProgram:
     _result = solve_log = solver_out = model = None
     choicevaridxs = integersolve = None
 
-    def __init__(self, cost, constraints, substitutions, *, checkbounds=True, **_):
+    def __init__(
+        self,
+        cost,
+        constraints,
+        substitutions,
+        *,
+        checkbounds=True,
+        linked_derivs=None,
+        **_,
+    ):
         self.cost, self.substitutions = cost, substitutions
+        self.linked_derivs = linked_derivs or {}
         for key, sub in self.substitutions.items():
             if isinstance(sub, FixedScalar):
                 sub = sub.value
@@ -469,11 +479,11 @@ class GeometricProgram:
             m_senss[lineagestr(c)] += abs(c_senss)
 
         # Handle linked sensitivities
-        for v in list(v for v in gpv_ss if v.gradients):
+        for v in list(v for v in gpv_ss if self.linked_derivs.get(v)):
             dlogcost_dlogv = gpv_ss.pop(v)
             dlogcost_dlogabsv = absv_ss.pop(v)
             val = np.array(self.substitutions[v])
-            for c, dv_dc in v.gradients.items():
+            for c, dv_dc in self.linked_derivs[v].items():
                 with pywarnings.catch_warnings():  # skip pesky divide-by-zeros
                     pywarnings.simplefilter("ignore")
                     dlogv_dlogc = dv_dc * self.substitutions[c] / val
