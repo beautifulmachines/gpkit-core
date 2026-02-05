@@ -16,7 +16,6 @@ from gpkit import (
     Variable,
     VectorVariable,
 )
-from gpkit.exceptions import UnboundedGP
 from gpkit.units import DimensionalityError
 from gpkit.util.small_scripts import mag
 
@@ -166,9 +165,9 @@ class TestModelSubs:
             m = gpkit.Model(x, [x >= 1 - y, y <= ymax])
             m.substitutions[ymax] = 0.2
             assert m.localsolve(verbosity=0).cost == pytest.approx(0.8, abs=1e-3)
+            # VarKey values now persist across models (no value-nulling mutation)
             m = gpkit.Model(x, [x >= 1 - y, y <= ymax])
-            with pytest.raises(UnboundedGP):  # from unbounded ymax
-                m.localsolve(verbosity=0)
+            assert m.localsolve(verbosity=0).cost == pytest.approx(0.9, abs=1e-3)
             m = gpkit.Model(x, [x >= 1 - y, y <= ymax])
             m.substitutions[ymax] = 0.1
             assert m.localsolve(verbosity=0).cost == pytest.approx(0.9, abs=1e-3)

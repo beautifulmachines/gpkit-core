@@ -92,12 +92,10 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         for key in self.vks:
             if key not in self.substitutions:
                 continue
+            if key.lineage and key not in self.unique_varkeys:
+                continue  # substitution inherited from another model
             self.bounded.add((key, "upper"))
             self.bounded.add((key, "lower"))
-            if key.value is not None and not key.constant:
-                key.descr["value"] = None  # TODO(PR2): eliminate mutation
-                if key.veckey and key.veckey.value is not None:
-                    key.veckey.descr["value"] = None
         add_meq_bounds(self.bounded, self.meq_bounded)
 
     def _update(self, constraint):

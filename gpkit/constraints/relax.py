@@ -215,6 +215,7 @@ class ConstantsRelaxed(ConstraintSet):
             const.descr["gradients"] = None  # nothing wants an old gradient
             newconstd = const.descr.copy()
             newconstd["veckey"] = None  # only const wants an old veckey
+            newconstd["value"] = None  # derived variables are free
             # everything but const wants a new lineage, to distinguish them
             newconstd["lineage"] = (newconstd.pop("lineage") or ()) + (
                 self.lineage[-1],
@@ -226,7 +227,9 @@ class ConstantsRelaxed(ConstraintSet):
             relaxvars.append(relaxvar)
             # the newly freed const can acquire a new value
             del substitutions[const]
-            freed = Variable(**const.descr)
+            freedd = const.descr.copy()
+            freedd["value"] = None  # freed from its original value
+            freed = Variable(**freedd)
             self.freedvars.append(freed)
             # becuase the make the newconst will take its old value
             newconstd["lineage"] += (("OriginalValues", 0),)
