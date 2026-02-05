@@ -1,5 +1,6 @@
 "Implements the VarMap class"
 
+from collections import defaultdict
 from collections.abc import MutableMapping
 
 import numpy as np
@@ -186,7 +187,7 @@ class VarMap(MutableMapping):
 
     @property
     def varset(self):
-        "public access to varset. used by set_necessarylineage in breakdowns"
+        "public access to varset. used by get_lineage_map"
         return self._varset
 
     def __setitem__(self, key, value):
@@ -258,3 +259,44 @@ class VarMap(MutableMapping):
         "Return a quantity corresponding to self[key]"
         clean_key, val = self.item(key)
         return Quantity(val, clean_key.units or "dimensionless")
+
+
+def get_lineage_map(solution):
+    """Compute and cache lineage display mapping for solution variables.
+
+    Returns a dict mapping each VarKey to the number of lineage levels
+    needed to uniquely identify it among the solution's variables.
+    """
+    # pylint: disable=too-many-branches
+    if "name_collision_varkeys" not in solution.meta:
+        solution.meta["name_collision_varkeys"] = {}
+        varset = VarSet(solution.primal.varset)
+        varset.update(solution.constants)
+        name_collisions = defaultdict(set)
+        for key in varset:
+            if len(varset.by_name(key.name)) == 1:  # unique
+                solution.meta["name_collision_varkeys"][key] = 0
+            else:
+                shortname = key.str_without(["lineage", "vec"])
+                if len(varset.by_name(shortname)) > 1:
+                    name_collisions[shortname].add(key)
+        for varkeys in name_collisions.values():
+            min_namespaced = defaultdict(set)
+            for vk in varkeys:
+                *_, mineage = vk.lineagestr().split(".")
+                min_namespaced[(mineage, 1)].add(vk)
+            while any(len(vks) > 1 for vks in min_namespaced.values()):
+                for key, vks in list(min_namespaced.items()):
+                    if len(vks) <= 1:
+                        continue
+                    del min_namespaced[key]
+                    mineage, idx = key
+                    idx += 1
+                    for vk in vks:
+                        lineages = vk.lineagestr().split(".")
+                        submineage = lineages[-idx] + "." + mineage
+                        min_namespaced[(submineage, idx)].add(vk)
+            for (_, idx), vks in min_namespaced.items():
+                (vk,) = vks
+                solution.meta["name_collision_varkeys"][vk] = idx
+    return solution.meta["name_collision_varkeys"]

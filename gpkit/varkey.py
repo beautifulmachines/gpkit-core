@@ -1,8 +1,28 @@
 """Defines the VarKey class"""
 
+from contextlib import contextmanager
+from contextvars import ContextVar
+
 from .units import qty
 from .util.repr_conventions import ReprMixin
 from .util.small_classes import Count
+
+_lineage_ctx: ContextVar[dict] = ContextVar("lineage_ctx", default={})
+
+
+@contextmanager
+def lineage_display_context(mapping):
+    """Set VarKey→int lineage display depth for the enclosed block."""
+    token = _lineage_ctx.set(mapping)
+    try:
+        yield
+    finally:
+        _lineage_ctx.reset(token)
+
+
+def necessarylineage(vk):
+    """Display lineage depth for a VarKey in the current context."""
+    return _lineage_ctx.get().get(vk)
 
 
 class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
@@ -35,7 +55,6 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
                 "idx",
                 "shape",
                 "veckey",
-                "necessarylineage",
                 "choices",
                 "gradients",
             ]
@@ -102,9 +121,10 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
                     if len(to_replace) > replaced:
                         namespace.insert(0, "." * (len(to_replace) - replaced))
             if "hiddenlineage" not in excluded:
-                necessarylineage = self.necessarylineage
+                lineage_map = _lineage_ctx.get()
+                necessarylineage = lineage_map.get(self)
                 if necessarylineage is None and self.veckey:
-                    necessarylineage = self.veckey.necessarylineage
+                    necessarylineage = lineage_map.get(self.veckey)
                 if necessarylineage is not None:
                     if necessarylineage > 0:
                         namespace = namespace[-necessarylineage:]

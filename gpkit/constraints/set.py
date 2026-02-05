@@ -1,6 +1,7 @@
 "Implements ConstraintSet"
 
 from collections import defaultdict
+from contextlib import nullcontext
 from itertools import chain
 
 import numpy as np
@@ -8,6 +9,7 @@ import numpy as np
 from ..nomials import NomialArray, Variable
 from ..util.repr_conventions import ReprMixin
 from ..util.small_scripts import try_str_without
+from ..varkey import lineage_display_context
 from ..varmap import VarMap, VarSet
 
 
@@ -53,7 +55,6 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
     unique_varkeys, idxlookup = frozenset(), {}
     _name_collision_varkeys = None
     _varkeys = None
-    _lineageset = False
 
     def __init__(
         self, constraints, substitutions=None, *, bonusvks=None
@@ -195,8 +196,8 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
             f"{len(self.varkeys)} variable(s)>"
         )
 
-    def set_necessarylineage(self, clear=False):  # pylint: disable=too-many-branches
-        "Returns the set of contained varkeys whose names are not unique"
+    def _get_lineage_map(self):  # pylint: disable=too-many-branches
+        "Returns mapping of VarKey → lineage depth for display"
         if self._name_collision_varkeys is None:
             self._name_collision_varkeys = {}
             name_collisions = defaultdict(set)
@@ -234,14 +235,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
                 for (_, idx), vks in min_namespaced.items():
                     (vk,) = vks
                     self._name_collision_varkeys[vk] = idx
-        if clear:
-            self._lineageset = False
-            for vk in self._name_collision_varkeys:
-                vk.descr["necessarylineage"] = None
-        else:
-            self._lineageset = True
-            for vk, idx in self._name_collision_varkeys.items():
-                vk.descr["necessarylineage"] = idx
+        return self._name_collision_varkeys
 
     def lines_without(self, excluded):
         "Lines representation of a ConstraintSet."
@@ -249,13 +243,14 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         root, rootlines = "root" not in excluded, []
         if root:
             excluded = {"root"}.union(excluded)
-            self.set_necessarylineage()
-            if hasattr(self, "_rootlines"):
+            ctx = lineage_display_context(self._get_lineage_map())
+        else:
+            ctx = nullcontext()
+        with ctx:
+            if root and hasattr(self, "_rootlines"):
                 rootlines = self._rootlines(excluded)  # pylint: disable=no-member
-        lines = recursively_line(self, excluded)
+            lines = recursively_line(self, excluded)
         indent = " " if root or getattr(self, "lineage", None) else ""
-        if root:
-            self.set_necessarylineage(clear=True)
         return rootlines + [(indent + line).rstrip() for line in lines]
 
     def str_without(self, excluded=("units",)):
