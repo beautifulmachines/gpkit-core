@@ -38,7 +38,8 @@ class TestNomialSubs:
                         return np.array(c[y]) + adnumber([1, 2, 3])
                     return c[y] + np.array([1, 2, 3])
 
-                self.x = VectorVariable(3, "x", vectorlink)
+                self.x = x = VectorVariable(3, "x")
+                return [], {x: vectorlink}
 
         m = VectorLinked()
         assert m.substitutions[m.x[0].key](m.substitutions) == 2

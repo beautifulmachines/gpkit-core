@@ -177,14 +177,6 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         for constraint in self.flat(yield_if_hasattr="process_result"):
             if hasattr(constraint, "process_result"):
                 constraint.process_result(result)
-        evalfn_vars = {
-            v.veckey or v
-            for v in self.unique_varkeys
-            if v.evalfn and v not in result.primal and v not in result.constants
-        }
-        for v in evalfn_vars:
-            val = v.evalfn(result.primal)
-            result.primal[v] = val
 
     def __repr__(self):
         "Returns namespaced string."

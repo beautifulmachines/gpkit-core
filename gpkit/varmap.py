@@ -193,19 +193,18 @@ class VarMap(MutableMapping):
     def __setitem__(self, key, value):
         key = self._varset.resolve(key)
         if isinstance(value, Quantity):
-            value = value.to(key.units).magnitude
+            value = value.to(key.units or "dimensionless").magnitude
         if is_veckey(key):
             if key not in self._varset._by_vec:
                 raise NotImplementedError
             if hasattr(value, "__call__"):  # a linked vector-function
-                # this case temporarily borrowed from keymap, should refactor
-                key.vecfn = value
+                fn = value
                 value = np.empty(key.shape, dtype="object")
                 it = np.nditer(value, flags=["multi_index", "refs_ok"])
                 while not it.finished:
                     i = it.multi_index
                     it.iternext()
-                    value[i] = veclinkedfn(key.vecfn, i)
+                    value[i] = veclinkedfn(fn, i)
             # to setitem via a veckey, the keys must already be registered.
             vks = set(self.varset._by_vec[key].flat)
             if np.prod(key.shape) != len(vks):

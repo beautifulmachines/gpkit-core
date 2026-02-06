@@ -129,7 +129,7 @@ parse_variables is no longer used directly with exec, but as a decorator:
 # pylint: disable=no-member
 def parse_varstring(string):
     "Parses a string to determine what variables to create from it"
-    consts = check_and_parse_flag(string, "Constants\n", constant_declare)
+    consts = check_and_parse_flag(string, "Constants\n")
     variables = check_and_parse_flag(string, "Variables\n")
     vecvars = check_and_parse_flag(string, "Variables of length", vv_declare)
     out = ["# " + line.strip() for line in string.split("\n")]
@@ -145,12 +145,6 @@ def vv_declare(string, flag, idx2, countstr):
     "Turns Variable declarations into VectorVariable ones"
     length = string[len(flag) : idx2].strip()
     return countstr.replace("Variable(", f"VectorVariable({length}, ")
-
-
-# pylint: disable=unused-argument
-def constant_declare(string, flag, idx2, countstr):
-    "Turns Variable declarations into Constant ones"
-    return countstr.replace("')", "', constant=True)")
 
 
 # pylint: disable=too-many-locals

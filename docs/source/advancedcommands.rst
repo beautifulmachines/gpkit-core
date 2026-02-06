@@ -76,20 +76,18 @@ accepting ``model.substitutions`` (for details, see `Substitutions`_ below).
 These functions are automatically differentiated with the `ad <https://pypi.org/project/ad/>`_ package to provide more accurate sensitivities. In some cases this requires functions from ``ad.admath`` instead of their python or numpy equivalents; the `ad documentation <https://pypi.org/project/ad/>`_ details how to do this.
 
 
-Evaluated Free Variables
-------------------------
+Computed Variables
+------------------
 
-Some free variables may be evaluated from the values of other (non-evaluated) free variables
+Some variables may be computed from the values of solved variables
 after the optimization is performed. For example, if the efficiency :math:`\nu` of a motor is not a GP-compatible
 variable, but :math:`(1-\nu)` is a valid GP variable, then :math:`\nu` can be calculated after solving.
-These evaluated free variables can be represented by a ``Variable`` with ``evalfn`` metadata.
-When constructing an ``evalfn``, remember that square-bracket access to variables
-pulls out magnitudes: use round-bracket access (i.e. ``v(var)``) to ensure unit correctness.
+These can be set up using the ``model.computed`` dictionary.
 
 .. literalinclude:: examples/evaluated_free_variables.py
 
-Note that this variable should not be used in constructing your model!
-For evaluated variables that can be used during a solution, see :ref:`sgp`.
+Note that computed variables should not be used in constructing your model constraints!
+For variables computed during a solution (linked substitutions), see :ref:`sgp`.
 
 
 .. _Sweeps:

@@ -66,11 +66,11 @@ class TestConstraint:
         with pytest.raises(TypeError):
             _ = Model(x, [v >= ["A", "B"]])
 
-    def test_evalfn(self):
+    def test_computed_variable(self):
         x = Variable("x")
-        x2 = Variable("x^2", evalfn=lambda solv: solv[x] ** 2)
+        x2 = Variable("x^2")
         m = Model(x, [x >= 2])
-        m.unique_varkeys = set([x2.key])
+        m.computed[x2] = lambda sol: sol[x] ** 2
         sol = m.solve(verbosity=0)
         assert sol[x2] == pytest.approx(sol[x] ** 2)
 

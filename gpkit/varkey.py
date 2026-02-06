@@ -49,9 +49,6 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
             [
                 "lineage",
                 "value",
-                "constant",
-                "evalfn",
-                "vecfn",
                 "idx",
                 "shape",
                 "veckey",
