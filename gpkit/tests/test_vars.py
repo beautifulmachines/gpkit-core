@@ -156,6 +156,14 @@ class TestVarKey:
         with pytest.raises(AttributeError):
             _ = x.nonexistent_attr
 
+    def test_frozen(self):
+        """VarKey is a frozen dataclass - attributes cannot be modified."""
+        from dataclasses import FrozenInstanceError
+
+        x = VarKey("x")
+        with pytest.raises(FrozenInstanceError):
+            x.name = "y"
+
     def test_models_empty_lineage(self):
         """Regression: models property returns () for no lineage.
         Previously crashed with TypeError: zip() argument after * must be
