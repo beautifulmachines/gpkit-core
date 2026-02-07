@@ -133,6 +133,7 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
     def __setstate__(self, state):
         """Unpickle: reconstruct VarKey from state dict."""
         new_vk = VarKey(**state)
+        # pylint: disable=no-member  # __dataclass_fields__ exists on dataclasses
         for name in self.__dataclass_fields__:
             object.__setattr__(self, name, getattr(new_vk, name))
 

@@ -1,6 +1,7 @@
 """Test VarKey, Variable, VectorVariable, and ArrayVariable classes"""
 
 import sys
+from dataclasses import FrozenInstanceError
 
 import numpy as np
 import pytest
@@ -154,12 +155,10 @@ class TestVarKey:
         """Regression: __getattr__ raises AttributeError for unknown attrs."""
         x = VarKey("x")
         with pytest.raises(AttributeError):
-            _ = x.nonexistent_attr
+            _ = x.nonexistent_attr  # pylint: disable=no-member
 
     def test_frozen(self):
         """VarKey is a frozen dataclass - attributes cannot be modified."""
-        from dataclasses import FrozenInstanceError
-
         x = VarKey("x")
         with pytest.raises(FrozenInstanceError):
             x.name = "y"
