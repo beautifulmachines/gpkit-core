@@ -25,7 +25,7 @@ def varkey_bounds(varkeys, lower, upper):
     """
     constraints = []
     for varkey in varkeys:
-        variable = Variable(**varkey.descr)
+        variable = Variable(varkey)
         if variable.units:  # non-dimensionalize the variable monomial
             variable.units = variable.hmap.units = None
         constraint = []

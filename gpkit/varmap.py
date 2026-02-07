@@ -1,5 +1,6 @@
 "Implements the VarMap class"
 
+from collections import defaultdict
 from collections.abc import MutableMapping
 
 import numpy as np
@@ -186,25 +187,24 @@ class VarMap(MutableMapping):
 
     @property
     def varset(self):
-        "public access to varset. used by set_necessarylineage in breakdowns"
+        "public access to varset. used by get_lineage_map"
         return self._varset
 
     def __setitem__(self, key, value):
         key = self._varset.resolve(key)
         if isinstance(value, Quantity):
-            value = value.to(key.units).magnitude
+            value = value.to(key.units or "dimensionless").magnitude
         if is_veckey(key):
             if key not in self._varset._by_vec:
                 raise NotImplementedError
             if hasattr(value, "__call__"):  # a linked vector-function
-                # this case temporarily borrowed from keymap, should refactor
-                key.vecfn = value
+                fn = value
                 value = np.empty(key.shape, dtype="object")
                 it = np.nditer(value, flags=["multi_index", "refs_ok"])
                 while not it.finished:
                     i = it.multi_index
                     it.iternext()
-                    value[i] = veclinkedfn(key.vecfn, i)
+                    value[i] = veclinkedfn(fn, i)
             # to setitem via a veckey, the keys must already be registered.
             vks = set(self.varset._by_vec[key].flat)
             if np.prod(key.shape) != len(vks):
@@ -258,3 +258,63 @@ class VarMap(MutableMapping):
         "Return a quantity corresponding to self[key]"
         clean_key, val = self.item(key)
         return Quantity(val, clean_key.units or "dimensionless")
+
+
+def _compute_collision_depths(name_collisions):
+    """Compute minimum lineage depth needed to disambiguate colliding varkeys.
+
+    Arguments
+    ---------
+    name_collisions : dict[str, set[VarKey]]
+        Mapping from short name to set of VarKeys that share that name.
+
+    Returns
+    -------
+    dict[VarKey, int]
+        Mapping from each VarKey to its required lineage depth.
+    """
+    result = {}
+    for varkeys in name_collisions.values():
+        min_namespaced = defaultdict(set)
+        for vk in varkeys:
+            *_, mineage = vk.lineagestr().split(".")
+            min_namespaced[(mineage, 1)].add(vk)
+        while any(len(vks) > 1 for vks in min_namespaced.values()):
+            for key, vks in list(min_namespaced.items()):
+                if len(vks) <= 1:
+                    continue
+                del min_namespaced[key]
+                mineage, idx = key
+                idx += 1
+                for vk in vks:
+                    lineages = vk.lineagestr().split(".")
+                    submineage = lineages[-idx] + "." + mineage
+                    min_namespaced[(submineage, idx)].add(vk)
+        for (_, idx), vks in min_namespaced.items():
+            (vk,) = vks
+            result[vk] = idx
+    return result
+
+
+def get_lineage_map(solution):
+    """Compute and cache lineage display mapping for solution variables.
+
+    Returns a dict mapping each VarKey to the number of lineage levels
+    needed to uniquely identify it among the solution's variables.
+    """
+    if "name_collision_varkeys" not in solution.meta:
+        solution.meta["name_collision_varkeys"] = {}
+        varset = VarSet(solution.primal.varset)
+        varset.update(solution.constants)
+        name_collisions = defaultdict(set)
+        for key in varset:
+            if len(varset.by_name(key.name)) == 1:  # unique
+                solution.meta["name_collision_varkeys"][key] = 0
+            else:
+                shortname = key.str_without(["lineage", "vec"])
+                if len(varset.by_name(shortname)) > 1:
+                    name_collisions[shortname].add(key)
+        solution.meta["name_collision_varkeys"].update(
+            _compute_collision_depths(name_collisions)
+        )
+    return solution.meta["name_collision_varkeys"]

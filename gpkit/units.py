@@ -12,6 +12,8 @@ QTY_CACHE = {}
 
 def qty(unit):
     "Returns a Quantity, caching the result for future retrievals"
+    if isinstance(unit, Quantity):
+        return unit
     if unit not in QTY_CACHE:
         QTY_CACHE[unit] = Quantity(1, unit)
     return QTY_CACHE[unit]

@@ -49,10 +49,8 @@ class Variable(Monomial):
                 if isinstance(arg, Strings) and "name" not in descr:
                     descr["name"] = arg
                 elif (
-                    isinstance(arg, Numbers)
-                    or hasattr(arg, "__call__")
-                    and "value" not in descr
-                ):
+                    isinstance(arg, Numbers) or hasattr(arg, "__call__")
+                ) and "value" not in descr:
                     descr["value"] = arg
                 elif isinstance(arg, Iterable) and not isinstance(arg, Strings):
                     raise NotImplementedError
@@ -160,8 +158,6 @@ class ArrayVariable(NomialArray):  # pylint: disable=too-many-locals
         veckeydescr = descr.copy()
         addmodelstodescr(veckeydescr)
         if values is not None:
-            if hasattr(values, "__call__"):
-                veckeydescr["vecfn"] = values
             veckeydescr["value"] = values
         veckey = VarKey(**veckeydescr)
 

@@ -17,8 +17,8 @@ from gpkit.util.repr_conventions import lineagestr
 from gpkit.util.repr_conventions import unitstr as get_unitstr
 from gpkit.util.small_classes import FixedScalar, HashVector, SolverLog
 from gpkit.util.small_scripts import mag, try_str_without
-from gpkit.varkey import VarKey
-from gpkit.varmap import VarSet
+from gpkit.varkey import VarKey, lineage_display_context, necessarylineage
+from gpkit.varmap import get_lineage_map
 
 Tree = namedtuple("Tree", ["key", "value", "branches"])
 Transform = namedtuple("Transform", ["factor", "power", "origkey"])
@@ -29,16 +29,16 @@ def bdtable_gen(key):
 
     def bdtable(self, _showvars, **_):
         "Cost breakdown plot"
-        set_necessarylineage(self)
+        lineage_map = get_lineage_map(self)
         bds = Breakdowns(self)
         original_stdout = sys.stdout
         try:
             sys.stdout = SolverLog(original_stdout, verbosity=0)
-            bds.plot(key)
+            with lineage_display_context(lineage_map):
+                bds.plot(key)
         finally:
             lines = sys.stdout.lines()
             sys.stdout = original_stdout
-            set_necessarylineage(self, clear=True)
         return lines
 
     return bdtable
@@ -129,49 +129,6 @@ def divide_out_vk(vk, pow, lt, gt):
     lt, gt = lt / var, gt / var
     lt.ast = gt.ast = None
     return lt, gt
-
-
-def set_necessarylineage(solution, clear=False):
-    # pylint: disable=too-many-branches
-    if "name_collision_varkeys" not in solution.meta:
-        solution.meta["name_collision_varkeys"] = {}
-        varset = VarSet(solution.primal.varset)
-        varset.update(solution.constants)
-        name_collisions = defaultdict(set)
-        for key in varset:
-            if len(varset.by_name(key.name)) == 1:  # unique
-                solution.meta["name_collision_varkeys"][key] = 0
-            else:
-                shortname = key.str_without(["lineage", "vec"])
-                if len(varset.by_name(shortname)) > 1:
-                    name_collisions[shortname].add(key)
-        for varkeys in name_collisions.values():
-            min_namespaced = defaultdict(set)
-            for vk in varkeys:
-                *_, mineage = vk.lineagestr().split(".")
-                min_namespaced[(mineage, 1)].add(vk)
-            while any(len(vks) > 1 for vks in min_namespaced.values()):
-                for key, vks in list(min_namespaced.items()):
-                    if len(vks) <= 1:
-                        continue
-                    del min_namespaced[key]
-                    mineage, idx = key
-                    idx += 1
-                    for vk in vks:
-                        lineages = vk.lineagestr().split(".")
-                        submineage = lineages[-idx] + "." + mineage
-                        min_namespaced[(submineage, idx)].add(vk)
-            for (_, idx), vks in min_namespaced.items():
-                (vk,) = vks
-                solution.meta["name_collision_varkeys"][vk] = idx
-    if clear:
-        solution.meta["lineageset"] = False
-        for vk in solution.meta["name_collision_varkeys"]:
-            vk.descr["necessarylineage"] = None
-    else:
-        solution.meta["lineageset"] = True
-        for vk, idx in solution.meta["name_collision_varkeys"].items():
-            vk.descr["necessarylineage"] = idx
 
 
 # @profile
@@ -344,11 +301,6 @@ def crawl(
     if visited_bdkeys is None:
         visited_bdkeys = set()
         all_visited_bdkeys = set()
-    if verbosity == 1:
-        # already_set = False  # not solution._lineageset TODO
-        already_set = solution.meta.get("lineageset", False)
-        if not already_set:
-            set_necessarylineage(solution)
     if verbosity:
         indent = verbosity - 1  # HACK: a bit of overloading, here
         kvstr = "%s (%s)" % (key, get_valstr(key, solution))
@@ -580,9 +532,6 @@ def crawl(
                 )
                 print("  " * indent + keyvalstr)
             subtree.append(Tree(mon, scaledmonval, []))
-    if verbosity == 1:
-        if not already_set:
-            set_necessarylineage(solution, clear=True)
     return tree
 
 
@@ -791,7 +740,7 @@ def prune(tree, solution, maxlength, length=-1, prefix=""):
         len(get_valstr(key, solution, into="(%s)")),
         len(get_keystr(key, solution, prefix)),
     )
-    if length == -1 and isinstance(key, VarKey) and key.necessarylineage:
+    if length == -1 and isinstance(key, VarKey) and necessarylineage(key):
         prefix = key.lineagestr()
     length += keylength + 3
     for branch in branches:
@@ -828,9 +777,6 @@ def graph(
     showlegend=False,
 ):
     "Prints breakdown"
-    already_set = solution.meta.get("lineageset", False)
-    if not already_set:
-        set_necessarylineage(solution)
     collapse = not showlegend
     # TODO: set to True while showlegend is True for first approx of receipts;
     # TODO: autoinclude with trace?
@@ -862,7 +808,7 @@ def graph(
         A_str = "Cost"
     else:
         A_str = get_keystr(A_key, solution)
-        if isinstance(A_key, VarKey) and A_key.necessarylineage:
+        if isinstance(A_key, VarKey) and necessarylineage(A_key):
             prefix = A_key.lineagestr()
     A_valstr = get_valstr(A_key, solution, into="(%s)")
     fmt = "{0:>%s}" % (max(len(A_str), len(A_valstr)) + 3)
@@ -971,9 +917,6 @@ def graph(
             ).rstrip()
             print(" " + line)
 
-    if not already_set:
-        set_necessarylineage(solution, clear=True)
-
 
 def legend_entry(key, shortname, solution, prefix, basically_fixed_variables):
     "Returns list of legend elements"
@@ -1068,7 +1011,7 @@ def plotlyify(tree, solution, minval=None):
     values = []
 
     key, value, branches = tree
-    if isinstance(key, VarKey) and key.necessarylineage:
+    if isinstance(key, VarKey) and necessarylineage(key):
         prefix = key.lineagestr()
     else:
         prefix = ""
@@ -1122,14 +1065,17 @@ def icicle(ids, labels, parents, values):
 class Breakdowns(object):
     def __init__(self, sol):
         self.sol = sol
+        self.lineage_map = get_lineage_map(sol)
         self.mlookup = {}
-        self.mtree = crawl_modelbd(get_model_breakdown(sol), self.mlookup)
+        with lineage_display_context(self.lineage_map):
+            self.mtree = crawl_modelbd(get_model_breakdown(sol), self.mlookup)
         self.basically_fixed_variables = set()
         self.bd = get_breakdowns(self.basically_fixed_variables, self.sol)
 
     def trace(self, key, *, permissivity=2):
         print("")  # a little padding to start
-        self.get_tree(key, permissivity=permissivity, verbosity=1)
+        with lineage_display_context(self.lineage_map):
+            self.get_tree(key, permissivity=permissivity, verbosity=1)
 
     def get_tree(self, key, *, permissivity=2, verbosity=0):
         tree = None
@@ -1167,21 +1113,23 @@ class Breakdowns(object):
         return tree, kind
 
     def plot(self, key, *, height=None, permissivity=2, showlegend=False, maxwidth=85):
-        tree, kind = self.get_tree(key, permissivity=permissivity)
-        lookup = self.bd if kind == "variable" else self.mlookup
-        graph(
-            tree,
-            lookup,
-            self.sol,
-            self.basically_fixed_variables,
-            height=height,
-            showlegend=showlegend,
-            maxwidth=maxwidth,
-        )
+        with lineage_display_context(self.lineage_map):
+            tree, kind = self.get_tree(key, permissivity=permissivity)
+            lookup = self.bd if kind == "variable" else self.mlookup
+            graph(
+                tree,
+                lookup,
+                self.sol,
+                self.basically_fixed_variables,
+                height=height,
+                showlegend=showlegend,
+                maxwidth=maxwidth,
+            )
 
     def treemap(self, key, *, permissivity=2, returnfig=False, filename=None):
-        tree, _ = self.get_tree(key)
-        fig = treemap(*plotlyify(tree, self.sol))
+        with lineage_display_context(self.lineage_map):
+            tree, _ = self.get_tree(key)
+            fig = treemap(*plotlyify(tree, self.sol))
         if returnfig:
             return fig
         if filename is None:
@@ -1195,8 +1143,9 @@ class Breakdowns(object):
         plotly.offline.plot(fig, filename=filename)
 
     def icicle(self, key, *, permissivity=2, returnfig=False, filename=None):
-        tree, _ = self.get_tree(key, permissivity=permissivity)
-        fig = icicle(*plotlyify(tree, self.sol))
+        with lineage_display_context(self.lineage_map):
+            tree, _ = self.get_tree(key, permissivity=permissivity)
+            fig = icicle(*plotlyify(tree, self.sol))
         if returnfig:
             return fig
         if filename is None:

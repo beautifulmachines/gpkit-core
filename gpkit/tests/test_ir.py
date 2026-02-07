@@ -205,7 +205,7 @@ class TestVarKeyIR:
         assert vk2 == vk
 
     def test_with_units(self):
-        vk = VarKey("S", unitrepr="m^2")
+        vk = VarKey("S", units="m^2")
         ir = vk.to_ir()
         assert ir["units"] == "m^2"
         vk2 = VarKey.from_ir(ir)
@@ -236,7 +236,7 @@ class TestVarKeyIR:
         assert vk2.label == "total weight"
 
     def test_json_serializable(self):
-        vk = VarKey("S", lineage=(("Wing", 0),), unitrepr="m^2", label="area")
+        vk = VarKey("S", lineage=(("Wing", 0),), units="m^2", label="area")
         ir = vk.to_ir()
         json_str = json.dumps(ir)
         ir2 = json.loads(json_str)
@@ -366,7 +366,7 @@ class TestNomialMapIR:
 
     def test_with_units(self):
         """Units survive round-trip."""
-        x = Variable("x", unitrepr="m")
+        x = Variable("x", units="m")
         hmap = NomialMap({HashVector({x.key: 1}): 1.0})
         hmap.units = qty("m")
         ir = hmap.to_ir()
@@ -438,8 +438,8 @@ class TestNomialIR:
         assert p2.ast.str_without() == p.ast.str_without()
 
     def test_units_survive_roundtrip(self):
-        x = Variable("x", unitrepr="m")
-        y = Variable("y", unitrepr="m")
+        x = Variable("x", units="m")
+        y = Variable("y", units="m")
         p = x + y
         ir = p.to_ir()
         assert "units" in ir
@@ -761,9 +761,9 @@ class TestModelIR:
 
     def test_units_roundtrip(self):
         """Model with pint units round-trips with matching costs."""
-        x = Variable("x", unitrepr="m")
-        y = Variable("y", unitrepr="m")
-        m = Model(x + y, [x * y >= 1 * Variable("u", unitrepr="m^2")])
+        x = Variable("x", units="m")
+        y = Variable("y", units="m")
+        m = Model(x + y, [x * y >= 1 * Variable("u", units="m^2")])
         m.substitutions[m["u"]] = 1
         sol = m.solve(verbosity=0)
 

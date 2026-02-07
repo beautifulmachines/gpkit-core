@@ -8,6 +8,8 @@ def veclinkedfn(linkedfn, i):
         "Linked function that pulls out a particular index"
         return linkedfn(c)[i]
 
+    newlinkedfn.original_fn = linkedfn
+    newlinkedfn.idx = i
     return newlinkedfn
 
 

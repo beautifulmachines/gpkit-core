@@ -70,7 +70,7 @@ class TestMonomial:  # pylint: disable=unnecessary-negation,comparison-with-itse
 
         # test label kwarg
         x = Variable("x", label="dummy variable")
-        assert list(x.exp)[0].descr["label"] == "dummy variable"
+        assert list(x.exp)[0].label == "dummy variable"
         _ = hash(m)
         _ = hash(x)
         _ = hash(Monomial(x))

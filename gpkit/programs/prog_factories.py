@@ -14,22 +14,24 @@ from ..varmap import VarMap
 
 def evaluate_linked(constants, linked):
     # pylint: disable=too-many-branches
-    "Evaluates the values and gradients of linked variables."
+    "Evaluates the values and derivatives of linked variables."
     kdc = VarMap({k: adnumber(maybe_flatten(v), k) for k, v in constants.items()})
     kdc_plain = None
-    array_calulated = {}
-    for key in constants:  # remove gradients from constants
-        key.descr["gradients"] = None
+    linked_derivs = {}
+    array_calculated = {}  # cache for batch-evaluated vector linked functions
     for v, f in linked.items():
         try:
-            if v.veckey and v.veckey.vecfn:
-                if v.veckey not in array_calulated:
-                    with SignomialsEnabled():  # to allow use of gpkit.units
-                        vecout = v.veckey.vecfn(kdc)
+            # Check if this is a veclinkedfn with a batch-callable original
+            original_fn = getattr(f, "original_fn", None)
+            if original_fn is not None and v.veckey:
+                # Batch-evaluate the original function once per veckey
+                if v.veckey not in array_calculated:
+                    with SignomialsEnabled():
+                        vecout = original_fn(kdc)
                     if not hasattr(vecout, "shape"):
                         vecout = np.array(vecout)
-                    array_calulated[v.veckey] = vecout
-                out = array_calulated[v.veckey][v.idx]
+                    array_calculated[v.veckey] = vecout
+                out = array_calculated[v.veckey][v.idx]
             else:
                 with SignomialsEnabled():  # to allow use of gpkit.units
                     out = f(kdc)
@@ -48,7 +50,7 @@ def evaluate_linked(constants, linked):
                 constants[v] = out
                 continue  # a new fixed variable, not a calculated one
             constants[v] = out.x
-            v.descr["gradients"] = {
+            linked_derivs[v] = {
                 adn.tag: grad for adn, grad in out.d().items() if adn.tag
             }
         except Exception as exception:  # pylint: disable=broad-except
@@ -59,7 +61,6 @@ def evaluate_linked(constants, linked):
             if kdc_plain is None:
                 kdc_plain = VarMap(constants)
             constants[v] = f(kdc_plain)
-            v.descr["gradients"] = None
             print(
                 "Warning: skipped auto-differentiation of linked variable"
                 f" {v} because {exception!r} was raised. Set `gpkit.settings"
@@ -75,6 +76,7 @@ def evaluate_linked(constants, linked):
                     f" gpkit.units.* in the function for {v}; try using"
                     " gpkit.ureg.* or gpkit.units.*.units instead."
                 )
+    return linked_derivs
 
 
 def progify(program, return_attr=None):
@@ -94,7 +96,9 @@ def progify(program, return_attr=None):
             constants = parse_subs(self.varkeys, self.substitutions)
             linked = parse_linked(self.varkeys, self.substitutions)
             if linked:
-                evaluate_linked(constants, linked)
+                linked_derivs = evaluate_linked(constants, linked)
+                if linked_derivs:
+                    initargs.setdefault("linked_derivs", linked_derivs)
         prog = program(self.cost, self, constants, **initargs)
         prog.model = self  # NOTE SIDE EFFECTS
         if return_attr:
