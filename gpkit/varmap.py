@@ -260,13 +260,48 @@ class VarMap(MutableMapping):
         return Quantity(val, clean_key.units or "dimensionless")
 
 
+def _compute_collision_depths(name_collisions):
+    """Compute minimum lineage depth needed to disambiguate colliding varkeys.
+
+    Arguments
+    ---------
+    name_collisions : dict[str, set[VarKey]]
+        Mapping from short name to set of VarKeys that share that name.
+
+    Returns
+    -------
+    dict[VarKey, int]
+        Mapping from each VarKey to its required lineage depth.
+    """
+    result = {}
+    for varkeys in name_collisions.values():
+        min_namespaced = defaultdict(set)
+        for vk in varkeys:
+            *_, mineage = vk.lineagestr().split(".")
+            min_namespaced[(mineage, 1)].add(vk)
+        while any(len(vks) > 1 for vks in min_namespaced.values()):
+            for key, vks in list(min_namespaced.items()):
+                if len(vks) <= 1:
+                    continue
+                del min_namespaced[key]
+                mineage, idx = key
+                idx += 1
+                for vk in vks:
+                    lineages = vk.lineagestr().split(".")
+                    submineage = lineages[-idx] + "." + mineage
+                    min_namespaced[(submineage, idx)].add(vk)
+        for (_, idx), vks in min_namespaced.items():
+            (vk,) = vks
+            result[vk] = idx
+    return result
+
+
 def get_lineage_map(solution):
     """Compute and cache lineage display mapping for solution variables.
 
     Returns a dict mapping each VarKey to the number of lineage levels
     needed to uniquely identify it among the solution's variables.
     """
-    # pylint: disable=too-many-branches
     if "name_collision_varkeys" not in solution.meta:
         solution.meta["name_collision_varkeys"] = {}
         varset = VarSet(solution.primal.varset)
@@ -279,23 +314,7 @@ def get_lineage_map(solution):
                 shortname = key.str_without(["lineage", "vec"])
                 if len(varset.by_name(shortname)) > 1:
                     name_collisions[shortname].add(key)
-        for varkeys in name_collisions.values():
-            min_namespaced = defaultdict(set)
-            for vk in varkeys:
-                *_, mineage = vk.lineagestr().split(".")
-                min_namespaced[(mineage, 1)].add(vk)
-            while any(len(vks) > 1 for vks in min_namespaced.values()):
-                for key, vks in list(min_namespaced.items()):
-                    if len(vks) <= 1:
-                        continue
-                    del min_namespaced[key]
-                    mineage, idx = key
-                    idx += 1
-                    for vk in vks:
-                        lineages = vk.lineagestr().split(".")
-                        submineage = lineages[-idx] + "." + mineage
-                        min_namespaced[(submineage, idx)].add(vk)
-            for (_, idx), vks in min_namespaced.items():
-                (vk,) = vks
-                solution.meta["name_collision_varkeys"][vk] = idx
+        solution.meta["name_collision_varkeys"].update(
+            _compute_collision_depths(name_collisions)
+        )
     return solution.meta["name_collision_varkeys"]

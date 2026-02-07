@@ -118,12 +118,12 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
                         namespace.insert(0, "." * (len(to_replace) - replaced))
             if "hiddenlineage" not in excluded:
                 lineage_map = _lineage_ctx.get()
-                necessarylineage = lineage_map.get(self)
-                if necessarylineage is None and self.veckey:
-                    necessarylineage = lineage_map.get(self.veckey)
-                if necessarylineage is not None:
-                    if necessarylineage > 0:
-                        namespace = namespace[-necessarylineage:]
+                lineage_depth = lineage_map.get(self)
+                if lineage_depth is None and self.veckey:
+                    lineage_depth = lineage_map.get(self.veckey)
+                if lineage_depth is not None:
+                    if lineage_depth > 0:
+                        namespace = namespace[-lineage_depth:]
                     else:
                         namespace = None
             if namespace:

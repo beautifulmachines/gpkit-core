@@ -10,7 +10,7 @@ from ..nomials import NomialArray, Variable
 from ..util.repr_conventions import ReprMixin
 from ..util.small_scripts import try_str_without
 from ..varkey import lineage_display_context
-from ..varmap import VarMap, VarSet
+from ..varmap import VarMap, VarSet, _compute_collision_depths
 
 
 # pylint: disable=fixme
@@ -188,7 +188,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
             f"{len(self.varkeys)} variable(s)>"
         )
 
-    def _get_lineage_map(self):  # pylint: disable=too-many-branches
+    def _get_lineage_map(self):
         "Returns mapping of VarKey → lineage depth for display"
         if self._name_collision_varkeys is None:
             self._name_collision_varkeys = {}
@@ -208,25 +208,9 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
                             name_collisions[shortname].add(key)
                 else:
                     raise ValueError(f"unexpected key {key} has no key attribute")
-            for varkeys in name_collisions.values():
-                min_namespaced = defaultdict(set)
-                for vk in varkeys:
-                    *_, mineage = vk.lineagestr().split(".")
-                    min_namespaced[(mineage, 1)].add(vk)
-                while any(len(vks) > 1 for vks in min_namespaced.values()):
-                    for key, vks in list(min_namespaced.items()):
-                        if len(vks) <= 1:
-                            continue
-                        del min_namespaced[key]
-                        mineage, idx = key
-                        idx += 1
-                        for vk in vks:
-                            lineages = vk.lineagestr().split(".")
-                            submineage = lineages[-idx] + "." + mineage
-                            min_namespaced[(submineage, idx)].add(vk)
-                for (_, idx), vks in min_namespaced.items():
-                    (vk,) = vks
-                    self._name_collision_varkeys[vk] = idx
+            self._name_collision_varkeys.update(
+                _compute_collision_depths(name_collisions)
+            )
         return self._name_collision_varkeys
 
     def lines_without(self, excluded):

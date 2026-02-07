@@ -239,7 +239,7 @@ class GeometricProgram:
     _result = solve_log = solver_out = model = None
     choicevaridxs = integersolve = None
 
-    def __init__(
+    def __init__(  # pylint: disable=too-many-arguments
         self,
         cost,
         constraints,

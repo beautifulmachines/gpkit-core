@@ -200,7 +200,7 @@ PARSETIP = (
 )
 
 
-def variable_declaration(nameval, units, label, line, errorcatch=True):
+def variable_declaration(nameval, units, label, line):
     "Turns parsed output into a Variable declaration"
     if len(nameval) > 2:
         raise ValueError(
