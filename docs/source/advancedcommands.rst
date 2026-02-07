@@ -184,7 +184,7 @@ so that updating any one of them will update all of them.
 Fixed Variables
 ---------------
 
-When a Model is created, any fixed Variables are used to form a dictionary: ``{var: var.descr["value"] for var in self.varlocs if "value" in var.descr}``. This dictionary in then substituted into the Model's cost and constraints before the ``substitutions`` argument is (and hence values are supplanted by any later substitutions).
+When a Model is created, any fixed Variables are used to form a dictionary: ``{var: var.value for var in self.varlocs if var.value is not None}``. This dictionary is then substituted into the Model's cost and constraints before the ``substitutions`` argument is (and hence values are supplanted by any later substitutions).
 
 ``solution.subinto(p)`` will substitute the solution(s) for variables into the posynomial ``p``, returning a NomialArray. For a non-swept solution, this is equivalent to ``p.sub(solution["variables"])``.
 

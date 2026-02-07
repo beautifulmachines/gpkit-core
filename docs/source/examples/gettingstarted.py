@@ -13,7 +13,7 @@ y = Variable("y", "m")
 z = Variable("z", "m", "A variable called z with units of meters")
 
 rho = Variable("rho", 1.225, "kg/m^3", "Density of air at sea level")
-pi = Variable("pi", 3.14159, "-", constant=True)
+pi = Variable("pi", 3.14159, "-")
 
 # Declare a 3-element vector variable "x" with units of "m"
 x = VectorVariable(3, "x", "m", "Cube corner coordinates")

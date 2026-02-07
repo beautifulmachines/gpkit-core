@@ -1,6 +1,8 @@
 # pylint: disable=consider-using-f-string
 """Models for assessing primal feasibility"""
 
+from dataclasses import replace
+
 from ..globals import NamedVariables, SignomialsEnabled
 from ..nomials import NomialArray, Variable, VectorVariable
 from ..nomials.substitution import parse_linked, parse_subs
@@ -212,27 +214,25 @@ class ConstantsRelaxed(ConstraintSet):
             if const.name in exclude:
                 continue
             # set up the lineage
-            newconstd = const.descr.copy()
-            newconstd["veckey"] = None  # only const wants an old veckey
-            newconstd["value"] = None  # derived variables are free
-            # everything but const wants a new lineage, to distinguish them
-            newconstd["lineage"] = (newconstd.pop("lineage") or ()) + (
-                self.lineage[-1],
-            )
+            new_lineage = (const.lineage or ()) + (self.lineage[-1],)
             # make the relaxation variable, free to get as large as it needs
-            relaxedd = newconstd.copy()
-            relaxedd["unitrepr"] = "-"  # and unitless, importantly
-            relaxvar = Variable(**relaxedd)
+            relaxvar = Variable(
+                replace(const, veckey=None, value=None, lineage=new_lineage, units=None)
+            )
             relaxvars.append(relaxvar)
             # the newly freed const can acquire a new value
             del substitutions[const]
-            freedd = const.descr.copy()
-            freedd["value"] = None  # freed from its original value
-            freed = Variable(**freedd)
+            freed = Variable(replace(const, value=None))
             self.freedvars.append(freed)
-            # becuase the make the newconst will take its old value
-            newconstd["lineage"] += (("OriginalValues", 0),)
-            newconst = Variable(**newconstd)
+            # because the newconst will take its old value
+            newconst = Variable(
+                replace(
+                    const,
+                    veckey=None,
+                    value=None,
+                    lineage=new_lineage + (("OriginalValues", 0),),
+                )
+            )
             substitutions[newconst] = val
             self._derelax_map[newconst.key] = const
             # add constraints so the newly freed's wiggle room

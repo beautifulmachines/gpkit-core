@@ -2,6 +2,8 @@
 
 from contextlib import contextmanager
 from contextvars import ContextVar
+from dataclasses import dataclass, field, replace
+from typing import Any
 
 from .units import qty
 from .util.repr_conventions import ReprMixin
@@ -25,77 +27,114 @@ def necessarylineage(vk):
     return _lineage_ctx.get().get(vk)
 
 
+@dataclass(frozen=True, eq=False)
 class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
     """An object to correspond to each 'variable name'.
 
     Arguments
     ---------
     name : str
-        Name of this Variable, or object to derive this Variable from.
+        Name of this Variable.
 
-    **descr :
-        Any additional attributes, which become the descr attribute (a dict).
+    **kwargs :
+        lineage, units, label, idx, shape, veckey, value, choices
 
     Returns
     -------
-    VarKey with the given name and descr.
+    VarKey with the given name and attributes.
     """
 
     unique_id = Count().next
     subscripts = ("lineage", "idx")
 
-    _DESCR_DEFAULTS = {
-        **dict.fromkeys(
-            [
-                "lineage",
-                "value",
-                "idx",
-                "shape",
-                "veckey",
-                "choices",
-            ]
-        ),
-        "label": "",
-    }
+    # Init fields
+    name: str = ""
+    lineage: tuple = None
+    units: Any = None
+    unitrepr: str = ""  # preserved through replace(); set from units if empty
+    label: str = ""
+    idx: tuple = None
+    shape: tuple = ()
+    veckey: "VarKey" = None
+    value: Any = None
+    choices: tuple = None
 
-    def __init__(self, name=None, **descr):
-        # NOTE: Python arg handling guarantees 'name' won't appear in descr
-        self.descr = {**self._DESCR_DEFAULTS, **descr}
-        self.descr["name"] = name or "\\fbox{%s}" % VarKey.unique_id()
-        unitrepr = self.descr.get("unitrepr") or self.descr.get("units")
-        if unitrepr in ["", "-", None]:  # dimensionless
-            self.descr["units"] = None
-            self.descr["unitrepr"] = "-"
+    # Derived fields (computed in __post_init__)
+    key: "VarKey" = field(default=None, init=False, repr=False)
+    keys: frozenset = field(default=frozenset(), init=False, repr=False)
+    ref: str = field(default="", init=False, repr=False)
+    _hashvalue: int = field(default=0, init=False, repr=False)
+
+    def __post_init__(self):
+        # Normalize name
+        name = self.name or "\\fbox{%s}" % VarKey.unique_id()
+        object.__setattr__(self, "name", name)
+
+        # Normalize lineage (None → ())
+        if self.lineage is None:
+            object.__setattr__(self, "lineage", ())
+
+        # Normalize units and derive unitrepr (if not already set)
+        if self.units in ("", "-", None):
+            object.__setattr__(self, "units", None)
+            if not self.unitrepr:
+                object.__setattr__(self, "unitrepr", "-")
         else:
-            self.descr["units"] = qty(unitrepr)
-            self.descr["unitrepr"] = unitrepr
+            # Capture original string before normalizing (if unitrepr not set)
+            if not self.unitrepr and isinstance(self.units, str):
+                object.__setattr__(self, "unitrepr", self.units)
+            units = qty(self.units)
+            object.__setattr__(self, "units", units)
+            # If still no unitrepr (units was already a Quantity), derive it
+            if not self.unitrepr:
+                object.__setattr__(self, "unitrepr", f"{units.units:~}")
 
-        self.key = self
-        self.ref = self._compute_ref()
-        self._hashvalue = hash(self.ref)
+        # Set key = self
+        object.__setattr__(self, "key", self)
+
+        # Compute ref and hash
+        ref = self._compute_ref()
+        object.__setattr__(self, "ref", ref)
+        object.__setattr__(self, "_hashvalue", hash(ref))
+
+        # Compute keys set
         fullstr = self.str_without({"hiddenlineage", "modelnums", "vec"})
-        self.keys = set((self.name, fullstr))
+        keys = {self.name, fullstr}
 
-        if self.descr["idx"] is not None:
-            if self.descr["veckey"] is None:
-                vecdescr = self.descr.copy()
-                vecdescr["idx"] = None
-                self.veckey = VarKey(**vecdescr)
+        # Auto-create veckey if idx is set but veckey is not
+        if self.idx is not None:
+            if self.veckey is None:
+                vk = replace(self, idx=None, veckey=None)
+                object.__setattr__(self, "veckey", vk)
             else:
-                self.keys.add(self.veckey)
-                self.keys.add(self.str_without({"idx", "modelnums"}))
+                keys.add(self.veckey)
+                keys.add(self.str_without({"idx", "modelnums"}))
 
-    def __getstate__(self):
-        "Stores varkey as its metadata dictionary, removing functions"
-        state = self.descr.copy()
-        for key, value in state.items():
-            if getattr(value, "__call__", None):
-                state[key] = "unpickleable function {value}"
-        return state
+        object.__setattr__(self, "keys", frozenset(keys))
+
+    def __reduce__(self):
+        """Pickle support: serialize unitrepr (string) not units (Quantity)."""
+        value = self.value
+        if callable(value):
+            value = f"unpickleable function {value}"
+        state = {
+            "name": self.name,
+            "lineage": self.lineage if self.lineage else None,
+            "units": self.unitrepr if self.unitrepr != "-" else None,
+            "label": self.label if self.label else None,
+            "idx": self.idx,
+            "shape": self.shape if self.shape else None,
+            "value": value,
+            "choices": self.choices,
+        }
+        state = {k: v for k, v in state.items() if v is not None}
+        return (VarKey, (), state)
 
     def __setstate__(self, state):
-        "Restores varkey from its metadata dictionary"
-        self.__init__(**state)
+        """Unpickle: reconstruct VarKey from state dict."""
+        new_vk = VarKey(**state)
+        for name in self.__dataclass_fields__:
+            object.__setattr__(self, name, getattr(new_vk, name))
 
     def str_without(self, excluded=()):  # pylint:disable=too-many-branches
         "Returns string without certain fields (such as 'lineage')."
@@ -148,19 +187,12 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
             ref += f"[{','.join(map(str, self.idx))}]"
         if self.shape:
             ref += f"#{','.join(map(str, self.shape))}"
-        if self.unitrepr != "-":
-            ref += f"|{self.unitrepr}"
+        if self.units is not None:
+            ref += f"|{self.units.units:~}"  # canonical format for identity
         return ref
 
     def __hash__(self):
         return self._hashvalue
-
-    def __getattr__(self, attr):
-        if attr in self.descr:
-            return self.descr[attr]
-        raise AttributeError(
-            f"'{type(self).__name__}' object has no attribute '{attr}'"
-        )
 
     def to_ir(self):
         "Serialize this VarKey to an IR dict."
@@ -181,18 +213,18 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
     def from_ir(cls, ir_dict):
         "Reconstruct a VarKey from an IR dict."
         name = ir_dict["name"]
-        descr = {}
+        kwargs = {}
         if "lineage" in ir_dict:
-            descr["lineage"] = tuple(tuple(pair) for pair in ir_dict["lineage"])
+            kwargs["lineage"] = tuple(tuple(pair) for pair in ir_dict["lineage"])
         if "units" in ir_dict:
-            descr["unitrepr"] = ir_dict["units"]
+            kwargs["units"] = ir_dict["units"]
         if "label" in ir_dict:
-            descr["label"] = ir_dict["label"]
+            kwargs["label"] = ir_dict["label"]
         if "idx" in ir_dict:
-            descr["idx"] = tuple(ir_dict["idx"])
+            kwargs["idx"] = tuple(ir_dict["idx"])
         if "shape" in ir_dict:
-            descr["shape"] = tuple(ir_dict["shape"])
-        return cls(name, **descr)
+            kwargs["shape"] = tuple(ir_dict["shape"])
+        return cls(name, **kwargs)
 
     @property
     def models(self):

@@ -34,11 +34,9 @@ class TestVarKey:
         # test no args
         x = VarKey()
         assert isinstance(x, VarKey)
-        y = VarKey(**x.descr)
+        y = VarKey(x.name)  # VarKeys with same name are equal
         assert x == y
-        # test special 'name' keyword overwriting behavior
-        x = VarKey("x", flavour="vanilla")
-        assert x.name == "x"
+        # test name keyword
         x = VarKey(name="x")
         assert x.name == "x"
         # pylint: disable=redundant-keyword-arg
@@ -149,8 +147,8 @@ class TestVarKey:
     def test_units_attr(self):
         """Make sure VarKey objects have a units attribute"""
         x = VarKey("x")
-        for vk in (VarKey(), x, VarKey(**x.descr), VarKey(units="m")):
-            assert "units" in vk.descr
+        for vk in (VarKey(), x, VarKey(x.name), VarKey(units="m")):
+            assert hasattr(vk, "units")
 
     def test_getattr_raises(self):
         """Regression: __getattr__ raises AttributeError for unknown attrs."""
@@ -199,7 +197,7 @@ class TestRef:
         assert vk.ref == "x"
 
     def test_with_units(self):
-        vk = VarKey("x", unitrepr="m")
+        vk = VarKey("x", units="m")
         assert vk.ref == "x|m"
 
     def test_with_lineage(self):
@@ -211,8 +209,21 @@ class TestRef:
         assert vk.ref == "Aircraft0.Wing1.S"
 
     def test_with_lineage_and_units(self):
-        vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 0)), unitrepr="m^2")
-        assert vk.ref == "Aircraft0.Wing0.S|m^2"
+        vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 0)), units="m^2")
+        assert vk.ref == "Aircraft0.Wing0.S|m ** 2"  # canonical pint format
+        assert vk.unitrepr == "m^2"  # preserves user's format
+
+    def test_unit_format_equivalence(self):
+        """VarKeys with equivalent units (different formats) are equal."""
+        vk1 = VarKey("x", units="m^2")
+        vk2 = VarKey("x", units="m ** 2")
+        vk3 = VarKey("x", units="m*m")
+        assert vk1 == vk2 == vk3
+        assert hash(vk1) == hash(vk2) == hash(vk3)
+        # But each preserves its original format
+        assert vk1.unitrepr == "m^2"
+        assert vk2.unitrepr == "m ** 2"
+        assert vk3.unitrepr == "m*m"
 
     def test_indexed(self):
         x = VectorVariable(3, "x")
@@ -229,16 +240,16 @@ class TestRef:
 
     def test_identity_via_ref(self):
         """Two VarKeys with same identity fields are equal."""
-        vk1 = VarKey("x", unitrepr="m")
-        vk2 = VarKey("x", unitrepr="m")
+        vk1 = VarKey("x", units="m")
+        vk2 = VarKey("x", units="m")
         assert vk1 == vk2
         assert hash(vk1) == hash(vk2)
         assert vk1.ref == vk2.ref
 
     def test_different_units_not_equal(self):
         """Different units means different ref, different identity."""
-        vk1 = VarKey("x", unitrepr="m")
-        vk2 = VarKey("x", unitrepr="ft")
+        vk1 = VarKey("x", units="m")
+        vk2 = VarKey("x", units="ft")
         assert vk1 != vk2
         assert vk1.ref != vk2.ref
 
