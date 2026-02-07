@@ -45,7 +45,6 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
     """
 
     unique_id = Count().next
-    subscripts = ("lineage", "idx")
 
     # Init fields
     name: str = ""
@@ -119,16 +118,15 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
             value = f"unpickleable function {value}"
         state = {
             "name": self.name,
-            "lineage": self.lineage if self.lineage else None,
+            "lineage": self.lineage or None,
             "units": self.unitrepr if self.unitrepr != "-" else None,
-            "label": self.label if self.label else None,
+            "label": self.label or None,
             "idx": self.idx,
-            "shape": self.shape if self.shape else None,
+            "shape": self.shape or None,
             "value": value,
             "choices": self.choices,
         }
-        state = {k: v for k, v in state.items() if v is not None}
-        return (VarKey, (), state)
+        return (VarKey, (), {k: v for k, v in state.items() if v is not None})
 
     def __setstate__(self, state):
         """Unpickle: reconstruct VarKey from state dict."""

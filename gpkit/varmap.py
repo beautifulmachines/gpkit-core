@@ -19,10 +19,7 @@ def _nested_lookup(nested_keys, val_dict):
 
 def is_veckey(key):
     "return True iff this key corresponds to a VectorVariable"
-    if getattr(key, "shape", None) and not getattr(key, "idx", None):
-        # it has a shape but no index
-        return True
-    return False
+    return bool(getattr(key, "shape", None)) and not getattr(key, "idx", None)
 
 
 class VarSet(set):
@@ -88,7 +85,7 @@ class VarSet(set):
 
     def by_name(self, name):
         """Return all VarKeys for a given name string."""
-        return set(self._by_name.get(name, set()))
+        return self._by_name.get(name, set()).copy()
 
     def by_vec(self, veckey):
         "Return np.array of keys for a given veckey"
@@ -275,24 +272,26 @@ def _compute_collision_depths(name_collisions):
     """
     result = {}
     for varkeys in name_collisions.values():
-        min_namespaced = defaultdict(set)
+        # Map (partial_lineage, depth) → set of varkeys with that partial lineage
+        by_partial_lineage = defaultdict(set)
         for vk in varkeys:
-            *_, mineage = vk.lineagestr().split(".")
-            min_namespaced[(mineage, 1)].add(vk)
-        while any(len(vks) > 1 for vks in min_namespaced.values()):
-            for key, vks in list(min_namespaced.items()):
+            *_, shortest = vk.lineagestr().split(".")
+            by_partial_lineage[(shortest, 1)].add(vk)
+        # Keep extending lineage depth until all varkeys are unique
+        while any(len(vks) > 1 for vks in by_partial_lineage.values()):
+            for key, vks in list(by_partial_lineage.items()):
                 if len(vks) <= 1:
                     continue
-                del min_namespaced[key]
-                mineage, idx = key
-                idx += 1
+                del by_partial_lineage[key]
+                partial, depth = key
+                depth += 1
                 for vk in vks:
                     lineages = vk.lineagestr().split(".")
-                    submineage = lineages[-idx] + "." + mineage
-                    min_namespaced[(submineage, idx)].add(vk)
-        for (_, idx), vks in min_namespaced.items():
+                    extended = lineages[-depth] + "." + partial
+                    by_partial_lineage[(extended, depth)].add(vk)
+        for (_, depth), vks in by_partial_lineage.items():
             (vk,) = vks
-            result[vk] = idx
+            result[vk] = depth
     return result
 
 
