@@ -125,7 +125,7 @@ class Model(CostedConstraintSet):
             ir["substitutions"] = subs_ir
 
         # Phase 5: structural metadata for nested/composable models
-        ir["model_tree"] = build_model_tree(self, variables)
+        ir["model_tree"] = build_model_tree(self)
 
         return ir
 

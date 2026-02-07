@@ -252,7 +252,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         return "\n".join(lines)
 
 
-def build_model_tree(model, ir_variables):
+def build_model_tree(model):
     """Build model_tree structure from a Model's constraint hierarchy.
 
     Walks the constraint tree in the same depth-first order as
@@ -263,8 +263,6 @@ def build_model_tree(model, ir_variables):
     ----------
     model : ConstraintSet
         The top-level constraint set (typically a Model).
-    ir_variables : dict
-        The variables dict from the IR document (ref -> ir_dict).
 
     Returns
     -------
@@ -338,7 +336,7 @@ def build_model_tree(model, ir_variables):
 
     # Assign unclaimed variables to the root node (handles flat models
     # without setup() where unique_varkeys is empty)
-    unclaimed = sorted(ref for ref in ir_variables if ref not in all_claimed_vars)
+    unclaimed = sorted(vk.ref for vk in model.vks if vk.ref not in all_claimed_vars)
     if unclaimed:
         tree["variables"] = sorted(set(tree["variables"]) | set(unclaimed))
 
