@@ -1,6 +1,7 @@
 "Implements ConstraintSet"
 
 from collections import defaultdict
+from contextlib import nullcontext
 from itertools import chain
 
 import numpy as np
@@ -8,7 +9,8 @@ import numpy as np
 from ..nomials import NomialArray, Variable
 from ..util.repr_conventions import ReprMixin
 from ..util.small_scripts import try_str_without
-from ..varmap import VarMap, VarSet
+from ..varkey import lineage_display_context
+from ..varmap import VarMap, VarSet, _compute_collision_depths
 
 
 # pylint: disable=fixme
@@ -53,7 +55,6 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
     unique_varkeys, idxlookup = frozenset(), {}
     _name_collision_varkeys = None
     _varkeys = None
-    _lineageset = False
 
     def __init__(
         self, constraints, substitutions=None, *, bonusvks=None
@@ -92,12 +93,10 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         for key in self.vks:
             if key not in self.substitutions:
                 continue
+            if key.lineage and key not in self.unique_varkeys:
+                continue  # substitution inherited from another model
             self.bounded.add((key, "upper"))
             self.bounded.add((key, "lower"))
-            if key.value is not None and not key.constant:
-                key.descr["value"] = None  # TODO(PR2): eliminate mutation
-                if key.veckey and key.veckey.value is not None:
-                    key.veckey.descr["value"] = None
         add_meq_bounds(self.bounded, self.meq_bounded)
 
     def _update(self, constraint):
@@ -178,14 +177,6 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         for constraint in self.flat(yield_if_hasattr="process_result"):
             if hasattr(constraint, "process_result"):
                 constraint.process_result(result)
-        evalfn_vars = {
-            v.veckey or v
-            for v in self.unique_varkeys
-            if v.evalfn and v not in result.primal and v not in result.constants
-        }
-        for v in evalfn_vars:
-            val = v.evalfn(result.primal)
-            result.primal[v] = val
 
     def __repr__(self):
         "Returns namespaced string."
@@ -197,8 +188,8 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
             f"{len(self.varkeys)} variable(s)>"
         )
 
-    def set_necessarylineage(self, clear=False):  # pylint: disable=too-many-branches
-        "Returns the set of contained varkeys whose names are not unique"
+    def _get_lineage_map(self):
+        "Returns mapping of VarKey → lineage depth for display"
         if self._name_collision_varkeys is None:
             self._name_collision_varkeys = {}
             name_collisions = defaultdict(set)
@@ -217,33 +208,10 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
                             name_collisions[shortname].add(key)
                 else:
                     raise ValueError(f"unexpected key {key} has no key attribute")
-            for varkeys in name_collisions.values():
-                min_namespaced = defaultdict(set)
-                for vk in varkeys:
-                    *_, mineage = vk.lineagestr().split(".")
-                    min_namespaced[(mineage, 1)].add(vk)
-                while any(len(vks) > 1 for vks in min_namespaced.values()):
-                    for key, vks in list(min_namespaced.items()):
-                        if len(vks) <= 1:
-                            continue
-                        del min_namespaced[key]
-                        mineage, idx = key
-                        idx += 1
-                        for vk in vks:
-                            lineages = vk.lineagestr().split(".")
-                            submineage = lineages[-idx] + "." + mineage
-                            min_namespaced[(submineage, idx)].add(vk)
-                for (_, idx), vks in min_namespaced.items():
-                    (vk,) = vks
-                    self._name_collision_varkeys[vk] = idx
-        if clear:
-            self._lineageset = False
-            for vk in self._name_collision_varkeys:
-                vk.descr["necessarylineage"] = None
-        else:
-            self._lineageset = True
-            for vk, idx in self._name_collision_varkeys.items():
-                vk.descr["necessarylineage"] = idx
+            self._name_collision_varkeys.update(
+                _compute_collision_depths(name_collisions)
+            )
+        return self._name_collision_varkeys
 
     def lines_without(self, excluded):
         "Lines representation of a ConstraintSet."
@@ -251,13 +219,14 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         root, rootlines = "root" not in excluded, []
         if root:
             excluded = {"root"}.union(excluded)
-            self.set_necessarylineage()
-            if hasattr(self, "_rootlines"):
+            ctx = lineage_display_context(self._get_lineage_map())
+        else:
+            ctx = nullcontext()
+        with ctx:
+            if root and hasattr(self, "_rootlines"):
                 rootlines = self._rootlines(excluded)  # pylint: disable=no-member
-        lines = recursively_line(self, excluded)
+            lines = recursively_line(self, excluded)
         indent = " " if root or getattr(self, "lineage", None) else ""
-        if root:
-            self.set_necessarylineage(clear=True)
         return rootlines + [(indent + line).rstrip() for line in lines]
 
     def str_without(self, excluded=("units",)):
@@ -283,7 +252,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         return "\n".join(lines)
 
 
-def build_model_tree(model, ir_variables):
+def build_model_tree(model):
     """Build model_tree structure from a Model's constraint hierarchy.
 
     Walks the constraint tree in the same depth-first order as
@@ -294,8 +263,6 @@ def build_model_tree(model, ir_variables):
     ----------
     model : ConstraintSet
         The top-level constraint set (typically a Model).
-    ir_variables : dict
-        The variables dict from the IR document (ref -> ir_dict).
 
     Returns
     -------
@@ -369,7 +336,7 @@ def build_model_tree(model, ir_variables):
 
     # Assign unclaimed variables to the root node (handles flat models
     # without setup() where unique_varkeys is empty)
-    unclaimed = sorted(ref for ref in ir_variables if ref not in all_claimed_vars)
+    unclaimed = sorted(vk.ref for vk in model.vks if vk.ref not in all_claimed_vars)
     if unclaimed:
         tree["variables"] = sorted(set(tree["variables"]) | set(unclaimed))
 

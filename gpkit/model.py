@@ -48,6 +48,7 @@ class Model(CostedConstraintSet):
 
     program = None
     solution = None
+    computed = None  # dict of {VarKey: fn(solution) -> value} for post-solve
 
     def __init__(self, cost=None, constraints=None, *args, **kwargs):
         # pylint: disable=keyword-arg-before-vararg
@@ -78,10 +79,18 @@ class Model(CostedConstraintSet):
             # even if they aren't used in any constraints
             self.unique_varkeys = frozenset(v.key for v in setup_vars)
         CostedConstraintSet.__init__(self, cost, constraints, substitutions)
+        self.computed = {}  # {VarKey: fn(solution)} for post-solve computation
         docstr = self.__class__.__doc__
         if self.lineage and docstr and "SKIP VERIFICATION" not in docstr:
             if "Unbounded" in docstr or "Bounded by" in docstr:
                 self.verify_docstring()
+
+    def process_result(self, result):
+        "Evaluate computed variables and add to result.primal"
+        super().process_result(result)
+        for var, fn in self.computed.items():
+            key = getattr(var, "key", var)
+            result.primal[key] = fn(result)
 
     def to_ir(self):
         "Serialize this Model to a complete IR document dict."
@@ -116,7 +125,7 @@ class Model(CostedConstraintSet):
             ir["substitutions"] = subs_ir
 
         # Phase 5: structural metadata for nested/composable models
-        ir["model_tree"] = build_model_tree(self, variables)
+        ir["model_tree"] = build_model_tree(self)
 
         return ir
 
