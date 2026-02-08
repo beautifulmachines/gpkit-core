@@ -95,6 +95,18 @@ class SparredAircraft(Model):
         return [W >= wing.cost * 1.2, wing]
 
 
+class MultiComponent(Model):
+    """Model with sum() over sub-model variables (triggers Monomial AST child)."""
+
+    def setup(self):
+        W = Variable("W", label="total weight")
+        sub1 = Sub()
+        sub2 = Sub()
+        components = [sub1, sub2]
+        self.cost = W
+        return [W >= sum(c.cost for c in components), sub1, sub2]
+
+
 class TestASTNodes:
     """Tests for AST node dataclass hierarchy."""
 
@@ -1013,5 +1025,31 @@ class TestModelTree:
         # from_ir ignores model_tree and still produces a solvable model
         m2 = Model.from_ir(ir)
         sol = m.solve(verbosity=0)
+        sol2 = m2.solve(verbosity=0)
+        assert abs(sol.cost - sol2.cost) < 1e-4
+
+
+class TestMultiComponentIR:
+    """Tests for models using sum() over sub-model variables."""
+
+    def test_sum_over_submodel_costs(self):
+        """sum(c.cost for c in components) produces serializable AST."""
+        m = MultiComponent()
+        ir = m.to_ir()
+        assert "constraints" in ir
+        assert len(ir["constraints"]) > 0
+
+        # Verify JSON serializable
+        json_str = json.dumps(ir)
+        ir2 = json.loads(json_str)
+        assert len(ir2["constraints"]) == len(ir["constraints"])
+
+    def test_sum_over_submodel_roundtrip(self):
+        """Multi-component model with sum() round-trips correctly."""
+        m = MultiComponent()
+        sol = m.solve(verbosity=0)
+
+        ir = m.to_ir()
+        m2 = Model.from_ir(ir)
         sol2 = m2.solve(verbosity=0)
         assert abs(sol.cost - sol2.cost) < 1e-4

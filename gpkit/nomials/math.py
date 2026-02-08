@@ -220,7 +220,7 @@ class Signomial(Nomial):
         other_hmap = getattr(other, "hmap", None)
         if isinstance(other, Numbers):
             if other == 0:
-                return Signomial(self.hmap)
+                return self
             other_hmap = NomialMap({EMPTY_HV: mag(other)})
             other_hmap.units_of_product(other)
         if other_hmap:
