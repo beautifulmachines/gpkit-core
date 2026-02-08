@@ -102,9 +102,9 @@ class MultiComponent(Model):
         W = Variable("W", label="total weight")
         sub1 = Sub()
         sub2 = Sub()
-        self.components = [sub1, sub2]
+        components = [sub1, sub2]
         self.cost = W
-        return [W >= sum(c.cost for c in self.components), sub1, sub2]
+        return [W >= sum(c.cost for c in components), sub1, sub2]
 
 
 class TestASTNodes:
