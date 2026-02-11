@@ -1,0 +1,24 @@
+name = "Simple Box"
+description = "Maximize box volume with area and aspect ratio constraints."
+
+[vars]
+alpha   = [2, "lower limit, wall aspect ratio"]
+beta    = [10, "upper limit, wall aspect ratio"]
+gamma   = [2, "lower limit, floor aspect ratio"]
+delta   = [10, "upper limit, floor aspect ratio"]
+A_wall  = ["200 m^2", "upper limit, wall area"]
+A_floor = ["50 m^2", "upper limit, floor area"]
+h = ["m", "height"]
+w = ["m", "width"]
+d = ["m", "depth"]
+
+[model]
+objective = "min: 1/(h*w*d)"
+constraints = [
+  "A_wall >= 2*h*w + 2*h*d",
+  "A_floor >= w*d",
+  "h/w >= alpha",
+  "h/w <= beta",
+  "d/w >= gamma",
+  "d/w <= delta",
+]

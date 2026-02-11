@@ -6,10 +6,16 @@ from ._expr import (
     parse_constraint,
     parse_objective,
 )
+from ._parser import (
+    TomlParseError,
+    load_toml,
+)
 
 __all__ = [
     "TomlExpressionError",
+    "TomlParseError",
     "eval_expr",
+    "load_toml",
     "parse_constraint",
     "parse_objective",
 ]
