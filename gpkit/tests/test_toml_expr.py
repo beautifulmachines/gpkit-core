@@ -18,6 +18,8 @@ from gpkit.toml._expr import (
 
 
 class TestArithmetic:
+    """Pure numeric arithmetic without gpkit objects."""
+
     def test_integer(self):
         assert eval_expr("42", {}) == 42
 
@@ -58,6 +60,8 @@ class TestArithmetic:
 
 
 class TestVariables:
+    """Variable lookups and gpkit type production."""
+
     def test_variable_lookup(self):
         x = Variable("x")
         result = eval_expr("x", {"x": x})
@@ -142,6 +146,8 @@ class TestVariables:
 
 
 class TestSubscript:
+    """Subscript indexing and slicing on VectorVariables."""
+
     def test_integer_index(self):
         d = VectorVariable(3, "d")
         result = eval_expr("d[0]", {"d": d})
@@ -149,8 +155,8 @@ class TestSubscript:
         assert result.key.idx == (0,)
 
     def test_computed_index(self):
-        V = VectorVariable(6, "V")
-        result = eval_expr("V[N-1]", {"V": V, "N": 6})
+        shear = VectorVariable(6, "V")
+        result = eval_expr("V[N-1]", {"V": shear, "N": 6})
         assert isinstance(result, Monomial)
         assert result.key.idx == (5,)
 
@@ -161,14 +167,14 @@ class TestSubscript:
         assert result.key.idx == (2,)
 
     def test_slice_upper(self):
-        V = VectorVariable(6, "V")
-        result = eval_expr("V[:-1]", {"V": V})
+        shear = VectorVariable(6, "V")
+        result = eval_expr("V[:-1]", {"V": shear})
         assert len(result) == 5
         assert result[0].key.idx == (0,)
 
     def test_slice_lower(self):
-        V = VectorVariable(6, "V")
-        result = eval_expr("V[1:]", {"V": V})
+        shear = VectorVariable(6, "V")
+        result = eval_expr("V[1:]", {"V": shear})
         assert len(result) == 5
         assert result[0].key.idx == (1,)
 
@@ -187,6 +193,8 @@ class TestSubscript:
 
 
 class TestConstraints:
+    """Constraint parsing (>=, <=, ==)."""
+
     def test_ge_constraint(self):
         x = Variable("x")
         c = parse_constraint("x >= 1", {"x": x})
@@ -230,8 +238,8 @@ class TestConstraints:
 
     def test_slice_constraint_produces_multiple(self):
         """Slice-based vector constraints expand to element-wise constraints."""
-        V = VectorVariable(6, "V")
-        c = parse_constraint("V[:-1] >= V[1:]", {"V": V})
+        shear = VectorVariable(6, "V")
+        c = parse_constraint("V[:-1] >= V[1:]", {"V": shear})
         # ArrayConstraint wraps 5 element-wise constraints
         assert len(list(c)) == 5
 
@@ -242,6 +250,8 @@ class TestConstraints:
 
 
 class TestObjective:
+    """Objective string parsing (min/max)."""
+
     def test_min_passthrough(self):
         x = Variable("x")
         cost = parse_objective("min: x", {"x": x})
@@ -279,6 +289,8 @@ class TestObjective:
 
 
 class TestSafety:
+    """Ensure dangerous Python constructs are rejected."""
+
     @pytest.mark.parametrize(
         "expr",
         [

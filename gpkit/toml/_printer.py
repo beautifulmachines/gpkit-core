@@ -2,6 +2,7 @@
 
 import re
 import sys
+import types
 
 from ..ast_nodes import ASTNode, ConstNode, ExprNode, VarNode, ast_from_ir
 
@@ -89,25 +90,22 @@ def ast_to_expr(node):
     raise ValueError(f"Cannot render AST node: {type(node).__name__}: {node!r}")
 
 
-class _RefNameRegistry:
-    """Minimal registry that converts IR var refs back to VarKey-like objects.
+class _RefNameRegistry(dict):
+    """Minimal registry mapping IR var refs back to objects with a .ref attr.
 
     ast_from_ir expects a registry mapping ref → VarKey.  We only need the
-    .ref attribute for rendering, so we use lightweight stubs.
+    .ref attribute for rendering, so we use SimpleNamespace stubs.
     """
 
-    def __getitem__(self, ref):
-        return _RefStub(ref)
+    def __missing__(self, ref):
+        stub = types.SimpleNamespace(ref=ref)
+        self[ref] = stub
+        return stub
 
 
-class _RefStub:
-    """Lightweight stand-in for VarKey, providing just .ref for VarNode."""
-
-    def __init__(self, ref):
-        self.ref = ref
-
-
-def _render_op(op, children):
+def _render_op(
+    op, children
+):  # pylint: disable=too-many-return-statements,too-many-branches
     """Render an AST operation to a plain expression string."""
     if op == "add":
         left = ast_to_expr(children[0])
@@ -154,7 +152,7 @@ def _render_op(op, children):
 
     if op == "index":
         left = ast_to_expr(children[0])
-        if left.endswith("[:]"):
+        if left.endswith("[:])"):
             left = left[:-3]
         idx_str = _format_index(children[1])
         return f"{left}[{idx_str}]"
@@ -275,7 +273,51 @@ def _format_objective(cost_ir):
 # ---------------------------------------------------------------------------
 
 
-def to_toml(source, path=None):
+def _group_variables(variables):
+    """Group IR variables into scalars and vector groups.
+
+    Returns (scalar_vars, vector_groups) where scalar_vars is a dict of
+    ref → info for non-vector variables, and vector_groups is a dict of
+    veckey_ref → {name, units, label, shape, elements}.
+    """
+    scalar_vars = {}
+    veckeys = {}
+    elements = []
+
+    for ref, info in variables.items():
+        if info.get("idx") is not None:
+            elements.append((ref, info))
+        elif info.get("shape") is not None:
+            veckeys[ref] = info
+        else:
+            scalar_vars[ref] = info
+
+    vector_groups = {}
+    veckey_by_name_shape = {
+        (info["name"], tuple(info["shape"])): (ref, info)
+        for ref, info in veckeys.items()
+    }
+    for ref, info in elements:
+        key = (info["name"], tuple(info.get("shape", [])))
+        vecref, vecinfo = veckey_by_name_shape[key]
+        assert info["name"] == vecinfo["name"]
+        assert info.get("units") == vecinfo.get("units")
+        if vecref not in vector_groups:
+            vector_groups[vecref] = {
+                "name": vecinfo["name"],
+                "units": vecinfo.get("units"),
+                "label": vecinfo.get("label"),
+                "shape": vecinfo["shape"],
+                "elements": [],
+            }
+        vector_groups[vecref]["elements"].append((ref, info))
+
+    return scalar_vars, vector_groups
+
+
+def to_toml(
+    source, path=None
+):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """Generate a TOML model spec from a gpkit Model or IR dict.
 
     Parameters
@@ -310,43 +352,7 @@ def to_toml(source, path=None):
     # --- variables ---
     variables = ir.get("variables", {})
     substitutions = ir.get("substitutions", {})
-
-    # Group into scalars vs vectors
-    scalar_vars = {}
-    vector_groups = {}  # {veckey_ref: {name, size, units, label, elements}}
-
-    # First pass: identify veckey entries (have shape but no idx)
-    veckeys = {}  # ref → info for veckey parent entries
-    elements = []  # (ref, info) for vector elements
-    for ref, info in variables.items():
-        if info.get("idx") is not None:
-            elements.append((ref, info))
-        elif info.get("shape") is not None:
-            veckeys[ref] = info
-        else:
-            scalar_vars[ref] = info
-
-    # Second pass: group elements under their veckey
-    # Match elements to veckeys by name + shape
-    veckey_by_name_shape = {
-        (info["name"], tuple(info["shape"])): (ref, info)
-        for ref, info in veckeys.items()
-    }
-    for ref, info in elements:
-        key = (info["name"], tuple(info.get("shape", [])))
-        vecref, vecinfo = veckey_by_name_shape[key]
-        # Sanity check: element metadata matches veckey
-        assert info["name"] == vecinfo["name"]
-        assert info.get("units") == vecinfo.get("units")
-        if vecref not in vector_groups:
-            vector_groups[vecref] = {
-                "name": vecinfo["name"],
-                "units": vecinfo.get("units"),
-                "label": vecinfo.get("label"),
-                "shape": vecinfo["shape"],
-                "elements": [],
-            }
-        vector_groups[vecref]["elements"].append((ref, info))
+    scalar_vars, vector_groups = _group_variables(variables)
 
     if scalar_vars:
         lines.append("[vars]")
@@ -361,7 +367,7 @@ def to_toml(source, path=None):
     # --- vector variables ---
     if vector_groups:
         by_shape = {}
-        for vecref, group in vector_groups.items():
+        for _, group in vector_groups.items():
             shape = group["shape"]
             if isinstance(shape, (list, tuple)):
                 shape = shape[0] if len(shape) == 1 else tuple(shape)
@@ -401,7 +407,7 @@ def to_toml(source, path=None):
     result = "\n".join(lines)
 
     if path is not None:
-        with open(path, "w") as f:
+        with open(path, "w", encoding="utf-8") as f:
             f.write(result)
 
     return result
@@ -422,7 +428,6 @@ def _format_var_line(name, value, units, label):
         if isinstance(spec, (int, float)):
             return f'{name} = [{spec}, "{label}"]'
         return f'{name} = ["{spec}", "{label}"]'
-    else:
-        if isinstance(spec, (int, float)):
-            return f"{name} = {spec}"
-        return f'{name} = "{spec}"'
+    if isinstance(spec, (int, float)):
+        return f"{name} = {spec}"
+    return f'{name} = "{spec}"'

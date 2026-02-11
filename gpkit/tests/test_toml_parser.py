@@ -2,6 +2,7 @@
 
 import pytest
 
+from gpkit import Model, Variable
 from gpkit.toml._parser import (
     TomlParseError,
     _parse_var_spec,
@@ -14,6 +15,8 @@ from gpkit.toml._parser import (
 
 
 class TestParseVarSpec:
+    """Variable declaration parsing for all TOML forms."""
+
     def test_bare_units(self):
         value, units, label = _parse_var_spec("m")
         assert value is None
@@ -93,48 +96,46 @@ class TestParseVarSpec:
 
 
 class TestLoadSimpleBox:
+    """Load and solve the simple_box.toml example."""
+
     @pytest.fixture
     def model(self):
+        """Load simple_box.toml."""
         return load_toml("docs/source/examples/toml/simple_box.toml")
 
     def test_loads_model(self, model):
-        from gpkit.model import Model
-
+        """Model loads as a gpkit Model instance."""
         assert isinstance(model, Model)
 
     def test_solves(self, model):
+        """Model solves without error."""
         sol = model.solve(verbosity=0)
         # Cost should be approximately 0.003674 (1/m³)
         assert sol.table()  # doesn't crash
 
     def test_cost_matches_python(self, model):
         """TOML model produces same optimal cost as the Python version."""
-        from gpkit import Model, Variable
-
-        # Python version
-        alpha = Variable("alpha", 2, "-", "lower limit, wall aspect ratio")
-        beta = Variable("beta", 10, "-", "upper limit, wall aspect ratio")
-        gamma = Variable("gamma", 2, "-", "lower limit, floor aspect ratio")
-        delta = Variable("delta", 10, "-", "upper limit, floor aspect ratio")
-        A_wall = Variable("A_wall", 200, "m^2", "upper limit, wall area")
-        A_floor = Variable("A_floor", 50, "m^2", "upper limit, floor area")
         h = Variable("h", "m", "height")
         w = Variable("w", "m", "width")
         d = Variable("d", "m", "depth")
-        constraints = [
-            A_wall >= 2 * h * w + 2 * h * d,
-            A_floor >= w * d,
-            h / w >= alpha,
-            h / w <= beta,
-            d / w >= gamma,
-            d / w <= delta,
-        ]
-        py_model = Model(1 / (h * w * d), constraints)
+        a_wall = Variable("A_wall", 200, "m^2", "upper limit, wall area")
+        a_floor = Variable("A_floor", 50, "m^2", "upper limit, floor area")
+        py_model = Model(
+            1 / (h * w * d),
+            [
+                a_wall >= 2 * h * w + 2 * h * d,
+                a_floor >= w * d,
+                h / w >= 2,
+                h / w <= 10,
+                d / w >= 2,
+                d / w <= 10,
+            ],
+        )
         py_sol = py_model.solve(verbosity=0)
 
         toml_sol = model.solve(verbosity=0)
 
-        assert float(toml_sol.primal[toml_sol.primal.keys().__iter__().__next__()]) > 0
+        assert float(next(iter(toml_sol.primal.values()))) > 0
         # Both solutions should have same table structure
         assert "Free Variables" in toml_sol.table()
         assert "Free Variables" in py_sol.table()
@@ -146,16 +147,19 @@ class TestLoadSimpleBox:
 
 
 class TestLoadWaterTank:
+    """Load and solve the water_tank.toml example (vectors)."""
+
     @pytest.fixture
     def model(self):
+        """Load water_tank.toml."""
         return load_toml("docs/source/examples/toml/water_tank.toml")
 
     def test_loads_model(self, model):
-        from gpkit.model import Model
-
+        """Model loads as a gpkit Model instance."""
         assert isinstance(model, Model)
 
     def test_solves(self, model):
+        """Model solves without error."""
         sol = model.solve(verbosity=0)
         assert "Free Variables" in sol.table()
 
@@ -178,6 +182,8 @@ class TestLoadWaterTank:
 
 
 class TestLoadFromString:
+    """Load models from inline TOML strings."""
+
     def test_minimal_model(self):
         toml_str = """
 [vars]
@@ -220,6 +226,8 @@ constraints = ["x[0] >= 1", "x[1] >= 2", "x[2] >= 3"]
 
 
 class TestErrors:
+    """Error handling for malformed TOML input."""
+
     def test_missing_model_section(self):
         with pytest.raises(TomlParseError, match="must have a .model."):
             load_toml("[vars]\nx = 1\n")

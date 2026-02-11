@@ -122,13 +122,12 @@ def _normalize_doc(doc):
 
 
 # ---------------------------------------------------------------------------
-# Model assembly
+# Model assembly helpers
 # ---------------------------------------------------------------------------
 
 
-def _build_model(model_id, model_def, dimension_overrides=None):
-    """Build a gpkit Model from a normalized model definition dict."""
-    # --- dimensions ---
+def _resolve_dimensions(model_def, dimension_overrides):
+    """Extract and validate dimension definitions."""
     dimensions = dict(model_def.get("dimensions", {}))
     if dimension_overrides:
         dimensions.update(dimension_overrides)
@@ -137,23 +136,25 @@ def _build_model(model_id, model_def, dimension_overrides=None):
             raise TomlParseError(
                 f"Dimension '{k}' must be an integer, got {type(v).__name__}: {v!r}"
             )
+    return dimensions
 
-    # --- scalar variables ---
+
+def _build_scalar_vars(vars_section):
+    """Parse scalar variable declarations into namespace and substitutions."""
     namespace = {}
     substitutions = {}
-    vars_section = model_def.get("vars", {})
-
     for var_name, raw in vars_section.items():
         value, units, label = _parse_var_spec(raw)
         var = _make_variable(var_name, value, units, label)
         namespace[var_name] = var
         if value is not None:
             substitutions[var] = value
+    return namespace, substitutions
 
-    # --- vector variables ---
-    vectors_section = model_def.get("vectors", {})
+
+def _build_vector_vars(vectors_section, dimensions, namespace, substitutions):
+    """Parse vector variable declarations into namespace and substitutions."""
     for size_key, vec_vars in vectors_section.items():
-        # size_key is either a dimension name or an integer literal
         if size_key in dimensions:
             shape = dimensions[size_key]
         else:
@@ -173,10 +174,16 @@ def _build_model(model_id, model_def, dimension_overrides=None):
                 for elem in vec.flat:
                     substitutions[elem] = elem.key.value
 
-    # --- add dimensions to namespace for expression evaluation ---
+
+def _build_model(model_id, model_def, dimension_overrides=None):
+    """Build a gpkit Model from a normalized model definition dict."""
+    dimensions = _resolve_dimensions(model_def, dimension_overrides)
+    namespace, substitutions = _build_scalar_vars(model_def.get("vars", {}))
+    _build_vector_vars(
+        model_def.get("vectors", {}), dimensions, namespace, substitutions
+    )
     namespace.update(dimensions)
 
-    # --- objective ---
     objective_str = model_def.get("objective")
     if objective_str is None:
         raise TomlParseError(f"Model '{model_id}' is missing an 'objective' field")
@@ -187,10 +194,8 @@ def _build_model(model_id, model_def, dimension_overrides=None):
             f"Error in objective of model '{model_id}': {exc}"
         ) from exc
 
-    # --- constraints ---
-    constraint_strs = model_def.get("constraints", [])
     constraints = []
-    for i, cstr in enumerate(constraint_strs):
+    for i, cstr in enumerate(model_def.get("constraints", [])):
         try:
             constraints.append(parse_constraint(cstr, namespace))
         except TomlExpressionError as exc:

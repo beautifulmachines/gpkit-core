@@ -1,6 +1,7 @@
 "Safe expression parser for TOML model specs."
 
 import ast
+import operator
 
 # ---------------------------------------------------------------------------
 # Whitelist of allowed AST node types
@@ -32,6 +33,14 @@ _ALLOWED_NODES = frozenset(
         ast.Eq,
     }
 )
+
+_BINOP_MAP = {
+    ast.Add: operator.add,
+    ast.Sub: operator.sub,
+    ast.Mult: operator.mul,
+    ast.Div: operator.truediv,
+    ast.Pow: operator.pow,
+}
 
 
 class TomlExpressionError(Exception):
@@ -78,56 +87,59 @@ def _reject(node):
 # ---------------------------------------------------------------------------
 
 
+def _eval_constant(node):
+    """Evaluate an AST Constant node."""
+    if not isinstance(node.value, (int, float)):
+        raise TomlExpressionError(f"Non-numeric constant: {node.value!r}")
+    return node.value
+
+
+def _eval_name(node, ns):
+    """Look up a variable name in the namespace."""
+    if node.id not in ns:
+        available = sorted(k for k in ns if not k.startswith("_"))
+        raise TomlExpressionError(
+            f"Unknown variable '{node.id}'. " f"Available: {', '.join(available)}"
+        )
+    return ns[node.id]
+
+
+def _eval_unary(node, ns):
+    """Evaluate a unary operation (negation or positive)."""
+    operand = _eval_node(node.operand, ns)
+    if isinstance(node.op, ast.USub):
+        return -operand
+    return +operand
+
+
+def _eval_binop(node, ns):
+    """Evaluate a binary operation (+, -, *, /, **)."""
+    left = _eval_node(node.left, ns)
+    right = _eval_node(node.right, ns)
+    handler = _BINOP_MAP.get(type(node.op))
+    if handler is None:
+        raise TomlExpressionError(
+            f"Unsupported binary operator: {type(node.op).__name__}"
+        )
+    return handler(left, right)
+
+
 def _eval_node(node, ns):
     """Recursively evaluate an AST node against *ns* (name → object)."""
     if isinstance(node, ast.Expression):
         return _eval_node(node.body, ns)
-
-    # --- literals ---
     if isinstance(node, ast.Constant):
-        if not isinstance(node.value, (int, float)):
-            raise TomlExpressionError(f"Non-numeric constant: {node.value!r}")
-        return node.value
-
-    # --- variable references ---
+        return _eval_constant(node)
     if isinstance(node, ast.Name):
-        if node.id not in ns:
-            available = sorted(k for k in ns if not k.startswith("_"))
-            raise TomlExpressionError(
-                f"Unknown variable '{node.id}'. " f"Available: {', '.join(available)}"
-            )
-        return ns[node.id]
-
-    # --- unary ops ---
+        return _eval_name(node, ns)
     if isinstance(node, ast.UnaryOp):
-        operand = _eval_node(node.operand, ns)
-        if isinstance(node.op, ast.USub):
-            return -operand
-        if isinstance(node.op, ast.UAdd):
-            return +operand
-
-    # --- binary ops ---
+        return _eval_unary(node, ns)
     if isinstance(node, ast.BinOp):
-        left = _eval_node(node.left, ns)
-        right = _eval_node(node.right, ns)
-        op = node.op
-        if isinstance(op, ast.Add):
-            return left + right
-        if isinstance(op, ast.Sub):
-            return left - right
-        if isinstance(op, ast.Mult):
-            return left * right
-        if isinstance(op, ast.Div):
-            return left / right
-        if isinstance(op, ast.Pow):
-            return left**right
-
-    # --- subscript / index ---
+        return _eval_binop(node, ns)
     if isinstance(node, ast.Subscript):
         value = _eval_node(node.value, ns)
         idx = _eval_slice(node.slice, ns)
         return value[idx]
-
     raise TomlExpressionError(  # pragma: no cover
         f"Unhandled AST node: {type(node).__name__}"
     )
