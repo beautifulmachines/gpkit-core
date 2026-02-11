@@ -222,7 +222,10 @@ def load_toml(source, *, dimensions=None, substitutions=None):
     -------
     gpkit.Model
     """
-    if isinstance(source, (str, Path)) and Path(source).is_file():
+    if isinstance(source, Path):
+        with open(source, "rb") as f:
+            doc = tomllib.load(f)
+    elif isinstance(source, str) and "\n" not in source and Path(source).is_file():
         with open(source, "rb") as f:
             doc = tomllib.load(f)
     elif isinstance(source, str):

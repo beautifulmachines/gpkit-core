@@ -10,6 +10,7 @@ from ._parser import (
     TomlParseError,
     load_toml,
 )
+from ._printer import to_toml
 
 __all__ = [
     "TomlExpressionError",
@@ -18,4 +19,5 @@ __all__ = [
     "load_toml",
     "parse_constraint",
     "parse_objective",
+    "to_toml",
 ]
