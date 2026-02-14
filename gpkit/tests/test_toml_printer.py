@@ -5,7 +5,7 @@ import pytest
 from gpkit import Model, Variable, VectorVariable
 from gpkit.ast_nodes import ConstNode, ExprNode, VarNode
 from gpkit.toml import load_toml
-from gpkit.toml._printer import ast_to_expr, to_toml
+from gpkit.toml._printer import _ref_to_name, ast_to_expr, to_toml
 from gpkit.util.small_scripts import mag
 from gpkit.varkey import VarKey
 
@@ -176,3 +176,33 @@ class TestRoundTrip:
         sol1, sol2 = self._round_trip("docs/source/examples/toml/simpleflight.toml")
         assert mag(sol1["D"]) == pytest.approx(mag(sol2["D"]), rel=1e-5)
         assert mag(sol1["W"]) == pytest.approx(mag(sol2["W"]), rel=1e-5)
+
+
+# ---------------------------------------------------------------------------
+# _ref_to_name: lineage and suffix stripping
+# ---------------------------------------------------------------------------
+
+
+class TestRefToName:
+    """_ref_to_name extracts bare variable names from IR ref strings."""
+
+    def test_bare_name(self):
+        assert _ref_to_name("S") == "S"
+
+    def test_units_stripped(self):
+        assert _ref_to_name("S|ft²") == "S"
+
+    def test_lineage_stripped(self):
+        assert _ref_to_name("wing0.S|ft²") == "S"
+
+    def test_deep_lineage(self):
+        assert _ref_to_name("Aircraft0.Wing0.S|ft²") == "S"
+
+    def test_vector_element(self):
+        assert _ref_to_name("d[0]#3|ft") == "d[0]"
+
+    def test_lineage_vector_element(self):
+        assert _ref_to_name("wing0.d[0]#3|ft") == "d[0]"
+
+    def test_no_suffix(self):
+        assert _ref_to_name("x") == "x"
