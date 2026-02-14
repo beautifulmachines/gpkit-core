@@ -269,8 +269,8 @@ N = 3.5
 objective = "min: 1"
 """)
 
-    def test_multi_model_not_supported(self):
-        with pytest.raises(TomlParseError, match="Multi-model"):
+    def test_multiple_roots_rejected(self):
+        with pytest.raises(TomlParseError, match="Multiple root models"):
             load_toml("""
 [models.a]
 objective = "min: 1"

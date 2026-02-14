@@ -1,14 +1,17 @@
 "TOML model loader: parse .toml files into gpkit Model objects."
 
+import keyword
 import re
 import tomllib
 from pathlib import Path
 
 import numpy as np
 
+from ..constraints.set import ConstraintSet
+from ..globals import NamedVariables, Vectorize
 from ..model import Model
 from ..nomials.variables import ArrayVariable, Variable
-from ._expr import TomlExpressionError, parse_constraint, parse_objective
+from ._expr import TomlExpressionError, _AmbiguousVar, parse_constraint, parse_objective
 
 
 class TomlParseError(Exception):
@@ -68,8 +71,15 @@ def _parse_var_spec(raw):
     raise TomlParseError(f"Invalid variable spec: {raw!r}")
 
 
+def _validate_var_name(name):
+    """Validate that a variable name is a valid Python identifier."""
+    if not name.isidentifier() or keyword.iskeyword(name):
+        raise TomlParseError(f"Variable name '{name}' is not a valid Python identifier")
+
+
 def _make_variable(name, value, units, label):
     """Create a gpkit Variable from parsed spec components."""
+    _validate_var_name(name)
     descr = {"name": name}
     if value is not None:
         descr["value"] = value
@@ -82,6 +92,7 @@ def _make_variable(name, value, units, label):
 
 def _make_vector_variable(name, shape, value, units, label):
     """Create a gpkit VectorVariable (ArrayVariable) from parsed spec."""
+    _validate_var_name(name)
     descr = {"name": name}
     if value is not None:
         descr["value"] = np.ones(shape) * value
@@ -119,6 +130,95 @@ def _normalize_doc(doc):
         raise TomlParseError("TOML model must have a [model] or [models.*] section")
 
     return doc
+
+
+# Keys in a model section that are model metadata, not variable declarations.
+_RESERVED_MODEL_KEYS = frozenset(
+    {
+        "constraints",
+        "dimensions",
+        "id",
+        "objective",
+        "submodels",
+        "vars",
+        "vectorize",
+        "vectors",
+    }
+)
+
+
+def _extract_model_vars(model_def):
+    """Get variable declarations from a model definition.
+
+    Supports both formats:
+    - Sub-table: [models.wing.vars] → model_def["vars"]
+    - Flat: non-reserved keys in model_def are variable declarations
+
+    Returns a dict of {name: raw_spec}.
+    """
+    vars_dict = dict(model_def.get("vars", {}))
+    for key, value in model_def.items():
+        if key not in _RESERVED_MODEL_KEYS:
+            if key in vars_dict:
+                raise TomlParseError(
+                    f"Variable '{key}' defined both as flat key "
+                    f"and in [vars] sub-table"
+                )
+            vars_dict[key] = value
+    return vars_dict
+
+
+# ---------------------------------------------------------------------------
+# Multi-model namespace proxies
+# ---------------------------------------------------------------------------
+
+
+class _ModelNamespace:
+    """Proxy for model-qualified variable access (e.g., wing.S)."""
+
+    _toml_namespace = True
+
+    def __init__(self, model_id, vars_dict):
+        self._model_id = model_id
+        self._vars = vars_dict
+
+    def __getattr__(self, name):
+        if name.startswith("_"):
+            raise AttributeError(name)
+        if name not in self._vars:
+            available = sorted(self._vars)
+            raise AttributeError(
+                f"Model '{self._model_id}' has no variable '{name}'. "
+                f"Available: {', '.join(available)}"
+            )
+        return self._vars[name]
+
+
+class _SubmodelsProxy:
+    """Proxy for summing a variable across submodels (e.g., submodels.W)."""
+
+    _toml_namespace = True
+
+    def __init__(self, submodel_vars):
+        self._submodel_vars = submodel_vars  # list of (model_id, vars_dict)
+
+    def __getattr__(self, name):
+        if name.startswith("_"):
+            raise AttributeError(name)
+        matches = []
+        for _, vs in self._submodel_vars:
+            if name in vs:
+                matches.append(vs[name])
+        if not matches:
+            model_ids = [mid for mid, _ in self._submodel_vars]
+            raise AttributeError(
+                f"No submodel defines variable '{name}'. "
+                f"Submodels: {', '.join(model_ids)}"
+            )
+        result = matches[0]
+        for m in matches[1:]:
+            result = result + m
+        return result
 
 
 # ---------------------------------------------------------------------------
@@ -194,16 +294,218 @@ def _build_model(model_id, model_def, dimension_overrides=None):
             f"Error in objective of model '{model_id}': {exc}"
         ) from exc
 
+    constraints = _parse_constraints(
+        model_def.get("constraints", []), namespace, model_id
+    )
+    return Model(cost, constraints, substitutions)
+
+
+# ---------------------------------------------------------------------------
+# Multi-model assembly
+# ---------------------------------------------------------------------------
+
+
+def _resolve_model_graph(models_section):
+    """Find root model and return topological ordering of reachable models.
+
+    The root is the unique model not referenced as a submodel by any other.
+    Returns (root_id, ordered_ids) with leaves first, root last.
+    """
+    # Find models referenced as submodels
+    referenced = set()
+    for mdef in models_section.values():
+        for sub_id in mdef.get("submodels", []):
+            referenced.add(sub_id)
+
+    # Root = models not referenced by anyone
+    roots = [mid for mid in models_section if mid not in referenced]
+    if len(roots) == 0:
+        raise TomlParseError(
+            "All models are referenced as submodels (circular dependency)"
+        )
+    if len(roots) > 1:
+        raise TomlParseError(
+            f"Multiple root models (not referenced as submodels): {roots}. "
+            f"Exactly one root model expected."
+        )
+    root_id = roots[0]
+
+    if "objective" not in models_section[root_id]:
+        raise TomlParseError(f"Root model '{root_id}' must have an 'objective' field")
+
+    # DFS for topological ordering + cycle/missing detection
+    ordered = []
+    visited = set()
+    visiting = set()
+
+    def dfs(model_id):
+        if model_id in visiting:
+            raise TomlParseError(f"Circular submodel dependency involving '{model_id}'")
+        if model_id in visited:
+            return
+        if model_id not in models_section:
+            raise TomlParseError(f"Submodel '{model_id}' referenced but not defined")
+        visiting.add(model_id)
+        for sub_id in models_section[model_id].get("submodels", []):
+            dfs(sub_id)
+        visiting.discard(model_id)
+        visited.add(model_id)
+        ordered.append(model_id)
+
+    dfs(root_id)
+    return root_id, ordered
+
+
+def _resolve_vectorize(model_def, dimensions):
+    """Resolve a model section's vectorize field to an integer or None.
+
+    The value must be a string referencing a key in [dimensions].
+    """
+    vec = model_def.get("vectorize")
+    if vec is None:
+        return None
+    if not isinstance(vec, str):
+        raise TomlParseError(
+            f"vectorize must be a dimension name (string), "
+            f"got {type(vec).__name__}: {vec!r}"
+        )
+    if vec not in dimensions:
+        raise TomlParseError(
+            f"vectorize references unknown dimension '{vec}'. "
+            f"Available: {sorted(dimensions)}"
+        )
+    return dimensions[vec]
+
+
+def _build_merged_namespace(per_model_vars, all_dimensions):
+    """Build merged namespace with bare names, model proxies, and ambiguity."""
+    namespace = {}
+    name_to_models = {}
+
+    for model_id, vars_dict in per_model_vars.items():
+        for name in vars_dict:
+            name_to_models.setdefault(name, []).append(model_id)
+
+    # Bare names: unique → variable, ambiguous → sentinel
+    for name, model_ids in name_to_models.items():
+        if len(model_ids) == 1:
+            namespace[name] = per_model_vars[model_ids[0]][name]
+        else:
+            namespace[name] = _AmbiguousVar(name, model_ids)
+
+    # Model namespace proxies for qualified access (wing.S)
+    for model_id, vars_dict in per_model_vars.items():
+        if model_id in name_to_models:
+            raise TomlParseError(f"Model ID '{model_id}' collides with a variable name")
+        namespace[model_id] = _ModelNamespace(model_id, vars_dict)
+
+    namespace.update(all_dimensions)
+    return namespace
+
+
+def _build_multi_model(
+    models_section, dimension_overrides=None
+):  # pylint: disable=too-many-locals
+    """Build a single Model from multiple model sections with structure."""
+    from contextlib import nullcontext
+
+    root_id, ordered_ids = _resolve_model_graph(models_section)
+
+    # Collect dimensions from all models
+    all_dimensions = {}
+    for model_id in ordered_ids:
+        dims = _resolve_dimensions(models_section[model_id], dimension_overrides)
+        all_dimensions.update(dims)
+
+    # Pass 1: Build all variables, record lineages
+    per_model_vars = {}
+    per_model_lineage = {}
+    substitutions = {}
+
+    for model_id in ordered_ids:
+        model_def = models_section[model_id]
+        vec_length = _resolve_vectorize(model_def, all_dimensions)
+        vec_ctx = Vectorize(vec_length) if vec_length else nullcontext()
+
+        with vec_ctx:
+            with NamedVariables(model_id) as (lineage, _):
+                ns, subs = _build_scalar_vars(_extract_model_vars(model_def))
+                substitutions.update(subs)
+                _build_vector_vars(
+                    model_def.get("vectors", {}),
+                    all_dimensions,
+                    ns,
+                    substitutions,
+                )
+                per_model_vars[model_id] = ns
+                per_model_lineage[model_id] = lineage
+
+    # Build merged namespace with ambiguity detection
+    namespace = _build_merged_namespace(per_model_vars, all_dimensions)
+
+    # Pass 2: Parse constraints using merged namespace
+    root_constraints = []
+    submodel_sets = {}
+
+    for model_id in ordered_ids:
+        model_def = models_section[model_id]
+
+        # Model-specific namespace: inject submodels proxy if applicable
+        constraint_ns = dict(namespace)
+        sub_ids = model_def.get("submodels", [])
+        if sub_ids:
+            constraint_ns["submodels"] = _SubmodelsProxy(
+                [(sid, per_model_vars[sid]) for sid in sub_ids]
+            )
+
+        constraints = _parse_constraints(
+            model_def.get("constraints", []),
+            constraint_ns,
+            model_id,
+        )
+
+        if model_id == root_id:
+            root_constraints = constraints
+        else:
+            cs = ConstraintSet(constraints)
+            cs.lineage = per_model_lineage[model_id]
+            cs.unique_varkeys = frozenset(
+                v.key for v in per_model_vars[model_id].values() if hasattr(v, "key")
+            )
+            submodel_sets[model_id] = cs
+
+    # Parse objective with root's namespace (including its submodels proxy)
+    root_def = models_section[root_id]
+    objective_ns = dict(namespace)
+    root_sub_ids = root_def.get("submodels", [])
+    if root_sub_ids:
+        objective_ns["submodels"] = _SubmodelsProxy(
+            [(sid, per_model_vars[sid]) for sid in root_sub_ids]
+        )
+    try:
+        cost = parse_objective(root_def["objective"], objective_ns)
+    except TomlExpressionError as exc:
+        raise TomlParseError(f"Error in objective of model '{root_id}': {exc}") from exc
+
+    all_constraints = root_constraints[:]
+    for model_id in ordered_ids:
+        if model_id != root_id and model_id in submodel_sets:
+            all_constraints.append(submodel_sets[model_id])
+
+    return Model(cost, all_constraints, substitutions)
+
+
+def _parse_constraints(constraint_strs, namespace, model_id):
+    """Parse a list of constraint strings against a namespace."""
     constraints = []
-    for i, cstr in enumerate(model_def.get("constraints", [])):
+    for i, cstr in enumerate(constraint_strs):
         try:
             constraints.append(parse_constraint(cstr, namespace))
         except TomlExpressionError as exc:
             raise TomlParseError(
                 f"Error in constraint {i} of model '{model_id}': {exc}"
             ) from exc
-
-    return Model(cost, constraints, substitutions)
+    return constraints
 
 
 # ---------------------------------------------------------------------------
@@ -242,13 +544,12 @@ def load_toml(source, *, dimensions=None, substitutions=None):
 
     doc = _normalize_doc(doc)
 
-    # For single-model files, build the one model
     models_section = doc["models"]
     if len(models_section) == 1:
         model_id, model_def = next(iter(models_section.items()))
         model = _build_model(model_id, model_def, dimensions)
     else:
-        raise TomlParseError("Multi-model files are not yet supported (Phase 2)")
+        model = _build_multi_model(models_section, dimensions)
 
     # Apply additional substitutions
     if substitutions:

@@ -14,6 +14,7 @@ _ALLOWED_NODES = frozenset(
         # values
         ast.Constant,
         ast.Name,
+        ast.Attribute,
         ast.Subscript,
         ast.Slice,
         ast.Load,  # context for Name/Subscript in eval mode
@@ -47,6 +48,14 @@ class TomlExpressionError(Exception):
     """Raised when an expression string is invalid or unsafe."""
 
 
+class _AmbiguousVar:
+    """Sentinel for variable names defined in multiple models."""
+
+    def __init__(self, name, model_ids):
+        self.name = name
+        self.model_ids = model_ids
+
+
 # ---------------------------------------------------------------------------
 # AST validation (whitelist check)
 # ---------------------------------------------------------------------------
@@ -68,10 +77,6 @@ def _reject(node):
             func = f" '{node.func.id}'"
         raise TomlExpressionError(
             f"Function calls{func} are not allowed in expressions"
-        )
-    if isinstance(node, ast.Attribute):
-        raise TomlExpressionError(
-            "Attribute access (x.something) is not allowed in expressions"
         )
     if isinstance(node, (ast.Import, ast.ImportFrom)):
         raise TomlExpressionError("Imports are not allowed in expressions")
@@ -101,7 +106,14 @@ def _eval_name(node, ns):
         raise TomlExpressionError(
             f"Unknown variable '{node.id}'. " f"Available: {', '.join(available)}"
         )
-    return ns[node.id]
+    val = ns[node.id]
+    if isinstance(val, _AmbiguousVar):
+        raise TomlExpressionError(
+            f"Variable '{val.name}' is defined in multiple models: "
+            f"{', '.join(val.model_ids)}. "
+            f"Use qualified access, e.g. {val.model_ids[0]}.{val.name}"
+        )
+    return val
 
 
 def _eval_unary(node, ns):
@@ -124,6 +136,28 @@ def _eval_binop(node, ns):
     return handler(left, right)
 
 
+def _eval_attribute(node, ns):
+    """Evaluate attribute access (e.g. wing.S, submodels.W).
+
+    Only allowed on objects that opt in via ``_toml_namespace = True``.
+    This prevents traversal of the Python object graph through
+    gpkit internals, descriptors, or dunder attributes.
+    """
+    value = _eval_node(node.value, ns)
+    attr = node.attr
+    if not getattr(value, "_toml_namespace", False):
+        raise TomlExpressionError(
+            f"Attribute access (.{attr}) is only allowed on model "
+            f"namespaces, not on {type(value).__name__}"
+        )
+    try:
+        return getattr(value, attr)
+    except AttributeError:
+        raise TomlExpressionError(
+            f"Cannot access '.{attr}' on '{type(value).__name__}'"
+        ) from None
+
+
 def _eval_node(node, ns):
     """Recursively evaluate an AST node against *ns* (name → object)."""
     if isinstance(node, ast.Expression):
@@ -132,6 +166,8 @@ def _eval_node(node, ns):
         return _eval_constant(node)
     if isinstance(node, ast.Name):
         return _eval_name(node, ns)
+    if isinstance(node, ast.Attribute):
+        return _eval_attribute(node, ns)
     if isinstance(node, ast.UnaryOp):
         return _eval_unary(node, ns)
     if isinstance(node, ast.BinOp):
