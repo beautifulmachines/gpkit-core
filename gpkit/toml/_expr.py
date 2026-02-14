@@ -121,6 +121,7 @@ def _eval_unary(node, ns):
     operand = _eval_node(node.operand, ns)
     if isinstance(node.op, ast.USub):
         return -operand
+    assert isinstance(node.op, ast.UAdd)
     return +operand
 
 
