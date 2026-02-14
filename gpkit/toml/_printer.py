@@ -319,6 +319,51 @@ def _group_variables(variables):
     return scalar_vars, vector_groups
 
 
+def _var_model_id(ref):
+    """Extract model_id from a variable ref's lineage prefix.
+
+    "wing0.S|ft²" → "wing", "aircraft0.W|lbf" → "aircraft".
+    Returns None if no lineage prefix is present.
+    """
+    bare = _REF_STRIP.sub("", ref)
+    if "." not in bare:
+        return None
+    prefix = bare.rsplit(".", 1)[0]
+    return re.sub(r"\d+$", "", prefix)
+
+
+def _collect_child_ids(tree):
+    """Collect all model_ids from children (recursively)."""
+    ids = set()
+    for child in tree.get("children", []):
+        ids.add(child["class"])
+        ids.update(_collect_child_ids(child))
+    return ids
+
+
+def _root_model_id(tree, all_variables):
+    """Determine the root model's ID from IR variables and model_tree.
+
+    Uses lineage prefixes from variable refs, excluding child model_ids,
+    to find the root's unique model_id. Falls back to "main".
+    """
+    child_ids = _collect_child_ids(tree)
+
+    # Try: find a model_id that appears in variables but not in children
+    all_model_ids = {_var_model_id(ref) for ref in all_variables} - {None}
+    root_candidates = all_model_ids - child_ids
+    if len(root_candidates) == 1:
+        return root_candidates.pop()
+
+    # Fallback: check root node's own variable refs
+    for ref in tree.get("variables", []):
+        mid = _var_model_id(ref)
+        if mid and mid not in child_ids:
+            return mid
+
+    return "main"
+
+
 def to_toml(
     source, path=None
 ):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
@@ -353,7 +398,25 @@ def to_toml(
     if name or desc:
         lines.append("")
 
-    # --- variables ---
+    # --- detect multi-model ---
+    tree = ir.get("model_tree", {})
+    if tree.get("children"):
+        _emit_multi_model(ir, lines)
+    else:
+        _emit_single_model(ir, lines)
+
+    lines.append("")
+    result = "\n".join(lines)
+
+    if path is not None:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(result)
+
+    return result
+
+
+def _emit_single_model(ir, lines):
+    """Emit [vars] + [model] sections for a flat single-model IR."""
     variables = ir.get("variables", {})
     substitutions = ir.get("substitutions", {})
     scalar_vars, vector_groups = _group_variables(variables)
@@ -368,7 +431,6 @@ def to_toml(
             lines.append(_format_var_line(vname, value, units, label))
         lines.append("")
 
-    # --- vector variables ---
     if vector_groups:
         by_shape = {}
         for _, group in vector_groups.items():
@@ -390,15 +452,11 @@ def to_toml(
                 lines.append(_format_var_line(vname, value, units, label))
             lines.append("")
 
-    # --- model section ---
     lines.append("[model]")
-
-    # Objective — detect 1/expr pattern and emit "max: expr" instead
     cost_ir = ir.get("cost", {})
     direction, cost_str = _format_objective(cost_ir)
     lines.append(f'objective = "{direction}: {cost_str}"')
 
-    # Constraints
     constraints = ir.get("constraints", [])
     if constraints:
         lines.append("constraints = [")
@@ -407,14 +465,130 @@ def to_toml(
             lines.append(f'  "{cstr}",')
         lines.append("]")
 
+
+def _emit_multi_model(ir, lines):  # pylint: disable=too-many-locals,too-many-branches
+    """Emit [models.*] sections from a multi-model IR."""
+    tree = ir["model_tree"]
+    variables = ir.get("variables", {})
+    substitutions = ir.get("substitutions", {})
+    constraints = ir.get("constraints", [])
+
+    # Group all variables by model_id (from lineage prefix)
+    root_id = _root_model_id(tree, variables)
+    vars_by_model = {}
+    for ref, info in variables.items():
+        mid = _var_model_id(ref) or root_id
+        vars_by_model.setdefault(mid, {})[ref] = info
+
+    # Flatten tree into ordered list of (model_id, node, child_ids)
+    nodes = []
+
+    def flatten(node):
+        if node.get("instance_id"):
+            model_id = node["class"]
+        else:
+            model_id = root_id
+        child_ids = [c["class"] for c in node.get("children", [])]
+        nodes.append((model_id, node, child_ids))
+        for child in node.get("children", []):
+            flatten(child)
+
+    flatten(tree)
+
+    # Emit non-root models first, then root (so submodels are defined first)
+    root_entry = nodes[0]
+    for model_id, node, child_ids in nodes[1:]:
+        _emit_model_section(
+            model_id,
+            node,
+            child_ids,
+            vars_by_model,
+            substitutions,
+            constraints,
+            lines,
+            is_root=False,
+            cost_ir=None,
+        )
+    _emit_model_section(
+        root_entry[0],
+        root_entry[1],
+        root_entry[2],
+        vars_by_model,
+        substitutions,
+        constraints,
+        lines,
+        is_root=True,
+        cost_ir=ir.get("cost", {}),
+    )
+
+
+def _emit_model_section(
+    model_id,
+    node,
+    child_ids,
+    vars_by_model,
+    substitutions,
+    all_constraints,
+    lines,
+    *,
+    is_root,
+    cost_ir,
+):  # pylint: disable=too-many-arguments,too-many-locals
+    """Emit a single [models.X] section."""
+    lines.append(f"[models.{model_id}]")
+
+    # Variables (flat format: vars as keys in model section)
+    model_vars = vars_by_model.get(model_id, {})
+    scalar_vars, vector_groups = _group_variables(model_vars)
+
+    for ref, info in scalar_vars.items():
+        vname = info["name"]
+        units = info.get("units")
+        label = info.get("label")
+        value = substitutions.get(ref)
+        lines.append(_format_var_line(vname, value, units, label))
+
+    # Vector variables as [models.X.vectors.N] sub-tables
+    if vector_groups:
+        by_shape = {}
+        for _, group in vector_groups.items():
+            shape = group["shape"]
+            if isinstance(shape, (list, tuple)):
+                shape = shape[0] if len(shape) == 1 else tuple(shape)
+            by_shape.setdefault(shape, []).append(group)
+
+        for shape, groups in by_shape.items():
+            lines.append(f"[models.{model_id}.vectors.{shape}]")
+            for group in groups:
+                vname = group["name"]
+                units = group["units"]
+                label = group["label"]
+                value = None
+                if group["elements"]:
+                    first_ref = group["elements"][0][0]
+                    value = substitutions.get(first_ref)
+                lines.append(_format_var_line(vname, value, units, label))
+
+    # Objective (root only)
+    if is_root and cost_ir:
+        direction, cost_str = _format_objective(cost_ir)
+        lines.append(f'objective = "{direction}: {cost_str}"')
+
+    # Submodels
+    if child_ids:
+        child_str = ", ".join(f'"{cid}"' for cid in child_ids)
+        lines.append(f"submodels = [{child_str}]")
+
+    # Constraints
+    node_constraints = [all_constraints[i] for i in node.get("constraint_indices", [])]
+    if node_constraints:
+        lines.append("constraints = [")
+        for c in node_constraints:
+            cstr = constraint_to_expr(c)
+            lines.append(f'  "{cstr}",')
+        lines.append("]")
+
     lines.append("")
-    result = "\n".join(lines)
-
-    if path is not None:
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(result)
-
-    return result
 
 
 def _format_var_line(name, value, units, label):
