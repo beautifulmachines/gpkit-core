@@ -146,6 +146,31 @@ class TestLoadSimpleBox:
 # ---------------------------------------------------------------------------
 
 
+class TestLoadBeam:
+    """Load and solve the beam.toml example (vector slicing)."""
+
+    @pytest.fixture
+    def model(self):
+        """Load beam.toml."""
+        return load_toml("docs/source/examples/toml/beam.toml")
+
+    def test_loads_model(self, model):
+        """Model loads as a gpkit Model instance."""
+        assert isinstance(model, Model)
+
+    def test_solves(self, model):
+        """Model solves without error."""
+        sol = model.solve(verbosity=0)
+        assert "Free Variables" in sol.table()
+
+    def test_tip_displacement_reasonable(self, model):
+        """Tip displacement w[N-1] should be positive and finite."""
+        sol = model.solve(verbosity=0)
+        cost = float(sol.cost)
+        assert cost > 0
+        assert cost < 1e3  # sanity bound
+
+
 class TestLoadWaterTank:
     """Load and solve the water_tank.toml example (vectors)."""
 
