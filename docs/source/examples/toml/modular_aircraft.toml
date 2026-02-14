@@ -2,22 +2,25 @@ name = "Modular Aircraft"
 description = "Three-model composition: wing + fuselage + aircraft."
 
 [models.wing]
-constraints = [
-  "c == (S/A)**0.5",
-  "W_wing >= S * rho_wing",
-]
-[models.wing.vars]
 S        = ["ft^2", "wing surface area"]
 rho_wing = ["1 lbf/ft^2", "wing areal density"]
 A        = [27, "aspect ratio"]
 c        = ["ft", "mean chord"]
 W_wing   = ["lbf", "wing weight"]
+constraints = [
+  "c == (S/A)**0.5",
+  "W_wing >= S * rho_wing",
+]
 
 [models.fuselage]
-[models.fuselage.vars]
 W_fuse = ["100 lbf", "fuselage weight"]
 
 [models.aircraft]
+W     = ["lbf", "total aircraft weight"]
+rho   = ["0.74 kg/m^3", "air density"]
+V     = ["40 knots", "true airspeed"]
+CL    = [1.0, "lift coefficient"]
+S_min = ["50 ft^2", "minimum wing area"]
 objective = "min: W"
 submodels = ["wing", "fuselage"]
 constraints = [
@@ -25,9 +28,3 @@ constraints = [
   "W <= 0.5*rho*S*CL*V**2",
   "S >= S_min",
 ]
-[models.aircraft.vars]
-W     = ["lbf", "total aircraft weight"]
-rho   = ["0.74 kg/m^3", "air density"]
-V     = ["40 knots", "true airspeed"]
-CL    = [1.0, "lift coefficient"]
-S_min = ["50 ft^2", "minimum wing area"]
