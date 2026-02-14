@@ -142,7 +142,36 @@ class TestLoadSimpleBox:
 
 
 # ---------------------------------------------------------------------------
-# TOML loading: water_tank.toml (vectors)
+# TOML loading: simpleflight.toml
+# ---------------------------------------------------------------------------
+
+
+class TestLoadSimpleFlight:
+    """Load and solve the simpleflight.toml example."""
+
+    @pytest.fixture
+    def model(self):
+        """Load simpleflight.toml."""
+        return load_toml("docs/source/examples/toml/simpleflight.toml")
+
+    def test_loads_model(self, model):
+        """Model loads as a gpkit Model instance."""
+        assert isinstance(model, Model)
+
+    def test_solves(self, model):
+        """Model solves without error."""
+        sol = model.solve(verbosity=0)
+        assert "Free Variables" in sol.table()
+
+    def test_drag_positive(self, model):
+        """Optimal drag should be positive."""
+        sol = model.solve(verbosity=0)
+        cost = float(sol.cost)
+        assert cost > 0
+
+
+# ---------------------------------------------------------------------------
+# TOML loading: beam.toml (vector slicing)
 # ---------------------------------------------------------------------------
 
 
@@ -494,7 +523,7 @@ constraints = ["b.W >= a.W * 2"]
         assert float(sol.cost) == pytest.approx(10.0, rel=1e-3)
 
     def test_submodels_sum(self):
-        """submodels.W sums variable across declared submodels."""
+        """sum(submodels.W_part) sums variable across declared submodels."""
         m = load_toml("""
 [models.wing]
 W_part = "-"
@@ -508,7 +537,7 @@ constraints = ["fuse.W_part >= 70"]
 W = "-"
 objective = "min: W"
 submodels = ["wing", "fuse"]
-constraints = ["W >= submodels.W_part"]
+constraints = ["W >= sum(submodels.W_part)"]
 """)
         sol = m.solve(verbosity=0)
         # W >= 30 + 70 = 100

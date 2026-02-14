@@ -11,6 +11,7 @@ import numpy as np
 from ..constraints.set import ConstraintSet
 from ..globals import NamedVariables, Vectorize
 from ..model import Model
+from ..nomials.array import NomialArray
 from ..nomials.variables import ArrayVariable, VectorizableVariable
 from ._expr import TomlExpressionError, _AmbiguousVar, parse_constraint, parse_objective
 
@@ -200,7 +201,11 @@ class _ModelNamespace:  # pylint: disable=too-few-public-methods
 
 
 class _SubmodelsProxy:  # pylint: disable=too-few-public-methods
-    """Proxy for summing a variable across submodels (e.g., submodels.W)."""
+    """Proxy for collecting a variable across submodels (e.g., submodels.W).
+
+    Returns a NomialArray of matching variables.  Use sum() or prod()
+    explicitly in constraints: ``"W >= sum(submodels.W_part)"``.
+    """
 
     _toml_namespace = True
 
@@ -220,10 +225,7 @@ class _SubmodelsProxy:  # pylint: disable=too-few-public-methods
                 f"No submodel defines variable '{name}'. "
                 f"Submodels: {', '.join(model_ids)}"
             )
-        result = matches[0]
-        for m in matches[1:]:
-            result = result + m
-        return result
+        return NomialArray(matches)
 
 
 # ---------------------------------------------------------------------------

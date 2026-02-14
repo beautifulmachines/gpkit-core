@@ -32,6 +32,8 @@ _ALLOWED_NODES = frozenset(
         ast.GtE,
         ast.LtE,
         ast.Eq,
+        # function calls (restricted to sum/prod in validation)
+        ast.Call,
     }
 )
 
@@ -61,11 +63,31 @@ class _AmbiguousVar:  # pylint: disable=too-few-public-methods
 # ---------------------------------------------------------------------------
 
 
+_ALLOWED_FUNCTIONS = frozenset({"sum", "prod"})
+
+
 def _validate_ast(tree):
     """Walk the AST and reject any node not in the whitelist."""
     for node in ast.walk(tree):
         if type(node) not in _ALLOWED_NODES:
             _reject(node)
+        if isinstance(node, ast.Call):
+            _validate_call(node)
+
+
+def _validate_call(node):
+    """Restrict function calls to sum() and prod() only."""
+    if not isinstance(node.func, ast.Name):
+        raise TomlExpressionError("Only sum() and prod() function calls are allowed")
+    if node.func.id not in _ALLOWED_FUNCTIONS:
+        raise TomlExpressionError(
+            f"Function call '{node.func.id}' is not allowed. "
+            f"Only sum() and prod() are supported."
+        )
+    if len(node.args) != 1 or node.keywords:
+        raise TomlExpressionError(
+            f"{node.func.id}() takes exactly one positional argument"
+        )
 
 
 def _reject(node):
@@ -137,6 +159,16 @@ def _eval_binop(node, ns):
     return handler(left, right)
 
 
+def _eval_call(node, ns):
+    """Evaluate a whitelisted function call (sum or prod)."""
+    func_name = node.func.id  # validated by _validate_call
+    arg = _eval_node(node.args[0], ns)
+    method = getattr(arg, func_name, None)
+    if method is None:
+        raise TomlExpressionError(f"Cannot call {func_name}() on {type(arg).__name__}")
+    return method()
+
+
 def _eval_attribute(node, ns):
     """Evaluate attribute access (e.g. wing.S, submodels.W).
 
@@ -177,6 +209,8 @@ def _eval_node(node, ns):  # pylint: disable=too-many-return-statements
         value = _eval_node(node.value, ns)
         idx = _eval_slice(node.slice, ns)
         return value[idx]
+    if isinstance(node, ast.Call):
+        return _eval_call(node, ns)
     raise TomlExpressionError(  # pragma: no cover
         f"Unhandled AST node: {type(node).__name__}"
     )

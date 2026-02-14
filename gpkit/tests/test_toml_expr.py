@@ -188,6 +188,45 @@ class TestSubscript:
 
 
 # ---------------------------------------------------------------------------
+# Sum and prod functions
+# ---------------------------------------------------------------------------
+
+
+class TestSumProd:
+    """sum() and prod() function calls on VectorVariables."""
+
+    def test_sum_vector(self):
+        x = VectorVariable(3, "x")
+        result = eval_expr("sum(x)", {"x": x})
+        assert isinstance(result, Posynomial)
+
+    def test_prod_vector(self):
+        x = VectorVariable(3, "x")
+        result = eval_expr("prod(x)", {"x": x})
+        assert isinstance(result, Monomial)
+
+    def test_sum_in_constraint(self):
+        x = VectorVariable(3, "x")
+        y = Variable("y")
+        constraint = parse_constraint("y >= sum(x)", {"x": x, "y": y})
+        assert isinstance(constraint, SingleEquationConstraint)
+
+    def test_sum_of_slice(self):
+        x = VectorVariable(5, "x")
+        result = eval_expr("sum(x[1:])", {"x": x})
+        assert isinstance(result, Posynomial)
+
+    def test_disallowed_function(self):
+        x = Variable("x")
+        with pytest.raises(TomlExpressionError, match="not allowed"):
+            eval_expr("abs(x)", {"x": x})
+
+    def test_sum_wrong_arg_count(self):
+        with pytest.raises(TomlExpressionError, match="exactly one"):
+            eval_expr("sum()", {})
+
+
+# ---------------------------------------------------------------------------
 # Constraints
 # ---------------------------------------------------------------------------
 

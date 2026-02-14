@@ -156,8 +156,6 @@ def _render_op(
 
     if op == "index":
         left = ast_to_expr(children[0])
-        if left.endswith("[:])"):
-            left = left[:-3]
         idx_str = _format_index(children[1])
         return f"{left}[{idx_str}]"
 
