@@ -1,0 +1,62 @@
+name = "Modular Aircraft Performance"
+description = "Port of performance_modeling.py with vectorized flight segments."
+
+[dimensions]
+N_seg = 4
+
+[models.wing]
+S        = ["ft^2", "wing surface area"]
+rho_wing = ["1 lbf/ft^2", "wing areal density"]
+A        = [27, "aspect ratio"]
+c        = ["ft", "mean chord"]
+W_wing   = ["lbf", "wing weight"]
+constraints = [
+  "c == (S/A)**0.5",
+  "W_wing >= S * rho_wing",
+]
+
+[models.fuselage]
+W_fuse = ["100 lbf", "fuselage weight"]
+
+[models.aircraft]
+submodels = ["wing", "fuselage"]
+W = ["lbf", "total aircraft weight"]
+constraints = [
+  "W >= W_wing + W_fuse",
+]
+
+[models.flight_state]
+vectorize = "N_seg"
+V     = ["40 knots", "true airspeed"]
+mu    = ["1.628e-5 N*s/m^2", "dynamic viscosity"]
+rho_a = ["0.74 kg/m^3", "air density"]
+
+[models.wing_aero]
+vectorize = "N_seg"
+CD    = ["-", "drag coefficient"]
+CL    = ["-", "lift coefficient"]
+e_osw = [0.9, "Oswald efficiency"]
+Re    = ["-", "Reynolds number"]
+D     = ["lbf", "drag force"]
+constraints = [
+  "D >= 0.5*rho_a*V**2*CD*S",
+  "Re == rho_a*V*c/mu",
+  "CD >= 0.074/Re**0.2 + CL**2/(3.14159265*A*e_osw)",
+]
+
+[models.aircraft_perf]
+vectorize = "N_seg"
+Wfuel = ["lbf", "fuel weight"]
+Wburn = ["lbf", "segment fuel burn"]
+constraints = [
+  "Wburn >= 0.1*D",
+  "W + Wfuel <= 0.5*rho_a*CL*S*V**2",
+]
+
+[models.mission]
+objective = "min: Wfuel[0]"
+submodels = ["aircraft", "flight_state", "wing_aero", "aircraft_perf"]
+constraints = [
+  "Wfuel[:-1] >= Wfuel[1:] + Wburn[:-1]",
+  "Wfuel[N_seg-1] >= Wburn[N_seg-1]",
+]

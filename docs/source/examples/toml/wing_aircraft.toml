@@ -1,0 +1,17 @@
+name = "Wing-Aircraft"
+description = "Simple two-model composition: wing weight drives aircraft weight."
+
+[models.wing]
+S   = [100, "wing area"]
+W_w = ["-", "wing weight"]
+constraints = [
+  "W_w >= S * 0.1",
+]
+
+[models.aircraft]
+W = ["-", "total weight"]
+objective = "min: W"
+submodels = ["wing"]
+constraints = [
+  "W >= W_w * 1.2",
+]

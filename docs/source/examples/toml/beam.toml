@@ -1,0 +1,35 @@
+name = "Euler-Bernoulli Beam"
+description = "Discretized beam equations for distributed load."
+
+[dimensions]
+N = 6
+
+[vars]
+EI      = ["1.1e4 N*m^2", "bending stiffness"]
+dx      = "m"
+L       = "6 m"
+V_tip   = "2e-4 N"
+M_tip   = "2e-4 N*m"
+th_base = 2e-4
+w_base  = "2e-4 m"
+
+[vectors.N]
+q  = ["100 N/m", "distributed load"]
+V  = ["N", "internal shear"]
+M  = ["N*m", "internal moment"]
+th = ["-", "slope"]
+w  = ["m", "displacement"]
+
+[model]
+objective = "min: w[N-1]"
+constraints = [
+  "L == (N-1)*dx",
+  "V[N-1] >= V_tip",
+  "M[N-1] >= M_tip",
+  "th[0] >= th_base",
+  "w[0] >= w_base",
+  "V[:-1] >= V[1:] + 0.5*dx*(q[:-1] + q[1:])",
+  "M[:-1] >= M[1:] + 0.5*dx*(V[:-1] + V[1:])",
+  "th[1:] >= th[:-1] + 0.5*dx*(M[1:] + M[:-1])/EI",
+  "w[1:] >= w[:-1] + 0.5*dx*(th[1:] + th[:-1])",
+]
