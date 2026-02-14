@@ -10,7 +10,7 @@ import numpy as np
 from ..constraints.set import ConstraintSet
 from ..globals import NamedVariables, Vectorize
 from ..model import Model
-from ..nomials.variables import ArrayVariable, Variable
+from ..nomials.variables import ArrayVariable, VectorizableVariable
 from ._expr import TomlExpressionError, _AmbiguousVar, parse_constraint, parse_objective
 
 
@@ -78,7 +78,11 @@ def _validate_var_name(name):
 
 
 def _make_variable(name, value, units, label):
-    """Create a gpkit Variable from parsed spec components."""
+    """Create a gpkit Variable from parsed spec components.
+
+    Uses VectorizableVariable so that variables declared inside a
+    Vectorize context automatically become ArrayVariables.
+    """
     _validate_var_name(name)
     descr = {"name": name}
     if value is not None:
@@ -87,7 +91,7 @@ def _make_variable(name, value, units, label):
         descr["units"] = units
     if label is not None:
         descr["label"] = label
-    return Variable(**descr)
+    return VectorizableVariable(**descr)
 
 
 def _make_vector_variable(name, shape, value, units, label):
@@ -549,7 +553,11 @@ def load_toml(source, *, dimensions=None, substitutions=None):
         model_id, model_def = next(iter(models_section.items()))
         model = _build_model(model_id, model_def, dimensions)
     else:
-        model = _build_multi_model(models_section, dimensions)
+        # For multi-model, merge top-level [dimensions] with user overrides
+        all_dims = dict(doc.get("dimensions", {}))
+        if dimensions:
+            all_dims.update(dimensions)
+        model = _build_multi_model(models_section, all_dims or None)
 
     # Apply additional substitutions
     if substitutions:
