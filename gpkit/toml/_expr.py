@@ -48,7 +48,7 @@ class TomlExpressionError(Exception):
     """Raised when an expression string is invalid or unsafe."""
 
 
-class _AmbiguousVar:
+class _AmbiguousVar:  # pylint: disable=too-few-public-methods
     """Sentinel for variable names defined in multiple models."""
 
     def __init__(self, name, model_ids):
@@ -158,7 +158,7 @@ def _eval_attribute(node, ns):
         ) from None
 
 
-def _eval_node(node, ns):
+def _eval_node(node, ns):  # pylint: disable=too-many-return-statements
     """Recursively evaluate an AST node against *ns* (name → object)."""
     if isinstance(node, ast.Expression):
         return _eval_node(node.body, ns)

@@ -3,6 +3,7 @@
 import keyword
 import re
 import tomllib
+from contextlib import nullcontext
 from pathlib import Path
 
 import numpy as np
@@ -177,7 +178,7 @@ def _extract_model_vars(model_def):
 # ---------------------------------------------------------------------------
 
 
-class _ModelNamespace:
+class _ModelNamespace:  # pylint: disable=too-few-public-methods
     """Proxy for model-qualified variable access (e.g., wing.S)."""
 
     _toml_namespace = True
@@ -198,7 +199,7 @@ class _ModelNamespace:
         return self._vars[name]
 
 
-class _SubmodelsProxy:
+class _SubmodelsProxy:  # pylint: disable=too-few-public-methods
     """Proxy for summing a variable across submodels (e.g., submodels.W)."""
 
     _toml_namespace = True
@@ -411,7 +412,6 @@ def _build_multi_model(
     models_section, dimension_overrides=None
 ):  # pylint: disable=too-many-locals
     """Build a single Model from multiple model sections with structure."""
-    from contextlib import nullcontext
 
     root_id, ordered_ids = _resolve_model_graph(models_section)
 

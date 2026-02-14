@@ -415,7 +415,7 @@ def to_toml(
     return result
 
 
-def _emit_single_model(ir, lines):
+def _emit_single_model(ir, lines):  # pylint: disable=too-many-locals
     """Emit [vars] + [model] sections for a flat single-model IR."""
     variables = ir.get("variables", {})
     substitutions = ir.get("substitutions", {})
@@ -533,7 +533,7 @@ def _emit_model_section(
     *,
     is_root,
     cost_ir,
-):  # pylint: disable=too-many-arguments,too-many-locals
+):  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
     """Emit a single [models.X] section."""
     lines.append(f"[models.{model_id}]")
 
