@@ -277,3 +277,249 @@ objective = "min: 1"
 [models.b]
 objective = "min: 1"
 """)
+
+    def test_invalid_var_name(self):
+        with pytest.raises(TomlParseError, match="not a valid Python identifier"):
+            load_toml("""
+[vars]
+my-var = "m"
+
+[model]
+objective = "min: 1"
+""")
+
+
+# ---------------------------------------------------------------------------
+# Multi-model loading and solving
+# ---------------------------------------------------------------------------
+
+
+class TestMultiModel:
+    """Multi-model composition via [models.*] sections."""
+
+    def test_load_wing_aircraft(self):
+        """Two-model composition: wing + aircraft."""
+        m = load_toml("docs/source/examples/toml/wing_aircraft.toml")
+        sol = m.solve(verbosity=0)
+        # W = 1.2 * 0.1 * 100 = 12.0
+        assert float(sol.cost) == pytest.approx(12.0, rel=1e-3)
+
+    def test_load_modular_aircraft(self):
+        """Three-model composition: wing + fuselage + aircraft."""
+        m = load_toml("docs/source/examples/toml/modular_aircraft.toml")
+        sol = m.solve(verbosity=0)
+        assert float(sol.cost) == pytest.approx(150.0, rel=1e-3)
+
+    def test_load_performance_modeling(self):
+        """Full performance_modeling port with vectorize."""
+        m = load_toml("docs/source/examples/toml/performance_modeling.toml")
+        sol = m.solve(verbosity=0)
+        assert float(sol.cost) == pytest.approx(1.091, rel=1e-2)
+
+    def test_multi_model_from_string(self):
+        """Load multi-model from inline TOML string."""
+        m = load_toml("""
+[models.sub]
+x = "-"
+constraints = ["x >= 5"]
+
+[models.main]
+y = "-"
+objective = "min: y"
+submodels = ["sub"]
+constraints = ["y >= x"]
+""")
+        sol = m.solve(verbosity=0)
+        assert float(sol.cost) == pytest.approx(5.0, rel=1e-3)
+
+    def test_transitive_submodels(self):
+        """Three-level nesting: root → mid → leaf."""
+        m = load_toml("""
+[models.leaf]
+a = "-"
+constraints = ["a >= 3"]
+
+[models.mid]
+b = "-"
+submodels = ["leaf"]
+constraints = ["b >= a"]
+
+[models.root]
+c = "-"
+objective = "min: c"
+submodels = ["mid"]
+constraints = ["c >= b"]
+""")
+        sol = m.solve(verbosity=0)
+        assert float(sol.cost) == pytest.approx(3.0, rel=1e-3)
+
+    def test_submodel_without_constraints(self):
+        """Submodel with only vars (no constraints) is valid."""
+        m = load_toml("""
+[models.params]
+k = 7
+
+[models.main]
+x = "-"
+objective = "min: x"
+submodels = ["params"]
+constraints = ["x >= k"]
+""")
+        sol = m.solve(verbosity=0)
+        assert float(sol.cost) == pytest.approx(7.0, rel=1e-3)
+
+    def test_circular_dependency(self):
+        with pytest.raises(TomlParseError, match="circular"):
+            load_toml("""
+[models.a]
+objective = "min: 1"
+submodels = ["b"]
+[models.b]
+submodels = ["a"]
+""")
+
+    def test_missing_submodel(self):
+        with pytest.raises(TomlParseError, match="referenced but not defined"):
+            load_toml("""
+[models.real]
+x = "-"
+
+[models.main]
+y = "-"
+objective = "min: y"
+submodels = ["real", "ghost"]
+""")
+
+    def test_no_root_objective(self):
+        with pytest.raises(TomlParseError, match="must have an 'objective'"):
+            load_toml("""
+[models.a]
+submodels = ["b"]
+[models.b]
+x = "-"
+""")
+
+    def test_model_id_collides_with_var(self):
+        with pytest.raises(TomlParseError, match="collides with a variable"):
+            load_toml("""
+[models.x]
+x = "-"
+constraints = ["x >= 1"]
+
+[models.main]
+objective = "min: 1"
+submodels = ["x"]
+""")
+
+
+# ---------------------------------------------------------------------------
+# Qualified variable access (wing.S, submodels.W)
+# ---------------------------------------------------------------------------
+
+
+class TestQualifiedAccess:
+    """Model-qualified variable access and submodels proxy."""
+
+    def test_qualified_access_same_as_bare(self):
+        """wing.S resolves to the same variable as bare S (when unique)."""
+        m = load_toml("""
+[models.wing]
+S = [100, "wing area"]
+W_w = ["-", "wing weight"]
+constraints = ["W_w >= S * 0.1"]
+
+[models.aircraft]
+W = ["-", "total weight"]
+objective = "min: W"
+submodels = ["wing"]
+constraints = ["W >= wing.W_w * 1.2"]
+""")
+        sol = m.solve(verbosity=0)
+        assert float(sol.cost) == pytest.approx(12.0, rel=1e-3)
+
+    def test_ambiguous_bare_name_raises(self):
+        """Bare name that exists in multiple models gives clear error."""
+        with pytest.raises(TomlParseError, match="defined in multiple models"):
+            load_toml("""
+[models.a]
+W = "-"
+constraints = ["W >= 1"]
+
+[models.b]
+W = "-"
+objective = "min: W"
+submodels = ["a"]
+constraints = ["W >= 1"]
+""")
+
+    def test_qualified_resolves_ambiguity(self):
+        """Qualified access (a.W, b.W) resolves ambiguous names."""
+        m = load_toml("""
+[models.a]
+W = "-"
+constraints = ["a.W >= 5"]
+
+[models.b]
+W = "-"
+objective = "min: b.W"
+submodels = ["a"]
+constraints = ["b.W >= a.W * 2"]
+""")
+        sol = m.solve(verbosity=0)
+        assert float(sol.cost) == pytest.approx(10.0, rel=1e-3)
+
+    def test_submodels_sum(self):
+        """submodels.W sums variable across declared submodels."""
+        m = load_toml("""
+[models.wing]
+W_part = "-"
+constraints = ["wing.W_part >= 30"]
+
+[models.fuse]
+W_part = "-"
+constraints = ["fuse.W_part >= 70"]
+
+[models.aircraft]
+W = "-"
+objective = "min: W"
+submodels = ["wing", "fuse"]
+constraints = ["W >= submodels.W_part"]
+""")
+        sol = m.solve(verbosity=0)
+        # W >= 30 + 70 = 100
+        assert float(sol.cost) == pytest.approx(100.0, rel=1e-3)
+
+    def test_attribute_on_non_namespace_rejected(self):
+        """Attribute access on non-namespace object raises error."""
+        with pytest.raises(TomlParseError, match="only allowed on model"):
+            load_toml("""
+[models.sub]
+x = "-"
+constraints = ["x >= 1"]
+
+[models.main]
+y = "-"
+objective = "min: y"
+submodels = ["sub"]
+constraints = ["x.__class__ >= 1"]
+""")
+
+    def test_vectorize_basic(self):
+        """Variables in vectorized model become vectors."""
+        m = load_toml("""
+[dimensions]
+N = 3
+
+[models.seg]
+vectorize = "N"
+x = "-"
+constraints = ["x >= 1"]
+
+[models.main]
+y = "-"
+objective = "min: y"
+submodels = ["seg"]
+constraints = ["y >= x[0] + x[1] + x[2]"]
+""")
+        sol = m.solve(verbosity=0)
+        assert float(sol.cost) == pytest.approx(3.0, rel=1e-3)
