@@ -181,7 +181,7 @@ def check_and_parse_flag(string, flag, declaration_func=None):
             else:
                 while line[labelstart] == " ":
                     labelstart += 1
-                label = line[labelstart:].replace("'", "\\'")
+                label = line[labelstart:].replace("\\", "\\\\").replace("'", "\\'")
             countstr += variable_declaration(nameval, units, label, line)
             # note that this is a 0-based line indexing
             lineidxs.append(originalstr[: originalstr.index(line)].count("\n"))
