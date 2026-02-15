@@ -8,7 +8,7 @@
 
        ┃┓
        ┃┃
-       ┃┣╸<external_constraint.ExternalConstraint object>
+       ┃┣╸<gpkit.examples.external_constraint.ExternalConstraint object>
  Model╺┫┛
        ┃┓
        ┃┃
