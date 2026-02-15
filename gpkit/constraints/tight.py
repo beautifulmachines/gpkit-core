@@ -24,7 +24,10 @@ class Tight(ConstraintSet):
             with SignomialsEnabled():
                 leftval = constraint.left.sub(variables).value
                 rightval = constraint.right.sub(variables).value
-            rel_diff = mag(abs(1 - leftval / rightval))
+            ratio = leftval / rightval
+            if hasattr(ratio, "to"):
+                ratio = ratio.to("dimensionless").magnitude
+            rel_diff = abs(1 - ratio)
             if rel_diff >= self.reltol:
                 msg = (
                     f"Constraint [{str(constraint.left)[:100]}... "
