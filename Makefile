@@ -1,17 +1,17 @@
-.PHONY: clean check-clean test test-unittest test-pytest coverage lint pylint format
+.PHONY: clean check-clean test coverage lint pylint format
 
 # Code quality
 lint:
-	uv run flake8 gpkit docs
+	uv run flake8 gpkit
 
 pylint:
-	uv run pylint --rcfile=.pylintrc gpkit/
-	uv run pylint --rcfile=.pylintrc.docs docs/
+	uv run pylint --rcfile=.pylintrc --ignore=examples gpkit/
+	uv run pylint --rcfile=.pylintrc.examples gpkit/examples/
 
 # Code formatting
 format:
-	uv run isort gpkit docs
-	uv run black gpkit docs
+	uv run isort gpkit
+	uv run black gpkit
 
 # Testing
 test:  # Run tests with pytest

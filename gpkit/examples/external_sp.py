@@ -2,10 +2,9 @@
 
 import numpy as np
 
-# pylint: disable=import-error
-from external_constraint import ExternalConstraint
-
 from gpkit import Model, Variable
+
+from .external_constraint import ExternalConstraint
 
 x = Variable("x")
 y = Variable("y")

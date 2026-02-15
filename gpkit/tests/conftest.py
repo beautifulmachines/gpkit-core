@@ -77,9 +77,9 @@ def solver_fixture(request):
 # Cache for imported example modules (shared across solvers)
 _example_imports = {}
 
-# Directory containing example scripts
+# Directory for captured example output (docs artifacts)
 _FILE_DIR = os.path.dirname(os.path.realpath(__file__))
-_EXAMPLE_DIR = os.path.abspath(_FILE_DIR + "../../../docs/source/examples")
+_OUTPUT_DIR = os.path.abspath(os.path.join(_FILE_DIR, "../../docs/source/examples"))
 
 
 def _verify_clean_global_state():
@@ -99,7 +99,7 @@ def _verify_clean_global_state():
 
 def _import_example(name):
     """
-    Import or reload an example module.
+    Import or reload an example from gpkit.examples.
 
     On first import, uses two-pass approach to isolate output:
     1. Import with suppressed output (populates sys.modules with dependencies)
@@ -108,20 +108,21 @@ def _import_example(name):
     This ensures each example's *_output.txt contains only that example's
     output, not output from any dependencies it imports.
     """
+    module_name = f"gpkit.examples.{name}"
     if name not in _example_imports:
         # First time: two-pass to isolate this example's output
         with StdoutCaptured():  # Suppress during initial import
-            if name in sys.modules:
-                importlib.reload(sys.modules[name])
+            if module_name in sys.modules:
+                importlib.reload(sys.modules[module_name])
             else:
-                importlib.import_module(name)
+                importlib.import_module(module_name)
 
         # Reset model numbers so captured reload has clean state
         gpkit.globals.NamedVariables.reset_modelnumbers()
 
-        filepath = os.path.join(_EXAMPLE_DIR, f"{name}_output.txt")
+        filepath = os.path.join(_OUTPUT_DIR, f"{name}_output.txt")
         with StdoutCaptured(logfilepath=filepath):
-            _example_imports[name] = importlib.reload(sys.modules[name])
+            _example_imports[name] = importlib.reload(sys.modules[module_name])
     else:
         # Already imported: just reload with suppressed output
         with StdoutCaptured():
@@ -136,14 +137,12 @@ def example(request, solver):
     Fixture that imports an example module and yields it for testing.
 
     Example name derived from test function: test_autosweep -> autosweep.py
-    First run captures output to *_output.txt for documentation.
+    Imports from gpkit.examples subpackage.
+    First run captures output to docs/source/examples/*_output.txt.
     """
     # Extract example name from test function (use originalname to strip params)
     test_name = request.node.originalname
     example_name = test_name[5:] if test_name.startswith("test_") else test_name
-
-    if os.path.isdir(_EXAMPLE_DIR) and _EXAMPLE_DIR not in sys.path:
-        sys.path.insert(0, _EXAMPLE_DIR)
 
     with NewDefaultSolver(solver):
         mod = _import_example(example_name)
