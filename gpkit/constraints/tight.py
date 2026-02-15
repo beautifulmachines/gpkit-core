@@ -18,16 +18,12 @@ class Tight(ConstraintSet):
     def process_result(self, result):
         "Checks that all constraints are satisfied with equality"
         super().process_result(result)
-        variables = result.primal
         initsolwarning(result, "Unexpectedly Loose Constraints")
         for constraint in self.flat():
             with SignomialsEnabled():
-                leftval = constraint.left.sub(variables).value
-                rightval = constraint.right.sub(variables).value
-            ratio = leftval / rightval
-            if hasattr(ratio, "to"):
-                ratio = ratio.to("dimensionless").magnitude
-            rel_diff = abs(1 - ratio)
+                leftval = constraint.left.sub(result.variables).value
+                rightval = constraint.right.sub(result.variables).value
+            rel_diff = mag(abs(1 - leftval / rightval))
             if rel_diff >= self.reltol:
                 msg = (
                     f"Constraint [{str(constraint.left)[:100]}... "
