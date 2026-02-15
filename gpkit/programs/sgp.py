@@ -212,7 +212,7 @@ solutions and can be solved with 'Model.solve()'.""")
             print()
         if verbosity > 0:
             print(
-                f"Solving took {self.result['soltime']:.3g} seconds and "
+                f"Solving took {self.result.meta['soltime']:.3g} seconds and "
                 f"{len(self.gps)} GP solves."
             )
         if hasattr(self.slack, "key"):
