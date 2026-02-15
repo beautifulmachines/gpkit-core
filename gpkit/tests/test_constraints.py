@@ -417,6 +417,20 @@ class TestTight:
         m.substitutions[x_min] = 0.5
         assert m.localsolve(verbosity=0).cost == pytest.approx(0.5, abs=1e-5)
 
+    def test_tight_substituted_constant(self):
+        "Tight.process_result substitutes constants, not just primal variables"
+        # Regression: process_result only substituted result.primal, so
+        # an externally-substituted variable on one side of a Tight
+        # constraint stayed as a Monomial while the other side evaluated
+        # to a pint Quantity, causing DimensionalityError.
+        t = Variable("T", units="lbf")  # free variable, will be fixed by substitution
+        dt = Variable("dT", units="lbf")
+        m = Model(dt, [Tight([dt >= t]), dt >= 200 * Variable("u", 1, "lbf")])
+        m.substitutions[t] = 100  # external substitution (not on VarKey.value)
+        sol = m.solve(verbosity=0)
+        # dt driven to 200 by dt >= 200; dt >= t (100) is loose
+        assert "Unexpectedly Loose Constraints" in sol.meta["warnings"]
+
 
 class TestBounded:  # pylint: disable=too-few-public-methods
     "Test bounded constraint set"

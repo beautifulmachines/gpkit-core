@@ -68,15 +68,20 @@ class Solution:
     # program : GP
     meta: dict
 
+    @property
+    def variables(self):
+        "All variables: primal (free) + constants (substituted)"
+        vmap = VarMap(self.primal)
+        vmap.update(self.constants)
+        return vmap
+
     def __getitem__(self, key: VarKey) -> float:
         if key in self.primal:
             return self.primal.quantity(key)
         if key in self.constants:
             return self.constants.quantity(key)
         if hasattr(key, "sub"):
-            variables = VarMap(self.primal)
-            variables.update(self.constants)
-            subbed = key.sub(variables, require_positive=False)
+            subbed = key.sub(self.variables, require_positive=False)
             # subbed should be a constant monomial
             assert getattr(subbed, "exp", {}) == {}
             return getattr(subbed, "c", subbed)
@@ -109,10 +114,7 @@ class Solution:
         if not hasattr(posy, "sub"):
             raise ValueError(f"no variable '{posy}' found in the solution")
 
-        variables = VarMap(self.primal)
-        variables.update(self.constants)
-
-        return posy.sub(variables, require_positive=False)
+        return posy.sub(self.variables, require_positive=False)
 
     def diff(self, baseline, **kwargs):
         "printable difference table between this and other"
