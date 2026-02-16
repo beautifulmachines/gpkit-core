@@ -9,9 +9,6 @@ dist/
 *.egg-info/
 *.egg
 
-# Pickled solutions
-*.p
-
 # MOSEK CLI folder
 gpkit_tmp/
 
