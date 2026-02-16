@@ -1,60 +1,41 @@
-# iPython checkpoint folders
-.ipynb_checkpoints/
+# Byte-compiled / optimized
+__pycache__/
+*.py[cod]
+*.so
 
-# Pickled solutions
-*.p
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
 
 # MOSEK CLI folder
 gpkit_tmp/
 
-# Byte-compiled / optimized / DLL files
-__pycache__/
-*.py[cod]
-
-# C extensions
-*.so
-
-# Distribution / packaging
-.Python
-env/
-bin/
-build/
-develop-eggs/
-dist/
-eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-*.egg-info/
-.installed.cfg
-*.egg
+# gpkit solver build artifacts
+gpkit/env/
 
 # Unit test / coverage reports
 htmlcov/
 .coverage
-.cache
 coverage.xml
-
-# Translations
-*.mo
+.pytest_cache/
 
 # Sphinx documentation
 docs/_build/
 
 # CI test xmloutput
 test_reports/
-test_reports_nounits/
 
 # MacOSX
 .DS_Store
 
-# vim
+# IDE / editor
+.idea/
 *.swp
 
 # Development environment
-.idea/
+.venv/
 
 # uv
 uv.lock

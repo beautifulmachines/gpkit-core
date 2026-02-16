@@ -128,6 +128,10 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         if veckey is None or any(v.key.veckey != veckey for v in othervars):
             if not othervars:
                 return Variable(firstvar)
+            # prefer this model's own variables over submodel variables
+            own = [v for v in variables if v in self.unique_varkeys]
+            if len(own) == 1:
+                return Variable(own[0])
             raise ValueError(
                 f"multiple variables are called '{key}'; show them"
                 f" with `.varkeys.keys({key})`"
