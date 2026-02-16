@@ -174,8 +174,13 @@ class TestExamples:
     def test_model_var_access(self, example):
         model = example.PS
         _ = model["E"]
-        with pytest.raises(ValueError):
-            _ = model["m"]  # multiple variables called m
+        # "m" exists on PowerSystem and its submodels; getitem prefers
+        # the model's own variable when exactly one match is in unique_varkeys
+        own_m = model["m"]
+        assert own_m.key == model.m.key
+        # all variables named "m" are still accessible via varkeys
+        all_m = model.varkeys.keys("m")
+        assert len(all_m) == 3  # PowerSystem.m, Battery.m, Motor.m
 
     @pytest.mark.skip(reason="pint units error - needs investigation")
     def test_plot_sweep1d(self, example):
