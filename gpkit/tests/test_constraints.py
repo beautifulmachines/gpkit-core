@@ -247,6 +247,80 @@ class TestMonomialEquality:
         c = MonomialEquality(x, y)
         assert isinstance(c, MonomialEquality)
 
+    def test_redundant_equalities(self):
+        "Chained equalities (a==b, b==c, c==d) create rank-deficient A"
+        a = Variable("a")
+        b = Variable("b")
+        c = Variable("c")
+        d = Variable("d", 2)
+        # 3 equalities but rank 2: a==b, b==c are independent; c==d is too,
+        # but a==c is implied by a==b and b==c
+        m = Model(a, [a == b, b == c, c == d])
+        sol = m.solve(verbosity=0)
+        assert sol["a"] == pytest.approx(2, rel=1e-4)
+
+    def test_contradictory_equalities(self):
+        "Contradictory equalities (x==2 and x==3) should raise"
+        x = Variable("x")
+        y = Variable("y")
+        d1 = Variable("d1", 2)
+        d2 = Variable("d2", 3)
+        m = Model(y, [x == d1, x == d2, y >= x])
+        with pytest.raises(Exception):
+            m.solve(verbosity=0)
+
+    def test_duplicate_constraint_detection(self):
+        "Including the same constraint object multiple times should error"
+        # Mimics JHO pattern: shared component returned by both parent and children
+        w = Variable("w", "lbf", "component weight")
+        s = Variable("s", "ft^2", "component area")
+        rho = Variable("rho", 0.5, "lbf/ft^2", "weight per area")
+        shared_constraint = w == rho * s
+
+        CL1 = Variable("C_{L1}", 1.0, "-", "cruise lift coeff")
+        CL2 = Variable("C_{L2}", 0.8, "-", "loiter lift coeff")
+
+        # shared_constraint included three times: parent + two children
+        m = Model(
+            w,
+            [
+                shared_constraint,
+                [w >= CL1 * rho * s, shared_constraint],
+                [w >= CL2 * rho * s, shared_constraint],
+            ],
+        )
+
+        with pytest.raises(ValueError, match="[Dd]uplicate"):
+            m.solve(verbosity=0)
+
+    def test_duplicate_nested_model_detection(self):
+        "Shared Model returned by both parent and child should error"
+
+        # Shared component model (like Aircraft in JHO)
+        class Component(Model):
+            def setup(self):
+                w = Variable("w", "lbf", "weight")
+                s = Variable("s", "ft^2", "area")
+                rho = Variable("rho", 0.5, "lbf/ft^2", "density")
+                return [w == rho * s]
+
+        # Child model that re-includes the shared component
+        class Segment(Model):
+            def setup(self, comp):
+                CL = Variable("C_L", 1.0, "-", "lift coefficient")
+                return [comp["w"] >= CL * comp["rho"] * comp["s"], comp]
+
+        comp = Component()
+
+        # System includes comp directly AND via each Segment
+        class System(Model):
+            def setup(self):
+                self.cost = comp["w"]
+                return [comp, Segment(comp), Segment(comp)]
+
+        with pytest.raises(ValueError, match="[Dd]uplicate"):
+            System().solve(verbosity=0)
+
 
 class TestSignomialInequality:
     "Test Signomial constraints"
