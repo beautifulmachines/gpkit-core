@@ -277,16 +277,16 @@ class TestMonomialEquality:
         rho = Variable("rho", 0.5, "lbf/ft^2", "weight per area")
         shared_constraint = w == rho * s
 
-        CL1 = Variable("C_{L1}", 1.0, "-", "cruise lift coeff")
-        CL2 = Variable("C_{L2}", 0.8, "-", "loiter lift coeff")
+        cl1 = Variable("C_{L1}", 1.0, "-", "cruise lift coeff")
+        cl2 = Variable("C_{L2}", 0.8, "-", "loiter lift coeff")
 
         # shared_constraint included three times: parent + two children
         m = Model(
             w,
             [
                 shared_constraint,
-                [w >= CL1 * rho * s, shared_constraint],
-                [w >= CL2 * rho * s, shared_constraint],
+                [w >= cl1 * rho * s, shared_constraint],
+                [w >= cl2 * rho * s, shared_constraint],
             ],
         )
 
@@ -296,24 +296,27 @@ class TestMonomialEquality:
     def test_duplicate_nested_model_detection(self):
         "Shared Model returned by both parent and child should error"
 
-        # Shared component model (like Aircraft in JHO)
         class Component(Model):
+            "Shared component model (like Aircraft in JHO)"
+
             def setup(self):
                 w = Variable("w", "lbf", "weight")
                 s = Variable("s", "ft^2", "area")
                 rho = Variable("rho", 0.5, "lbf/ft^2", "density")
                 return [w == rho * s]
 
-        # Child model that re-includes the shared component
         class Segment(Model):
+            "Child model that re-includes the shared component"
+
             def setup(self, comp):
-                CL = Variable("C_L", 1.0, "-", "lift coefficient")
-                return [comp["w"] >= CL * comp["rho"] * comp["s"], comp]
+                cl = Variable("C_L", 1.0, "-", "lift coefficient")
+                return [comp["w"] >= cl * comp["rho"] * comp["s"], comp]
 
         comp = Component()
 
-        # System includes comp directly AND via each Segment
         class System(Model):
+            "System includes comp directly AND via each Segment"
+
             def setup(self):
                 self.cost = comp["w"]
                 return [comp, Segment(comp), Segment(comp)]

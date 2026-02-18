@@ -187,7 +187,7 @@ solutions and can be solved with 'Model.solve()'.""")
             if verbosity > 2:
                 result = gp.generate_result(solver_out, verbosity=verbosity - 3)
                 self._results.append(result)
-                # TODO: restore showvars filtering for SGP convergence display
+                # future: restore showvars filtering for SGP convergence display
                 # showvars was removed from PrintOptions; restore for this use case
                 vartable = result.table(tables=["freevariables"])
                 vartable = "\n" + vartable.replace("Free", "SGP", 1)
