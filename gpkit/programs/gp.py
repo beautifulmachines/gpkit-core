@@ -391,7 +391,8 @@ class GeometricProgram:
                 )
             else:
                 raise ValueError("Unexpected infeasibility {infeasibility}")
-            if verbosity > 0 and solver_out.meta["soltime"] < 1 and self.model:
+            soltime = time() - starttime
+            if verbosity > 0 and soltime < 1 and self.model:
                 print(
                     msg + "\nSince the model solved in less than a second,"
                     " let's run `.debug()` to analyze what happened.\n"

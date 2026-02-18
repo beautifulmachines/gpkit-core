@@ -2,7 +2,6 @@
 
 from collections import defaultdict
 from contextlib import nullcontext
-from itertools import chain
 
 import numpy as np
 
@@ -156,14 +155,27 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
 
     flat = flatiter
 
-    def as_hmapslt1(self, subs):
-        "Yields hmaps<=1 from self.flat()"
-        yield from chain(
-            *(
-                c.as_hmapslt1(subs)
-                for c in flatiter(self, yield_if_hasattr="as_hmapslt1")
-            )
-        )
+    def as_hmapslt1(self, subs, _seen=None):
+        "Yields hmaps<=1 from self.flat(), checking for duplicate constraints"
+        if _seen is None:
+            _seen = set()
+        for c in flatiter(self, yield_if_hasattr="as_hmapslt1"):
+            c_id = id(c)
+            if c_id in _seen:
+                lineage = getattr(c, "lineage", None)
+                raise ValueError(
+                    f"Duplicate constraint detected: {c}\n"
+                    f"  Lineage: {lineage}\n"
+                    "This constraint object appears multiple times in the "
+                    "model tree. Each constraint should be included exactly "
+                    "once. Check that submodel setup() methods don't return "
+                    "shared components that are already included by a parent."
+                )
+            _seen.add(c_id)
+            if isinstance(c, ConstraintSet):
+                yield from c.as_hmapslt1(subs, _seen)
+            else:
+                yield from c.as_hmapslt1(subs)
 
     def process_result(self, result):
         """Does arbitrary computation / manipulation of a program's result
