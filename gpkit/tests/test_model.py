@@ -341,6 +341,36 @@ class TestGP:
         sol = m.solve(solver=solver, verbosity=0, kktsolver="ldl")
         assert sol.cost == pytest.approx(12.0, abs=10 ** (-get_ndig(solver)))
 
+    def test_printing_with_asymmetric_lineage_depth(self, solver):
+        """Regression: sol.table() raised IndexError when the same model class
+        appears at two different lineage depths in the same solution.
+
+        NamedVariables.modelnums is keyed by (parent_lineage, class_name), so
+        the same class in two distinct parent contexts each gets number 0:
+          - standalone Inner() → lineage (("Inner", 0),) → lineagestr "Inner0"
+          - Outer's Inner()   → lineage (("Outer", 0), ("Inner", 0)) → "Outer0.Inner0"
+        Both produce "Inner0" at depth 1, causing a name collision. When
+        _compute_collision_depths tried depth 2, lineages[-2] on the 1-element
+        standalone list raised IndexError.
+        """
+
+        class _Inner(Model):
+            def setup(self):
+                v = Variable("v")
+                return [v >= 1]
+
+        class _Outer(Model):
+            def setup(self):
+                inner = _Inner()
+                return [inner]
+
+        outer = _Outer()
+        inner_standalone = _Inner()
+        m = Model(outer["v"] + inner_standalone["v"], [outer, inner_standalone])
+        sol = m.solve(solver=solver, verbosity=0)
+        tab = sol.table()  # Must not raise IndexError
+        assert isinstance(tab, str)
+
 
 class TestSP:
     "test case for SP class -- run for each installed solver via solver fixture"
@@ -835,3 +865,42 @@ class TestModelNoSolve:
         gp = m.sp().gp(x0={x: 0.5})  # pylint: disable=no-member
         (first_gp_constr_posy_exp,) = gp.hmaps[1]  # first after cost
         assert first_gp_constr_posy_exp[x.key] == -1.0 / 3
+
+    def test_verify_docstring_constant_not_flagged_as_unbounded(self):
+        """Regression: verify_docstring raised ValueError for an inherited constant.
+
+        ConstraintSet.__init__ intentionally skips adding bounds for constants
+        that have lineage AND are not in unique_varkeys (i.e., inherited from a
+        parent model). Such constants end up in self.substitutions and varkeys,
+        but NOT in bounded. The old count shortcut then fired:
+            len(bounded) + len(missingbounds) != 2 * len(self.varkeys)
+        and incorrectly added the inherited constant to missingbounds → ValueError.
+        The fix skips keys in self.substitutions in the missing-bounds loop.
+        """
+
+        class _Child(Model):
+            """Model with an inherited constant — should not need bound for rho.
+
+            Upper Unbounded
+            ---------------
+            x
+            """
+
+            def setup(self, rho):
+                x = self.x = Variable("x")
+                # rho has lineage from _Parent's context and is not in
+                # _Child.unique_varkeys, so ConstraintSet skips adding its bounds.
+                return [x >= rho]
+
+        class _Parent(Model):
+            """SKIP VERIFICATION"""
+
+            def setup(self):
+                rho = Variable("rho", 1.225)
+                self.child = _Child(rho)
+                return [self.child]
+
+        # Must construct without ValueError about inherited constant rho
+        m = _Parent()
+        assert m is not None
+        assert "rho" in m.child.substitutions
