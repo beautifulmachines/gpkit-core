@@ -218,12 +218,13 @@ class Model(CostedConstraintSet):
                 ", but would gain it from any of these sets of bounds: " + bsets
             )
         # then add everything that's not in bounded
-        if len(bounded) + len(self.missingbounds) != 2 * len(self.varkeys):
-            for key in self.varkeys:
-                for bound in ("upper", "lower"):
-                    if (key, bound) not in bounded:
-                        if (key, bound) not in self.missingbounds:
-                            self.missingbounds[(key, bound)] = ""
+        for key in self.varkeys:
+            if key in self.substitutions:  # constants don't need optimization bounds
+                continue
+            for bound in ("upper", "lower"):
+                if (key, bound) not in bounded:
+                    if (key, bound) not in self.missingbounds:
+                        self.missingbounds[(key, bound)] = ""
         if self.missingbounds:  # anything unbounded? err!
             boundstrs = "\n".join(
                 f"  {v} has no {b} bound{x}" for (v, b), x in self.missingbounds.items()

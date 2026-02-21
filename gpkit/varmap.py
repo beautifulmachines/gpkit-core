@@ -287,7 +287,10 @@ def _compute_collision_depths(name_collisions):
                 depth += 1
                 for vk in vks:
                     lineages = vk.lineagestr().split(".")
-                    extended = lineages[-depth] + "." + partial
+                    if depth > len(lineages):
+                        extended = vk.lineagestr()  # full lineage; guaranteed unique
+                    else:
+                        extended = lineages[-depth] + "." + partial
                     by_partial_lineage[(extended, depth)].add(vk)
         for (_, depth), vks in by_partial_lineage.items():
             (vk,) = vks

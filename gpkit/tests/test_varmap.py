@@ -5,7 +5,7 @@ import pytest
 
 from gpkit import Variable, VectorVariable, ureg
 from gpkit.varkey import VarKey
-from gpkit.varmap import VarMap
+from gpkit.varmap import VarMap, _compute_collision_depths
 
 
 @pytest.fixture(name="vm")
@@ -178,3 +178,42 @@ class TestVarMap:
         vm[x] = 1
         assert x in vm
         assert set(vm) == set([x.key])
+
+
+class TestComputeCollisionDepths:
+    """Tests for _compute_collision_depths in varmap.py."""
+
+    def test_simple_depth1_resolution(self):
+        """Two vars with distinct innermost model names resolve at depth 1."""
+        vk_a = VarKey("m", lineage=(("SubA", 0),))
+        vk_b = VarKey("m", lineage=(("SubB", 0),))
+        result = _compute_collision_depths({"m": {vk_a, vk_b}})
+        assert result[vk_a] == 1
+        assert result[vk_b] == 1
+
+    def test_asymmetric_lineage_no_indexerror(self):
+        """Regression: IndexError when shorter lineage is a suffix of a longer one.
+
+        The same model class in two different parent contexts each get num=0:
+          standalone Inner: lineagestr "Inner0" (1 component)
+          nested Outer.Inner: lineagestr "Outer0.Inner0" (2 components)
+        Both have "Inner0" at depth 1 → collision. At depth 2, the standalone
+        key only has 1 lineage component, so lineages[-2] raised IndexError.
+        With the fix, the shorter lineage falls back to its full lineagestr,
+        which differs from the longer one, resolving the collision.
+        """
+        vk_short = VarKey("x", lineage=(("Inner", 0),))
+        vk_long = VarKey("x", lineage=(("Outer", 0), ("Inner", 0)))
+        # Must not raise IndexError
+        result = _compute_collision_depths({"x": {vk_short, vk_long}})
+        assert vk_short in result
+        assert vk_long in result
+
+        # The resolved display strings must be distinct
+        def display_str(vk, depth):
+            parts = vk.lineagestr().split(".")
+            return vk.lineagestr() if depth > len(parts) else ".".join(parts[-depth:])
+
+        assert display_str(vk_short, result[vk_short]) != display_str(
+            vk_long, result[vk_long]
+        )
