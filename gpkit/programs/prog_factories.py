@@ -1,7 +1,5 @@
 "Scripts for generating, solving and sweeping programs"
 
-import warnings as pywarnings
-
 import numpy as np
 from adce import adnumber
 
@@ -16,66 +14,39 @@ def evaluate_linked(constants, linked):
     # pylint: disable=too-many-branches
     "Evaluates the values and derivatives of linked variables."
     kdc = VarMap({k: adnumber(maybe_flatten(v), k) for k, v in constants.items()})
-    kdc_plain = None
     linked_derivs = {}
     array_calculated = {}  # cache for batch-evaluated vector linked functions
     for v, f in linked.items():
-        try:
-            # Check if this is a veclinkedfn with a batch-callable original
-            original_fn = getattr(f, "original_fn", None)
-            if original_fn is not None and v.veckey:
-                # Batch-evaluate the original function once per veckey
-                if v.veckey not in array_calculated:
-                    with SignomialsEnabled():
-                        vecout = original_fn(kdc)
-                    if not hasattr(vecout, "shape"):
-                        vecout = np.array(vecout)
-                    array_calculated[v.veckey] = vecout
-                out = array_calculated[v.veckey][v.idx]
-            else:
-                with SignomialsEnabled():  # to allow use of gpkit.units
-                    out = f(kdc)
-            if isinstance(out, FixedScalar):  # to allow use of gpkit.units
-                out = out.value
-            if hasattr(out, "units"):
-                out = out.to(v.units or "dimensionless").magnitude
-            elif out != 0 and v.units:
-                pywarnings.warn(
-                    f"Linked function for {v} did not return a united value."
-                    " Modifying it to do so (e.g. by using `()` instead of `[]`"
-                    " to access variables) will reduce errors."
-                )
-            out = maybe_flatten(out)
-            if not hasattr(out, "x"):
-                constants[v] = out
-                continue  # a new fixed variable, not a calculated one
-            constants[v] = out.x
-            linked_derivs[v] = {
-                adn.tag: grad for adn, grad in out.d().items() if adn.tag
-            }
-        except Exception as exception:  # pylint: disable=broad-except
-            from ..globals import settings  # pylint: disable=import-outside-toplevel
-
-            if settings.get("ad_errors_raise", None):
-                raise
-            if kdc_plain is None:
-                kdc_plain = VarMap(constants)
-            constants[v] = f(kdc_plain)
-            print(
-                "Warning: skipped auto-differentiation of linked variable"
-                f" {v} because {exception!r} was raised. Set `gpkit.settings"
-                '["ad_errors_raise"] = True` to raise such Exceptions'
-                " directly.\n"
+        # Check if this is a veclinkedfn with a batch-callable original
+        original_fn = getattr(f, "original_fn", None)
+        if original_fn is not None and v.veckey:
+            # Batch-evaluate the original function once per veckey
+            if v.veckey not in array_calculated:
+                with SignomialsEnabled():
+                    vecout = original_fn(kdc)
+                if not hasattr(vecout, "shape"):
+                    vecout = np.array(vecout)
+                array_calculated[v.veckey] = vecout
+            out = array_calculated[v.veckey][v.idx]
+        else:
+            with SignomialsEnabled():  # to allow use of gpkit.units
+                out = f(kdc)
+        if isinstance(out, FixedScalar):  # to allow use of gpkit.units
+            out = out.value
+        if hasattr(out, "units"):
+            out = out.to(v.units or "dimensionless").magnitude
+        elif out != 0 and v.units:
+            raise ValueError(
+                f"Linked function for {v} must return a value with units"
+                f" (compatible with '{v.units}'),"
+                f" e.g. `return value * gpkit.units('{v.units}')`."
             )
-            if (
-                "Automatic differentiation not yet supported for <class "
-                "'gpkit.nomials.math.Monomial'> objects"
-            ) in str(exception):
-                print(
-                    "This particular warning may have come from using"
-                    f" gpkit.units.* in the function for {v}; try using"
-                    " gpkit.ureg.* or gpkit.units.*.units instead."
-                )
+        out = maybe_flatten(out)
+        if not hasattr(out, "x"):
+            constants[v] = out
+            continue  # a new fixed variable, not a calculated one
+        constants[v] = out.x
+        linked_derivs[v] = {adn.tag: grad for adn, grad in out.d().items() if adn.tag}
     return linked_derivs
 
 
