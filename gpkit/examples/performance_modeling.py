@@ -1,115 +1,82 @@
-# pylint: disable=no-member
 """Modular aircraft concept"""
 
 import numpy as np
 
-from gpkit import Model, Vectorize, parse_variables
+from gpkit import Model, Var, Vectorize
 from gpkit.interactive.references import referencesplot
 
 
 class AircraftP(Model):
-    """Aircraft flight physics: weight <= lift, fuel burn
+    """Aircraft flight physics: weight <= lift, fuel burn"""
 
-    Variables
-    ---------
-    Wfuel  [lbf]  fuel weight
-    Wburn  [lbf]  segment fuel burn
+    Wfuel = Var("lbf", "fuel weight")
+    Wburn = Var("lbf", "segment fuel burn")
 
-    Upper Unbounded
-    ---------------
-    Wburn, aircraft.wing.c, aircraft.wing.A
+    upper_unbounded = ("Wburn", "aircraft.wing.c", "aircraft.wing.A")
+    lower_unbounded = ("Wfuel", "aircraft.W", "state.mu")
 
-    Lower Unbounded
-    ---------------
-    Wfuel, aircraft.W, state.mu
-
-    """
-
-    @parse_variables(__doc__, globals())
     def setup(self, aircraft, state):
         self.aircraft = aircraft
         self.state = state
 
-        self.wing_aero = aircraft.wing.dynamic(aircraft.wing, state)
+        self.wing_aero = aircraft.wing.perf(state)
         self.perf_models = [self.wing_aero]
 
         W = aircraft.W
         S = aircraft.wing.S
-
         V = state.V
         rho = state.rho
-
         D = self.wing_aero.D
         CL = self.wing_aero.CL
 
         return (
-            Wburn >= 0.1 * D,
-            W + Wfuel <= 0.5 * rho * CL * S * V**2,
+            self.Wburn >= 0.1 * D,
+            W + self.Wfuel <= 0.5 * rho * CL * S * V**2,
             {"performance": self.perf_models},
         )
 
 
 class Aircraft(Model):
-    """The vehicle model
+    """The vehicle model"""
 
-    Variables
-    ---------
-    W  [lbf]  weight
+    W = Var("lbf", "weight")
 
-    Upper Unbounded
-    ---------------
-    W
+    upper_unbounded = ("W",)
+    lower_unbounded = ("wing.c", "wing.S")
 
-    Lower Unbounded
-    ---------------
-    wing.c, wing.S
-    """
-
-    @parse_variables(__doc__, globals())
     def setup(self):
         self.fuse = Fuselage()
         self.wing = Wing()
         self.components = [self.fuse, self.wing]
 
-        return [W >= sum(c.W for c in self.components), self.components]
+        return [self.W >= sum(c.W for c in self.components), self.components]
 
-    dynamic = AircraftP
+    def perf(self, state):
+        return AircraftP(self, state)
 
 
 class FlightState(Model):
-    """Context for evaluating flight physics
+    """Context for evaluating flight physics"""
 
-    Variables
-    ---------
-    V     40       [knots]    true airspeed
-    mu    1.628e-5 [N*s/m^2]  dynamic viscosity
-    rho   0.74     [kg/m^3]   air density
+    V = Var("knots", "true airspeed", default=40)
+    mu = Var("N*s/m^2", "dynamic viscosity", default=1.628e-5)
+    rho = Var("kg/m^3", "air density", default=0.74)
 
-    """
-
-    @parse_variables(__doc__, globals())
     def setup(self):
         pass
 
 
 class FlightSegment(Model):
-    """Combines a context (flight state) and a component (the aircraft)
+    """Combines a context (flight state) and a component (the aircraft)"""
 
-    Upper Unbounded
-    ---------------
-    Wburn, aircraft.wing.c, aircraft.wing.A
-
-    Lower Unbounded
-    ---------------
-    Wfuel, aircraft.W
-
-    """
+    upper_unbounded = ("Wburn", "aircraft.wing.c", "aircraft.wing.A")
+    lower_unbounded = ("Wfuel", "aircraft.W")
 
     def setup(self, aircraft):
         self.aircraft = aircraft
 
         self.flightstate = FlightState()
-        self.aircraftp = aircraft.dynamic(aircraft, self.flightstate)
+        self.aircraftp = aircraft.perf(self.flightstate)
 
         self.Wburn = self.aircraftp.Wburn
         self.Wfuel = self.aircraftp.Wfuel
@@ -118,16 +85,10 @@ class FlightSegment(Model):
 
 
 class Mission(Model):
-    """A sequence of flight segments
+    """A sequence of flight segments"""
 
-    Upper Unbounded
-    ---------------
-    aircraft.wing.c, aircraft.wing.A
-
-    Lower Unbounded
-    ---------------
-    aircraft.W
-    """
+    upper_unbounded = ("aircraft.wing.c", "aircraft.wing.A")
+    lower_unbounded = ("aircraft.W",)
 
     def setup(self, aircraft):
         self.aircraft = aircraft
@@ -149,26 +110,17 @@ class Mission(Model):
 
 
 class WingAero(Model):
-    """Wing aerodynamics
+    """Wing aerodynamics"""
 
-    Variables
-    ---------
-    CD      [-]    drag coefficient
-    CL      [-]    lift coefficient
-    e   0.9 [-]    Oswald efficiency
-    Re      [-]    Reynold's number
-    D       [lbf]  drag force
+    CD = Var("-", "drag coefficient")
+    CL = Var("-", "lift coefficient")
+    e = Var("-", "Oswald efficiency", default=0.9)
+    Re = Var("-", "Reynold's number")
+    D = Var("lbf", "drag force")
 
-    Upper Unbounded
-    ---------------
-    D, Re, wing.A, state.mu
+    upper_unbounded = ("D", "Re", "wing.A", "state.mu")
+    lower_unbounded = ("CL", "wing.S", "state.mu", "state.rho", "state.V")
 
-    Lower Unbounded
-    ---------------
-    CL, wing.S, state.mu, state.rho, state.V
-    """
-
-    @parse_variables(__doc__, globals())
     def setup(self, wing, state):
         self.wing = wing
         self.state = state
@@ -181,51 +133,39 @@ class WingAero(Model):
         mu = state.mu
 
         return [
-            D >= 0.5 * rho * V**2 * CD * S,
-            Re == rho * V * c / mu,
-            CD >= 0.074 / Re**0.2 + CL**2 / np.pi / A / e,
+            self.D >= 0.5 * rho * V**2 * self.CD * S,
+            self.Re == rho * V * c / mu,
+            self.CD >= 0.074 / self.Re**0.2 + self.CL**2 / np.pi / A / self.e,
         ]
 
 
 class Wing(Model):
-    """Aircraft wing model
+    """Aircraft wing model"""
 
-    Variables
-    ---------
-    W        [lbf]       weight
-    S        [ft^2]      surface area
-    rho    1 [lbf/ft^2]  areal density
-    A     27 [-]         aspect ratio
-    c        [ft]        mean chord
+    W = Var("lbf", "weight")
+    S = Var("ft^2", "surface area")
+    rho = Var("lbf/ft^2", "areal density", default=1)
+    A = Var("-", "aspect ratio", default=27)
+    c = Var("ft", "mean chord")
 
-    Upper Unbounded
-    ---------------
-    W
+    upper_unbounded = ("W",)
+    lower_unbounded = ("c", "S")
 
-    Lower Unbounded
-    ---------------
-    c, S
-    """
-
-    @parse_variables(__doc__, globals())
     def setup(self):
-        return [c == (S / A) ** 0.5, W >= S * rho]
+        return [self.c == (self.S / self.A) ** 0.5, self.W >= self.S * self.rho]
 
-    dynamic = WingAero
+    def perf(self, state):
+        return WingAero(self, state)
 
 
 class Fuselage(Model):
     """The thing that carries the fuel, engine, and payload
 
     A full model is left as an exercise for the reader.
-
-    Variables
-    ---------
-    W  100 [lbf]  weight
-
     """
 
-    @parse_variables(__doc__, globals())
+    W = Var("lbf", "weight", default=100)
+
     def setup(self):
         pass
 

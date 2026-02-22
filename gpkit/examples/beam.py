@@ -5,7 +5,8 @@ Euler-Bernoulli beam equations for a constant distributed load
 
 import numpy as np
 
-from gpkit import Model, parse_variables, ureg
+from gpkit import Model, Var, Vectorize, ureg
+from gpkit.nomials import VectorizableVariable as Variable
 from gpkit.util.small_scripts import mag
 
 eps = 2e-4  # has to be quite large for consistent cvxopt printouts;
@@ -13,55 +14,49 @@ eps = 2e-4  # has to be quite large for consistent cvxopt printouts;
 
 
 class Beam(Model):
-    """Discretization of the Euler beam equations for a distributed load.
+    """Discretization of the Euler beam equations for a distributed load."""
 
-    Variables
-    ---------
-    EI    [N*m^2]   Bending stiffness
-    dx    [m]       Length of an element
-    L   5 [m]       Overall beam length
+    EI = Var("N*m^2", "Bending stiffness")
+    dx = Var("m", "Length of an element")
+    L = Var("m", "Overall beam length", default=5)
 
-    Boundary Condition Variables
-    ----------------------------
-    V_tip     eps [N]     Tip loading
-    M_tip     eps [N*m]   Tip moment
-    th_base   eps [-]     Base angle
-    w_base    eps [m]     Base deflection
+    # Boundary condition variables (small nonzero to keep GP feasible)
+    V_tip = Var("N", "Tip loading", default=eps)
+    M_tip = Var("N*m", "Tip moment", default=eps)
+    th_base = Var("-", "Base angle", default=eps)
+    w_base = Var("m", "Base deflection", default=eps)
 
-    Node Variables of length N
-    --------------------------
-    q  100*np.ones(N) [N/m]    Distributed load
-    V                 [N]      Internal shear
-    M                 [N*m]    Internal moment
-    th                [-]      Slope
-    w                 [m]      Displacement
+    upper_unbounded = ("w_tip",)
 
-    Upper Unbounded
-    ---------------
-    w_tip
-
-    """
-
-    @parse_variables(__doc__, globals())
     def setup(self, N=4):
+        # N-element distributed variables (N depends on setup arg, so use Vectorize)
+        with Vectorize(N):
+            q = Variable("q", 100, "N/m", "Distributed load")
+            V = Variable("V", "N", "Internal shear")
+            M = Variable("M", "N*m", "Internal moment")
+            th = Variable("th", "-", "Slope")
+            w = Variable("w", "m", "Displacement")
+
         # minimize tip displacement (the last w)
         self.cost = self.w_tip = w[-1]
         return {
-            "definition of dx": L == (N - 1) * dx,
+            "definition of dx": self.L == (N - 1) * self.dx,
             "boundary_conditions": [
-                V[-1] >= V_tip,
-                M[-1] >= M_tip,
-                th[0] >= th_base,
-                w[0] >= w_base,
+                V[-1] >= self.V_tip,
+                M[-1] >= self.M_tip,
+                th[0] >= self.th_base,
+                w[0] >= self.w_base,
             ],
             # below: trapezoidal integration to form a piecewise-linear
             #        approximation of loading, shear, and so on
             # shear and moment increase from tip to base (left > right)
-            "shear integration": V[:-1] >= V[1:] + 0.5 * dx * (q[:-1] + q[1:]),
-            "moment integration": M[:-1] >= M[1:] + 0.5 * dx * (V[:-1] + V[1:]),
+            "shear integration": V[:-1] >= V[1:] + 0.5 * self.dx * (q[:-1] + q[1:]),
+            "moment integration": M[:-1] >= M[1:] + 0.5 * self.dx * (V[:-1] + V[1:]),
             # slope and displacement increase from base to tip (right > left)
-            "theta integration": th[1:] >= th[:-1] + 0.5 * dx * (M[1:] + M[:-1]) / EI,
-            "displacement integration": w[1:] >= w[:-1] + 0.5 * dx * (th[1:] + th[:-1]),
+            "theta integration": th[1:]
+            >= th[:-1] + 0.5 * self.dx * (M[1:] + M[:-1]) / self.EI,
+            "displacement integration": w[1:]
+            >= w[:-1] + 0.5 * self.dx * (th[1:] + th[:-1]),
         }
 
 
