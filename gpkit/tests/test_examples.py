@@ -189,6 +189,7 @@ class TestExamples:
     def test_performance_modeling(self, example):
         m = Model(example.M.cost, Loose(example.M), example.M.substitutions)
         sol = m.solve(verbosity=0)
+        assert sol.cost == pytest.approx(2.1963, rel=1e-3)
         sol.table()
         sol.save("solution.pkl")
         sol.table()
@@ -282,6 +283,7 @@ class TestExamples:
 
     def test_beam(self, example):
         assert not np.isnan(example.sol["w"]).any()
+        assert example.sol.cost == pytest.approx(1.6214, rel=1e-3)
 
     def test_water_tank(self, example):
         pass
