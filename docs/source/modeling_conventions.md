@@ -403,16 +403,7 @@ Callers that need a different perf model pass it explicitly:
 p = Propulsor(prop_flight_model=BladeElementProp)
 ```
 
-### D. Self-equality no-ops
-
-```python
-# BAD — mathematically meaningless; creates spurious constraints
-constraints = [rho == rho, mu == mu, h == h]
-```
-
-Variables with substitutions (constants) do not need fake equality constraints. Remove them.
-
-### E. Perf model string key access
+### D. Perf model string key access
 
 ```python
 # BAD — fragile string key; breaks on rename
