@@ -18,6 +18,7 @@ from .programs.sgp import SequentialGeometricProgram
 from .solutions import SolutionSequence
 from .tools.autosweep import autosweep_1d
 from .util.docstring import expected_unbounded
+from .var import Var
 from .varkey import VarKey
 from .varmap import VarMap
 
@@ -59,6 +60,13 @@ class Model(CostedConstraintSet):
             # lineage holds the (name, num) environment a model was created in,
             # including its own (name, num), and those of models above it
             with NamedVariables(self.__class__.__name__) as (self.lineage, setup_vars):
+                # instantiate Var descriptors before setup() so self.x works
+                seen = set()
+                for klass in type(self).__mro__:
+                    for name, val in klass.__dict__.items():
+                        if isinstance(val, Var) and name not in seen:
+                            seen.add(name)
+                            val._create(self)
                 args = (
                     tuple(arg for arg in [cost, constraints] if arg is not None) + args
                 )
@@ -81,8 +89,13 @@ class Model(CostedConstraintSet):
         CostedConstraintSet.__init__(self, cost, constraints, substitutions)
         self.computed = {}  # {VarKey: fn(solution)} for post-solve computation
         docstr = self.__class__.__doc__
-        if self.lineage and docstr and "SKIP VERIFICATION" not in docstr:
-            if "Unbounded" in docstr or "Bounded by" in docstr:
+        has_class_bounds = hasattr(type(self), "upper_unbounded") or hasattr(
+            type(self), "lower_unbounded"
+        )
+        if self.lineage and (docstr is None or "SKIP VERIFICATION" not in docstr):
+            if has_class_bounds or (
+                docstr and ("Unbounded" in docstr or "Bounded by" in docstr)
+            ):
                 self.verify_docstring()
 
     def process_result(self, result):
@@ -190,8 +203,27 @@ class Model(CostedConstraintSet):
         "Verifies docstring bounds are sufficient but not excessive."
         err = f"while verifying {self.__class__.__name__}:\n"
         bounded, meq_bounded = self.bounded.copy(), self.meq_bounded.copy()
-        doc = self.__class__.__doc__
+        doc = self.__class__.__doc__ or ""
         exp_unbounds = expected_unbounded(self, doc)
+        # also process class-level upper_unbounded / lower_unbounded tuples
+        for direction in ("upper", "lower"):
+            for var in getattr(type(self), f"{direction}_unbounded", ()):
+                try:
+                    obj = self
+                    for attr in var.split("."):
+                        obj = getattr(obj, attr)
+                except AttributeError as exc:
+                    raise AttributeError(
+                        f"`{var}` is in {self.__class__.__name__}."
+                        f"{direction}_unbounded, but is not an attribute of"
+                        " that model."
+                    ) from exc
+                variables = obj if hasattr(obj, "shape") else np.array([obj])
+                it = np.nditer(variables, flags=["multi_index", "refs_ok"])
+                while not it.finished:
+                    i = it.multi_index
+                    it.iternext()
+                    exp_unbounds.add((variables[i].key, direction))
         unexp_bounds = bounded.intersection(exp_unbounds)
         if unexp_bounds:  # anything bounded that shouldn't be? err!
             for direction in ["lower", "upper"]:

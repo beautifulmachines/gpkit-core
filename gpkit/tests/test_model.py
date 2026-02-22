@@ -12,7 +12,9 @@ from gpkit import (
     NamedVariables,
     SignomialEquality,
     SignomialsEnabled,
+    Var,
     Variable,
+    Vectorize,
     VectorVariable,
     parse_variables,
     settings,
@@ -904,3 +906,166 @@ class TestModelNoSolve:
         m = _Parent()
         assert m is not None
         assert "rho" in m.child.substitutions
+
+
+class TestVar:
+    """Tests for the Var class-level variable descriptor."""
+
+    def test_basic_access(self):
+        "Var descriptors create Variable instances accessible via self.W, self.S"
+        # W >= S: W lower-bounded (upper_unbounded), S upper-bounded (lower_unbounded)
+
+        class _Wing(Model):
+            W = Var("-", "weight ratio")
+            S = Var("-", "surface ratio")
+
+            upper_unbounded = ("W",)
+            lower_unbounded = ("S",)
+
+            def setup(self):
+                return [self.W >= self.S]
+
+        wing = _Wing()
+        assert hasattr(wing.W, "key")
+        assert hasattr(wing.S, "key")
+        assert wing.W.key.name == "W"
+        assert wing.S.key.name == "S"
+
+    def test_lineage(self):
+        "Var variables carry the model's lineage"
+        # Unconstrained component: both bounds declared as unbounded
+
+        class _Component(Model):
+            x = Var("-", "ratio")
+
+            upper_unbounded = ("x",)
+            lower_unbounded = ("x",)
+
+            def setup(self):
+                return []
+
+        c = _Component()
+        assert c.x.key.lineage == (("_Component", 0),)
+
+    def test_default(self):
+        "Var with default produces a substitution; constant skips bounds checking"
+
+        class _Aero(Model):
+            # e has a default → treated as a constant; no bounds declaration needed
+            e = Var("-", "Oswald efficiency", default=0.9)
+            x = Var("-", "ratio")
+
+            upper_unbounded = ("x",)
+            lower_unbounded = ("x",)
+
+            def setup(self):
+                return []
+
+        m = _Aero()
+        assert m.e.key in m.substitutions
+        assert m.substitutions[m.e.key] == pytest.approx(0.9)
+
+    def test_subclass_inherits_var(self):
+        "Child class inherits Var declarations and bounds from parent"
+        # Parent declares W as fully unconstrained; child inherits that declaration
+
+        class _Base(Model):
+            W = Var("-", "weight ratio")
+
+            upper_unbounded = ("W",)
+            lower_unbounded = ("W",)
+
+            def setup(self):
+                return []
+
+        class _Child(_Base):
+            def setup(self):
+                return []
+
+        c = _Child()
+        assert hasattr(c.W, "key")
+        assert c.W.key.name == "W"
+
+    def test_vectorize(self):
+        "Var becomes a vector when model is instantiated inside Vectorize"
+
+        class _Segment(Model):
+            V = Var("-", "speed ratio")
+
+            upper_unbounded = ("V",)
+            lower_unbounded = ("V",)
+
+            def setup(self):
+                return []
+
+        with Vectorize(4):
+            seg = _Segment()
+        assert seg.V.shape == (4,)
+
+    def test_reserved_name_raises(self):
+        "Declaring a Var with a reserved name raises ValueError at class definition"
+        with pytest.raises(ValueError, match="reserved"):
+
+            class _Bad(Model):  # pylint: disable=unused-variable
+                cost = Var("-", "should raise")
+
+                def setup(self):
+                    return []
+
+    def test_underscore_prefix_raises(self):
+        "Declaring a Var whose name starts with _var_ raises ValueError"
+        with pytest.raises(ValueError, match="reserved"):
+
+            class _Bad2(Model):  # pylint: disable=unused-variable
+                _var_x = Var("-", "should raise")
+
+                def setup(self):
+                    return []
+
+    def test_class_level_bounds_pass(self):
+        "class-level upper_unbounded / lower_unbounded accepted without error"
+        # W >= x: W lower-bounded (upper_unbounded), x upper-bounded (lower_unbounded)
+
+        class _Model(Model):
+            W = Var("-", "weight ratio")
+            x = Var("-", "length ratio")
+
+            upper_unbounded = ("W",)
+            lower_unbounded = ("x",)
+
+            def setup(self):
+                return [self.W >= self.x]
+
+        m = _Model()
+        assert m is not None
+
+    def test_class_level_bounds_violation_raises(self):
+        "Declaring lower_unbounded for a var that IS lower-bounded raises ValueError"
+        # W >= x bounds W from below; claiming W is lower_unbounded is wrong
+
+        class _BadBounds(Model):
+            W = Var("-", "weight ratio")
+            x = Var("-", "length ratio")
+
+            upper_unbounded = ("W",)
+            lower_unbounded = ("W", "x")  # W IS lower-bounded → wrong declaration
+
+            def setup(self):
+                return [self.W >= self.x]
+
+        with pytest.raises(ValueError):
+            _BadBounds()
+
+    def test_class_descriptor_access(self):
+        "Accessing Var on the class (not instance) returns the Var descriptor itself"
+
+        class _M(Model):
+            x = Var("-", "ratio")
+
+            upper_unbounded = ("x",)
+            lower_unbounded = ("x",)
+
+            def setup(self):
+                return []
+
+        assert isinstance(_M.x, Var)
