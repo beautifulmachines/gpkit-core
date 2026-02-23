@@ -1,9 +1,8 @@
 "Implements the Var class-level variable descriptor"
 
-from typing import TYPE_CHECKING, overload
+from typing import overload
 
-if TYPE_CHECKING:
-    from .nomials.variables import Variable as _Variable
+from .nomials.variables import Variable, VectorizableVariable
 
 _RESERVED_NAMES = frozenset(
     {"cost", "lineage", "setup", "substitutions", "unique_varkeys", "vks"}
@@ -55,7 +54,7 @@ class Var:
     def __get__(self, obj: None, objtype: type) -> "Var": ...
 
     @overload
-    def __get__(self, obj: object, objtype: type) -> "_Variable": ...
+    def __get__(self, obj: object, objtype: type) -> "Variable": ...
 
     def __get__(self, obj, objtype=None):
         if obj is None:
@@ -64,8 +63,6 @@ class Var:
 
     def _create(self, obj):
         """Create the Variable instance on obj, inside a NamedVariables context."""
-        from .nomials.variables import VectorizableVariable
-
         key = f"_var_{self._name}"
         if key in obj.__dict__:
             raise RuntimeError(

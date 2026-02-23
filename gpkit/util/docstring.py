@@ -4,7 +4,7 @@ import ast
 import inspect
 
 
-class parse_variables:  # pylint:disable=invalid-name
+class parse_variables:  # pylint:disable=invalid-name,too-few-public-methods
     """decorator for adding local Variables from a string.
 
     Generally called as `@parse_variables(__doc__, globals())`.
