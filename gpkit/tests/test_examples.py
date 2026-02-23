@@ -247,9 +247,6 @@ class TestExamples:
         with pytest.raises(primal_or_unknown):
             example.m.solve(verbosity=0)
 
-    def test_docstringparsing(self, example):
-        pass
-
     def test_debug(self, example):
         dual_or_primal = DualInfeasible
         if "mosek_conif" == settings["default_solver"]:  # pragma: no cover
