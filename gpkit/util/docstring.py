@@ -2,65 +2,6 @@
 
 import ast
 import inspect
-import re
-
-import numpy as np
-
-
-# pylint: disable=too-many-locals,too-many-nested-blocks
-# pylint: disable=too-many-branches,too-few-public-methods
-def expected_unbounded(instance, doc):
-    "Gets expected-unbounded variables from a string"
-    exp_unbounded = set()
-    for direction in ["upper", "lower"]:
-        flag = direction[0].upper() + direction[1:] + " Unbounded\n"
-        count = doc.count(flag)
-        if count == 0:
-            continue
-        if count > 1:
-            raise ValueError(f"multiple instances of {flag}")
-
-        idx = doc.index(flag) + len(flag)
-        idx2 = doc[idx:].index("\n")
-        try:
-            idx3 = doc[idx:][idx2 + 1 :].index("\n\n")
-        except ValueError:
-            idx3 = doc[idx:][idx2 + 1 :].index("\n")
-        varstrs = doc[idx:][idx2 + 1 :][:idx3].strip()
-        varstrs = varstrs.replace("\n", ", ")  # cross newlines
-        varstrs = re.sub(" +", " ", varstrs)  # multiple-whitespace removal
-        if varstrs:
-            for var in varstrs.split(", "):
-                if " (if " in var:  # it's a conditional!
-                    var, condition = var.split(" (if ")
-                    assert condition[-1] == ")"
-                    condition = condition[:-1]
-                    invert = condition[:4] == "not "
-                    if invert:
-                        condition = condition[4:]
-                        if getattr(instance, condition):
-                            continue
-                    elif not getattr(instance, condition):
-                        continue
-                try:
-                    obj = instance
-                    for subdot in var.split("."):
-                        obj = getattr(obj, subdot)
-                    variables = obj
-                except AttributeError as err:
-                    raise AttributeError(
-                        f"`{var}` is noted in {instance.__class__.__name__} as "
-                        "unbounded, but is not "
-                        "an attribute of that model."
-                    ) from err
-                if not hasattr(variables, "shape"):
-                    variables = np.array([variables])
-                it = np.nditer(variables, flags=["multi_index", "refs_ok"])
-                while not it.finished:
-                    i = it.multi_index
-                    it.iternext()
-                    exp_unbounded.add((variables[i].key, direction))
-    return exp_unbounded
 
 
 class parse_variables:  # pylint:disable=invalid-name

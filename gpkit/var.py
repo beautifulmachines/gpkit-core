@@ -20,9 +20,6 @@ class Var:
             S = Var("ft^2", "wing area")
             A = Var("-", "aspect ratio", default=27)
 
-            upper_unbounded = ("W",)
-            lower_unbounded = ("S",)
-
             def setup(self):
                 return [self.W >= self.S * self.rho]
 

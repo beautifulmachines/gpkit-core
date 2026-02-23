@@ -12,9 +12,6 @@ class AircraftP(Model):
     Wfuel = Var("lbf", "fuel weight")
     Wburn = Var("lbf", "segment fuel burn")
 
-    upper_unbounded = ("Wburn", "aircraft.wing.c", "aircraft.wing.A")
-    lower_unbounded = ("Wfuel", "aircraft.W", "state.mu")
-
     def setup(self, aircraft, state):
         self.aircraft = aircraft
         self.state = state
@@ -41,9 +38,6 @@ class Aircraft(Model):
 
     W = Var("lbf", "weight")
 
-    upper_unbounded = ("W",)
-    lower_unbounded = ("wing.c", "wing.S")
-
     def setup(self):
         self.fuse = Fuselage()
         self.wing = Wing()
@@ -69,9 +63,6 @@ class FlightState(Model):
 class FlightSegment(Model):
     """Combines a context (flight state) and a component (the aircraft)"""
 
-    upper_unbounded = ("Wburn", "aircraft.wing.c", "aircraft.wing.A")
-    lower_unbounded = ("Wfuel", "aircraft.W")
-
     def setup(self, aircraft):
         self.aircraft = aircraft
 
@@ -86,9 +77,6 @@ class FlightSegment(Model):
 
 class Mission(Model):
     """A sequence of flight segments"""
-
-    upper_unbounded = ("aircraft.wing.c", "aircraft.wing.A")
-    lower_unbounded = ("aircraft.W",)
 
     def setup(self, aircraft):
         self.aircraft = aircraft
@@ -118,9 +106,6 @@ class WingAero(Model):
     Re = Var("-", "Reynold's number")
     D = Var("lbf", "drag force")
 
-    upper_unbounded = ("D", "Re", "wing.A", "state.mu")
-    lower_unbounded = ("CL", "wing.S", "state.mu", "state.rho", "state.V")
-
     def setup(self, wing, state):
         self.wing = wing
         self.state = state
@@ -147,9 +132,6 @@ class Wing(Model):
     rho = Var("lbf/ft^2", "areal density", default=1)
     A = Var("-", "aspect ratio", default=27)
     c = Var("ft", "mean chord")
-
-    upper_unbounded = ("W",)
-    lower_unbounded = ("c", "S")
 
     def setup(self):
         return [self.c == (self.S / self.A) ** 0.5, self.W >= self.S * self.rho]

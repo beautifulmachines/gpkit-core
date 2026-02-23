@@ -7,7 +7,7 @@ from time import time
 import numpy as np
 
 from .constraints.costed import CostedConstraintSet
-from .constraints.set import add_meq_bounds, build_model_tree, flatiter
+from .constraints.set import build_model_tree, flatiter
 from .exceptions import Infeasible, InvalidGPConstraint
 from .globals import NamedVariables
 from .nomials import Monomial
@@ -17,7 +17,6 @@ from .programs.prog_factories import progify, solvify
 from .programs.sgp import SequentialGeometricProgram
 from .solutions import SolutionSequence
 from .tools.autosweep import autosweep_1d
-from .util.docstring import expected_unbounded
 from .var import Var
 from .varkey import VarKey
 from .varmap import VarMap
@@ -94,15 +93,6 @@ class Model(CostedConstraintSet):
             self.unique_varkeys = frozenset(v.key for v in setup_vars)
         CostedConstraintSet.__init__(self, cost, constraints, substitutions)
         self.computed = {}  # {VarKey: fn(solution)} for post-solve computation
-        docstr = self.__class__.__doc__
-        has_class_bounds = hasattr(type(self), "upper_unbounded") or hasattr(
-            type(self), "lower_unbounded"
-        )
-        if self.lineage and (docstr is None or "SKIP VERIFICATION" not in docstr):
-            if has_class_bounds or (
-                docstr and ("Unbounded" in docstr or "Bounded by" in docstr)
-            ):
-                self.verify_docstring()
 
     def process_result(self, result):
         "Evaluate computed variables and add to result.primal"
@@ -202,85 +192,6 @@ class Model(CostedConstraintSet):
 
     sp = progify(SequentialGeometricProgram)
     localsolve = solvify(progify(SequentialGeometricProgram, "localsolve"))
-
-    def verify_docstring(
-        self,
-    ):  # pylint:disable=too-many-locals,too-many-branches,too-many-statements
-        "Verifies docstring bounds are sufficient but not excessive."
-        err = f"while verifying {self.__class__.__name__}:\n"
-        bounded, meq_bounded = self.bounded.copy(), self.meq_bounded.copy()
-        doc = self.__class__.__doc__ or ""
-        exp_unbounds = expected_unbounded(self, doc)
-        # also process class-level upper_unbounded / lower_unbounded tuples
-        for direction in ("upper", "lower"):
-            for var in getattr(type(self), f"{direction}_unbounded", ()):
-                try:
-                    obj = self
-                    for attr in var.split("."):
-                        obj = getattr(obj, attr)
-                except AttributeError as exc:
-                    raise AttributeError(
-                        f"`{var}` is in {self.__class__.__name__}."
-                        f"{direction}_unbounded, but is not an attribute of"
-                        " that model."
-                    ) from exc
-                variables = obj if hasattr(obj, "shape") else np.array([obj])
-                it = np.nditer(variables, flags=["multi_index", "refs_ok"])
-                while not it.finished:
-                    i = it.multi_index
-                    it.iternext()
-                    exp_unbounds.add((variables[i].key, direction))
-        unexp_bounds = bounded.intersection(exp_unbounds)
-        if unexp_bounds:  # anything bounded that shouldn't be? err!
-            for direction in ["lower", "upper"]:
-                badvks = [v for v, d in unexp_bounds if d == direction]
-                if not badvks:
-                    continue
-                badvks = ", ".join(str(v) for v in badvks)
-                badvks += " were" if len(badvks) > 1 else " was"
-                err += "    "
-                err += f"{badvks} {direction}-bounded;"
-                err += f"expected {direction}-unbounded\n"
-            raise ValueError(err)
-        bounded.update(exp_unbounds)  # if not, treat expected as bounded
-        add_meq_bounds(bounded, meq_bounded)  # and add more meqs
-        self.missingbounds = {}  # now let's figure out what's missing
-        for bound in meq_bounded:  # first add the un-dealt-with meq bounds
-            for condition in list(meq_bounded[bound]):
-                meq_bounded[bound].remove(condition)
-                newcond = condition - bounded
-                if newcond and not any(c.issubset(newcond) for c in meq_bounded[bound]):
-                    meq_bounded[bound].add(newcond)
-            bsets = " or ".join(str(list(c)) for c in meq_bounded[bound])
-            self.missingbounds[bound] = (
-                ", but would gain it from any of these sets of bounds: " + bsets
-            )
-        # then add everything that's not in bounded
-        for key in self.varkeys:
-            if key in self.substitutions:  # constants don't need optimization bounds
-                continue
-            for bound in ("upper", "lower"):
-                if (key, bound) not in bounded:
-                    if (key, bound) not in self.missingbounds:
-                        self.missingbounds[(key, bound)] = ""
-        if self.missingbounds:  # anything unbounded? err!
-            boundstrs = "\n".join(
-                f"  {v} has no {b} bound{x}" for (v, b), x in self.missingbounds.items()
-            )
-            docstring = (
-                f"To fix this add the following to {self.__class__.__name__}'s"
-                " docstring (you may not need it all):"
-                " \n"
-            )
-            for direction in ["upper", "lower"]:
-                mb = [k for (k, b) in self.missingbounds if b == direction]
-                if mb:
-                    docstring += f"""
-{direction.title()} Unbounded
----------------
-{", ".join(set(k.name for k in mb))}
-"""
-            raise ValueError(err + boundstrs + "\n\n" + docstring)
 
     def sweep(self, sweepvals, skipfailures=False, **solveargs):
         "Sweeps {var: values} in-sync across one dim. Returns SolutionSequence"

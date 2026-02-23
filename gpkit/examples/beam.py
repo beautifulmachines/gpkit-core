@@ -25,8 +25,6 @@ class Beam(Model):
     th_base = Var("-", "Base angle", default=eps)
     w_base = Var("m", "Base deflection", default=eps)
 
-    upper_unbounded = ("w_tip",)
-
     def setup(self, N=4):
         # N-element distributed variables (N depends on setup arg, so use Vectorize)
         with Vectorize(N):
