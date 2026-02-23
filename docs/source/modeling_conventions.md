@@ -48,12 +48,9 @@ class Wing(Model):
 
     W = Var("lbf", "weight")
     S = Var("ft^2", "surface area")
-    rho = Var("lbf/ft^2", "areal density", default=1)
-    A = Var("-", "aspect ratio", default=27)
+    rho = Var("lbf/ft^2", "areal density", value=1)
+    A = Var("-", "aspect ratio", value=27)
     c = Var("ft", "mean chord")
-
-    upper_unbounded = ("W",)
-    lower_unbounded = ("c", "S")
 
     def setup(self):
         return [self.c == (self.S / self.A) ** 0.5, self.W >= self.S * self.rho]
@@ -67,7 +64,7 @@ class Wing(Model):
 initializes the variable correctly inside the `NamedVariables` context during `Model.__init__`,
 so lineage (`Wing.W`) is stamped automatically.
 
-`Var(units, label, *, default=None)` — `default` sets a substitution on the variable. Variables
+`Var(units, label, *, value=None)` — `default` sets a substitution on the variable. Variables
 with defaults act as constants in the optimization unless explicitly freed by the caller.
 
 **Sub-model selection via class attributes** allows behavior to vary by subclassing without
@@ -105,9 +102,9 @@ framework concept — it is simply what we call the second argument to a Perf mo
 class FlightState(Model):
     """Context for evaluating flight physics"""
 
-    V = Var("knots", "true airspeed", default=40)
-    mu = Var("N*s/m^2", "dynamic viscosity", default=1.628e-5)
-    rho = Var("kg/m^3", "air density", default=0.74)
+    V = Var("knots", "true airspeed", value=40)
+    mu = Var("N*s/m^2", "dynamic viscosity", value=1.628e-5)
+    rho = Var("kg/m^3", "air density", value=0.74)
 
     def setup(self):
         pass
@@ -134,12 +131,9 @@ class WingAero(Model):
 
     CD = Var("-", "drag coefficient")
     CL = Var("-", "lift coefficient")
-    e = Var("-", "Oswald efficiency", default=0.9)
+    e = Var("-", "Oswald efficiency", value=0.9)
     Re = Var("-", "Reynold's number")
     D = Var("lbf", "drag force")
-
-    upper_unbounded = ("D", "Re", "wing.A", "state.mu")
-    lower_unbounded = ("CL", "wing.S", "state.mu", "state.rho", "state.V")
 
     def setup(self, wing, state):
         self.wing = wing
@@ -188,9 +182,6 @@ coupling constraints between them. Use `Vectorize(N)` to create N simultaneous i
 class Mission(Model):
     """A sequence of flight segments"""
 
-    upper_unbounded = ("aircraft.wing.c", "aircraft.wing.A")
-    lower_unbounded = ("aircraft.W",)
-
     def setup(self, aircraft):
         self.aircraft = aircraft
 
@@ -234,7 +225,7 @@ context), declare vector variables inside `setup()`:
 ```python
 class Beam(Model):
     EI = Var("N*m^2", "bending stiffness")
-    L = Var("m", "overall beam length", default=5)
+    L = Var("m", "overall beam length", value=5)
 
     def setup(self, N):
         with Vectorize(N):
@@ -265,15 +256,11 @@ Every model has a **pressure signature**: which variables it bounds, and in whic
 - **Upward pressure** on `x`: the model contains `x >= f(...)`, preventing `x → 0`.
 - **Downward pressure** on `x`: the model contains `x <= f(...)`, preventing `x → ∞`.
 
-`upper_unbounded` / `lower_unbounded` class-level tuples declare where a model provides *no*
-downward/upward pressure — meaning external models must provide those bounds. gpkit validates
-these declarations at construction time.
-
-```python
-class Wing(Model):
-    upper_unbounded = ("W",)    # nothing in Wing prevents W → ∞; caller must bound it
-    lower_unbounded = ("c", "S")  # nothing in Wing prevents c,S → 0; caller must bound them
-```
+The pressure signature is always derivable from a model's constraints. It is a useful mental
+model for reasoning about composition: when you remove a sub-model or swap it for another, ask
+which pressures the original was providing. Any variable that loses all upward or downward
+pressure in the combined problem will cause the solver to fail with an unbounded-variable error.
+gpkit reports these at solve time via `check_bounds`.
 
 **Drop-in compatibility.** Model B drops in for Model A if B provides all the pressures the
 system was relying on A for. Two common patterns:
@@ -430,8 +417,7 @@ Poper >= state.PSmin * static.solarcells.S * static.solarcells.etasolar
 | Task | Pattern |
 |---|---|
 | Declare a variable | `W = Var("lbf", "weight")` (class level) |
-| Declare a constant | `A = Var("-", "aspect ratio", default=27)` |
+| Declare a constant | `A = Var("-", "aspect ratio", value=27)` |
 | Swap sub-model type | Class attribute override: `class SolarWing(Wing): sparModel = BoxSpar` |
 | Connect two components | Equality constraint: `prop.Q == motor.Q` |
-| Expose pressure signature | Class-level `upper_unbounded`/`lower_unbounded` tuples |
 | Make Perf accessible from Component | `def perf(self, state): return WingAero(self, state)` |

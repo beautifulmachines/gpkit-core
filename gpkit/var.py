@@ -9,7 +9,7 @@ _RESERVED_NAMES = frozenset(
 )
 
 
-class Var:
+class Var:  # pylint: disable=too-few-public-methods
     """Class-level variable declaration for Model subclasses.
 
     Usage
