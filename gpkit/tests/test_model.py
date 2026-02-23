@@ -945,8 +945,10 @@ class TestVar:
         assert seg.V.shape == (4,)
 
     def test_reserved_name_raises(self):
-        "Declaring a Var with a reserved name raises ValueError at class definition"
-        with pytest.raises(ValueError, match="reserved"):
+        "Declaring a Var with a reserved name raises an error at class definition"
+        # Python 3.11 wraps __set_name__ exceptions in RuntimeError;
+        # 3.12+ propagates directly
+        with pytest.raises((ValueError, RuntimeError)):
 
             class _Bad(Model):  # pylint: disable=unused-variable
                 cost = Var("-", "should raise")
@@ -955,8 +957,10 @@ class TestVar:
                     return []
 
     def test_underscore_prefix_raises(self):
-        "Declaring a Var whose name starts with _var_ raises ValueError"
-        with pytest.raises(ValueError, match="reserved"):
+        "Declaring a Var whose name starts with _var_ raises at class definition"
+        # Python 3.11 wraps __set_name__ exceptions in RuntimeError;
+        # 3.12+ propagates directly
+        with pytest.raises((ValueError, RuntimeError)):
 
             class _Bad2(Model):  # pylint: disable=unused-variable
                 _var_x = Var("-", "should raise")
