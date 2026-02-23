@@ -17,13 +17,13 @@ class Beam(Model):
 
     EI = Var("N*m^2", "Bending stiffness")
     dx = Var("m", "Length of an element")
-    L = Var("m", "Overall beam length", default=5)
+    L = Var("m", "Overall beam length", value=5)
 
     # Boundary condition variables (small nonzero to keep GP feasible)
-    V_tip = Var("N", "Tip loading", default=eps)
-    M_tip = Var("N*m", "Tip moment", default=eps)
-    th_base = Var("-", "Base angle", default=eps)
-    w_base = Var("m", "Base deflection", default=eps)
+    V_tip = Var("N", "Tip loading", value=eps)
+    M_tip = Var("N*m", "Tip moment", value=eps)
+    th_base = Var("-", "Base angle", value=eps)
+    w_base = Var("m", "Base deflection", value=eps)
 
     def setup(self, N=4):
         # N-element distributed variables (N depends on setup arg, so use Vectorize)

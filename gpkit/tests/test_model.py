@@ -904,7 +904,7 @@ class TestVar:
         "Var with default produces a substitution"
 
         class _Aero(Model):
-            e = Var("-", "Oswald efficiency", default=0.9)
+            e = Var("-", "Oswald efficiency", value=0.9)
             x = Var("-", "ratio")
 
             def setup(self):

@@ -18,7 +18,7 @@ class Var:
         class Wing(Model):
             W = Var("lbf", "wing weight")
             S = Var("ft^2", "wing area")
-            A = Var("-", "aspect ratio", default=27)
+            A = Var("-", "aspect ratio", value=27)
 
             def setup(self):
                 return [self.W >= self.S * self.rho]
@@ -35,10 +35,10 @@ class Var:
       Var descriptors automatically become N-element vector variables.
     """
 
-    def __init__(self, units: str, label: str = "", *, default=None, latex: str = None):
+    def __init__(self, units: str, label: str = "", *, value=None, latex: str = None):
         self.units = units
         self.label = label
-        self.default = default
+        self.value = value
         self.latex = latex
         self._name: str | None = None
 
@@ -73,8 +73,8 @@ class Var:
                 "Possible duplicate Var declarations in the MRO."
             )
         args = [self._name]
-        if self.default is not None:
-            args.append(self.default)
+        if self.value is not None:
+            args.append(self.value)
         args.extend([self.units, self.label])
         v = VectorizableVariable(*args)
         obj.__dict__[key] = v

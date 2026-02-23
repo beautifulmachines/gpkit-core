@@ -7,12 +7,12 @@ class Box(Model):
     "Box volume maximization."
 
     # Parameters
-    alpha = Var("-", "lower limit, wall aspect ratio", default=2)
-    beta = Var("-", "upper limit, wall aspect ratio", default=10)
-    gamma = Var("-", "lower limit, floor aspect ratio", default=2)
-    delta = Var("-", "upper limit, floor aspect ratio", default=10)
-    A_wall = Var("m^2", "upper limit, wall area", default=200)
-    A_floor = Var("m^2", "upper limit, floor area", default=50)
+    alpha = Var("-", "lower limit, wall aspect ratio", value=2)
+    beta = Var("-", "upper limit, wall aspect ratio", value=10)
+    gamma = Var("-", "lower limit, floor aspect ratio", value=2)
+    delta = Var("-", "upper limit, floor aspect ratio", value=10)
+    A_wall = Var("m^2", "upper limit, wall area", value=200)
+    A_floor = Var("m^2", "upper limit, floor area", value=50)
 
     # Free variables
     h = Var("m", "height")

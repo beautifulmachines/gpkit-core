@@ -52,9 +52,9 @@ class Aircraft(Model):
 class FlightState(Model):
     """Context for evaluating flight physics"""
 
-    V = Var("knots", "true airspeed", default=40)
-    mu = Var("N*s/m^2", "dynamic viscosity", default=1.628e-5)
-    rho = Var("kg/m^3", "air density", default=0.74)
+    V = Var("knots", "true airspeed", value=40)
+    mu = Var("N*s/m^2", "dynamic viscosity", value=1.628e-5)
+    rho = Var("kg/m^3", "air density", value=0.74)
 
     def setup(self):
         pass
@@ -102,7 +102,7 @@ class WingAero(Model):
 
     CD = Var("-", "drag coefficient")
     CL = Var("-", "lift coefficient")
-    e = Var("-", "Oswald efficiency", default=0.9)
+    e = Var("-", "Oswald efficiency", value=0.9)
     Re = Var("-", "Reynold's number")
     D = Var("lbf", "drag force")
 
@@ -129,8 +129,8 @@ class Wing(Model):
 
     W = Var("lbf", "weight")
     S = Var("ft^2", "surface area")
-    rho = Var("lbf/ft^2", "areal density", default=1)
-    A = Var("-", "aspect ratio", default=27)
+    rho = Var("lbf/ft^2", "areal density", value=1)
+    A = Var("-", "aspect ratio", value=27)
     c = Var("ft", "mean chord")
 
     def setup(self):
@@ -146,7 +146,7 @@ class Fuselage(Model):
     A full model is left as an exercise for the reader.
     """
 
-    W = Var("lbf", "weight", default=100)
+    W = Var("lbf", "weight", value=100)
 
     def setup(self):
         pass
