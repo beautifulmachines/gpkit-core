@@ -1,22 +1,27 @@
-"Minimizes cylindrical tank surface area for a particular volume."
+"Minimizes rectangular tank surface area for a particular volume."
 
-from gpkit import Model, Variable, VectorVariable
+from gpkit import Model, Var, VectorVariable
 
-M = Variable("M", 100, "kg", "Mass of Water in the Tank")
-rho = Variable("\\rho", 1000, "kg/m^3", "Density of Water in the Tank")
-A = Variable("A", "m^2", "Surface Area of the Tank")
-V = Variable("V", "m^3", "Volume of the Tank")
-d = VectorVariable(3, "d", "m", "Dimension Vector")
 
-# because its units are incorrect the line below will print a warning
-bad_monomial_equality = M == V
+class WaterTank(Model):
+    "Rectangular tank surface area minimization."
 
-constraints = (
-    A >= 2 * (d[0] * d[1] + d[0] * d[2] + d[1] * d[2]),
-    V == d[0] * d[1] * d[2],
-    M == V * rho,
-)
+    M = Var("kg", "mass of water", default=100)
+    rho = Var("kg/m^3", "density of water", default=1000)
+    A = Var("m^2", "surface area")
+    V = Var("m^3", "volume")
 
-m = Model(A, constraints)
+    def setup(self):
+        d = VectorVariable(3, "d", "m", "dimension vector")
+
+        self.cost = self.A
+        return [
+            self.A >= 2 * (d[0] * d[1] + d[0] * d[2] + d[1] * d[2]),
+            self.V == d[0] * d[1] * d[2],
+            self.M == self.V * self.rho,
+        ]
+
+
+m = WaterTank()
 sol = m.solve(verbosity=0)
 print(sol.summary())

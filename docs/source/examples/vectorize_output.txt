@@ -7,10 +7,10 @@ SCALAR
 
 
 
-       ┃┓
- Model╺┫┃
-       ┃┣╸x ≥ 1
-       ┃┛
+      ┃┓
+ Test╺┫┃
+      ┃┣╸x ≥ 1
+      ┃┛
 
 
 Optimal Cost

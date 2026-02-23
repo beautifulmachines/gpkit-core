@@ -1068,7 +1068,18 @@ class Breakdowns(object):
         self.lineage_map = get_lineage_map(sol)
         self.mlookup = {}
         with lineage_display_context(self.lineage_map):
-            self.mtree = crawl_modelbd(get_model_breakdown(sol), self.mlookup)
+            bd = get_model_breakdown(sol)
+            model_keys = [k for k in bd if k != "|sensitivity|"]
+            # Skip the generic "Model" wrapper when there's a single named
+            # submodel — but only if that key is a real model (has children),
+            # not a leaf constraint/variable string.
+            if len(model_keys) == 1 and any(
+                k != "|sensitivity|" for k in bd[model_keys[0]]
+            ):
+                top = model_keys[0]
+                self.mtree = crawl_modelbd(bd[top], self.mlookup, name=top)
+            else:
+                self.mtree = crawl_modelbd(bd, self.mlookup)
         self.basically_fixed_variables = set()
         self.bd = get_breakdowns(self.basically_fixed_variables, self.sol)
 
