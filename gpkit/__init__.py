@@ -1,6 +1,6 @@
 "GP and SP modeling package"
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 from .build import build
 from .constraints.set import ConstraintSet
@@ -14,6 +14,7 @@ from .programs.gp import GeometricProgram
 from .programs.sgp import SequentialGeometricProgram
 from .units import DimensionalityError, units, ureg
 from .util.docstring import parse_variables
+from .var import Var
 from .varkey import VarKey
 
 if "just built!" in settings:  # pragma: no cover

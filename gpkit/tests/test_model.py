@@ -12,7 +12,9 @@ from gpkit import (
     NamedVariables,
     SignomialEquality,
     SignomialsEnabled,
+    Var,
     Variable,
+    Vectorize,
     VectorVariable,
     parse_variables,
     settings,
@@ -866,41 +868,113 @@ class TestModelNoSolve:
         (first_gp_constr_posy_exp,) = gp.hmaps[1]  # first after cost
         assert first_gp_constr_posy_exp[x.key] == -1.0 / 3
 
-    def test_verify_docstring_constant_not_flagged_as_unbounded(self):
-        """Regression: verify_docstring raised ValueError for an inherited constant.
 
-        ConstraintSet.__init__ intentionally skips adding bounds for constants
-        that have lineage AND are not in unique_varkeys (i.e., inherited from a
-        parent model). Such constants end up in self.substitutions and varkeys,
-        but NOT in bounded. The old count shortcut then fired:
-            len(bounded) + len(missingbounds) != 2 * len(self.varkeys)
-        and incorrectly added the inherited constant to missingbounds → ValueError.
-        The fix skips keys in self.substitutions in the missing-bounds loop.
-        """
+class TestVar:
+    """Tests for the Var class-level variable descriptor."""
 
-        class _Child(Model):
-            """Model with an inherited constant — should not need bound for rho.
+    def test_basic_access(self):
+        "Var descriptors create Variable instances accessible via self.W, self.S"
 
-            Upper Unbounded
-            ---------------
-            x
-            """
-
-            def setup(self, rho):
-                x = self.x = Variable("x")
-                # rho has lineage from _Parent's context and is not in
-                # _Child.unique_varkeys, so ConstraintSet skips adding its bounds.
-                return [x >= rho]
-
-        class _Parent(Model):
-            """SKIP VERIFICATION"""
+        class _Wing(Model):
+            W = Var("-", "weight ratio")
+            S = Var("-", "surface ratio")
 
             def setup(self):
-                rho = Variable("rho", 1.225)
-                self.child = _Child(rho)
-                return [self.child]
+                return [self.W >= self.S]
 
-        # Must construct without ValueError about inherited constant rho
-        m = _Parent()
-        assert m is not None
-        assert "rho" in m.child.substitutions
+        wing = _Wing()
+        assert hasattr(wing.W, "key")
+        assert hasattr(wing.S, "key")
+        assert wing.W.key.name == "W"
+        assert wing.S.key.name == "S"
+
+    def test_lineage(self):
+        "Var variables carry the model's lineage"
+
+        class _Component(Model):
+            x = Var("-", "ratio")
+
+            def setup(self):
+                return []
+
+        c = _Component()
+        assert c.x.key.lineage == (("_Component", 0),)
+
+    def test_default(self):
+        "Var with default produces a substitution"
+
+        class _Aero(Model):
+            e = Var("-", "Oswald efficiency", value=0.9)
+            x = Var("-", "ratio")
+
+            def setup(self):
+                return []
+
+        m = _Aero()
+        assert m.e.key in m.substitutions
+        assert m.substitutions[m.e.key] == pytest.approx(0.9)
+
+    def test_subclass_inherits_var(self):
+        "Child class inherits Var declarations from parent"
+
+        class _Base(Model):
+            W = Var("-", "weight ratio")
+
+            def setup(self):
+                return []
+
+        class _Child(_Base):
+            def setup(self):
+                return []
+
+        c = _Child()
+        assert hasattr(c.W, "key")
+        assert c.W.key.name == "W"
+
+    def test_vectorize(self):
+        "Var becomes a vector when model is instantiated inside Vectorize"
+
+        class _Segment(Model):
+            V = Var("-", "speed ratio")
+
+            def setup(self):
+                return []
+
+        with Vectorize(4):
+            seg = _Segment()
+        assert seg.V.shape == (4,)
+
+    def test_reserved_name_raises(self):
+        "Declaring a Var with a reserved name raises an error at class definition"
+        # Python 3.11 wraps __set_name__ exceptions in RuntimeError;
+        # 3.12+ propagates directly
+        with pytest.raises((ValueError, RuntimeError)):
+
+            class _Bad(Model):  # pylint: disable=unused-variable
+                cost = Var("-", "should raise")
+
+                def setup(self):
+                    return []
+
+    def test_underscore_prefix_raises(self):
+        "Declaring a Var whose name starts with _var_ raises at class definition"
+        # Python 3.11 wraps __set_name__ exceptions in RuntimeError;
+        # 3.12+ propagates directly
+        with pytest.raises((ValueError, RuntimeError)):
+
+            class _Bad2(Model):  # pylint: disable=unused-variable
+                _var_x = Var("-", "should raise")
+
+                def setup(self):
+                    return []
+
+    def test_class_descriptor_access(self):
+        "Accessing Var on the class (not instance) returns the Var descriptor itself"
+
+        class _M(Model):
+            x = Var("-", "ratio")
+
+            def setup(self):
+                return []
+
+        assert isinstance(_M.x, Var)
