@@ -1,6 +1,6 @@
 "GP and SP modeling package"
 
-__version__ = "0.2.0"
+__version__ = "0.2.1"
 
 from .build import build
 from .constraints.set import ConstraintSet
