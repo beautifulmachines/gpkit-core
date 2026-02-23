@@ -51,6 +51,12 @@ class Model(CostedConstraintSet):
     solution = None
     computed = None  # dict of {VarKey: fn(solution) -> value} for post-solve
 
+    def __init_subclass__(cls, **kwargs):
+        super().__init_subclass__(**kwargs)
+        cls._own_var_fields = tuple(
+            v for v in cls.__dict__.values() if isinstance(v, Var)
+        )
+
     def __init__(self, cost=None, constraints=None, *args, **kwargs):
         # pylint: disable=keyword-arg-before-vararg
         setup_vars = None
@@ -63,10 +69,10 @@ class Model(CostedConstraintSet):
                 # instantiate Var descriptors before setup() so self.x works
                 seen = set()
                 for klass in type(self).__mro__:
-                    for name, val in klass.__dict__.items():
-                        if isinstance(val, Var) and name not in seen:
-                            seen.add(name)
-                            val._create(self)
+                    for var in getattr(klass, "_own_var_fields", ()):
+                        if var._name not in seen:
+                            seen.add(var._name)
+                            var._create(self)
                 args = (
                     tuple(arg for arg in [cost, constraints] if arg is not None) + args
                 )
