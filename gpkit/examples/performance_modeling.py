@@ -46,6 +46,7 @@ class Aircraft(Model):
         return [self.W >= sum(c.W for c in self.components), self.components]
 
     def perf(self, state):
+        "Return an AircraftP performance model for the given state."
         return AircraftP(self, state)
 
 
@@ -137,6 +138,7 @@ class Wing(Model):
         return [self.c == (self.S / self.A) ** 0.5, self.W >= self.S * self.rho]
 
     def perf(self, state):
+        "Return a WingAero performance model for the given state."
         return WingAero(self, state)
 
 
