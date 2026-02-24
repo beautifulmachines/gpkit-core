@@ -1,48 +1,34 @@
 "Verifies that bounds are caught through monomials"
 
-from gpkit import Model, parse_variables
+from gpkit import Model, Var
 from gpkit.exceptions import UnboundedGP, UnknownInfeasible
 
 
-# pylint: disable=no-member
 class BoundsChecking(Model):
-    """Implements a crazy set of unbounded variables.
+    "Implements a crazy set of unbounded variables."
 
-    Variables
-    ---------
-    Ap          [-]  d
-    D           [-]  e
-    F           [-]  s
-    mi          [-]  c
-    mf          [-]  r
-    T           [-]  i
-    nu          [-]  p
-    Fs    0.9   [-]  t
-    mb    0.4   [-]  i
-    rf    0.01  [-]  o
-    V   300     [-]  n
+    Ap = Var("-", "d")
+    D = Var("-", "e")
+    F = Var("-", "s")
+    mi = Var("-", "c")
+    mf = Var("-", "r")
+    T = Var("-", "i")
+    nu = Var("-", "p")
+    Fs = Var("-", "t", value=0.9)
+    mb = Var("-", "i", value=0.4)
+    rf = Var("-", "o", value=0.01)
+    V = Var("-", "n", value=300)
 
-    Upper Unbounded
-    ---------------
-    F
-
-    Lower Unbounded
-    ---------------
-    D
-
-    """
-
-    @parse_variables(__doc__, globals())
     def setup(self):
-        self.cost = F
+        self.cost = self.F
         return [
-            F >= D + T,
-            D == rf * V**2 * Ap,
-            Ap == nu,
-            T == mf * V,
-            mf >= mi + mb,
-            mf == rf * V,
-            Fs <= mi,
+            self.F >= self.D + self.T,
+            self.D == self.rf * self.V**2 * self.Ap,
+            self.Ap == self.nu,
+            self.T == self.mf * self.V,
+            self.mf >= self.mi + self.mb,
+            self.mf == self.rf * self.V,
+            self.Fs <= self.mi,
         ]
 
 

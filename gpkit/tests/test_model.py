@@ -16,7 +16,6 @@ from gpkit import (
     Variable,
     Vectorize,
     VectorVariable,
-    parse_variables,
     settings,
     units,
 )
@@ -748,27 +747,15 @@ class Thing2(Model):
 
 
 class Box(Model):
-    """simple box for model testing
+    "simple box for model testing"
 
-    Variables
-    ---------
-    h  [m]     height
-    w  [m]     width
-    d  [m]     depth
-    V  [m**3]  volume
+    h = Var("m", "height")
+    w = Var("m", "width")
+    d = Var("m", "depth")
+    V = Var("m**3", "volume")
 
-    Upper Unbounded
-    ---------------
-    w, d, h
-
-    Lower Unbounded
-    ---------------
-    w, d, h
-    """
-
-    @parse_variables(__doc__, globals())
     def setup(self):
-        return [V == h * w * d]
+        return [self.V == self.h * self.w * self.d]
 
 
 class BoxAreaBounds(Model):
