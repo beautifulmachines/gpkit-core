@@ -340,3 +340,19 @@ class TestExamples:
 
     def test_unbounded(self, example):
         assert example.sol.cost == pytest.approx(1e-30, rel=1e-2)
+
+    def test_bemt_hover(self, example):
+        # Minimum induced power for a 5-bin BEMT rotor at 1e4 N vehicle weight
+        assert example.sol.cost == pytest.approx(43582.47, rel=1e-2)
+
+    def test_gp_textbook(self, example):
+        # Five classic textbook GP problems; assert all five costs
+        assert example.sol1.cost == pytest.approx(100.0, rel=1e-2)  # BoxTransport
+        assert example.sol2.cost == pytest.approx(8.0, rel=1e-2)  # FencePlot
+        assert example.sol3.cost == pytest.approx(0.1925, rel=1e-2)  # BeamCrossSection
+        assert example.sol4.cost == pytest.approx(13.5, rel=1e-2)  # BoxFromSheet
+        assert example.sol5.cost == pytest.approx(0.009006, rel=1e-2)  # WorkSleep
+
+    def test_fuel_burn(self, example):
+        # Multi-point aircraft fuel burn minimization (total W_fuel, 3 conditions)
+        assert example.sol.cost == pytest.approx(7561.15, rel=1e-2)
