@@ -156,6 +156,21 @@ class WingAero(Model):
 **One operating point only.** A Perf model writes constraints for a single element — never
 coupling constraints between conditions. Coupling belongs at the multi-condition level (Section 5).
 
+**`setup()` Return Value Contract.** The return value of `setup()` determines what constraints
+and submodels the parent model collects. Use the form appropriate for your case:
+
+| Return value | When to use |
+|---|---|
+| `None` (or nothing) | `setup()` only sets instance attributes; all constraints live in submodels |
+| flat list `[c1, c2, submodel, ...]` | Simple model; constraints and submodels mix freely |
+| tuple `(submodelA, [c1, c2])` | Multiple groups; all elements are flattened by gpkit |
+| `(constraints, {var: fn})` | Post-solve computed variables only (callback dict as second element) |
+
+**Anti-pattern: storing AND returning.** Do not assign `self.constraints = [...]` AND include
+`self` in the returned list. If `self` is returned as a submodel, the parent model will traverse
+its constraints through the submodel relationship; returning the same list separately causes
+double-counting.
+
 **`.perf()` method.** A Component may define a `perf()` convenience method that constructs the
 associated Perf model:
 
@@ -247,6 +262,13 @@ class Beam(Model):
 Scalar `Var` declarations (like `EI`) automatically become vector variables when the model is
 instantiated inside an external `Vectorize(N)` context.
 
+**Orchestrator vs. leaf: who owns the N dimension.** There are two distinct roles in multi-condition modeling:
+
+- **Orchestrator** (e.g., `FlightSegment`, `Mission`): uses `with Vectorize(N)` *inside* `setup()` to create N simultaneous operating-point instances. The orchestrator model owns the multi-condition expansion.
+- **Leaf Component** (e.g., `Wing`, `Motor`, `SolarCell`): never uses `with Vectorize(N)` internally. Its scalar `Var` descriptors automatically become vector variables when the leaf is instantiated *inside* an external `Vectorize` context owned by a parent model.
+
+This means: `Wing` does not need to know about N. If `FlightSegment.setup()` wraps `Wing()` construction inside `with Vectorize(N)`, each `Wing.S`, `Wing.W`, etc. becomes a length-N vector automatically. Adding internal `Vectorize` to a leaf Component would create a double-vectorization that is almost certainly wrong.
+
 ---
 
 ## 6. Pressure Signature and Drop-in Compatibility
@@ -308,6 +330,28 @@ Not:
 def setup(self, wing, state):
     c = wing["c"]        # fragile — string key lookup
 ```
+
+**Submodel attribute storage is the mechanism that makes attribute access work.** Every submodel
+the caller may need to reference after construction must be stored as `self.attr` inside
+`setup()`. Storing submodels only in a list is insufficient:
+
+```python
+# CORRECT — each submodel stored as self.attr
+def setup(self, aircraft):
+    self.fs = FlightState()
+    self.perf = aircraft.perf(self.fs)
+    self.wing = aircraft.wing
+    return [self.fs, self.perf]
+
+# WRONG — wing only in a list; prevents mission.aircraft.wing.S access later
+def setup(self, aircraft):
+    components = [FlightState(), aircraft.perf(aircraft.fs)]
+    return components
+```
+
+Storing a submodel only in a list (e.g., `self.components = [wing, fuselage]`) prevents tree
+navigation like `mission.aircraft.wing.planform.S`. The obligation lives in `setup()`: if the
+caller will need to reference it, assign it to `self`.
 
 ---
 
@@ -403,6 +447,193 @@ Poper >= state["(P/S)_{min}"] * static.solarcells["S"] * static.solarcells["\\et
 Poper >= state.PSmin * static.solarcells.S * static.solarcells.etasolar
 ```
 
+### E. String keys in substitution dictionaries
+
+```python
+# BAD — string key in substitutions dict; same fragility as model["varname"]
+model.substitutions["Vv"] = 0.04
+model.substitutions["latitude"] = 45
+```
+
+`model.substitutions["varname"]` relies on gpkit's name-matching lookup: it returns the first
+variable whose name matches the string, fails silently on rename, and cannot be type-checked.
+
+**Fix**: use Variable object keys via attribute access:
+
+```python
+# CORRECT — Variable object as key; exact reference, rename-safe
+self.emp.substitutions[self.emp.vtail.Vv] = 0.04
+model.substitutions[model.fs.latitude] = 45
+```
+
+This is the substitution-side complement of Anti-pattern D. See Section 9.4 for the full
+Substitution-Based Configuration decision.
+
+---
+
+## 9. Additional Patterns
+
+These patterns address common implementation choices not covered by sections 1–8. Each entry
+states the canonical decision, the GP or engineering rationale behind it, and the code form.
+
+---
+
+### 9.1 Cost Function Setting
+
+**Decision:** Cost is set at the call site on the top-level model, after construction. Never
+inside `setup()`.
+
+**Rationale:** The cost function is the optimization objective — a modeling *choice*, not a model
+*property*. In GP, the objective is a monomial or posynomial expression chosen by the analyst.
+The same constraint structure may be optimized for minimum takeoff weight, maximum endurance, or
+minimum power draw depending on the study. Baking cost into `setup()` removes this flexibility
+without any GP-structural benefit; the cost is not a constraint and does not affect the feasible
+region.
+
+```python
+# CORRECT — set at call site, after construction, using attribute access
+model = Mission()
+model.cost = model.aircraft.MTOW       # minimize takeoff weight
+
+# Or for a different study objective using the same model:
+model.cost = model.fs.t_flight         # maximize endurance (invert: minimize 1/t)
+
+# WRONG — cost baked into setup(); objective cannot be changed without modifying the class
+class Mission(Model):
+    def setup(self):
+        ...
+        self.cost = self["MTOW"]       # anti-pattern: string subscript + hard-coded objective
+```
+
+**Anti-pattern note:** The API does not prevent setting cost inside `setup()`. It is a natural
+mistake because cost looks like any other model property. The error only surfaces when you try to
+re-use the model for a different optimization objective.
+
+---
+
+### 9.2 Weight (Mass) Rollup
+
+**Decision:** For new code, use `sum(comp.W for comp in self.components)` where `W` is a `Var`
+descriptor. `summing_vars` is legacy; it still works but is not preferred for new code.
+
+**Rationale:** A weight rollup is a posynomial inequality in GP:
+`W_total >= W_1 + W_2 + ... + W_n`. Using `Var` descriptors and attribute access makes each
+summand an explicit Variable object — exact references, type-safe, rename-safe. `summing_vars`
+requires a string name and returns a list through a dictionary lookup, which has the same
+fragility as string key access everywhere else.
+
+```python
+# CORRECT — attribute access, no string; summands are explicit Variable objects
+self.m_dry >= sum(comp.m_dry for comp in self.components)
+
+# LEGACY — works but not preferred for new code
+Wzfw >= sum(summing_vars(components, "W")) + Wpay + Wavn
+```
+
+**Anti-pattern note:** `summing_vars` appears throughout existing models and still functions
+correctly. The audit table in `model_inventory.md` flags non-conformant uses for reference; do
+not retrofit during Phase 2.
+
+---
+
+### 9.3 Scalar Configuration Arguments to `setup()`
+
+**Decision:** `setup()` arguments are for configuration that changes model *structure* — which
+submodels are included, the dimension N for Vectorize. Constants and parameters that can vary at
+solve time belong as substitutions set at the call site.
+
+**Rationale:** `setup()` is called once during construction, before any solving. A `setup()`
+argument changes the set of constraints and variables gpkit builds. A substitution changes the
+value of a variable but leaves the constraint structure unchanged. This distinction is fundamental
+to how gpkit constructs and solves models: structural choices (which wing subclass, how many
+segments) must be made at construction time; parameter choices (latitude, payload, speed) can be
+deferred to substitutions and changed between solves without rebuilding the model.
+
+```python
+# CORRECT — sp=False selects which Wing subclass to instantiate (structural choice)
+def setup(self, sp=False):
+    self.wing = WingSP() if sp else WingGP()
+    self.fuselage = Fuselage()
+    ...
+
+# WRONG — latitude is a parameter, not a structural choice; set as substitution instead
+class Mission(Model):
+    def setup(self, latitude=45):                       # anti-pattern
+        self.lat = Variable("latitude", latitude, "deg", "latitude")
+
+# CORRECT replacement: latitude as a substitution at the call site
+model = Mission()
+model.substitutions[model.fs.latitude] = 45            # set at call site; can change without rebuild
+```
+
+---
+
+### 9.4 Substitution-Based Configuration
+
+**Decision:** Substitution keys must be Variable objects, not strings. Use
+`model.substitutions[model.submodel.var] = value`. Never `model.substitutions["varname"] = value`
+in new code.
+
+**Rationale:** String keys rely on gpkit's name-matching lookup, which returns the first variable
+whose name matches — fragile, fails silently on rename, and cannot be verified by static
+analysis. Variable object keys are exact references: renaming the variable at the `Var` declaration
+automatically updates any code that uses attribute access to reach it. This is the same
+correctness argument as for constraint-level attribute access (CONV-06) applied to the
+substitutions dict.
+
+```python
+# CORRECT — Variable object as key; attribute access chain is exact and rename-safe
+self.emp.substitutions[self.emp.vtail.Vv] = 0.04
+model.substitutions[model.fs.altitude] = 10000        # ft
+
+# WRONG — string key; first-match lookup, breaks silently on rename (CONV-06 violation)
+model.substitutions["Vv"] = 0.04
+model.substitutions["altitude"] = 10000
+```
+
+See also: Anti-pattern E in Section 8.
+
+---
+
+### 9.5 Conditional Vectorize
+
+**Decision:** Use `with Vectorize(N)` inside `setup()` when the model *itself* orchestrates N
+operating points (e.g., FlightSegment creating N FlightState + Perf pairs). Do NOT use internal
+`Vectorize` for leaf Components — their scalar `Var` descriptors automatically become vectors
+when they are instantiated inside an external `Vectorize` context from a parent model.
+
+**Rationale:** `Vectorize` is a context manager that marks new Variables as members of an
+N-element vector. The question is: who owns the N dimension? If `FlightSegment` creates N
+`FlightState` instances inside `with Vectorize(N)`, `FlightSegment` owns the multi-condition
+structure and N is its setup argument. If `Wing` is a leaf component, it should not know about
+N — its scalar `Var` descriptors become vectors automatically when `Wing` is constructed inside
+an external `Vectorize` block. Adding `with Vectorize(N)` inside a leaf's `setup()` would create
+a double-vectorization (an N×M tensor when only an N-vector was intended).
+
+```python
+# CORRECT — orchestrator model uses Vectorize internally (owns the N dimension)
+class FlightSegment(Model):
+    def setup(self, aircraft, N=5):
+        with Vectorize(N):
+            self.fs = FlightState()                    # N FlightState instances
+            self.perf = aircraft.perf(self.fs)         # N Perf instances
+        return [self.fs, self.perf, ...]
+
+# CORRECT — leaf Component: NO Vectorize inside setup()
+class Wing(Model):
+    W = Var("lbf", "weight")    # scalar Var; becomes vector automatically when Wing is
+    S = Var("ft^2", "area")     # instantiated inside an external with Vectorize(N) block
+
+    def setup(self):
+        return [self.W >= self.S * self.rho]   # no Vectorize here; parent owns N
+
+# WRONG — leaf tries to own its own vectorization (double-vectorization risk)
+class Wing(Model):
+    def setup(self, N=5):
+        with Vectorize(N):                     # anti-pattern for a leaf component
+            self.W = Variable("W", "lbf", "weight")
+```
+
 ---
 
 ## Quick Reference
@@ -421,3 +652,12 @@ Poper >= state.PSmin * static.solarcells.S * static.solarcells.etasolar
 | Swap sub-model type | Class attribute override: `class SolarWing(Wing): sparModel = BoxSpar` |
 | Connect two components | Equality constraint: `prop.Q == motor.Q` |
 | Make Perf accessible from Component | `def perf(self, state): return WingAero(self, state)` |
+| Set optimization objective | `model.cost = model.aircraft.MTOW` (call site, after construction) |
+| Roll up component masses | `self.m_dry >= sum(comp.m_dry for comp in self.components)` |
+| Pass structural config to setup() | `setup(self, sp=False)` — selects subclass, not a parameter value |
+| Set a parameter at call site | `model.substitutions[model.fs.latitude] = 45` (Variable object key) |
+| Vectorize an orchestrator | `with Vectorize(N): self.fs = FlightState()` inside orchestrator `setup()` |
+
+---
+
+See also: [Model Inventory and Conformance Audit](model_inventory.md)
