@@ -49,10 +49,10 @@ class TestExamples:
     #     pass
 
     def test_issue_1513(self, example):
-        pass
+        assert example.sol[0].cost == pytest.approx(20.0, rel=1e-2)
 
     def test_issue_1522(self, example):
-        pass
+        assert example.sol.cost == pytest.approx(3.0, rel=1e-2)
 
     def test_autosweep(self, example):
         bst1, tol1 = example.bst1, example.tol1
@@ -81,6 +81,7 @@ class TestExamples:
         os.remove("autosweep.pkl")
 
     def test_treemap(self, example):
+        # treemap.py is a visualization-only example; no model solve, no cost to assert
         pass
 
     def test_checking_result_changes(self, example):
@@ -103,7 +104,7 @@ class TestExamples:
         assert abs(sol[x2] - 4) <= 1e-4
 
     def test_external_constraint(self, example):
-        pass
+        pass  # external_constraint.py defines a class only; no solve, no cost to assert
 
     def test_migp(self, example):
         solx = [sol[example.x] for sol in example.sols]
@@ -136,7 +137,7 @@ class TestExamples:
         assert y in sol.primal
 
     def test_gettingstarted(self, example):
-        pass
+        assert example.sol.cost == pytest.approx(1.414, rel=1e-2)
 
     def test_loose_constraintsets(self, example):
         m = example.m
@@ -231,7 +232,8 @@ class TestExamples:
             example.gp.solve(verbosity=0)  # mosek_conif and cvxopt solve it
 
     def test_vectorize(self, example):
-        pass
+        sol = example.m.solve(verbosity=0)
+        assert sol.cost == pytest.approx(2.0, rel=1e-2)
 
     def test_primal_infeasible_ex1(self, example):
         primal_or_unknown = PrimalInfeasible
@@ -270,23 +272,25 @@ class TestExamples:
             gp3.solve(verbosity=0)
 
     def test_simple_sp(self, example):
-        pass
+        assert example.sol.cost == pytest.approx(0.9, rel=1e-2)
 
     def test_simple_box(self, example):
-        pass
+        sol = example.m.solve(verbosity=0)
+        assert sol.cost == pytest.approx(0.003674, rel=1e-2)
 
     def test_x_greaterthan_1(self, example):
-        pass
+        assert example.sol.cost == pytest.approx(1.0, rel=1e-2)
 
     def test_beam(self, example):
         assert not np.isnan(example.sol["w"]).any()
         assert example.sol.cost == pytest.approx(1.6214, rel=1e-3)
 
     def test_water_tank(self, example):
-        pass
+        assert example.sol.cost == pytest.approx(1.293, rel=1e-2)
 
     def test_sin_approx_example(self, example):
-        pass
+        sol = example.m.solve(verbosity=0)
+        assert sol.cost == pytest.approx(0.785, rel=1e-2)
 
     def test_simpleflight(self, example):
         assert example.sol.almost_equal(example.sol_loaded)
@@ -327,7 +331,28 @@ class TestExamples:
         os.remove("referencesplot.html")
 
     def test_relaxation(self, example):
-        pass
+        sol1 = example.mr1.solve(verbosity=0)
+        sol2 = example.mr2.solve(verbosity=0)
+        sol3 = example.mr3.solve(verbosity=0)
+        assert sol1.cost == pytest.approx(1.414, rel=1e-2)
+        assert sol2.cost == pytest.approx(2.0, rel=1e-2)
+        assert sol3.cost == pytest.approx(2.0, rel=1e-2)
 
     def test_unbounded(self, example):
-        pass
+        assert example.sol.cost == pytest.approx(1e-30, rel=1e-2)
+
+    def test_bemt_hover(self, example):
+        # Minimum induced power for a 5-bin BEMT rotor at 1e4 N vehicle weight
+        assert example.sol.cost == pytest.approx(43582.47, rel=1e-2)
+
+    def test_gp_textbook(self, example):
+        # Five classic textbook GP problems; assert all five costs
+        assert example.sol1.cost == pytest.approx(100.0, rel=1e-2)  # BoxTransport
+        assert example.sol2.cost == pytest.approx(8.0, rel=1e-2)  # FencePlot
+        assert example.sol3.cost == pytest.approx(0.1925, rel=1e-2)  # BeamCrossSection
+        assert example.sol4.cost == pytest.approx(13.5, rel=1e-2)  # BoxFromSheet
+        assert example.sol5.cost == pytest.approx(0.009006, rel=1e-2)  # WorkSleep
+
+    def test_fuel_burn(self, example):
+        # Multi-point aircraft fuel burn minimization (total W_fuel, 3 conditions)
+        assert example.sol.cost == pytest.approx(7561.15, rel=1e-2)
