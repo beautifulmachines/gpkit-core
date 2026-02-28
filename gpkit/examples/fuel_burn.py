@@ -89,7 +89,7 @@ class FuelBurn(Model):
     W_web = Var("N", "shear web weight")
     W_wing = Var("N", "wing weight")
 
-    def setup(self):
+    def setup(self):  # pylint: disable=too-many-locals
         # Unpack frequently used constants
         rho, mu = self.rho, self.mu
         rho_sl = self.rho_sl
