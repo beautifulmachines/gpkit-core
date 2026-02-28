@@ -660,4 +660,4 @@ class Wing(Model):
 
 ---
 
-See also: [Model Inventory and Conformance Audit](model_inventory.md)
+See also: Model Inventory and Conformance Audit — `.planning/model_inventory.md` in the beautifulmachines meta-repo (covers cross-repo model variants: gassolar, jho, lunar/apollo, liberty)
