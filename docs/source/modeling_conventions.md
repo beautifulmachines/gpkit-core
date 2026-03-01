@@ -6,22 +6,30 @@ illustrated with concrete code from the included examples.
 
 ---
 
-## 1. Core Abstraction: Component and Performance
+## 1. Core Abstraction: Component, State, and Performance
 
-Every gpkit model fits one of two roles, distinguished by its `setup()` signature:
+Every gpkit model fits one of four roles, distinguished by its `setup()` signature:
 
 | Role | `setup()` signature | Contains |
 |---|---|---|
 | **Component** | `setup(self)` or `setup(self, N)` | Static geometry, materials, structural properties |
-| **Perf** | `setup(self, static, state)` | Constraints for one operating point |
+| **State** | `setup(self)` | One operating condition — what changes across analysis points |
+| **Perf** | `setup(self, static, state)` | Constraints linking one Component to one State |
+| **Multi-condition** | `setup(self, component, N=...)` | N States, N Perfs, coupling constraints |
 
 These are naming conventions, not framework enforcement. A model *is* a Perf model if it follows
 the `(static, state)` pattern.
 
-**State** is just the second argument to a Perf model — a bundle of variables describing one
-operating condition (airspeed, altitude, temperature, orbital position, applied load, …). It may
-be a few variables or a full Model subclass; what matters is that it carries condition-specific
-data that the Perf model needs.
+**State is the thing that gets vectorized.** When a multi-condition model creates N analysis
+points with `with Vectorize(N)`, it is creating N State instances — N different operating
+conditions. The Component (the aircraft, the beam, the solar panel) is shared across all N
+points. The Perf model evaluates one (Component, State) pair; by vectorizing State, the
+multi-condition model creates N Perf instances in parallel.
+
+This decomposition is the key insight: Component captures what doesn't change; State captures
+what does. A State may carry a few variables or a full set of atmospheric/environmental
+correlations, but its role is always the same — bundle the condition-specific data that Perf
+needs to evaluate one operating point.
 
 The same pattern appears across domains:
 
@@ -32,8 +40,8 @@ The same pattern appears across domains:
 | `AircraftP` → Perf | `BeamSection` → Perf | `PanelPerf` → Perf |
 | `Mission` → multi-condition | `BeamAnalysis` → multi-condition | `Orbit` → multi-condition |
 
-Domain-specific names are fine. "Component" and "Perf" are the conceptual roles; class names can
-reflect the engineering domain.
+Domain-specific names are fine. "Component," "State," "Perf," and "Multi-condition" are the
+conceptual roles; class names can reflect the engineering domain.
 
 ---
 
@@ -90,6 +98,66 @@ class SolarWing(Wing):      # solar aircraft needs different structural layup
 ```
 
 This is Pattern A (class attribute override). See Section 8 for the anti-pattern it replaces.
+
+**Sub-component decomposition.** Components can contain other Components. There is no limit on
+depth; the solver flattens the entire constraint tree regardless of nesting level. The convention:
+
+1. Instantiate each sub-component in `setup()` and store it as `self.attr`.
+2. Pass sub-components to each other as constructor arguments when one needs another's variables.
+3. Return all sub-components from `setup()` so gpkit collects their constraints.
+
+```python
+class Wing(Model):
+    """Wing: planform geometry + structural sub-components"""
+
+    W    = Var("lbf", "wing weight")
+    mfac = Var("-",   "wing weight margin factor", value=1.2)
+
+    spar_model = CapSpar     # override in subclasses to swap spar type
+    fill_model = WingCore
+    skin_model = WingSkin
+
+    def setup(self, N=5):
+        self.planform = Planform(N)          # stored as self.attr — navigable from outside
+        self.components = []
+
+        if self.skin_model:
+            self.skin = self.skin_model(self.planform)       # planform passed in
+            self.components.append(self.skin)
+        if self.spar_model:
+            self.spar = self.spar_model(N, self.planform)    # planform passed in
+            self.components.append(self.spar)
+        if self.fill_model:
+            self.foam = self.fill_model(self.planform)
+            self.components.append(self.foam)
+
+        return [
+            self.W / self.mfac >= sum(c.W for c in self.components),
+            self.planform,
+            self.components,
+        ]
+```
+
+`Planform(N)` is passed to `CapSpar(N, self.planform)` so the spar can reference
+`planform.b`, `planform.cave`, etc. by variable identity — no explicit "connect" step.
+All sub-components are stored as `self.attr` so callers can navigate after construction:
+`wing.planform.AR`, `wing.spar.W`, `wing.foam.W`. Storing sub-components only in the
+returned list (without `self.attr` assignment) prevents this navigation.
+
+A Perf model receiving a composite Component navigates as deep as needed:
+
+```python
+class WingAero(Model):
+    def setup(self, static, state):
+        AR   = static.planform.AR     # navigate into sub-component
+        cmac = static.planform.cmac
+        tau  = static.planform.tau
+        ...
+```
+
+`static` is the Wing; `static.planform` is the Planform sub-component;
+`static.planform.AR` is the exact Variable object that appears in Planform's own
+constraints. Identity is the link — not string lookup, not copying.
 
 ---
 
@@ -171,6 +239,64 @@ and submodels the parent model collects. Use the form appropriate for your case:
 its constraints through the submodel relationship; returning the same list separately causes
 double-counting.
 
+**The dependency principle: why `setup()` receives model instances.**
+
+The `(self, static, state)` signature is not imposed by the framework — it follows from how
+gpkit links variables. Variables link by *object identity*: two constraints referencing the
+same `Variable` object are linked automatically. There is no separate "connect" step.
+
+The implication for `setup()` argument design: **pass the models whose variables appear in
+your constraints.** If `WingAero` constrains `wing.planform.AR`, `wing.planform.cmac`, and
+`state.rho`, then `setup()` must receive both `wing` (to navigate into its planform sub-component)
+and `state`. Receiving copies of those values would create new, disconnected Variable objects
+that the structural constraints never see.
+
+The `(static, state)` naming maps to the two fundamental inputs of any physics equation:
+
+| Argument | What it represents | Example |
+|---|---|---|
+| `static` | What the component *is* — geometry, materials, topology | Wing chord, aspect ratio, spar thickness |
+| `state` | What the conditions *are* — environment, operating point | Airspeed, density, viscosity |
+
+**Fewer or more arguments are correct when physics requires it.** The `(static, state)` form
+is the common case for a single-component Perf. Some simpler Perfs need only one input:
+
+```python
+class BreguetEndurance(Model):
+    def setup(self, perf):        # only needs performance outputs, not the static component
+        BSFC    = perf.engine.BSFC
+        W_end   = perf.W_end
+        W_start = perf.W_start
+        ...
+```
+
+Higher-level *coupling* models — those that write constraints linking two subsystems rather than
+evaluating one subsystem at one condition — naturally have more arguments:
+
+```python
+class MarsTransitInjection(Model):
+    """Couples rocket capability to payload mass — neither is 'static' vs 'state'"""
+    def setup(self, rocket, payload):
+        self.burn = Burn(rocket, self.v_p)
+        return [
+            self.burn.m_prop <= rocket.m_prop_max,
+            self.burn.m_cutoff >= payload.m + rocket.m_dry,
+            ...
+        ]
+```
+
+Here `rocket` and `payload` are both "static" in the sense of being design components, but
+neither plays the role of operating conditions. The `(static, state)` convention applies to
+single-component Perf models; coupling models receive whatever they constrain.
+
+The rule is always the same: design arguments to match your constraint dependencies.
+
+**The `state` argument vectorizes transparently.** When an orchestrator creates N instances
+inside `with Vectorize(N)`, the `state` passed to each Perf becomes an N-element vector.
+The Perf model's code does not change — `state.V` and `state.rho` are written identically —
+but those variables are now length-N arrays, and the returned constraints are N constraints in
+parallel. The multi-condition structure is invisible to the Perf model.
+
 **`.perf()` method.** A Component may define a `perf()` convenience method that constructs the
 associated Perf model:
 
@@ -234,33 +360,119 @@ together.
 dependencies. It can be used as a Perf in a higher-level analysis. There is no ceiling on
 composition depth.
 
-**Internal discretization.** When `N` comes from a `setup()` argument (not an external Vectorize
-context), declare vector variables inside `setup()`:
+**Internal discretization.** A spatial discretization follows the same pattern as multi-condition
+analysis: define a leaf element model, then vectorize it in the parent. `BeamElement` plays the
+same role as `FlightSegment` — a model for one element, vectorized to produce N simultaneous
+instances. The integration constraints live in the parent `Beam`, just as coupling constraints
+live in `Mission`.
 
 ```python
+class BeamElement(Model):
+    """Loads and displacements at one cross-section — the spatial analogue of FlightState."""
+
+    q  = Var("N/m", "distributed load")
+    V  = Var("N",   "internal shear")
+    M  = Var("N*m", "bending moment")
+    th = Var("-",   "slope")
+    w  = Var("m",   "deflection")
+
+    def setup(self):
+        pass   # no intra-element constraints; integration lives in the parent
+
+
 class Beam(Model):
+    """Vectorizes BeamElement — the spatial analogue of Mission."""
+
     EI = Var("N*m^2", "bending stiffness")
-    L = Var("m", "overall beam length", value=5)
+    L  = Var("m",     "beam length", value=5)
 
-    def setup(self, N):
+    def setup(self, N=5):
+        self.dx = self.L / N
+
         with Vectorize(N):
-            q = Variable("q", 100, "N/m", "distributed load")
-            V = Variable("V", "N", "internal shear")
-            M = Variable("M", "N*m", "internal moment")
-            th = Variable("th", "-", "slope")
-            w = Variable("w", "m", "displacement")
+            self.elem = BeamElement()    # N cross-sections; all vars become shape-(N,) arrays
 
-        self.w_tip = w[-1]
-        return {
-            "shear integration": V[:-1] >= V[1:] + 0.5 * self.dx * (q[:-1] + q[1:]),
-            "moment integration": M[:-1] >= M[1:] + 0.5 * self.dx * (V[:-1] + V[1:]),
-            "theta integration": th[1:] >= th[:-1] + 0.5 * self.dx * (M[1:] + M[:-1]) / self.EI,
-            "displacement integration": w[1:] >= w[:-1] + 0.5 * self.dx * (th[1:] + th[:-1]),
-        }
+        e = self.elem    # shorthand
+
+        return [
+            # Trapezoidal integration: shear and moment from tip to root
+            e.V[:-1] >= e.V[1:]  + 0.5 * self.dx * (e.q[:-1]  + e.q[1:]),
+            e.M[:-1] >= e.M[1:]  + 0.5 * self.dx * (e.V[:-1]  + e.V[1:]),
+            # Slope and deflection from root to tip
+            e.th[1:] >= e.th[:-1] + 0.5 * self.dx * (e.M[1:]  + e.M[:-1]) / self.EI,
+            e.w[1:]  >= e.w[:-1]  + 0.5 * self.dx * (e.th[1:] + e.th[:-1]),
+        ]
 ```
 
 Scalar `Var` declarations (like `EI`) automatically become vector variables when the model is
 instantiated inside an external `Vectorize(N)` context.
+
+**Discrete integration: the unifying pattern.**
+
+`BeamElement` and `FlightSegment` play the same role: a model for a single element, vectorized
+by its parent to create N simultaneous instances. The integration constraints in `Beam` and
+`Mission` are structurally identical — they differ only in governing equation.
+
+Two coupling patterns appear whenever N elements are integrated:
+
+| Pattern | Purpose | Form |
+|---|---|---|
+| **Accumulator** | Sum a consumed or produced quantity across all N elements | `total >= per_element.sum()` |
+| **Continuity chain** | Enforce state consistency between adjacent elements | `x_end[:-1] >= x_start[1:]` |
+
+**Accumulator** — for quantities that add up (fuel burned, energy consumed, load accumulated):
+
+```python
+# Fuel: sum W_fuel across all N segments into a mission total
+self.W_fuel_total >= self.be.W_fuel.sum()
+
+# Beam: sum element loads into a total applied force (if needed)
+self.F_total >= self.elem.q.sum() * self.dx
+```
+
+`.sum()` on a `NomialArray` produces a single posynomial, GP-tractable as an inequality.
+
+**Continuity chain** — for state variables that must be consistent across adjacent elements:
+
+```python
+# Mission: aircraft weight at end of segment i >= weight at start of segment i+1
+self.perf.W_end[:-1] >= self.perf.W_start[1:]
+
+# Beam: same structure; slope and deflection chain root-to-tip
+e.th[1:] >= e.th[:-1] + curvature_term
+```
+
+`[:-1]` selects elements 0 through N−2; `[1:]` selects 1 through N−1. The result is
+N−1 element-wise constraints. Boundary conditions on the terminal element(s) are set separately.
+
+The two patterns are complementary, not alternatives. A fuel burn model uses both: the
+accumulator sums per-segment burn into a total; the continuity chain enforces weight bookkeeping
+across segment boundaries.
+
+**Why `>=` instead of `==`?** A constraint where both sides are sums of terms
+(posynomial = posynomial) is not GP-tractable in general. The `>=` form is a posynomial
+inequality, which is GP-tractable. It is also physically conservative: the optimizer cannot
+underestimate accumulated loads or fuel consumption. For monotone quantities (fuel strictly
+decreases; shear strictly accumulates toward the root under positive loading), the inequality
+binds at the optimum, so no fidelity is lost.
+
+**Integration direction** is a modeling choice: choose the direction that makes the inequality
+conservative in the physically meaningful sense. For fuel, the chain runs backward in time
+(fuel remaining decreases). For beam shear, the chain runs tip-to-root (shear accumulates
+inward). Slope and deflection chain root-to-tip (they accumulate outward).
+
+**Not limited to trapezoidal.** The trapezoidal rule (`0.5*dx*(f[i] + f[i+1])`) is one
+approximation. Forward Euler (`dx*f[i]`), backward Euler (`dx*f[i+1]`), and higher-order
+schemes work equally well — each produces a different posynomial expression on the right-hand
+side, all GP-tractable as inequalities. The trapezoidal rule is a reasonable default: it is
+second-order accurate and symmetric.
+
+**Recipe for any new discretized physics model:**
+1. Define a leaf element Model with per-element state variables.
+2. Vectorize it in the parent: `with Vectorize(N): self.elem = MyElement()`.
+3. Write the governing ODE as a trapezoidal (or other) inequality chain.
+4. Set boundary conditions on the terminal element(s) separately.
+5. Accumulate totals with `.sum()` where needed.
 
 **Orchestrator vs. leaf: who owns the N dimension.** There are two distinct roles in multi-condition modeling:
 
@@ -657,6 +869,8 @@ class Wing(Model):
 | Pass structural config to setup() | `setup(self, sp=False)` — selects subclass, not a parameter value |
 | Set a parameter at call site | `model.substitutions[model.fs.latitude] = 45` (Variable object key) |
 | Vectorize an orchestrator | `with Vectorize(N): self.fs = FlightState()` inside orchestrator `setup()` |
+| Accumulate a consumable total | `self.W_fuel >= self.be.W_fuel.sum()` |
+| Chain state continuity across N elements | `self.perf.W_end[:-1] >= self.perf.W_start[1:]` |
 
 ---
 
