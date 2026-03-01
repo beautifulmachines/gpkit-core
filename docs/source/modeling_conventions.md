@@ -875,3 +875,135 @@ class Wing(Model):
 ---
 
 See also: Model Inventory and Conformance Audit — `.planning/model_inventory.md` in the beautifulmachines meta-repo (covers cross-repo model variants: gassolar, jho, lunar/apollo, liberty)
+
+---
+
+## 10. `default()` Classmethod Convention
+
+Every Model subclass that can stand alone as a complete GP (or SP) problem must define a
+`default()` classmethod. This is the canonical entry point for loading a model without
+prior knowledge of its constructor arguments — Compass calls `ModelClass.default()` to
+obtain a configured, ready-to-solve instance.
+
+**Protocol:**
+
+- `default()` is zero-arg: decorated with `@classmethod`, takes only `cls`, no other parameters.
+- Returns a model instance with `self.cost` assigned and all required substitutions applied —
+  the caller can immediately call `.solve()` or `.localsolve()` on the returned object.
+- If a model has meaningful variants (e.g., N=3 vs. N=8 discretization), each variant defines
+  its own `default()`. No shared logic or extra arguments.
+- Registration in `catalog.toml` implies `default()` compliance — a model cannot be registered
+  without it.
+- `default()` must use attribute access for all variable references (CONV-06 compliant). No
+  `m["varname"]` string subscripts.
+
+**Call-site pattern (Compass / test_catalog):**
+
+```python
+m = ModelClass.default()  # no arguments — always works
+sol = m.solve(verbosity=0)
+```
+
+**Pattern A — legacy models that set cost inside `setup()`:**
+
+Most existing gpkit-core examples set `self.cost` inside `setup()`. For these, `default()`
+simply returns `cls()`:
+
+```python
+class Box(Model):
+    alpha = Var("-", "wall aspect ratio lower limit", value=2)
+    h = Var("m", "height")
+    # ...
+
+    def setup(self):
+        self.cost = 1 / (self.h * self.w * self.d)
+        return [...]
+
+    @classmethod
+    def default(cls):
+        "Return a ready-to-solve Box (cost in setup; all Vars have value=)."
+        return cls()
+```
+
+**Pattern B — canonical models (cost NOT in `setup()`, set at call site):**
+
+For models following the canonical CONV-09 pattern (Section 9.1), `setup()` does not set
+cost. `default()` sets it using attribute access, then applies any required substitutions:
+
+```python
+class SpacecraftMission(Model):
+    def setup(self):
+        # NO self.cost here — set at call site
+        return [self.vehicle, ...]
+
+    @classmethod
+    def default(cls):
+        m = cls()
+        m.cost = 1 / m.vehicle.reactor.m_dry  # attribute access, CONV-06 compliant
+        m.substitutions[m.vehicle.payload_mass] = 500  # Variable object key
+        return m
+```
+
+**Pattern C — models with required substitutions (no `value=` default):**
+
+If a model has a `Var` without a `value=` default, `default()` must supply it:
+
+```python
+class Beam(Model):
+    EI = Var("N*m^2", "Bending stiffness")  # no value= — caller must set it
+    L = Var("m", "Overall beam length", value=5)
+
+    @classmethod
+    def default(cls):
+        "Return a ready-to-solve Beam with N=4 elements, L=5m, EI=1e4 N*m^2."
+        m = cls(N=4)
+        m.substitutions[m.EI] = 1e4  # EI has no value= default; must be set here
+        return m
+```
+
+**SP models:** For SP models, `default()` does not need to signal the SP/GP distinction.
+Callers (e.g., `test_catalog.py`) detect it automatically: try `solve()`, catch
+`InvalidGPConstraint`, fall back to `localsolve()`.
+
+---
+
+## 11. Per-Model Directory Layout
+
+As models grow in complexity, three optional supplemental files provide context that the
+model code alone cannot. These are not required for all models — they grow organically as
+models mature and are documented here as patterns to follow when applicable.
+
+**`fitting/` directory** — present when a model contains empirically fitted coefficients.
+
+Contains the raw data files and curve-fitting scripts that produced the baked-in model
+constants. Without `fitting/`, future maintainers cannot verify or re-derive the constants.
+
+Example: `gpkitmodels/GP/aircraft/prop/fitting/` contains `arctan_fit.py` and coefficient
+CSV files for the propeller model's performance fits.
+
+**`test_<model>.py`** — present when model-specific assertions are warranted.
+
+`test_catalog.py` provides universal smoke-test coverage (imports, `default()`, solve
+without exception) for all registered models. A co-located test file supplements this with
+deeper assertions: cost baselines for specific physical scenarios, edge cases, and structural
+tests that go beyond "does it solve."
+
+Co-located tests are a supplement for deeper assertions, not a replacement for
+`test_catalog.py`. Example files: `gpkitmodels/GP/aircraft/wing/wing_test.py`,
+`gpkitmodels/GP/aircraft/tail/tail_tests.py`.
+
+**`README.md`** — present when the model is complex enough to warrant standalone
+documentation.
+
+Should cover: mathematical assumptions, governing equations with references, key design
+variables and their physical meaning, and any known limitations. Example:
+`gpkitmodels/GP/aircraft/wing/README.md`.
+
+**These three files are optional.** `test_catalog.py` (described in Section 10 and in the
+catalog infrastructure) provides universal CI coverage for all registered models. The
+per-model files are optional supplements that grow organically as models mature.
+
+**Existing examples:** The gpkit-models aircraft subdirectories (`wing/`, `tail/`, `prop/`)
+already demonstrate this layout organically — `wing_test.py`, `tail_tests.py`,
+`prop_test.py` for extended tests; `fitting/` equivalents in `prop/` and `wing/`; `README.md`
+files where applicable.
