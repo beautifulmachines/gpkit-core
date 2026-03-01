@@ -35,6 +35,11 @@ class BoxTransport(Model):
     w = Var("-", "box width")
     h = Var("-", "box height")
 
+    @classmethod
+    def default(cls):
+        "Return a ready-to-solve instance (cost in setup; all Vars have value=)."
+        return cls()
+
     def setup(self):
         V1, c_sides, c_ends, c_ferry = self.V1, self.c_sides, self.c_ends, self.c_ferry
         length, w, h = self.length, self.w, self.h
@@ -59,6 +64,11 @@ class FencePlot(Model):
     length = Var("-", "plot side parallel to river")
     w = Var("-", "plot side perpendicular to river")
 
+    @classmethod
+    def default(cls):
+        "Return a ready-to-solve instance (cost in setup; all Vars have value=)."
+        return cls()
+
     def setup(self):
         length, w, L = self.length, self.w, self.L
         self.cost = 1 / (length * w)
@@ -77,6 +87,11 @@ class BeamCrossSection(Model):
 
     d = Var("-", "beam depth")
     w = Var("-", "beam width")
+
+    @classmethod
+    def default(cls):
+        "Return a ready-to-solve instance (cost in setup; all Vars have value=)."
+        return cls()
 
     def setup(self):
         d, w, R = self.d, self.w, self.R
@@ -99,6 +114,11 @@ class BoxFromSheet(Model):
     h = Var("-", "box height")
     cx = Var("-", "corner cutout length in x dimension")
     cy = Var("-", "corner cutout length in y dimension")
+
+    @classmethod
+    def default(cls):
+        "Return a ready-to-solve instance (cost in setup; all Vars have value=)."
+        return cls()
 
     def setup(self):
         length, w, h = self.length, self.w, self.h
@@ -129,6 +149,11 @@ class WorkSleep(Model):
     to = Var("-", "hours spent eating and/or listening")
     tm = Var("-", "hours spent listening to music")
     s = Var("-", "savings accrued per day")
+
+    @classmethod
+    def default(cls):
+        "Return a ready-to-solve instance (cost in setup; all Vars have value=)."
+        return cls()
 
     def setup(self):
         p, c, te = self.p, self.c, self.te

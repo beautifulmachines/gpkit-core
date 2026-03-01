@@ -25,6 +25,13 @@ class Beam(Model):
     th_base = Var("-", "Base angle", value=eps)
     w_base = Var("m", "Base deflection", value=eps)
 
+    @classmethod
+    def default(cls):
+        "Return a ready-to-solve Beam with N=4 elements, L=5m, EI=1e4 N*m^2."
+        m = cls(N=4)
+        m.substitutions[m.EI] = 1e4  # EI has no value= default; must be set here
+        return m
+
     def setup(self, N=4):
         # N-element distributed variables (N depends on setup arg, so use Vectorize)
         with Vectorize(N):

@@ -19,6 +19,11 @@ class Box(Model):
     w = Var("m", "width")
     d = Var("m", "depth")
 
+    @classmethod
+    def default(cls):
+        "Return a ready-to-solve Box (cost set in setup; all Vars have value=)."
+        return cls()
+
     def setup(self):
         h, w, d = self.h, self.w, self.d
         self.cost = 1 / (h * w * d)
