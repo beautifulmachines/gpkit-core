@@ -10,7 +10,7 @@ import pytest
 def _find_catalog():
     """Walk up from this file to find catalog.toml."""
     p = Path(__file__).resolve().parent
-    for _ in range(5):
+    for _ in range(3):
         candidate = p / "catalog.toml"
         if candidate.exists():
             return candidate
