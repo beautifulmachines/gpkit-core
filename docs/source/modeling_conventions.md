@@ -1,7 +1,7 @@
 # Modeling Conventions
 
 This document describes the canonical patterns for building composable gpkit models. The patterns
-generalize across engineering domains — aircraft, beams, thermal systems, spacecraft — and are
+generalize across engineering domains — from aircraft to energy systems to spacecraft — and are
 illustrated with concrete code from the included examples.
 
 ---
@@ -64,8 +64,8 @@ class Wing(Model):
 initializes the variable correctly inside the `NamedVariables` context during `Model.__init__`,
 so lineage (`Wing.W`) is stamped automatically.
 
-`Var(units, label, *, value=None)` — `default` sets a substitution on the variable. Variables
-with defaults act as constants in the optimization unless explicitly freed by the caller.
+`Var(units, label, *, value=None)` — `value` sets a default substitution on the variable. Variables
+with values act as constants in the optimization unless explicitly freed by the caller.
 
 **Sub-model selection via class attributes** allows behavior to vary by subclassing without
 mutating shared classes:
@@ -123,7 +123,7 @@ them share the same Variable objects for that operating condition.
 ## 4. Performance Model (Perf)
 
 A Perf model writes constraints linking a Component's properties to a State's conditions. Its
-`setup()` always takes `(self, static, state)`.
+`setup()` typically takes `(self, static, state)`.
 
 ```python
 class WingAero(Model):
@@ -153,7 +153,7 @@ class WingAero(Model):
         ]
 ```
 
-**One operating point only.** A Perf model writes constraints for a single element — never
+**One operating point only.** A Perf model writes constraints for a single point — never
 coupling constraints between conditions. Coupling belongs at the multi-condition level (Section 5).
 
 **`setup()` Return Value Contract.** The return value of `setup()` determines what constraints
