@@ -6,6 +6,8 @@ from pathlib import Path
 
 import pytest
 
+from gpkit.exceptions import InvalidGPConstraint
+
 
 def _find_catalog():
     """Walk up from this file to find catalog.toml."""
@@ -35,8 +37,6 @@ def _catalog_ids(models):
 @pytest.mark.parametrize("model_entry", _CATALOG, ids=_catalog_ids(_CATALOG))
 def test_catalog_model(model_entry):
     """Each catalog entry must: import, default(), and solve without exception."""
-    from gpkit.exceptions import InvalidGPConstraint
-
     mod = importlib.import_module(model_entry["module"])
     cls = getattr(mod, model_entry["class"])
 
