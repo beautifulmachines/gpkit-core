@@ -71,6 +71,7 @@ class TestGP:
         x = Variable("x")
         y = Variable("y")
         prob = Model(cost=(x + 2 * y), constraints=[x * y >= 1])
+        assert prob.is_gp()
         sol = prob.solve(solver=solver, verbosity=0)
         assert isinstance(prob.latex(), str)
         # pylint: disable=protected-access
@@ -123,6 +124,7 @@ class TestGP:
                 c,
                 [c >= (x + 0.25) ** 2 + (y - 0.5) ** 2, SignomialEquality(x**2 + x, y)],
             )
+        assert not m.is_gp()
         sol = m.localsolve(solver=solver, verbosity=0)
         assert sol["x"] == pytest.approx(0.1639472, abs=10 ** (-get_ndig(solver)))
         assert sol["y"][0] == pytest.approx(0.1908254, abs=10 ** (-get_ndig(solver)))

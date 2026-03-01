@@ -61,6 +61,10 @@ class Model(CostedConstraintSet):
         """Return a ready-to-solve instance (assumes cost set; all Vars bounded)."""
         return cls()
 
+    def is_gp(self):
+        """Return True if the model contains no signomial constraints."""
+        return not any(hasattr(cs, "as_gpconstr") for cs in self.flat())
+
     def __init__(self, cost=None, constraints=None, *args, **kwargs):
         # pylint: disable=keyword-arg-before-vararg
         setup_vars = None

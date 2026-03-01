@@ -1,4 +1,10 @@
-"""Catalog-driven smoke test: every registered model must default() and solve."""
+"""Catalog-driven smoke test: every registered model must default() and solve.
+
+Public API (importable by other repos):
+  load_catalog(start)       — load models list from catalog.toml nearest to `start`
+  catalog_ids(models)       — generate pytest parametrize IDs
+  run_catalog_test(entry)   — the shared test body
+"""
 
 import importlib
 import tomllib
@@ -6,12 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from gpkit.exceptions import InvalidGPConstraint
 
-
-def _find_catalog():
-    """Walk up from this file to find catalog.toml."""
-    p = Path(__file__).resolve().parent
+def _find_catalog(start):
+    """Walk up from `start` to find catalog.toml."""
+    p = Path(start).resolve().parent
     for _ in range(3):
         candidate = p / "catalog.toml"
         if candidate.exists():
@@ -20,22 +24,17 @@ def _find_catalog():
     raise FileNotFoundError("catalog.toml not found in any parent directory")
 
 
-def _load_catalog():
-    catalog_path = _find_catalog()
-    with open(catalog_path, "rb") as f:
-        data = tomllib.load(f)
-    return data.get("models", [])
+def load_catalog(start):
+    """Load models list from the catalog.toml nearest to `start`."""
+    with open(_find_catalog(start), "rb") as f:
+        return tomllib.load(f).get("models", [])
 
 
-_CATALOG = _load_catalog()
-
-
-def _catalog_ids(models):
+def catalog_ids(models):
     return [f"{m['module']}:{m['class']}" for m in models]
 
 
-@pytest.mark.parametrize("model_entry", _CATALOG, ids=_catalog_ids(_CATALOG))
-def test_catalog_model(model_entry):
+def run_catalog_test(model_entry):
     """Each catalog entry must: import, default(), and solve without exception."""
     mod = importlib.import_module(model_entry["module"])
     cls = getattr(mod, model_entry["class"])
@@ -47,9 +46,15 @@ def test_catalog_model(model_entry):
         "default() must return a model with cost assigned."
     )
 
-    try:
-        sol = m.solve(verbosity=0)
-    except InvalidGPConstraint:
-        sol = m.localsolve(verbosity=0)
+    sol = m.solve(verbosity=0) if m.is_gp() else m.localsolve(verbosity=0)
 
     assert sol is not None
+
+
+_CATALOG = load_catalog(__file__)
+
+
+@pytest.mark.parametrize("model_entry", _CATALOG, ids=catalog_ids(_CATALOG))
+def test_catalog_model(model_entry):
+    """Each catalog entry must: import, default(), and solve without exception."""
+    run_catalog_test(model_entry)
