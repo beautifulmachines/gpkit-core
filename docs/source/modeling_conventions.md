@@ -978,8 +978,8 @@ models mature and are documented here as patterns to follow when applicable.
 Contains the raw data files and curve-fitting scripts that produced the baked-in model
 constants. Without `fitting/`, future maintainers cannot verify or re-derive the constants.
 
-Example: `gpkitmodels/GP/aircraft/prop/fitting/` contains `arctan_fit.py` and coefficient
-CSV files for the propeller model's performance fits.
+Example: [`gpkitmodels/GP/aircraft/prop/fitting/`](https://github.com/beautifulmachines/gpkit-models/tree/main/gpkitmodels/GP/aircraft/prop/fitting)
+contains `arctan_fit.py` and coefficient CSV files for the propeller model's performance fits.
 
 **`test_<model>.py`** — present when model-specific assertions are warranted.
 
@@ -989,21 +989,23 @@ deeper assertions: cost baselines for specific physical scenarios, edge cases, a
 tests that go beyond "does it solve."
 
 Co-located tests are a supplement for deeper assertions, not a replacement for
-`test_catalog.py`. Example files: `gpkitmodels/GP/aircraft/wing/wing_test.py`,
-`gpkitmodels/GP/aircraft/tail/tail_tests.py`.
+`test_catalog.py`. Example files:
+[`wing_test.py`](https://github.com/beautifulmachines/gpkit-models/blob/main/gpkitmodels/GP/aircraft/wing/wing_test.py),
+[`tail_tests.py`](https://github.com/beautifulmachines/gpkit-models/blob/main/gpkitmodels/GP/aircraft/tail/tail_tests.py)
+in [gpkit-models](https://github.com/beautifulmachines/gpkit-models).
 
 **`README.md`** — present when the model is complex enough to warrant standalone
 documentation.
 
 Should cover: mathematical assumptions, governing equations with references, key design
 variables and their physical meaning, and any known limitations. Example:
-`gpkitmodels/GP/aircraft/wing/README.md`.
+[`gpkitmodels/GP/aircraft/wing/README.md`](https://github.com/beautifulmachines/gpkit-models/blob/main/gpkitmodels/GP/aircraft/wing/README.md).
 
 **These three files are optional.** `test_catalog.py` (described in Section 10 and in the
 catalog infrastructure) provides universal CI coverage for all registered models. The
 per-model files are optional supplements that grow organically as models mature.
 
-**Existing examples:** The gpkit-models aircraft subdirectories (`wing/`, `tail/`, `prop/`)
-already demonstrate this layout organically — `wing_test.py`, `tail_tests.py`,
-`prop_test.py` for extended tests; `fitting/` equivalents in `prop/` and `wing/`; `README.md`
-files where applicable.
+**Existing examples:** The [gpkit-models](https://github.com/beautifulmachines/gpkit-models)
+aircraft subdirectories (`wing/`, `tail/`, `prop/`) already demonstrate this layout organically —
+`wing_test.py`, `tail_tests.py`, `prop_test.py` for extended tests; `fitting/` directories
+in `prop/` and `wing/`; `README.md` files where applicable.
