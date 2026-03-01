@@ -880,10 +880,10 @@ See also: Model Inventory and Conformance Audit — `.planning/model_inventory.m
 
 ## 10. `default()` Classmethod Convention
 
-Every Model subclass that can stand alone as a complete GP (or SP) problem must define a
+Any Model that can stand alone as a complete GP (or SP) problem should define a
 `default()` classmethod. This is the canonical entry point for loading a model without
-prior knowledge of its constructor arguments — Compass calls `ModelClass.default()` to
-obtain a configured, ready-to-solve instance.
+prior knowledge of its constructor arguments — `ModelClass.default()` returns
+a configured, ready-to-solve instance.
 
 **Protocol:**
 
@@ -894,20 +894,19 @@ obtain a configured, ready-to-solve instance.
   its own `default()`. No shared logic or extra arguments.
 - Registration in `catalog.toml` implies `default()` compliance — a model cannot be registered
   without it.
-- `default()` must use attribute access for all variable references (CONV-06 compliant). No
-  `m["varname"]` string subscripts.
 
-**Call-site pattern (Compass / test_catalog):**
+**Call-site pattern:**
 
 ```python
 m = ModelClass.default()  # no arguments — always works
 sol = m.solve(verbosity=0)
 ```
 
-**Pattern A — legacy models that set cost inside `setup()`:**
+**Pattern A — models that set cost inside `setup()` (inherited, no override needed):**
 
-Most existing gpkit-core examples set `self.cost` inside `setup()`. For these, `default()`
-simply returns `cls()`:
+`Model` provides a base implementation of `default()` that simply returns `cls()`. Models
+that set `self.cost` inside `setup()` and have all `Var` constants with `value=` defaults
+inherit this behavior for free — no override required:
 
 ```python
 class Box(Model):
@@ -919,10 +918,7 @@ class Box(Model):
         self.cost = 1 / (self.h * self.w * self.d)
         return [...]
 
-    @classmethod
-    def default(cls):
-        "Return a ready-to-solve Box (cost in setup; all Vars have value=)."
-        return cls()
+# No default() needed — inherits Model.default() which returns cls()
 ```
 
 **Pattern B — canonical models (cost NOT in `setup()`, set at call site):**
@@ -931,22 +927,23 @@ For models following the canonical CONV-09 pattern (Section 9.1), `setup()` does
 cost. `default()` sets it using attribute access, then applies any required substitutions:
 
 ```python
-class SpacecraftMission(Model):
+class AircraftMission(Model):
     def setup(self):
+        self.aircraft = Aircraft()
         # NO self.cost here — set at call site
-        return [self.vehicle, ...]
+        return [self.aircraft, ...]
 
     @classmethod
     def default(cls):
         m = cls()
-        m.cost = 1 / m.vehicle.reactor.m_dry  # attribute access, CONV-06 compliant
-        m.substitutions[m.vehicle.payload_mass] = 500  # Variable object key
+        m.cost = m.aircraft.W_total   # attribute access, CONV-06 compliant
+        m.substitutions[m.aircraft.W_payload] = 500  # Variable object key
         return m
 ```
 
-**Pattern C — models with required substitutions (no `value=` default):**
+**Pattern C — models that need substitutions to be solvable:**
 
-If a model has a `Var` without a `value=` default, `default()` must supply it:
+If a model is unbounded without certain substitutions, `default()` must supply them:
 
 ```python
 class Beam(Model):

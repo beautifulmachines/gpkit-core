@@ -40,11 +40,6 @@ def test_catalog_model(model_entry):
     mod = importlib.import_module(model_entry["module"])
     cls = getattr(mod, model_entry["class"])
 
-    assert hasattr(cls, "default"), (
-        f"{cls.__name__} has no default() classmethod."
-        " Registration in catalog.toml requires default() compliance."
-    )
-
     m = cls.default()
 
     assert m.cost is not None, (

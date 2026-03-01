@@ -11,11 +11,6 @@ class WaterTank(Model):
     A = Var("m^2", "surface area")
     V = Var("m^3", "volume")
 
-    @classmethod
-    def default(cls):
-        "Return a ready-to-solve WaterTank (cost in setup; all Vars have value=)."
-        return cls()
-
     def setup(self):
         d = VectorVariable(3, "d", "m", "dimension vector")
 

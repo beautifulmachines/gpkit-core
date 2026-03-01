@@ -42,11 +42,6 @@ class BEMTHover(Model):
     R = Var("m", "rotor radius")
     P = Var("W", "total induced power")
 
-    @classmethod
-    def default(cls):
-        "Return a ready-to-solve BEMTHover with N=5 bins and W_vehicle=1e4 N."
-        return cls(N=5, W_vehicle=1e4)
-
     def setup(self, N=5, W_vehicle=1e4):
         rho = self.rho
         A, Omega, R, P = self.A, self.Omega, self.R, self.P

@@ -89,11 +89,6 @@ class FuelBurn(Model):
     W_web = Var("N", "shear web weight")
     W_wing = Var("N", "wing weight")
 
-    @classmethod
-    def default(cls):
-        "Return a ready-to-solve FuelBurn (cost in setup; all Vars have value=)."
-        return cls()
-
     def setup(self):  # pylint: disable=too-many-locals
         # Unpack frequently used constants
         rho, mu = self.rho, self.mu

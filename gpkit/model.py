@@ -56,6 +56,11 @@ class Model(CostedConstraintSet):
             v for v in cls.__dict__.values() if isinstance(v, Var)
         )
 
+    @classmethod
+    def default(cls):
+        """Return a ready-to-solve instance (assumes cost set; all Vars bounded)."""
+        return cls()
+
     def __init__(self, cost=None, constraints=None, *args, **kwargs):
         # pylint: disable=keyword-arg-before-vararg
         setup_vars = None
