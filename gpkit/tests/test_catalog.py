@@ -31,6 +31,7 @@ def load_catalog(start):
 
 
 def catalog_ids(models):
+    """Return pytest parametrize IDs for a list of catalog model entries."""
     return [f"{m['module']}:{m['class']}" for m in models]
 
 
