@@ -1,0 +1,49 @@
+# catalog.toml — model registry for gpkit-core examples
+#
+# Schema:
+#   module — Python import path
+#   class  — class name within that module
+#
+# All registered models must implement default() classmethod.
+# Registration implies compliance: a model cannot appear here without a passing
+# CI test via test_catalog.py.
+
+[[models]]
+module = "gpkit.examples.simple_box"
+class = "Box"
+
+[[models]]
+module = "gpkit.examples.water_tank"
+class = "WaterTank"
+
+[[models]]
+module = "gpkit.examples.bemt_hover"
+class = "BEMTHover"
+
+[[models]]
+module = "gpkit.examples.fuel_burn"
+class = "FuelBurn"
+
+[[models]]
+module = "gpkit.examples.beam"
+class = "Beam"
+
+[[models]]
+module = "gpkit.examples.gp_textbook"
+class = "BoxTransport"
+
+[[models]]
+module = "gpkit.examples.gp_textbook"
+class = "FencePlot"
+
+[[models]]
+module = "gpkit.examples.gp_textbook"
+class = "BeamCrossSection"
+
+[[models]]
+module = "gpkit.examples.gp_textbook"
+class = "BoxFromSheet"
+
+[[models]]
+module = "gpkit.examples.gp_textbook"
+class = "WorkSleep"
