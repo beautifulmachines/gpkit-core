@@ -269,11 +269,11 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
 
 
 def build_model_tree(model):
-    """Build model_tree structure from a Model's constraint hierarchy.
+    """Build model_tree structure from a Model's explicit _children graph.
 
-    Walks the constraint tree in the same depth-first order as
-    collect_flat_constraints_ir, tracking which flat constraint indices
-    belong to which model node.
+    Uses model._children (populated during __init__) as the authoritative
+    source for child detection. Constraint indices are still derived by
+    walking the flat constraint list in flatiter order.
 
     Parameters
     ----------
@@ -325,8 +325,10 @@ def build_model_tree(model):
             iterable = iterable.values()
 
         for item in iterable:
-            if isinstance(item, ConstraintSet) and getattr(item, "lineage", None):
-                # Sub-model: create child node
+            if isinstance(item, ConstraintSet) and item in getattr(
+                iterable, "_children", []
+            ):
+                # Sub-model detected via _children: create child node
                 children.append(_walk(item))
             elif not hasattr(item, "__iter__"):
                 # Leaf constraint (non-iterable)
