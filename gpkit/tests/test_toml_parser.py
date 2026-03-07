@@ -577,3 +577,106 @@ constraints = ["y >= x[0] + x[1] + x[2]"]
 """)
         sol = m.solve(verbosity=0)
         assert float(sol.cost) == pytest.approx(3.0, rel=1e-3)
+
+
+# ---------------------------------------------------------------------------
+# GRAPH-04: namespace construction behavior (no proxy classes)
+# ---------------------------------------------------------------------------
+
+
+class TestNamespaceBehavior:
+    """Verify namespace construction behavior after proxy class elimination.
+
+    These tests capture the contracts that the old proxy classes provided —
+    qualified access, ambiguity detection, and submodels aggregation —
+    now implemented via types.SimpleNamespace.
+    """
+
+    def test_qualified_access_cross_model(self):
+        """wing.W_w qualified access resolves correctly in aircraft constraint."""
+        m = load_toml("""
+[models.wing]
+S = 100
+W_w = "-"
+constraints = ["W_w >= S * 0.1"]
+
+[models.aircraft]
+W = "-"
+submodels = ["wing"]
+objective = "min: W"
+constraints = ["W >= wing.W_w * 1.2"]
+""")
+        sol = m.solve(verbosity=0)
+        # W_w >= 100 * 0.1 = 10; W >= 10 * 1.2 = 12
+        assert float(sol.cost) == pytest.approx(12.0, rel=1e-3)
+
+    def test_ambiguous_name_in_constraint_raises(self):
+        """Bare name ambiguous across two models raises with clear message."""
+        with pytest.raises(TomlParseError, match="defined in multiple models"):
+            load_toml("""
+[models.a]
+x = "-"
+constraints = ["x >= 3"]
+
+[models.b]
+x = "-"
+objective = "min: x"
+submodels = ["a"]
+constraints = ["x >= b.x"]
+""")
+
+    def test_qualified_resolves_same_name_in_two_models(self):
+        """a.x and b.x correctly select the variable from the named model."""
+        m = load_toml("""
+[models.a]
+x = "-"
+constraints = ["a.x >= 3"]
+
+[models.b]
+x = "-"
+objective = "min: b.x"
+submodels = ["a"]
+constraints = ["b.x >= a.x * 2"]
+""")
+        sol = m.solve(verbosity=0)
+        assert float(sol.cost) == pytest.approx(6.0, rel=1e-3)
+
+    def test_submodels_sum_three_submodels(self):
+        """sum(submodels.W) works when all three submodels define W."""
+        m = load_toml("""
+[models.wing]
+W = "-"
+constraints = ["wing.W >= 10"]
+
+[models.fuse]
+W = "-"
+constraints = ["fuse.W >= 20"]
+
+[models.tail]
+W = "-"
+constraints = ["tail.W >= 5"]
+
+[models.aircraft]
+W_total = "-"
+objective = "min: W_total"
+submodels = ["wing", "fuse", "tail"]
+constraints = ["W_total >= sum(submodels.W)"]
+""")
+        sol = m.solve(verbosity=0)
+        assert float(sol.cost) == pytest.approx(35.0, rel=1e-3)
+
+    def test_unique_submodel_var_accessible_bare(self):
+        """Variable unique across all submodels is accessible without qualification."""
+        m = load_toml("""
+[models.engine]
+thrust = "-"
+constraints = ["thrust >= 100"]
+
+[models.aircraft]
+W = "-"
+objective = "min: W"
+submodels = ["engine"]
+constraints = ["W >= thrust * 0.1"]
+""")
+        sol = m.solve(verbosity=0)
+        assert float(sol.cost) == pytest.approx(10.0, rel=1e-3)
