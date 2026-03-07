@@ -1028,6 +1028,32 @@ class TestModelTree:
         sol2 = m2.solve(verbosity=0)
         assert abs(sol.cost - sol2.cost) < 1e-4
 
+    def test_model_tree_uses_children_not_lineage(self):
+        """build_model_tree() reflects _children, not just lineage."""
+
+        class _Wing(Model):
+            def setup(self):
+                S = Variable("S")
+                self.cost = S
+                return [S >= 10]
+
+        class _Aircraft(Model):
+            def setup(self):
+                W = Variable("W")
+                self.wing = _Wing()
+                self.cost = W
+                return [W >= self.wing.cost * 1.2, self.wing]
+
+        from gpkit.constraints.set import build_model_tree
+
+        a = _Aircraft()
+        tree = build_model_tree(a)
+        # The children list from _children has exactly one entry: _Wing
+        assert len(tree["children"]) == 1
+        assert tree["children"][0]["class"] == "_Wing"
+        # Also verify _children and tree children agree
+        assert len(a._children) == 1
+
 
 class TestMultiComponentIR:
     """Tests for models using sum() over sub-model variables."""
