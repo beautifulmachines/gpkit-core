@@ -50,14 +50,6 @@ class TomlExpressionError(Exception):
     """Raised when an expression string is invalid or unsafe."""
 
 
-class _AmbiguousVar:  # pylint: disable=too-few-public-methods
-    """Sentinel for variable names defined in multiple models."""
-
-    def __init__(self, name, model_ids):
-        self.name = name
-        self.model_ids = model_ids
-
-
 # ---------------------------------------------------------------------------
 # AST validation (whitelist check)
 # ---------------------------------------------------------------------------
@@ -129,7 +121,7 @@ def _eval_name(node, ns):
             f"Unknown variable '{node.id}'. " f"Available: {', '.join(available)}"
         )
     val = ns[node.id]
-    if isinstance(val, _AmbiguousVar):
+    if getattr(val, "_is_ambiguous_sentinel", False):
         raise TomlExpressionError(
             f"Variable '{val.name}' is defined in multiple models: "
             f"{', '.join(val.model_ids)}. "

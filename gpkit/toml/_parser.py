@@ -3,6 +3,7 @@
 import keyword
 import re
 import tomllib
+import types
 from contextlib import nullcontext
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from ..globals import NamedVariables, Vectorize
 from ..model import Model
 from ..nomials.array import NomialArray
 from ..nomials.variables import ArrayVariable, VectorizableVariable
-from ._expr import TomlExpressionError, _AmbiguousVar, parse_constraint, parse_objective
+from ._expr import TomlExpressionError, parse_constraint, parse_objective
 
 
 class TomlParseError(Exception):
@@ -175,57 +176,29 @@ def _extract_model_vars(model_def):
 
 
 # ---------------------------------------------------------------------------
-# Multi-model namespace proxies
+# Multi-model namespace helpers
 # ---------------------------------------------------------------------------
 
 
-class _ModelNamespace:  # pylint: disable=too-few-public-methods
-    """Proxy for model-qualified variable access (e.g., wing.S)."""
+class _TomlNamespace(types.SimpleNamespace):  # pylint: disable=too-few-public-methods
+    """SimpleNamespace subclass that opts in to TOML attribute access."""
 
     _toml_namespace = True
 
-    def __init__(self, model_id, vars_dict):
-        self._model_id = model_id
-        self._vars = vars_dict
 
-    def __getattr__(self, name):
-        if name.startswith("_"):
-            raise AttributeError(name)
-        if name not in self._vars:
-            available = sorted(self._vars)
-            raise AttributeError(
-                f"Model '{self._model_id}' has no variable '{name}'. "
-                f"Available: {', '.join(available)}"
-            )
-        return self._vars[name]
+class _AmbiguousVarSentinel:  # pylint: disable=too-few-public-methods
+    """Sentinel placed in namespace for names defined in multiple models.
 
-
-class _SubmodelsProxy:  # pylint: disable=too-few-public-methods
-    """Proxy for collecting a variable across submodels (e.g., submodels.W).
-
-    Returns a NomialArray of matching variables.  Use sum() or prod()
-    explicitly in constraints: ``"W >= sum(submodels.W_part)"``.
+    When _eval_name encounters this sentinel it raises a descriptive
+    TomlExpressionError asking the user to use qualified access.
+    This class is an internal implementation detail; it is not exported.
     """
 
-    _toml_namespace = True
+    _is_ambiguous_sentinel = True
 
-    def __init__(self, submodel_vars):
-        self._submodel_vars = submodel_vars  # list of (model_id, vars_dict)
-
-    def __getattr__(self, name):
-        if name.startswith("_"):
-            raise AttributeError(name)
-        matches = []
-        for _, vs in self._submodel_vars:
-            if name in vs:
-                matches.append(vs[name])
-        if not matches:
-            model_ids = [mid for mid, _ in self._submodel_vars]
-            raise AttributeError(
-                f"No submodel defines variable '{name}'. "
-                f"Submodels: {', '.join(model_ids)}"
-            )
-        return NomialArray(matches)
+    def __init__(self, name, model_ids):
+        self.name = name
+        self.model_ids = model_ids
 
 
 # ---------------------------------------------------------------------------
@@ -385,7 +358,7 @@ def _resolve_vectorize(model_def, dimensions):
 
 
 def _build_merged_namespace(per_model_vars, all_dimensions):
-    """Build merged namespace with bare names, model proxies, and ambiguity."""
+    "merged namespace with bare names, model namespaces, and ambiguity sentinels"
     namespace = {}
     name_to_models = {}
 
@@ -398,16 +371,43 @@ def _build_merged_namespace(per_model_vars, all_dimensions):
         if len(model_ids) == 1:
             namespace[name] = per_model_vars[model_ids[0]][name]
         else:
-            namespace[name] = _AmbiguousVar(name, model_ids)
+            namespace[name] = _AmbiguousVarSentinel(name, model_ids)
 
-    # Model namespace proxies for qualified access (wing.S)
+    # Per-model namespaces for qualified access (wing.S)
     for model_id, vars_dict in per_model_vars.items():
         if model_id in name_to_models:
             raise TomlParseError(f"Model ID '{model_id}' collides with a variable name")
-        namespace[model_id] = _ModelNamespace(model_id, vars_dict)
+        namespace[model_id] = _TomlNamespace(**vars_dict)
 
     namespace.update(all_dimensions)
     return namespace
+
+
+def _build_submodels_namespace(sub_ids, per_model_vars):
+    """Build a _TomlNamespace of variables aggregated from direct submodels.
+
+    For each variable name that appears in exactly one submodel, the
+    attribute maps to that Variable.  Names that appear in multiple
+    submodels are omitted (caller should use qualified access instead).
+    Returns a NomialArray for multi-submodel names when accessed via
+    ``submodels.name`` inside an expression — because ``sum(submodels.W)``
+    is the canonical pattern, we collect all matches into a NomialArray.
+    """
+    name_to_vars = {}
+    for sid in sub_ids:
+        for name, var in per_model_vars.get(sid, {}).items():
+            name_to_vars.setdefault(name, []).append(var)
+
+    sub_ns_dict = {}
+    for name, var_list in name_to_vars.items():
+        if len(var_list) == 1:
+            sub_ns_dict[name] = var_list[0]
+        else:
+            # Multiple submodels define this name — return NomialArray so
+            # sum(submodels.W_part) works correctly
+            sub_ns_dict[name] = NomialArray(var_list)
+
+    return _TomlNamespace(**sub_ns_dict)
 
 
 def _build_multi_model(
@@ -456,12 +456,12 @@ def _build_multi_model(
     for model_id in ordered_ids:
         model_def = models_section[model_id]
 
-        # Model-specific namespace: inject submodels proxy if applicable
+        # Model-specific namespace: inject submodels namespace if applicable
         constraint_ns = dict(namespace)
         sub_ids = model_def.get("submodels", [])
         if sub_ids:
-            constraint_ns["submodels"] = _SubmodelsProxy(
-                [(sid, per_model_vars[sid]) for sid in sub_ids]
+            constraint_ns["submodels"] = _build_submodels_namespace(
+                sub_ids, per_model_vars
             )
 
         constraints = _parse_constraints(
@@ -480,13 +480,13 @@ def _build_multi_model(
             )
             submodel_sets[model_id] = cs
 
-    # Parse objective with root's namespace (including its submodels proxy)
+    # Parse objective with root's namespace (including its submodels namespace)
     root_def = models_section[root_id]
     objective_ns = dict(namespace)
     root_sub_ids = root_def.get("submodels", [])
     if root_sub_ids:
-        objective_ns["submodels"] = _SubmodelsProxy(
-            [(sid, per_model_vars[sid]) for sid in root_sub_ids]
+        objective_ns["submodels"] = _build_submodels_namespace(
+            root_sub_ids, per_model_vars
         )
     try:
         cost = parse_objective(root_def["objective"], objective_ns)
