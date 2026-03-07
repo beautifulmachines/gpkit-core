@@ -43,3 +43,11 @@ class PrimalInfeasible(Infeasible):
 
 class DualInfeasible(Infeasible):
     "Raised if a model returns a certificate of dual infeasibility"
+
+
+class VariableNotFound(LookupError):
+    "Raised by get_var() when no variable matches the given dotted path"
+
+
+class AmbiguousVariable(LookupError):
+    "Raised by get_var() when multiple variables match the given dotted path"
