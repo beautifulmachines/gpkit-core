@@ -8,9 +8,14 @@ import numpy as np
 
 from .constraints.costed import CostedConstraintSet
 from .constraints.set import build_model_tree, flatiter
-from .exceptions import Infeasible, InvalidGPConstraint
+from .exceptions import (
+    AmbiguousVariable,
+    Infeasible,
+    InvalidGPConstraint,
+    VariableNotFound,
+)
 from .globals import NamedVariables
-from .nomials import Monomial
+from .nomials import Monomial, Variable
 from .nomials.math import constraint_from_ir, nomial_from_ir
 from .programs.gp import GeometricProgram
 from .programs.prog_factories import progify, solvify
@@ -141,6 +146,57 @@ class Model(CostedConstraintSet):
         for child in self._children:
             yield child
             yield from child.walk()
+
+    def get_var(self, path: str):
+        """Resolve a dotted attribute path to a Variable object.
+
+        Parameters
+        ----------
+        path : str
+            Dotted path using setup() attribute names, e.g. "wing.S" or "S".
+            The first segment is an attribute name set via self.wing = Wing()
+            in setup(). The last segment is a variable name.
+
+        Returns
+        -------
+        Variable
+            The Variable object at the resolved path.
+
+        Raises
+        ------
+        VariableNotFound
+            If no child matches the first segment, or no variable matches the leaf.
+        AmbiguousVariable
+            If multiple variables match the leaf name in this model's unique_varkeys.
+        """
+        parts = path.split(".")
+        if len(parts) == 1:
+            # Leaf: resolve in this model's own unique_varkeys only
+            name = parts[0]
+            matches = self.varkeys.by_name(name) & self.unique_varkeys
+            if not matches:
+                cls = self.__class__.__name__
+                raise VariableNotFound(
+                    f"No variable '{name}' in {cls}. "
+                    f"Variables: {sorted(vk.name for vk in self.unique_varkeys)}"
+                )
+            if len(matches) > 1:
+                cls = self.__class__.__name__
+                raise AmbiguousVariable(
+                    f"'{name}' is ambiguous in {cls}: "
+                    f"{sorted(vk.str_without() for vk in matches)}"
+                )
+            return Variable(next(iter(matches)))
+        # Dotted path: first segment is child attribute name
+        head, rest = parts[0], ".".join(parts[1:])
+        if head not in self._child_attrs:
+            cls = self.__class__.__name__
+            available = sorted(self._child_attrs.keys())
+            raise VariableNotFound(
+                f"No child attribute '{head}' in {cls}. "
+                f"Available children: {available}"
+            )
+        return self._child_attrs[head].get_var(rest)
 
     def to_ir(self):
         "Serialize this Model to a complete IR document dict."

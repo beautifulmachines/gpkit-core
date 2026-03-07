@@ -1149,3 +1149,108 @@ class TestSubmodels:
         assert W_rollup is not None
         sol = s.solve(verbosity=0)
         assert sol.cost == pytest.approx(3.0, rel=1e-3)
+
+
+class TestGetVar:
+    """Tests for Model.get_var() dotted-path resolver (GRAPH-02)."""
+
+    @pytest.fixture
+    def aircraft(self):
+        class _GVWing(Model):
+            def setup(self):
+                S = Variable("S")
+                self.cost = S
+                return [S >= 10]
+
+        class _GVAircraft(Model):
+            def setup(self):
+                W = Variable("W")
+                self.wing = _GVWing()
+                self.cost = W
+                return [W >= self.wing.cost * 1.2, self.wing]
+
+        return _GVAircraft()
+
+    def test_get_var_one_level(self, aircraft):
+        """model.get_var('wing.S') returns the Wing's S Variable."""
+        S = aircraft.get_var("wing.S")
+        assert S.key.name == "S"
+
+    def test_get_var_own_variable(self, aircraft):
+        """model.get_var('W') returns Aircraft's own W."""
+        W = aircraft.get_var("W")
+        assert W.key.name == "W"
+
+    def test_get_var_not_found_leaf(self, aircraft):
+        """Raises VariableNotFound for missing variable name."""
+        from gpkit.exceptions import VariableNotFound
+
+        with pytest.raises(VariableNotFound, match="nonexistent"):
+            aircraft.get_var("nonexistent")
+
+    def test_get_var_not_found_child(self, aircraft):
+        """Raises VariableNotFound for missing child attribute."""
+        from gpkit.exceptions import VariableNotFound
+
+        with pytest.raises(VariableNotFound, match="fuselage"):
+            aircraft.get_var("fuselage.W")
+
+    def test_get_var_ambiguous(self):
+        """AmbiguousVariable is importable and is a LookupError subclass."""
+        from gpkit.exceptions import AmbiguousVariable
+
+        assert issubclass(AmbiguousVariable, LookupError)
+
+    def test_get_var_two_levels(self):
+        """model.get_var('wing.spar.t') traverses two levels."""
+
+        class _GVSpar(Model):
+            def setup(self):
+                t = Variable("t")
+                self.cost = t
+                return [t >= 0.01]
+
+        class _GVWingWithSpar(Model):
+            def setup(self):
+                S = Variable("S")
+                self.spar = _GVSpar()
+                self.cost = S
+                return [S >= 10, self.spar]
+
+        class _GVAircraftDeep(Model):
+            def setup(self):
+                W = Variable("W")
+                self.wing = _GVWingWithSpar()
+                self.cost = W
+                return [W >= 1.2 * self.wing.cost, self.wing]
+
+        a = _GVAircraftDeep()
+        t = a.get_var("wing.spar.t")
+        assert t.key.name == "t"
+
+    def test_get_var_works_before_solve(self, aircraft):
+        """get_var() works on an unsolved model."""
+        S = aircraft.get_var("wing.S")
+        assert S is not None  # no solve needed
+
+    def test_get_var_two_children_same_class(self):
+        """get_var distinguishes sub1 vs sub2 of same class."""
+
+        class _GVSub(Model):
+            def setup(self):
+                x = Variable("x")
+                self.cost = x
+                return [x >= 1]
+
+        class _GVTop(Model):
+            def setup(self):
+                W = Variable("W")
+                self.sub1 = _GVSub()
+                self.sub2 = _GVSub()
+                self.cost = W
+                return [W >= self.sub1.cost + self.sub2.cost, self.sub1, self.sub2]
+
+        t = _GVTop()
+        x1 = t.get_var("sub1.x")
+        x2 = t.get_var("sub2.x")
+        assert x1.key != x2.key  # different VarKeys from different lineage contexts
