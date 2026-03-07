@@ -69,6 +69,10 @@ class Model(CostedConstraintSet):
         # pylint: disable=keyword-arg-before-vararg
         setup_vars = None
         substitutions = kwargs.pop("substitutions", None)  # reserved keyword
+        # Initialize _children and _child_attrs unconditionally so that flat
+        # Model(cost, constraints) calls also have the attribute (empty list).
+        self._children = []
+        self._child_attrs = {}
         if hasattr(self, "setup"):
             self.cost = None
             # lineage holds the (name, num) environment a model was created in,
@@ -90,6 +94,23 @@ class Model(CostedConstraintSet):
                 else:
                     constraints = cs
             cost = self.cost
+
+            # Collect direct child Model instances from constraints returned
+            # by setup(). Recurse into lists but NOT into arbitrary
+            # ConstraintSet instances — only direct Model instances count.
+            def _scan_for_children(items):
+                if isinstance(items, Model):
+                    if items not in self._children:
+                        self._children.append(items)
+                elif isinstance(items, list):
+                    for item in items:
+                        _scan_for_children(item)
+
+            _scan_for_children(constraints)
+            # Map attribute names to child models (for get_var() path resolution)
+            for attr_name, val in list(self.__dict__.items()):
+                if isinstance(val, Model) and val in self._children:
+                    self._child_attrs[attr_name] = val
         elif args and not substitutions:
             # backwards compatibility: substitutions as third argument
             (substitutions,) = args
@@ -109,6 +130,17 @@ class Model(CostedConstraintSet):
         for var, fn in self.computed.items():
             key = getattr(var, "key", var)
             result.primal[key] = fn(result)
+
+    @property
+    def submodels(self):
+        """Direct child models in setup() definition order."""
+        return list(self._children)
+
+    def walk(self):
+        """Yield all descendant models depth-first."""
+        for child in self._children:
+            yield child
+            yield from child.walk()
 
     def to_ir(self):
         "Serialize this Model to a complete IR document dict."
