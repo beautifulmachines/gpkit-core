@@ -152,7 +152,7 @@ class TestModelSubs:
             _ = m.substitutions["x"]
         with pytest.raises(KeyError):
             _ = m.substitutions["y"]
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             _ = m["x"]
         assert x.key in m.varkeys.by_name("x")
         assert x_.key in m.varkeys.by_name("x")
@@ -312,27 +312,27 @@ class TestModelSubs:
         concat_cost = concatm.solve(verbosity=0).cost
         yard, cm = gpkit.ureg("yard"), gpkit.ureg("cm")
         ft, meter = gpkit.ureg("ft"), gpkit.ureg("m")
-        if not isinstance(a["x"].key.units, str):
+        if not isinstance(a.x.key.units, str):
             assert round(a.solve(verbosity=0).cost - ft / yard, 5) == 0
             assert round(b.solve(verbosity=0).cost - cm / meter, 5) == 0
             assert round(concat_cost - cm / yard, 5) == 0
         NamedVariables.reset_modelnumbers()
         a1, b1 = Above(), Below()
-        assert a1["x"].key.lineage == (("Above", 0),)
-        m = Model(a1["x"], [a1, b1, b1["x"] == a1["x"]])
+        assert a1.x.key.lineage == (("Above", 0),)
+        m = Model(a1.x, [a1, b1, b1.x == a1.x])
         sol = m.solve(verbosity=0)
-        if not isinstance(a1["x"].key.units, str):
+        if not isinstance(a1.x.key.units, str):
             assert round(sol.cost - cm / ft, 5) == 0
         a1, b1 = Above(), Below()
-        assert a1["x"].key.lineage == (("Above", 1),)
-        m = Model(b1["x"], [a1, b1, b1["x"] == a1["x"]])
+        assert a1.x.key.lineage == (("Above", 1),)
+        m = Model(b1.x, [a1, b1, b1.x == a1.x])
         sol = m.solve(verbosity=0)
-        if not isinstance(b1["x"].key.units, str):
+        if not isinstance(b1.x.key.units, str):
             assert round(sol.cost - cm / meter, 5) == 0
-        assert a1["x"] in sol.primal
-        assert b1["x"] in sol.primal
-        assert a["x"] not in sol.primal
-        assert b["x"] not in sol.primal
+        assert a1.x in sol.primal
+        assert b1.x in sol.primal
+        assert a.x not in sol.primal
+        assert b.x not in sol.primal
 
     def test_getkey(self):
         class Top(Model):
@@ -346,7 +346,7 @@ class TestModelSubs:
             def setup(self):
                 y = self.y = Variable("y")
                 s = Sub()
-                sy = s["y"]
+                sy = s.y
                 self.cost = y
                 return [s, y >= sy, sy >= 1]
 
@@ -380,7 +380,7 @@ class TestModelSubs:
                 sub = Sub()
                 x = self.x = Variable("x")
                 self.cost = x
-                return sub, [x >= sub["y"], sub["y"] >= 1]
+                return sub, [x >= sub.y, sub.y >= 1]
 
         class Sub(Model):
             """A simple sub model

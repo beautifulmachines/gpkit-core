@@ -174,10 +174,10 @@ class TestExamples:
 
     def test_model_var_access(self, example):
         model = example.PS
-        _ = model["E"]
-        # "m" exists on PowerSystem and its submodels; getitem prefers
-        # the model's own variable when exactly one match is in unique_varkeys
-        own_m = model["m"]
+        # Direct attribute access for variables stored by setup()
+        _ = model.E
+        # get_var resolves own variables (PowerSystem.m is in unique_varkeys)
+        own_m = model.get_var("m")
         assert own_m.key == model.m.key
         # all variables named "m" are still accessible via varkeys
         all_m = model.varkeys.keys("m")

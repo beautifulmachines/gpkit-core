@@ -840,8 +840,9 @@ class TestModelIR:
         """Model with pint units round-trips with matching costs."""
         x = Variable("x", units="m")
         y = Variable("y", units="m")
-        m = Model(x + y, [x * y >= 1 * Variable("u", units="m^2")])
-        m.substitutions[m["u"]] = 1
+        u = Variable("u", units="m^2")
+        m = Model(x + y, [x * y >= 1 * u])
+        m.substitutions[u] = 1
         sol = m.solve(verbosity=0)
 
         ir = m.to_ir()

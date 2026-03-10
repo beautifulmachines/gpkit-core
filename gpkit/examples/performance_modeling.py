@@ -165,7 +165,7 @@ vars_of_interest = set(AC.varkeys)
 # note that there's two ways to access submodels
 assert MISSION["flight segment"]["aircraft performance"] is MISSION.fs.aircraftp
 vars_of_interest.update(MISSION.fs.aircraftp.unique_varkeys)
-vars_of_interest.add(M["D"])
+vars_of_interest.add(MISSION.fs.aircraftp.wing_aero.D)
 print(sol.summary())
 print()
 print(sol.table(tables=["slack constraints"], empty="(none)"))

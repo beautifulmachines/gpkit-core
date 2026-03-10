@@ -18,13 +18,13 @@ class Test(Model):
 
 print("SCALAR")
 m = Test()
-m.cost = m["x"]
+m.cost = m.x
 print(m.solve(verbosity=0).summary())
 
 print("__________\n")
 print("VECTORIZED")
 with Vectorize(3):
     m = Test()
-m.cost = m["x"].prod()
-m.append(m["x"][1] >= 2)
+m.cost = m.x.prod()
+m.append(m.x[1] >= 2)
 print(m.solve(verbosity=0).summary())

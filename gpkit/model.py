@@ -175,6 +175,19 @@ class Model(CostedConstraintSet):
             name = parts[0]
             matches = self.varkeys.by_name(name) & self.unique_varkeys
             if not matches:
+                # VectorVariable fallback: varkeys.by_name(name) returns the
+                # veckey (not element keys), so the intersection with
+                # unique_varkeys (which contains only element keys) is empty.
+                # Collect all element VarKeys whose veckey shares the name.
+                vec_element_matches = {
+                    vk
+                    for vk in self.unique_varkeys
+                    if getattr(getattr(vk, "veckey", None), "name", None) == name
+                }
+                if vec_element_matches:
+                    # Delegate to _choosevar which handles NomialArray assembly
+                    return self._choosevar(name, list(self.varkeys.keys(name)))
+            if not matches:
                 cls = self.__class__.__name__
                 raise VariableNotFound(
                     f"No variable '{name}' in {cls}. "
@@ -352,7 +365,11 @@ class Model(CostedConstraintSet):
         """
         sols = []
         for sweepvar, sweepvals in sweeps.items():
-            sweepvar = self[sweepvar].key
+            if isinstance(sweepvar, str):
+                sweepvar = self.get_var(sweepvar).key
+            elif hasattr(sweepvar, "key"):
+                sweepvar = sweepvar.key
+            # else: sweepvar is already a VarKey
             start, end = sweepvals
             bst = autosweep_1d(self, tol, sweepvar, [start, end], **solveargs)
             sols.append(bst.sample_at(np.linspace(start, end, samplepoints)))

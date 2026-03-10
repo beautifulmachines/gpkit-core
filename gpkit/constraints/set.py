@@ -113,10 +113,17 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
             self.meq_bounded[bound].update(solutionset)
 
     def __getitem__(self, key):
+        # Named constraint sets (created with a dict argument) use string keys
+        # as integer-index aliases stored in idxlookup.  Resolve those first.
         if key in self.idxlookup:
             key = self.idxlookup[key]
         if isinstance(key, int):
             return list.__getitem__(self, key)
+        if isinstance(key, str):
+            raise TypeError(
+                f"String subscript access model['{key}'] is not supported. "
+                f"Use model.get_var('{key}') to look up a variable by name."
+            )
         return self._choosevar(key, self.varkeys.keys(key))
 
     def _choosevar(self, key, variables):
