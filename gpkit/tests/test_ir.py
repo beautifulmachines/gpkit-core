@@ -10,6 +10,8 @@ import pytest
 from gpkit import Model, SignomialsEnabled, Variable, VarKey, VectorVariable
 from gpkit.ast_nodes import ConstNode, ExprNode, VarNode, ast_from_ir, to_ast
 from gpkit.constraints.array import ArrayConstraint
+from gpkit.constraints.set import build_model_tree
+from gpkit.exceptions import IRSerializationError
 from gpkit.nomials.map import NomialMap
 from gpkit.nomials.math import (
     Monomial,
@@ -22,14 +24,17 @@ from gpkit.nomials.math import (
     constraint_from_ir,
     nomial_from_ir,
 )
+from gpkit.tests.test_catalog import catalog_ids, load_catalog
 from gpkit.units import qty
 from gpkit.util.small_classes import EMPTY_HV, HashVector
+
+_CORE_CATALOG = load_catalog(__file__)
 
 # ── IR diff helper (importable by other repos) ────────────────────────
 
 
-def ir_diff(ir1, ir2):
-    """Return a human-readable diff string between two IR dicts, or None if equal.
+def ir_diff(ir1, ir2) -> str:
+    """Return a human-readable diff string between two IR dicts, or '' if equal.
 
     Checks:
     - Same constraint count
@@ -42,7 +47,7 @@ def ir_diff(ir1, ir2):
     not class hierarchy. The model_tree topology gap is documented as a known IR
     limitation for Phase 4 (GRAPH-05 follow-up).
 
-    Returns None if identical, otherwise a multi-line string describing differences.
+    Returns '' if identical, otherwise a multi-line string describing differences.
     """
     lines = []
 
@@ -61,7 +66,7 @@ def ir_diff(ir1, ir2):
     if only_in_2:
         lines.append(f"variables only in ir2: {only_in_2}")
 
-    return "\n".join(lines) if lines else None
+    return "\n".join(lines)
 
 
 def ir_diff_with_topology(ir1, ir2):
@@ -1104,21 +1109,21 @@ class TestModelTree:
                 return [S >= 10]
 
         class _Aircraft(Model):
+            wing: "_Wing"
+
             def setup(self):
                 W = Variable("W")
                 self.wing = _Wing()
                 self.cost = W
                 return [W >= self.wing.cost * 1.2, self.wing]
 
-        from gpkit.constraints.set import build_model_tree
-
         a = _Aircraft()
         tree = build_model_tree(a)
         # The children list from _children has exactly one entry: _Wing
         assert len(tree["children"]) == 1
         assert tree["children"][0]["class"] == "_Wing"
-        # Also verify _children and tree children agree
-        assert len(a._children) == 1
+        # Also verify submodels and tree children agree
+        assert len(a.submodels) == 1
 
 
 class TestMultiComponentIR:
@@ -1162,7 +1167,7 @@ class TestIRRoundTrip:
         m2 = Model.from_ir(ir1)
         ir2 = m2.to_ir()
         diff = ir_diff(ir1, ir2)
-        assert diff is None, f"IR changed after round-trip:\n{diff}"
+        assert not diff, f"IR changed after round-trip:\n{diff}"
 
     def test_flat_model_identity(self):
         """Flat model: IR is identical after round-trip."""
@@ -1186,6 +1191,8 @@ class TestIRRoundTrip:
                 return [S >= 10]
 
         class _RTAircraft(Model):
+            wing: "_RTWing"
+
             def setup(self):
                 W = Variable("W")
                 self.wing = _RTWing()
@@ -1210,6 +1217,8 @@ class TestIRRoundTrip:
                 return [S >= 10]
 
         class _RTAircraft2(Model):
+            wing: "_RTWing2"
+
             def setup(self):
                 W = Variable("W")
                 self.wing = _RTWing2()
@@ -1222,7 +1231,7 @@ class TestIRRoundTrip:
         ir2 = m2.to_ir()
 
         # ir_diff (constraint+variable check) must pass
-        assert ir_diff(ir1, ir2) is None
+        assert not ir_diff(ir1, ir2)
 
         # but model_tree topology IS different (from_ir returns flat Model)
         assert ir2["model_tree"]["class"] == "Model"
@@ -1250,8 +1259,7 @@ class TestIRRoundTrip:
         ir2 = dict(ir1)
         ir2["constraints"] = []  # artificially remove constraints
         diff = ir_diff(ir1, ir2)
-        assert diff is not None
-        assert "constraint count" in diff
+        assert diff and "constraint count" in diff
 
     def test_ir_diff_detects_variable_change(self):
         """ir_diff() correctly reports a missing variable."""
@@ -1262,22 +1270,17 @@ class TestIRRoundTrip:
         ir2 = dict(ir1)
         ir2["variables"] = {k: v for k, v in ir1["variables"].items() if "x" not in k}
         diff = ir_diff(ir1, ir2)
-        assert diff is not None
-        assert "variables only in ir1" in diff
+        assert diff and "variables only in ir1" in diff
 
-    def test_ir_diff_returns_none_for_equal(self):
-        """ir_diff() returns None when IRs are identical."""
+    def test_ir_diff_returns_empty_for_equal(self):
+        """ir_diff() returns empty string when IRs are identical."""
         x = Variable("x")
         m = Model(x, [x >= 1])
         ir = m.to_ir()
-        assert ir_diff(ir, ir) is None
+        assert not ir_diff(ir, ir)
 
 
 # ── gpkit-core catalog round-trip ─────────────────────────────────────
-
-from gpkit.tests.test_catalog import catalog_ids, load_catalog  # noqa: E402
-
-_CORE_CATALOG = load_catalog(__file__)
 
 
 @pytest.mark.parametrize("model_entry", _CORE_CATALOG, ids=catalog_ids(_CORE_CATALOG))
@@ -1292,9 +1295,9 @@ def test_core_catalog_ir_roundtrip(model_entry):
     m = cls.default()
     try:
         ir1 = m.to_ir()
-    except Exception as exc:
+    except IRSerializationError as exc:
         pytest.skip(f"{cls.__name__}.to_ir() failed (known IR gap): {exc}")
     m2 = Model.from_ir(ir1)
     ir2 = m2.to_ir()
     diff = ir_diff(ir1, ir2)
-    assert diff is None, f"{cls.__name__} IR changed after round-trip:\n{diff}"
+    assert not diff, f"{cls.__name__} IR changed after round-trip:\n{diff}"
