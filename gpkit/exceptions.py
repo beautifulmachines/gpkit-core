@@ -43,3 +43,15 @@ class PrimalInfeasible(Infeasible):
 
 class DualInfeasible(Infeasible):
     "Raised if a model returns a certificate of dual infeasibility"
+
+
+class IRSerializationError(RuntimeError):
+    "Raised by to_ir() when a model or constraint cannot be serialized to IR"
+
+
+class VariableNotFound(LookupError):
+    "Raised by get_var() when no variable matches the given dotted path"
+
+
+class AmbiguousVariable(LookupError):
+    "Raised by get_var() when multiple variables match the given dotted path"

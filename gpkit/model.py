@@ -8,9 +8,14 @@ import numpy as np
 
 from .constraints.costed import CostedConstraintSet
 from .constraints.set import build_model_tree, flatiter
-from .exceptions import Infeasible, InvalidGPConstraint
+from .exceptions import (
+    AmbiguousVariable,
+    Infeasible,
+    InvalidGPConstraint,
+    VariableNotFound,
+)
 from .globals import NamedVariables
-from .nomials import Monomial
+from .nomials import Monomial, Variable
 from .nomials.math import constraint_from_ir, nomial_from_ir
 from .programs.gp import GeometricProgram
 from .programs.prog_factories import progify, solvify
@@ -69,6 +74,10 @@ class Model(CostedConstraintSet):
         # pylint: disable=keyword-arg-before-vararg
         setup_vars = None
         substitutions = kwargs.pop("substitutions", None)  # reserved keyword
+        # Initialize _children and _child_attrs unconditionally so that flat
+        # Model(cost, constraints) calls also have the attribute (empty list).
+        self._children = []
+        self._child_attrs = {}
         if hasattr(self, "setup"):
             self.cost = None
             # lineage holds the (name, num) environment a model was created in,
@@ -90,6 +99,23 @@ class Model(CostedConstraintSet):
                 else:
                     constraints = cs
             cost = self.cost
+
+            # Collect direct child Model instances from constraints returned
+            # by setup(). Recurse into lists but NOT into arbitrary
+            # ConstraintSet instances — only direct Model instances count.
+            def _scan_for_children(items):
+                if isinstance(items, Model):
+                    if items not in self._children:
+                        self._children.append(items)
+                elif isinstance(items, list):
+                    for item in items:
+                        _scan_for_children(item)
+
+            _scan_for_children(constraints)
+            # Map attribute names to child models (for get_var() path resolution)
+            for attr_name, val in list(self.__dict__.items()):
+                if isinstance(val, Model) and val in self._children:
+                    self._child_attrs[attr_name] = val
         elif args and not substitutions:
             # backwards compatibility: substitutions as third argument
             (substitutions,) = args
@@ -109,6 +135,83 @@ class Model(CostedConstraintSet):
         for var, fn in self.computed.items():
             key = getattr(var, "key", var)
             result.primal[key] = fn(result)
+
+    @property
+    def submodels(self):
+        """Direct child models in setup() definition order."""
+        return list(self._children)
+
+    def walk(self):
+        """Yield all descendant models depth-first."""
+        for child in self._children:
+            yield child
+            yield from child.walk()
+
+    def get_var(self, path: str):
+        """Resolve a dotted attribute path to a Variable object.
+
+        Parameters
+        ----------
+        path : str
+            Dotted path using setup() attribute names, e.g. "wing.S" or "S".
+            The first segment is an attribute name set via self.wing = Wing()
+            in setup(). The last segment is a variable name.
+
+        Returns
+        -------
+        Variable
+            The Variable object at the resolved path.
+
+        Raises
+        ------
+        VariableNotFound
+            If no child matches the first segment, or no variable matches the leaf.
+        AmbiguousVariable
+            If multiple variables match the leaf name in this model's unique_varkeys.
+        """
+        parts = path.split(".")
+        if len(parts) == 1:
+            # Leaf: resolve in this model's own unique_varkeys only
+            name = parts[0]
+            matches = self.varkeys.by_name(name) & self.unique_varkeys
+            if not matches:
+                # VectorVariable fallback: varkeys.by_name(name) returns the
+                # veckey (not element keys), so the intersection with
+                # unique_varkeys (which contains only element keys) is empty.
+                # Collect all element VarKeys whose veckey shares the name.
+                vec_element_matches = {
+                    vk
+                    for vk in self.unique_varkeys
+                    if getattr(getattr(vk, "veckey", None), "name", None) == name
+                }
+                if vec_element_matches:
+                    # Delegate to _choosevar which handles NomialArray assembly.
+                    # Use vec_element_matches (scoped to unique_varkeys) rather
+                    # than varkeys.keys(name) which would include child models.
+                    return self._choosevar(name, list(vec_element_matches))
+            if not matches:
+                cls = self.__class__.__name__
+                raise VariableNotFound(
+                    f"No variable '{name}' in {cls}. "
+                    f"Variables: {sorted(vk.name for vk in self.unique_varkeys)}"
+                )
+            if len(matches) > 1:
+                cls = self.__class__.__name__
+                raise AmbiguousVariable(
+                    f"'{name}' is ambiguous in {cls}: "
+                    f"{sorted(vk.str_without() for vk in matches)}"
+                )
+            return Variable(next(iter(matches)))
+        # Dotted path: first segment is child attribute name
+        head, rest = parts[0], ".".join(parts[1:])
+        if head not in self._child_attrs:
+            cls = self.__class__.__name__
+            available = sorted(self._child_attrs.keys())
+            raise VariableNotFound(
+                f"No child attribute '{head}' in {cls}. "
+                f"Available children: {available}"
+            )
+        return self._child_attrs[head].get_var(rest)
 
     def to_ir(self):
         "Serialize this Model to a complete IR document dict."
@@ -264,7 +367,11 @@ class Model(CostedConstraintSet):
         """
         sols = []
         for sweepvar, sweepvals in sweeps.items():
-            sweepvar = self[sweepvar].key
+            if isinstance(sweepvar, str):
+                sweepvar = self.get_var(sweepvar).key
+            elif hasattr(sweepvar, "key"):
+                sweepvar = sweepvar.key
+            # else: sweepvar is already a VarKey
             start, end = sweepvals
             bst = autosweep_1d(self, tol, sweepvar, [start, end], **solveargs)
             sols.append(bst.sample_at(np.linspace(start, end, samplepoints)))

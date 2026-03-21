@@ -104,20 +104,17 @@ class TestConstraint:
         assert m2.solve(verbosity=0)[x] == pytest.approx(3, abs=1e-3)
 
     def test_constraintget(self):
+        # model["varname"] raises TypeError; use model[variable] or
+        # model.get_var("varname") to retrieve a variable
         x = Variable("x")
-        x_ = Variable("x", lineage=[("_", 0)])
         xv = VectorVariable(2, "x")
-        xv_ = VectorVariable(2, "x", lineage=[("_", 0)])
-        assert Model(x, [x >= 1])["x"] == x
-        with pytest.raises(ValueError):
-            _ = Model(x, [x >= 1, x_ >= 1])["x"]
-        with pytest.raises(ValueError):
-            _ = Model(x, [x >= 1, xv >= 1])["x"]
-        assert all(Model(xv.prod(), [xv >= 1])["x"] == xv)
-        with pytest.raises(ValueError):
-            _ = Model(xv.prod(), [xv >= 1, xv_ >= 1])["x"]
-        with pytest.raises(ValueError):
-            _ = Model(xv.prod(), [xv >= 1, x_ >= 1])["x"]
+        with pytest.raises(TypeError):
+            _ = Model(x, [x >= 1])["x"]
+        with pytest.raises(TypeError):
+            _ = Model(xv.prod(), [xv >= 1])["x"]
+        # Variable-object access still works
+        assert Model(x, [x >= 1])[x] == x
+        assert all(Model(xv.prod(), [xv >= 1])[xv] == xv)
 
     def test_additive_scalar(self):
         "Make sure additive scalars simplify properly"
@@ -173,7 +170,7 @@ class TestConstraint:
         with pytest.raises(PrimalInfeasible):
             m.solve(verbosity=0)
         PosynomialInequality.feastol = 1e-3
-        assert m.substitutions["x"] == m.solve(verbosity=0)["x"]
+        assert m.substitutions["x"] == m.solve(verbosity=0)[x]
 
 
 class TestCostedConstraint:
@@ -257,7 +254,7 @@ class TestMonomialEquality:
         # but a==c is implied by a==b and b==c
         m = Model(a, [a == b, b == c, c == d])
         sol = m.solve(verbosity=0)
-        assert sol["a"] == pytest.approx(2, rel=1e-4)
+        assert sol[a] == pytest.approx(2, rel=1e-4)
 
     def test_contradictory_equalities(self):
         "Contradictory equalities (x==2 and x==3) should raise"
@@ -310,7 +307,10 @@ class TestMonomialEquality:
 
             def setup(self, comp):
                 cl = Variable("C_L", 1.0, "-", "lift coefficient")
-                return [comp["w"] >= cl * comp["rho"] * comp["s"], comp]
+                return [
+                    comp.get_var("w") >= cl * comp.get_var("rho") * comp.get_var("s"),
+                    comp,
+                ]
 
         comp = Component()
 
@@ -318,7 +318,7 @@ class TestMonomialEquality:
             "System includes comp directly AND via each Segment"
 
             def setup(self):
-                self.cost = comp["w"]
+                self.cost = comp.get_var("w")
                 return [comp, Segment(comp), Segment(comp)]
 
         with pytest.raises(ValueError, match="[Dd]uplicate"):

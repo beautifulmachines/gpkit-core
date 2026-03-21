@@ -113,10 +113,17 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
             self.meq_bounded[bound].update(solutionset)
 
     def __getitem__(self, key):
+        # Named constraint sets (created with a dict argument) use string keys
+        # as integer-index aliases stored in idxlookup.  Resolve those first.
         if key in self.idxlookup:
             key = self.idxlookup[key]
         if isinstance(key, int):
             return list.__getitem__(self, key)
+        if isinstance(key, str):
+            raise TypeError(
+                f"String subscript access model['{key}'] is not supported. "
+                f"Use model.get_var('{key}') to look up a variable by name."
+            )
         return self._choosevar(key, self.varkeys.keys(key))
 
     def _choosevar(self, key, variables):
@@ -269,11 +276,11 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
 
 
 def build_model_tree(model):
-    """Build model_tree structure from a Model's constraint hierarchy.
+    """Build model_tree structure from a Model's explicit _children graph.
 
-    Walks the constraint tree in the same depth-first order as
-    collect_flat_constraints_ir, tracking which flat constraint indices
-    belong to which model node.
+    Uses model._children (populated during __init__) as the authoritative
+    source for child detection. Constraint indices are still derived by
+    walking the flat constraint list in flatiter order.
 
     Parameters
     ----------
@@ -303,7 +310,8 @@ def build_model_tree(model):
         constraint_indices = []
         children = []
 
-        _collect(cset, constraint_indices, children)
+        model_children = getattr(cset, "_children", [])
+        _collect(cset, constraint_indices, children, model_children)
 
         owned_vars = sorted(
             vk.ref for vk in getattr(cset, "unique_varkeys", frozenset())
@@ -318,15 +326,20 @@ def build_model_tree(model):
             "children": children,
         }
 
-    def _collect(iterable, constraint_indices, children):
-        """Walk items, mirroring flatiter's traversal order."""
+    def _collect(iterable, constraint_indices, children, model_children):
+        """Walk items, mirroring flatiter's traversal order.
+
+        model_children is the frozenset of direct child Models for the model
+        currently being walked. It is passed through recursive calls so that
+        children nested inside plain lists are still detected correctly.
+        """
         nonlocal counter
         if isinstance(iterable, dict):
             iterable = iterable.values()
 
         for item in iterable:
-            if isinstance(item, ConstraintSet) and getattr(item, "lineage", None):
-                # Sub-model: create child node
+            if isinstance(item, ConstraintSet) and item in model_children:
+                # Sub-model detected via _children: create child node
                 children.append(_walk(item))
             elif not hasattr(item, "__iter__"):
                 # Leaf constraint (non-iterable)
@@ -334,19 +347,22 @@ def build_model_tree(model):
                 counter += 1
             else:
                 # Iterable: numpy array, list, ArrayConstraint, or
-                # ConstraintSet without lineage
+                # ConstraintSet without lineage. Pass model_children through
+                # so children inside nested lists are still found.
                 try:
                     flat_items = item.flat
                     if callable(flat_items):
                         # ConstraintSet.flat is flatiter (a bound method);
                         # recurse into the ConstraintSet's items directly
-                        _collect(item, constraint_indices, children)
+                        _collect(item, constraint_indices, children, model_children)
                     else:
                         # numpy flatiter: process each element
-                        _collect(flat_items, constraint_indices, children)
+                        _collect(
+                            flat_items, constraint_indices, children, model_children
+                        )
                 except AttributeError:
                     # list, dict, ArrayConstraint, etc.
-                    _collect(item, constraint_indices, children)
+                    _collect(item, constraint_indices, children, model_children)
 
     tree = _walk(model)
 

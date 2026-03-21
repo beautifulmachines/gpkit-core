@@ -173,9 +173,9 @@ class TestGP:
         m = Model(x, [x >= x_min])
         with pytest.raises(PrimalInfeasible):
             m.solve(solver=solver, verbosity=0)
-        del m.substitutions[m["x"]]
+        del m.substitutions[x]
         assert m.solve(solver=solver, verbosity=0).cost == pytest.approx(2)
-        del m.substitutions[m["x_{min}"]]
+        del m.substitutions[x_min]
         with pytest.raises(UnboundedGP):
             m.solve(solver=solver, verbosity=0)
         gp = m.gp(checkbounds=False)
@@ -359,17 +359,20 @@ class TestGP:
 
         class _Inner(Model):
             def setup(self):
-                v = Variable("v")
+                v = self.v = Variable("v")
                 return [v >= 1]
 
         class _Outer(Model):
             def setup(self):
-                inner = _Inner()
-                return [inner]
+                self.inner = _Inner()
+                return [self.inner]
 
         outer = _Outer()
         inner_standalone = _Inner()
-        m = Model(outer["v"] + inner_standalone["v"], [outer, inner_standalone])
+        m = Model(
+            outer.inner.v + inner_standalone.v,
+            [outer, inner_standalone],
+        )
         sol = m.solve(solver=solver, verbosity=0)
         tab = sol.table()  # Must not raise IndexError
         assert isinstance(tab, str)
@@ -605,7 +608,7 @@ class TestSP:
         spsol = m.solve(solver, verbosity=0)
         # now solve as GP
         m[-1] = Obj >= a_val * (2 * L + 2 * W) + (1 - a_val) * (12 * W**-1 * L**-3)
-        del m.substitutions[m["a"]]
+        del m.substitutions[a]
         gpsol = m.solve(solver, verbosity=0)
         assert spsol.cost == pytest.approx(gpsol.cost)
 
@@ -737,7 +740,7 @@ class Thing(Model):
     def setup(self, length):
         a = self.a = VectorVariable(length, "a", "g/m")
         b = self.b = VectorVariable(length, "b", "m")
-        c = Variable("c", 17 / 4.0, "g")
+        c = self.c = Variable("c", 17 / 4.0, "g")
         return [a >= c / b]
 
 
@@ -745,7 +748,8 @@ class Thing2(Model):
     "another thing for model testing"
 
     def setup(self):
-        return [Thing(2), Model()]
+        self.thing = Thing(2)
+        return [self.thing, Model()]
 
 
 class Box(Model):
@@ -784,7 +788,7 @@ class Sub(Model):
     "Submodel with mass, for testing"
 
     def setup(self):
-        m = Variable("m", "lb", "mass")  # noqa: F841
+        self.m = Variable("m", "lb", "mass")
 
 
 class Widget(Model):
@@ -794,7 +798,7 @@ class Widget(Model):
         m_tot = Variable("m_{tot}", "lb", "total mass")
         self.subA = Sub()
         self.subB = Sub()
-        return [self.subA, self.subB, m_tot >= self.subA["m"] + self.subB["m"]]
+        return [self.subA, self.subB, m_tot >= self.subA.m + self.subB.m]
 
 
 class TestModelNoSolve:
@@ -807,7 +811,7 @@ class TestModelNoSolve:
 
     def test_modelcontainmentprinting(self):
         t = Thing2()
-        assert t["c"].key.models == ("Thing2", "Thing")
+        assert t.thing.c.key.models == ("Thing2", "Thing")
         assert isinstance(t.str_without(), str)
         assert isinstance(t.latex(), str)
 
@@ -816,7 +820,7 @@ class TestModelNoSolve:
         # variables looked up from other models
         box = Box()
         area_bounds = BoxAreaBounds(box)
-        M = Model(box["V"], [box, area_bounds])
+        M = Model(box.V, [box, area_bounds])
         for var in ("h", "w", "d"):
             assert len(M.varkeys.by_name(var)) == 1
 
@@ -825,12 +829,12 @@ class TestModelNoSolve:
         # w has two Sub models, both with their own variable m
         assert len(w.varkeys.by_name("m")) == 2
         # keys for both submodel m's should be in the parent model varkeys
-        assert w.subA["m"].key in w.varkeys
-        assert w.subB["m"].key in w.varkeys
+        assert w.subA.m.key in w.varkeys
+        assert w.subB.m.key in w.varkeys
         # keys of w.variables_byname("m") should match m.varkeys
         m_vbn_keys = w.varkeys.by_name("m")
-        assert w.subA["m"].key in m_vbn_keys
-        assert w.subB["m"].key in m_vbn_keys
+        assert w.subA.m.key in m_vbn_keys
+        assert w.subB.m.key in m_vbn_keys
         # dig a level deeper, into the keymap
         assert len(w.varkeys.keys("m")) == 2
 

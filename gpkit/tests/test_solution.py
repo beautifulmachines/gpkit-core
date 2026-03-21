@@ -23,7 +23,7 @@ class TestSolution:
         y = Variable("y", "m")
         m = Model(y, [y >= x])
         sol = m.solve(verbosity=0)
-        assert sol["y"] / sol["x"] == pytest.approx(1.0, abs=1e-6)
+        assert sol[y] / sol[x] == pytest.approx(1.0, abs=1e-6)
         assert sol[x] / sol[y] == pytest.approx(1.0, abs=1e-6)
 
     def test_call_vector(self):
@@ -81,9 +81,6 @@ class TestSolution:
         msol = m.localsolve(verbosity=0)
         spsol = m.sp().localsolve(verbosity=0)  # pylint: disable=no-member
         gpsol = m.program.gps[-1].solve(verbosity=0)
-        assert msol[x] == msol["x"]
-        assert spsol[x] == spsol["x"]
-        assert gpsol[x] == gpsol["x"]
         assert msol[x] == spsol[x]
         assert msol[x] == gpsol[x]
 
@@ -97,4 +94,4 @@ class TestSolution:
         sol = m.localsolve(verbosity=0)
         assert all(isinstance(gp.result.table(), Strings) for gp in m.program.gps)
         assert sol.cost / 4.0 == pytest.approx(1.0, abs=1e-5)
-        assert sol["x"] / 3.0 == pytest.approx(1.0, abs=1e-3)
+        assert sol[x] / 3.0 == pytest.approx(1.0, abs=1e-3)

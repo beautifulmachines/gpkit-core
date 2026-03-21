@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from .exceptions import IRSerializationError
 from .util.repr_conventions import _render_ast_node
 
 if TYPE_CHECKING:
@@ -92,7 +93,7 @@ def _child_to_ir(child):
     try:
         return float(child)
     except (TypeError, ValueError) as exc:
-        raise TypeError(
+        raise IRSerializationError(
             f"Cannot serialize AST child of type {type(child).__name__}: {child!r}"
         ) from exc
 

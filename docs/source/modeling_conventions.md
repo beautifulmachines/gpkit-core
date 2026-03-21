@@ -1006,3 +1006,93 @@ per-model files are optional supplements that grow organically as models mature.
 aircraft subdirectories (`wing/`, `tail/`, `prop/`) already demonstrate this layout organically —
 `wing_test.py`, `tail_tests.py`, `prop_test.py` for extended tests; `fitting/` directories
 in `prop/` and `wing/`; `README.md` files where applicable.
+
+---
+
+## 8. Model Graph — `submodels`, `walk()`, `get_var()`
+
+Every gpkit model maintains an explicit live graph of its direct children,
+populated during `__init__`. This enables traversal and variable lookup
+without reasoning about lineage stamps.
+
+### `model.submodels`
+
+Returns a list of direct child Model instances in `setup()` return order:
+
+```python
+class Wing(Model):
+    W = Var("lbf", "wing weight")
+    def setup(self):
+        self.spar = Spar()
+        self.skin = Skin()
+        return [self.W >= self.spar.W + self.skin.W, self.spar, self.skin]
+
+wing = Wing()
+wing.submodels           # [<Spar>, <Skin>]
+wing.submodels[0].W      # Spar's weight variable
+```
+
+Only Models explicitly returned from `setup()` as constraints appear in
+`submodels`. A `ConstraintSet` that is not a `Model` subclass is just a
+grouping — it does not appear here.
+
+### `model.walk()`
+
+A depth-first generator over all descendant Models:
+
+```python
+class Vehicle(Model):
+    def setup(self):
+        self.wing = Wing()
+        self.fuselage = Fuselage()
+        ...
+
+v = Vehicle()
+for m in v.walk():
+    print(type(m).__name__)
+# Wing
+# Spar       ← Wing's child
+# Skin       ← Wing's child
+# Fuselage
+```
+
+Combined with `get_var()` and a solved `Solution`, this gives a hierarchical
+view of any quantity:
+
+```python
+sol = mission.solve(verbosity=0)
+
+# Print mass at each model level:
+for m in [mission] + list(mission.walk()):
+    try:
+        print(f"{type(m).__name__}: {sol[m.get_var('m')]:.3g}")
+    except (VariableNotFound, KeyError):
+        pass
+# Mission: 12000 kg
+# Vehicle: 8000 kg
+# ...
+```
+
+Models that do not define the variable are skipped. The caller determines
+which variable name to extract — this works for any quantity (`"W"`, `"P"`,
+`"m_dry"`, etc.) as long as the name is used consistently across the models
+of interest.
+
+### `model.get_var(path)`
+
+Resolves a dotted path to a `Variable` object:
+
+```python
+mission.get_var("vehicle.wing.S")   # Wing's area variable
+mission.get_var("S")                # Mission's own S (not a child's)
+```
+
+The path uses the attribute names set in `setup()` (`self.vehicle = Vehicle()`).
+The final segment is a variable name within that model's own variables.
+
+Raises `VariableNotFound` if any path segment doesn't exist, or
+`AmbiguousVariable` if the name matches multiple variables at the leaf.
+Both are importable from `gpkit.exceptions`.
+
+`get_var()` is local-only at each level — it searches the model's own
+variables, not its descendants. Use a dotted path to reach into children.
