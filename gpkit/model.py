@@ -185,8 +185,10 @@ class Model(CostedConstraintSet):
                     if getattr(getattr(vk, "veckey", None), "name", None) == name
                 }
                 if vec_element_matches:
-                    # Delegate to _choosevar which handles NomialArray assembly
-                    return self._choosevar(name, list(self.varkeys.keys(name)))
+                    # Delegate to _choosevar which handles NomialArray assembly.
+                    # Use vec_element_matches (scoped to unique_varkeys) rather
+                    # than varkeys.keys(name) which would include child models.
+                    return self._choosevar(name, list(vec_element_matches))
             if not matches:
                 cls = self.__class__.__name__
                 raise VariableNotFound(
