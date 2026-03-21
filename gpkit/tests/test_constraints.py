@@ -116,6 +116,17 @@ class TestConstraint:
         assert Model(x, [x >= 1])[x] == x
         assert all(Model(xv.prod(), [xv >= 1])[xv] == xv)
 
+    def test_factored_constraint_equivalent_to_expanded(self):
+        "Regression test for issue #138"
+        a = Variable("a", 0.15)
+        b = Variable("b")
+        sol_expanded = Model(b, [a + a * b <= b]).solve(verbosity=0)
+        sol_factored = Model(b, [a * (1 + b) <= b]).solve(verbosity=0)
+        # optimal b = a/(1-a) = 0.15/0.85
+        expected = 0.15 / 0.85
+        assert sol_expanded[b] == pytest.approx(expected, rel=1e-4)
+        assert sol_factored[b] == pytest.approx(expected, rel=1e-4)
+
     def test_additive_scalar(self):
         "Make sure additive scalars simplify properly"
         x = Variable("x")
