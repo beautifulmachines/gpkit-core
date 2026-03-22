@@ -507,7 +507,7 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
             raise TypeError(f"greater-than side '{m_gt}' is not monomial.") from err
         m_c *= units.of_division(m_gt, p_lt)
         hmap = NomialMap()
-        hmap.units = p_lt.hmap.units
+        hmap.units = None
         for exp, c in p_lt.hmap.items():
             new_exp = exp - m_exp
             val = c / m_c
