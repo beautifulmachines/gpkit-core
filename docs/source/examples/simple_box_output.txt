@@ -48,8 +48,15 @@ A_floor : 50  [m²] upper limit, floor area
 Variable Sensitivities
 ----------------------
 Box
-A_wall : -1.5 upper limit, wall area
- alpha : +0.5 lower limit, wall aspect ratio
+ A_wall : -1.5       upper limit, wall area
+  alpha : +0.5       lower limit, wall aspect ratio
+  gamma : +0.0002986 lower limit, floor aspect ratio
+      d : ~0         depth
+      w : ~0         width
+A_floor : ~0         upper limit, floor area
+   beta : ~0         upper limit, wall aspect ratio
+  delta : ~0         upper limit, floor aspect ratio
+      h : ~0         height
 
 Most Sensitive Constraints
 --------------------------

@@ -122,6 +122,10 @@ class SectionSpec:
         assert lines[-1] == ""
         return title_lines + lines[:-1]
 
+    def _fmt_one(self, x, p, suff="") -> str:
+        "Format a single scalar element for vector display."
+        return f"{x:{self.pm}.{p-1}g}{suff}".replace("+nan", "nan")
+
     def _fmt_val(self, val, suff="") -> str:
         n = self.options.vecn
         p = self.options.precision
@@ -129,10 +133,7 @@ class SectionSpec:
         if np.shape(val):
             flat = np.asarray(val).ravel()
             shown = flat[:n]
-            body = "  ".join(
-                f"{x:{self.pm}.{p-1}g}{suff}".replace("+nan", "nan").ljust(w)
-                for x in shown
-            )
+            body = "  ".join(self._fmt_one(x, p, suff).ljust(w) for x in shown)
             dots = " ..." if flat.size > n else ""
             return f"[ {body}{dots} ]"
         return f"{val:{self.pm}.{p}g}{suff}"
@@ -250,18 +251,24 @@ class Sweeps(Constants):
 class Sensitivities(SectionSpec):
     title = "Variable Sensitivities"
     sortkey = staticmethod(lambda x: (-rounded_mag(x[1]), str(x[0])))
-    filterfun = staticmethod(lambda x: rounded_mag(x[1]) >= 0.01)
     align = "><<"
     pm = "+"
     source = ItemSource("sens.variables")
+    nearzero_tol = 1e-7  # values below this display as "~0"
+
+    def _fmt_one(self, x, p, suff="") -> str:
+        if abs(x) < self.nearzero_tol:
+            return "~0"
+        return super()._fmt_one(x, p, suff)
 
     def row_from(self, item):
         """Extract [name, value, label] (no units!)."""
         key, val = item
         name = key.str_without("lineage")
         label = key.label
-        value = self._fmt_val(val)
-        return [f"{name} :", value, label]
+        if not np.shape(val) and abs(val) < self.nearzero_tol:
+            return [f"{name} :", "~0", label]
+        return [f"{name} :", self._fmt_val(val), label]
 
 
 class Constraints(SectionSpec):
