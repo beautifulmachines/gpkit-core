@@ -304,8 +304,12 @@ def _attach_sub_budget(node, child_vk, ctx, visited, term_val):
         child_vk, sub_lt, sub_c, ctx, visited | {child_vk}, level_units=child_units
     )
     sub_sum = sum(c.value for c in node.children if c.label != "[slack]")
-    if term_val:
-        node.slack = max(0.0, (term_val - sub_sum) / term_val)
+    try:
+        child_val = float(ctx.solution[child_vk].to(child_units).magnitude)
+    except (DimensionalityError, KeyError, AttributeError, TypeError, ValueError):
+        child_val = None
+    if child_val:
+        node.slack = max(0.0, (child_val - sub_sum) / child_val)
 
 
 def _process_term(top_vk, exp, coeff, ctx, visited, level_units):
