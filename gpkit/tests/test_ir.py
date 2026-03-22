@@ -256,6 +256,16 @@ class TestASTNodes:
         node = VarNode(x.key)
         assert to_ast(node) is node
 
+    def test_to_ast_unit_monomial_becomes_const(self):
+        """units("lbf") is variable-free;
+        to_ast should return ConstNode, not raw Monomial."""
+        from gpkit.units import units
+
+        unit_mono = units("lbf")
+        node = to_ast(unit_mono)
+        assert isinstance(node, ConstNode)
+        assert node.value == pytest.approx(1.0)
+
     def test_nested_ast(self):
         """Compound expressions produce nested ExprNode trees."""
         x = Variable("x")
@@ -855,6 +865,17 @@ class TestModelIR:
         sol2 = m2.solve(verbosity=0)
 
         assert abs(sol.cost - sol2.cost) < 1e-4
+
+    def test_units_pow_fractional_to_ir(self):
+        "Regression for #159: units(...)**<float> must not raise IRSerializationError."
+        from gpkit.units import units
+
+        W = Variable("W", "lbf")
+        W_eng = Variable("W_eng", "lbf")
+        mfac = Variable("mfac", "-")
+        m = Model(W, [W / mfac >= 2.572 * W_eng**0.922 * units("lbf") ** 0.078])
+        ir = m.to_ir()  # must not raise
+        assert "constraints" in ir
 
     def test_nested_model_roundtrip(self):
         """Nested model: lineage appears in IR variables."""
