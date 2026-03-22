@@ -420,6 +420,15 @@ class TestSignomialInequality:
         with pytest.raises(InvalidGPConstraint):
             _ = sc.as_hmapslt1({})
 
+    def test_sp_with_units(self):
+        "DimensionalityError for signomial constraints with units (issue 151)"
+        x = Variable("x", units="N")
+        y = Variable("y", units="N")
+        eps = Variable("eps", 1, units="N")
+        with SignomialsEnabled():
+            m = Model(x, [x >= y - eps, y >= 2 * eps])
+        m.localsolve(verbosity=0)  # must not raise DimensionalityError
+
 
 class TestLoose:
     "Test loose constraint set"
