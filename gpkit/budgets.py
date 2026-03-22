@@ -276,11 +276,13 @@ class _BudgetCtx:
     display_units: str
 
 
-def _eval_term_val(exp, coeff, ctx):
-    """Evaluate a monomial term in *display_units*; return nan on unit errors."""
+def _eval_term_val(exp, coeff, ctx, level_units=None):
+    """Evaluate a monomial term in *level_units*; return nan on unit errors."""
+    if level_units is None:
+        level_units = ctx.display_units
     try:
         term_qty = _eval_term_qty(exp, coeff, ctx.solution)
-        return float(term_qty.to(ctx.display_units).magnitude)
+        return float(term_qty.to(level_units).magnitude)
     except (DimensionalityError, KeyError, AttributeError, TypeError, ValueError):
         return float("nan")
 
@@ -297,13 +299,16 @@ def _attach_sub_budget(node, child_vk, ctx, visited, term_val):
             stacklevel=5,
         )
     sub_c, sub_lt = sub_matches[0][0], sub_matches[0][1]
-    node.children = _build_children(child_vk, sub_lt, sub_c, ctx, visited | {child_vk})
+    child_units = child_vk.unitrepr or "dimensionless"
+    node.children = _build_children(
+        child_vk, sub_lt, sub_c, ctx, visited | {child_vk}, level_units=child_units
+    )
     sub_sum = sum(c.value for c in node.children if c.label != "[slack]")
     if term_val:
         node.slack = max(0.0, (term_val - sub_sum) / term_val)
 
 
-def _process_term(top_vk, exp, coeff, ctx, visited):
+def _process_term(top_vk, exp, coeff, ctx, visited, level_units):
     """Build a single BudgetNode for one term in a budget constraint's RHS.
 
     Parameters
@@ -316,6 +321,8 @@ def _process_term(top_vk, exp, coeff, ctx, visited):
         Coefficient of this monomial term.
     ctx : _BudgetCtx
     visited : frozenset[VarKey]
+    level_units : str
+        Units to use when evaluating this term's value.
 
     Returns
     -------
@@ -323,7 +330,7 @@ def _process_term(top_vk, exp, coeff, ctx, visited):
     """
     is_self_ref = top_vk in exp
     free_in_term = {vk for vk in exp if vk not in ctx.solution.constants}
-    term_val = _eval_term_val(exp, coeff, ctx)
+    term_val = _eval_term_val(exp, coeff, ctx, level_units)
 
     # Simple case: single free var with exponent 1, coefficient 1, not self-referential
     is_simple = (
@@ -352,7 +359,7 @@ def _process_term(top_vk, exp, coeff, ctx, visited):
     return BudgetNode(label=label, vk=None, value=term_val, fraction=0.0, slack=0.0)
 
 
-def _build_children(top_vk, lt, constraint, ctx, visited):
+def _build_children(top_vk, lt, constraint, ctx, visited, level_units=None):
     """Recursively build BudgetNode children from the lt side of a budget constraint.
 
     Parameters
@@ -367,16 +374,22 @@ def _build_children(top_vk, lt, constraint, ctx, visited):
         Shared context (solution, model, display_units).
     visited : frozenset[VarKey]
         Guards against infinite recursion.
+    level_units : str, optional
+        Units for values at this recursion level.  Defaults to ctx.display_units
+        (top-level call) but sub-levels pass the child variable's own units so
+        that cross-dimensional recursion (e.g. mass → volume → area) works.
 
     Returns
     -------
     list[BudgetNode]
     """
-    total_val = float(ctx.solution[top_vk].to(ctx.display_units).magnitude)
+    if level_units is None:
+        level_units = ctx.display_units
+    total_val = float(ctx.solution[top_vk].to(level_units).magnitude)
     is_tight = abs(ctx.solution.sens.constraints.get(constraint, 0.0)) > 1e-5
 
     nodes = [
-        _process_term(top_vk, exp, coeff, ctx, visited)
+        _process_term(top_vk, exp, coeff, ctx, visited, level_units)
         for exp, coeff in lt.hmap.items()
     ]
 
