@@ -2,7 +2,7 @@
 
 from typing import overload
 
-from .nomials.variables import Variable, VectorizableVariable
+from .nomials.variables import Variable
 
 _RESERVED_NAMES = frozenset(
     {"cost", "lineage", "setup", "substitutions", "unique_varkeys", "vks"}
@@ -73,6 +73,6 @@ class Var:  # pylint: disable=too-few-public-methods
         if self.value is not None:
             args.append(self.value)
         args.extend([self.units, self.label])
-        v = VectorizableVariable(*args)
+        v = Variable(*args)
         obj.__dict__[key] = v
         return v

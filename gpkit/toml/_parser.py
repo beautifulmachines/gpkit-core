@@ -13,7 +13,7 @@ from ..constraints.set import ConstraintSet
 from ..globals import NamedVariables, Vectorize
 from ..model import Model
 from ..nomials.array import NomialArray
-from ..nomials.variables import ArrayVariable, VectorizableVariable
+from ..nomials.variables import ArrayVariable, Variable
 from ._expr import TomlExpressionError, parse_constraint, parse_objective
 
 
@@ -83,7 +83,7 @@ def _validate_var_name(name):
 def _make_variable(name, value, units, label):
     """Create a gpkit Variable from parsed spec components.
 
-    Uses VectorizableVariable so that variables declared inside a
+    Uses Variable so that variables declared inside a
     Vectorize context automatically become ArrayVariables.
     """
     _validate_var_name(name)
@@ -94,7 +94,7 @@ def _make_variable(name, value, units, label):
         descr["units"] = units
     if label is not None:
         descr["label"] = label
-    return VectorizableVariable(**descr)
+    return Variable(**descr)
 
 
 def _make_vector_variable(name, shape, value, units, label):

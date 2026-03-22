@@ -7,9 +7,15 @@ from .constraints.set import ConstraintSet
 from .constraints.sigeq import SignomialEquality
 from .globals import NamedVariables, SignomialsEnabled, Vectorize, settings
 from .model import Model
-from .nomials import ArrayVariable, Monomial, NomialArray, Posynomial, Signomial
-from .nomials import VectorizableVariable as Variable  # Variable the user sees
-from .nomials import VectorVariable
+from .nomials import (
+    ArrayVariable,
+    Monomial,
+    NomialArray,
+    Posynomial,
+    Signomial,
+    Variable,
+    VectorVariable,
+)
 from .programs.gp import GeometricProgram
 from .programs.sgp import SequentialGeometricProgram
 from .units import DimensionalityError, units, ureg
