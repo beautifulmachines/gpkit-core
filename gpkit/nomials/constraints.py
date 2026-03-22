@@ -1,4 +1,4 @@
-"Implements SingleEquationConstraint"
+"Base classes for nomial-layer constraints."
 
 from operator import eq, ge, le
 
@@ -47,3 +47,31 @@ class SingleEquationConstraint(ReprMixin):
                 try_str_without(self.right, excluded, latex=True),
             )
         )
+
+
+class ArrayConstraint(SingleEquationConstraint, list):
+    """A ConstraintSet for prettier array-constraint printing.
+
+    When created by NomialArray `left` and `right` are likely to be
+    be either NomialArrays or Varkeys of VectorVariables.
+    """
+
+    def __init__(self, constraints, left, oper, right):
+        self.constraints = constraints
+        list.__init__(self, constraints)
+        SingleEquationConstraint.__init__(self, left, oper, right)
+
+    def __iter__(self):
+        yield from self.constraints.flat
+
+    def lines_without(self, excluded):
+        "Returns lines for indentation in hierarchical printing."
+        return self.str_without(excluded).split("\n")
+
+    def to_ir(self):
+        "Serialize as a list of element constraint IR dicts."
+        return [c.to_ir() for c in self.constraints.flat]
+
+    def __bool__(self):
+        "Allows the use of '=' NomialArrays as truth elements."
+        return False if self.oper != "=" else bool(self.constraints.all())

@@ -18,7 +18,7 @@ type = layers
 
 layers =
     # Interactive/UI helpers (may import everything below)
-    gpkit.interactive | gpkit.breakdowns | gpkit.tools
+    gpkit.interactive | gpkit.tools
 
     # Model eventually goes here? user-friendly interface to model and solvers
     gpkit.model
@@ -29,34 +29,30 @@ layers =
     # GP representation and solver interfaces
     gpkit.solvers : gpkit.solutions
 
+    # Solution breakdown analysis (solutions imports from here)
+    gpkit.breakdowns
+
     # Modelling primitives + indexing
     gpkit.constraints
 
-    # Algebra + mathematical objects
+    # Algebra + mathematical objects (including constraint primitives)
     gpkit.nomials
 
     # Variables and hashing
     gpkit.varkey | gpkit.varmap
 
-    # small helpers that might evantually move or be eliminated
+    # Utilities (including globals, build)
     gpkit.util
 
     # Pure primitives & units (no gpkit imports allowed)
     gpkit.units | gpkit.exceptions
 
-# goal is to evantually eliminate the ignore list below via refactoring
+# goal is to eventually eliminate the ignore list below via refactoring
 ignore_imports =
     # the following import patterns exist today but should be eliminated
     gpkit.units -> gpkit.nomials
-    gpkit.nomials.math -> gpkit.constraints
-    gpkit.nomials.array -> gpkit.constraints
-    gpkit.solutions -> gpkit.breakdowns
     gpkit.tools.autosweep -> gpkit.interactive.plot_sweep
     gpkit.model -> gpkit.tools.autosweep
-    gpkit.constraints.* -> gpkit.globals
-    gpkit.nomials.* -> gpkit.globals
-    gpkit.programs.* -> gpkit.globals
-    gpkit.solvers.mosek_cli -> gpkit.globals
 
 # ---------------------------------------------------------------------------
 # Contract 2: Keep test helpers independent of production code (optional)

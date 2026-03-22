@@ -1,5 +1,7 @@
 [MESSAGES CONTROL]
 
+# cyclic-import: gpkit.units imports from gpkit.nomials (deferred fix, tracked in issue #29).
+# All pylint cyclic-import warnings are variants of this single root cycle.
 disable=cyclic-import
 
 [BASIC]

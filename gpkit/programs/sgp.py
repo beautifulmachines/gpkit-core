@@ -13,9 +13,9 @@ from ..exceptions import (
     InvalidSGPConstraint,
     UnnecessarySGP,
 )
-from ..globals import NamedVariables
 from ..nomials import Posynomial, PosynomialInequality, Variable
 from ..solutions import _WeakModelRef
+from ..util.globals import NamedVariables
 from ..util.small_scripts import appendsolwarning, initsolwarning
 from ..varmap import VarMap
 from .gp import GeometricProgram

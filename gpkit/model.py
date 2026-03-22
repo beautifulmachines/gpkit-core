@@ -14,7 +14,6 @@ from .exceptions import (
     InvalidGPConstraint,
     VariableNotFound,
 )
-from .globals import NamedVariables
 from .nomials import Monomial, Variable
 from .nomials.math import constraint_from_ir, nomial_from_ir
 from .programs.gp import GeometricProgram
@@ -22,6 +21,7 @@ from .programs.prog_factories import progify, solvify
 from .programs.sgp import SequentialGeometricProgram
 from .solutions import SolutionSequence
 from .tools.autosweep import autosweep_1d
+from .util.globals import NamedVariables
 from .var import Var
 from .varkey import VarKey
 from .varmap import VarMap

@@ -2,10 +2,8 @@
 
 __version__ = "0.2.5"
 
-from .build import build
 from .constraints.set import ConstraintSet
 from .constraints.sigeq import SignomialEquality
-from .globals import NamedVariables, SignomialsEnabled, Vectorize, settings
 from .model import Model
 from .nomials import (
     ArrayVariable,
@@ -19,6 +17,8 @@ from .nomials import (
 from .programs.gp import GeometricProgram
 from .programs.sgp import SequentialGeometricProgram
 from .units import DimensionalityError, units, ureg
+from .util.build import build
+from .util.globals import NamedVariables, SignomialsEnabled, Vectorize, settings
 from .var import Var
 from .varkey import VarKey
 

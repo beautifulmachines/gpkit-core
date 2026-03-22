@@ -85,7 +85,7 @@ _OUTPUT_DIR = os.path.abspath(os.path.join(_FILE_DIR, "../../docs/source/example
 def _verify_clean_global_state():
     """Verify gpkit global state is reset after test."""
     for name, value in [
-        ("model numbers", gpkit.globals.NamedVariables.modelnums),
+        ("model numbers", gpkit.util.globals.NamedVariables.modelnums),
         ("lineage", gpkit.NamedVariables.lineage),
         ("signomials enabled", gpkit.SignomialsEnabled),
         ("vectorization", gpkit.Vectorize.vectorization),
@@ -118,7 +118,7 @@ def _import_example(name):
                 importlib.import_module(module_name)
 
         # Reset model numbers so captured reload has clean state
-        gpkit.globals.NamedVariables.reset_modelnumbers()
+        gpkit.util.globals.NamedVariables.reset_modelnumbers()
 
         filepath = os.path.join(_OUTPUT_DIR, f"{name}_output.txt")
         with StdoutCaptured(logfilepath=filepath):
@@ -148,5 +148,5 @@ def example(request, solver):
         mod = _import_example(example_name)
         yield mod
 
-    gpkit.globals.NamedVariables.reset_modelnumbers()
+    gpkit.util.globals.NamedVariables.reset_modelnumbers()
     _verify_clean_global_state()

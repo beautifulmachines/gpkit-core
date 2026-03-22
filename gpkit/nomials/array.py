@@ -13,11 +13,12 @@ from operator import eq, ge, le, xor
 import numpy as np
 
 from ..ast_nodes import ExprNode, to_ast
-from ..constraints import ArrayConstraint
 from ..util.repr_conventions import ReprMixin
 from ..util.small_classes import EMPTY_HV, HashVector
 from ..util.small_scripts import try_str_without
+from .constraints import ArrayConstraint
 from .map import NomialMap
+from .math import Signomial
 
 
 @np.vectorize
@@ -208,7 +209,3 @@ class NomialArray(ReprMixin, np.ndarray):
                 hmap.units = (hmap.units or 1) * m.units
         hmap[exp] = c
         return Signomial(hmap, ast=ExprNode("prod", (to_ast(self),)))
-
-
-# pylint: disable=wrong-import-position
-from .math import Signomial  # noqa: E402
