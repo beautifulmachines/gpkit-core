@@ -4,7 +4,7 @@ from collections.abc import Iterable, MutableMapping
 
 import numpy as np
 
-from ..globals import NamedVariables, Vectorize
+from ..util.globals import NamedVariables, Vectorize
 from ..util.small_classes import HashVector, Numbers, Strings
 from ..util.small_scripts import veclinkedfn
 from ..varkey import VarKey

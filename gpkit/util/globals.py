@@ -3,13 +3,15 @@
 import os
 from collections import defaultdict
 
-from . import build
+from .build import build
 
 
 def load_settings(path=None, trybuild=True):
     "Load the settings file at SETTINGS_PATH; return settings dict"
     if path is None:
-        path = os.sep.join([os.path.dirname(__file__), "env", "settings"])
+        path = os.sep.join(
+            [os.path.dirname(os.path.dirname(__file__)), "env", "settings"]
+        )
     try:  # if the settings file already exists, read it
         with open(path, encoding="utf-8") as settingsfile:
             lines = [

@@ -21,9 +21,9 @@ from gpkit.constraints.relax import (
 )
 from gpkit.constraints.tight import Tight
 from gpkit.exceptions import InvalidGPConstraint, PrimalInfeasible
-from gpkit.globals import NamedVariables
 from gpkit.nomials import MonomialEquality, PosynomialInequality, SignomialInequality
 from gpkit.units import DimensionalityError
+from gpkit.util.globals import NamedVariables
 
 
 class TestConstraint:

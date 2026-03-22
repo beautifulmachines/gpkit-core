@@ -43,7 +43,7 @@ class MonoEqualityIndexes:
 def _get_solver(solver, kwargs):
     """Get the solverfn and solvername associated with solver"""
     if solver is None:
-        from ..globals import settings
+        from ..util.globals import settings
 
         try:
             solver = settings["default_solver"]

@@ -20,8 +20,8 @@ from ..exceptions import (
     PrimalInfeasible,
     UnknownInfeasible,
 )
-from ..globals import settings
 from ..solutions import RawSolution
+from ..util.globals import settings
 
 
 def _handle_remove_readonly(func, path, exc_or_exc_info):  # pragma: no cover

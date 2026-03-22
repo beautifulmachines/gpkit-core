@@ -3,9 +3,9 @@
 
 from dataclasses import replace
 
-from ..globals import NamedVariables, SignomialsEnabled
 from ..nomials import NomialArray, Variable, VectorVariable
 from ..nomials.substitution import parse_linked, parse_subs
+from ..util.globals import NamedVariables, SignomialsEnabled
 from ..util.small_scripts import appendsolwarning, initsolwarning, mag
 from ..varmap import VarMap
 from .set import ConstraintSet

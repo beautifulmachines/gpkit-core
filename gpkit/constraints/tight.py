@@ -1,6 +1,6 @@
 "Implements Tight"
 
-from ..globals import SignomialsEnabled
+from ..util.globals import SignomialsEnabled
 from ..util.small_scripts import appendsolwarning, initsolwarning, mag
 from .set import ConstraintSet
 

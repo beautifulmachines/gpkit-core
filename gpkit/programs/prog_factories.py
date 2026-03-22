@@ -3,8 +3,8 @@
 import numpy as np
 from adce import adnumber
 
-from ..globals import SignomialsEnabled
 from ..nomials.substitution import parse_linked, parse_subs
+from ..util.globals import SignomialsEnabled
 from ..util.small_classes import FixedScalar
 from ..util.small_scripts import maybe_flatten
 from ..varmap import VarMap

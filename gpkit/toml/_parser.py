@@ -10,10 +10,10 @@ from pathlib import Path
 import numpy as np
 
 from ..constraints.set import ConstraintSet
-from ..globals import NamedVariables, Vectorize
 from ..model import Model
 from ..nomials.array import NomialArray
 from ..nomials.variables import ArrayVariable, Variable
+from ..util.globals import NamedVariables, Vectorize
 from ._expr import TomlExpressionError, parse_constraint, parse_objective
 
 
