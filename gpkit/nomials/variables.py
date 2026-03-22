@@ -186,15 +186,3 @@ class ArrayVariable(NomialArray):  # pylint: disable=too-many-locals
         obj.key = veckey
         obj.units = obj.key.units
         return obj
-
-
-class VectorizableVariable(
-    Variable, ArrayVariable
-):  # pylint: disable=too-many-ancestors
-    "A Variable outside a vectorized environment, an ArrayVariable within."
-
-    def __new__(cls, *args, **descr):
-        if Vectorize.vectorization:
-            shape = descr.pop("shape", ())
-            return ArrayVariable.__new__(cls, shape, *args, **descr)
-        return object.__new__(cls)

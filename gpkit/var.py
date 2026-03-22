@@ -28,8 +28,8 @@ class Var:  # pylint: disable=too-few-public-methods
     - Reserved names (cost, lineage, setup, substitutions, unique_varkeys, vks)
       and names starting with '_var_' cannot be used.
     - For vector variables whose length comes from a setup() argument, use
-      Vectorize inside setup() with VectorizableVariable() directly.
-    - Flat (script-form) models should use VectorizableVariable() directly.
+      Vectorize inside setup() with Variable() directly.
+    - Flat (script-form) models should use Variable() directly.
     - When a Model subclass is instantiated inside a Vectorize(N) context, all
       Var descriptors automatically become N-element vector variables.
     """
