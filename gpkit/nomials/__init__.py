@@ -13,6 +13,6 @@ from .math import (
     SignomialInequality,
     SingleSignomialEquality,
 )
-from .variables import ArrayVariable, Variable, VectorizableVariable
+from .variables import ArrayVariable, Variable
 
 VectorVariable = ArrayVariable

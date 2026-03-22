@@ -273,6 +273,11 @@ class TestVariable:
         assert isinstance(3 * v, Monomial)
         assert not isinstance(3 * v, PlainVariable)
 
+    def test_isinstance_public_variable(self):
+        """Variable() should be isinstance of the public Variable (issue #114)"""
+        v = Variable("v")
+        assert isinstance(v, Variable)
+
     def test_value(self):
         """Detailed tests for value kwarg of __init__"""
         a = Variable("a")
@@ -364,9 +369,9 @@ class TestVectorVariable:
                 x = gpkit.VectorVariable(2, "x")
             z = gpkit.VectorVariable(7, "z")
 
-        assert y.shape == (5, 3)
-        assert x.shape == (2, 5, 3)
-        assert z.shape == (7, 3)
+        assert y.key.shape == (5, 3)
+        assert x.key.shape == (2, 5, 3)
+        assert z.key.shape == (7, 3)
 
 
 class TestArrayVariable:

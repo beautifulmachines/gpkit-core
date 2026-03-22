@@ -41,6 +41,12 @@ class Variable(Monomial):
     where $name is the vector's name and i is the VarKey's index.
     """
 
+    def __new__(cls, *args, **descr) -> "NomialArray | Variable":
+        if Vectorize.vectorization and "idx" not in descr:
+            shape = descr.pop("shape", ())
+            return ArrayVariable.__new__(ArrayVariable, shape, *args, **descr)
+        return object.__new__(cls)
+
     def __init__(self, *args, **descr):
         if len(args) == 1 and isinstance(args[0], VarKey):
             (self.key,) = args
@@ -62,11 +68,18 @@ class Variable(Monomial):
             self.key = VarKey(**descr)
         hmap = NomialMap({HashVector({self.key: 1}): 1.0})
         hmap.units = self.key.units
+        original_class = type(self)
         Monomial.__init__(self, hmap)
-        # NOTE: needed because Signomial.__init__ will change the class
-        self.__class__ = Variable
+        # NOTE: Signomial.__init__ mutates __class__; restore original
+        self.__class__ = original_class
 
     __hash__ = NomialData.__hash__
+
+    def __getitem__(self, idx):
+        raise TypeError(
+            f"{self!r} is a scalar Variable and cannot be indexed. "
+            "Use Variable() inside a Vectorize context to create an array variable."
+        )
 
     def to(self, units):
         "Create new Signomial converted to new units"
@@ -179,15 +192,3 @@ class ArrayVariable(NomialArray):  # pylint: disable=too-many-locals
         obj.key = veckey
         obj.units = obj.key.units
         return obj
-
-
-class VectorizableVariable(
-    Variable, ArrayVariable
-):  # pylint: disable=too-many-ancestors
-    "A Variable outside a vectorized environment, an ArrayVariable within."
-
-    def __new__(cls, *args, **descr):
-        if Vectorize.vectorization:
-            shape = descr.pop("shape", ())
-            return ArrayVariable.__new__(cls, shape, *args, **descr)
-        return Variable(*args, **descr)
