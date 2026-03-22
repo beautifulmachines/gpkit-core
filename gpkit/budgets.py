@@ -41,16 +41,22 @@ def _get_gt_lt(constraint):
     return None, None
 
 
-def _format_term_label(exp, coeff):
+def _format_term_label(exp, coeff, strip_prefix=None):
     """Format a monomial term's exponent dict + coefficient as a string.
 
     Example: coeff=0.1, exp={m: 1, f: 1} → "0.1·m·f"
+
+    If ``strip_prefix`` is given (a lineagestr of the parent model), that
+    prefix is removed from variable names so only the relative path is shown.
     """
     parts = []
     if abs(coeff - 1.0) > 1e-10:
         parts.append(f"{coeff:.4g}")
     for vk, pow_ in exp.items():
-        name = vk.str_without(["lineage"])
+        if strip_prefix:
+            name = vk.str_without(["units", f":MAGIC:{strip_prefix}"])
+        else:
+            name = vk.str_without(["lineage"])
         parts.append(name if pow_ == 1 else f"{name}^{pow_:.4g}")
     return "·".join(parts) if parts else f"{coeff:.4g}"
 
@@ -341,6 +347,8 @@ def _process_term(top_vk, exp, coeff, ctx, visited, level_units):
     free_in_term = {vk for vk in exp if vk not in ctx.solution.constants}
     term_val = _eval_term_val(exp, coeff, ctx, level_units)
 
+    parent_prefix = top_vk.lineagestr() if top_vk.lineage else None
+
     # Simple case: single free var with exponent 1, coefficient 1, not self-referential
     is_simple = (
         not is_self_ref
@@ -354,9 +362,8 @@ def _process_term(top_vk, exp, coeff, ctx, visited, level_units):
         # If constants co-appear in the term (e.g. rho·V), show the full
         # expression so the budget is readable in physical terms.
         has_constants = any(vk in ctx.solution.constants for vk in exp)
-        parent_prefix = top_vk.lineagestr() if top_vk.lineage else None
         label = (
-            _format_term_label(exp, coeff)
+            _format_term_label(exp, coeff, strip_prefix=parent_prefix)
             if has_constants
             else _vk_display(child_vk, lineage=True, strip_prefix=parent_prefix)
         )
@@ -375,7 +382,7 @@ def _process_term(top_vk, exp, coeff, ctx, visited, level_units):
             _attach_sub_budget(node, child_vk, ctx, visited, term_val)
         return node
 
-    label = _format_term_label(exp, coeff)
+    label = _format_term_label(exp, coeff, strip_prefix=parent_prefix)
     if is_self_ref:
         label += " [margin]"
     return BudgetNode(label=label, vk=None, value=term_val, fraction=0.0, slack=0.0)
