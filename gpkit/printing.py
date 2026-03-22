@@ -284,7 +284,7 @@ class Constants(SectionSpec):
         name_col = f"{key.str_without('lineage'):>{name_w}} :"
         parts = [name_col, val_vec, _unitstr(key), key.label or ""]
         line1 = self.col_sep.join(x for x in parts if x).rstrip()
-        sens_col = f"{'sens':>{name_w}} :"
+        sens_col = f"{'sens':>{name_w + 2}}"
         return [line1, f"{sens_col}{self.col_sep}{sens_vec}"]
 
     def _format_model_group(self, model_items) -> list[str]:
@@ -298,7 +298,7 @@ class Constants(SectionSpec):
         if vector_items:
             name_w = max(
                 max(len(k.str_without("lineage")) for k, _ in vector_items),
-                len("sens"),
+                len("sens") - 2,
             )
             for key, (val, sens) in vector_items:
                 lines.extend(self._fmt_vector_item(key, val, sens, name_w))
