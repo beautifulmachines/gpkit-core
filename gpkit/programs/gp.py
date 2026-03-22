@@ -21,7 +21,7 @@ from ..exceptions import (
     UnknownInfeasible,
 )
 from ..nomials.map import NomialMap
-from ..solutions import Sensitivities, Solution
+from ..solutions import Sensitivities, Solution, _WeakModelRef
 from ..util.repr_conventions import lineagestr
 from ..util.small_classes import CootMatrix, FixedScalar, Numbers, SolverLog
 from ..util.small_scripts import appendsolwarning, initsolwarning
@@ -532,6 +532,7 @@ class GeometricProgram:
             meta={"soltime": solver_out.meta["soltime"], "warnings": warnings},
         )
         result.meta["cost function"] = self.cost
+        result.meta["model"] = _WeakModelRef(self.model)
         return result
 
     def _handle_choicevars(self, solver_out):

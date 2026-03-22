@@ -2,13 +2,39 @@
 
 import json
 import pickle
+import weakref
 from dataclasses import dataclass
 from typing import List, Sequence
 
 from . import printing
 from .breakdowns import bdtable_gen
+from .budgets import build_budget
 from .varkey import VarKey
 from .varmap import VarMap
+
+
+class _WeakModelRef:
+    """Weakly references a model for use in solution.meta.
+
+    Storing the full model object in meta would make solutions unpicklable
+    (models hold a reference to the solved program which contains
+    unpicklable file handles).  This wrapper holds a weakref instead, and
+    when pickled it restores as an empty (dead) ref so that the solution
+    remains serialisable.
+    """
+
+    __slots__ = ("_ref",)
+
+    def __init__(self, model):
+        self._ref = weakref.ref(model) if model is not None else None
+
+    def __call__(self):
+        "Return the referenced model, or None if it has been garbage-collected."
+        return self._ref() if self._ref is not None else None
+
+    def __reduce__(self):
+        # Pickle as an empty ref — the model is not persisted across save/load.
+        return (type(self), (None,))
 
 
 @dataclass(frozen=True, slots=True)
@@ -151,6 +177,30 @@ class Solution:
         if "tables" not in kwargs:  # don't add breakdowns if tables custom
             lines += self.cost_breakdown() + self.model_sens_breakdown() + [""]
         return "\n".join(lines) + printing.table(self, **kwargs)
+
+    def budget(self, var, display_units=None):
+        """Build and return a Budget breakdown for a variable.
+
+        Parameters
+        ----------
+        var : Variable or VarKey
+            The top-level budget variable (e.g. ``aircraft.m_total``).
+        display_units : str, optional
+            Units for all displayed values.  Defaults to the variable's units.
+
+        Returns
+        -------
+        Budget
+            Call ``.text()`` or ``print(sol.budget(...))`` to display.
+        """
+        model_ref = self.meta.get("model")
+        model = model_ref() if callable(model_ref) else model_ref
+        if model is None:
+            raise ValueError(
+                "No model in solution.meta. Ensure the solution was produced "
+                "by a current gpkit solve (meta['model'] is set at solve time)."
+            )
+        return build_budget(self, model, var, display_units)
 
     def cost_breakdown(self) -> str:
         "printable visualization of cost breakdown"
