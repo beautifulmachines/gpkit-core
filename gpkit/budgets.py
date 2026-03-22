@@ -346,14 +346,24 @@ def _process_term(top_vk, exp, coeff, ctx, visited, level_units):
 
     if is_simple:
         child_vk = next(iter(free_in_term))
+        # If constants co-appear in the term (e.g. rho·V), show the full
+        # expression so the budget is readable in physical terms.
+        has_constants = any(vk in ctx.solution.constants for vk in exp)
+        label = (
+            _format_term_label(exp, coeff) if has_constants else _vk_display(child_vk)
+        )
         node = BudgetNode(
-            label=_vk_display(child_vk),
+            label=label,
             vk=child_vk,
             value=term_val,
             fraction=0.0,
             slack=0.0,
         )
-        if child_vk not in visited:
+        if (
+            child_vk not in visited
+            and child_vk.units is not None
+            and child_vk.units.is_compatible_with(level_units)
+        ):
             _attach_sub_budget(node, child_vk, ctx, visited, term_val)
         return node
 

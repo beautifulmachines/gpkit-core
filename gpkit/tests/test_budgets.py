@@ -397,3 +397,18 @@ class TestBuildBudgetMixedUnits:
         sol = model.solve(verbosity=0)
         b = sol.budget(model.m)
         assert isinstance(b, Budget)
+
+    def test_label_includes_constants(self):
+        # m >= rho*V: child label should show "rho·V", not just "V"
+        model = Cylinder()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        assert any("rho" in c.label for c in b.children)
+
+    def test_no_cross_unit_recursion(self):
+        # rho·V contributes to m, but V (m^3) != m (kg): should not recurse into V
+        model = Cylinder()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        rho_v_node = b.children[0]
+        assert rho_v_node.children == []
