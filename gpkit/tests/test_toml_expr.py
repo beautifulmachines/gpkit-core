@@ -3,7 +3,7 @@
 import pytest
 
 from gpkit import Variable, VectorVariable
-from gpkit.constraints.single_equation import SingleEquationConstraint
+from gpkit.constraints import SingleEquationConstraint
 from gpkit.nomials.math import Monomial, Posynomial
 from gpkit.toml._expr import (
     TomlExpressionError,

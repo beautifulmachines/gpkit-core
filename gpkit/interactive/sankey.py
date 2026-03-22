@@ -11,7 +11,7 @@ from ipysankeywidget import SankeyWidget
 from ipywidgets import Layout
 
 from .. import GPCOLORS, Model
-from ..constraints.array import ArrayConstraint
+from ..constraints import ArrayConstraint
 from ..repr_conventions import lineagestr, unitstr
 from ..varkey import lineage_display_context
 from ..varmap import get_lineage_map

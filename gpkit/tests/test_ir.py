@@ -9,7 +9,7 @@ import pytest
 
 from gpkit import Model, SignomialsEnabled, Variable, VarKey, VectorVariable
 from gpkit.ast_nodes import ConstNode, ExprNode, VarNode, ast_from_ir, to_ast
-from gpkit.constraints.array import ArrayConstraint
+from gpkit.constraints import ArrayConstraint
 from gpkit.constraints.set import build_model_tree
 from gpkit.exceptions import IRSerializationError
 from gpkit.nomials.map import NomialMap
