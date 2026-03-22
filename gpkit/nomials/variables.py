@@ -75,11 +75,6 @@ class Variable(Monomial):
 
     __hash__ = NomialData.__hash__
 
-    @property
-    def shape(self):
-        "Shape of this variable's vector key, or () for scalars."
-        return self.key.shape
-
     def to(self, units):
         "Create new Signomial converted to new units"
         return Monomial(self).to(units)  # pylint: disable=no-member
