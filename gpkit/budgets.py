@@ -219,14 +219,19 @@ class Budget:
 # ------------------------------------------------------------------
 
 
-def _vk_display(vk, lineage=False):
+def _vk_display(vk, lineage=False, strip_prefix=None):
     """Return a display string for a VarKey.
 
-    With ``lineage=True`` returns the full model-qualified path (e.g.
-    ``"Aircraft.Wing.m"``).  With ``lineage=False`` returns just the
-    variable's own name without the lineage prefix.
+    With ``lineage=True`` returns the model-qualified path.  If
+    ``strip_prefix`` is given (a lineagestr of the parent model), that
+    prefix is removed so only the path *below* the parent is shown
+    (e.g. ``"Wing.m"`` instead of ``"Aircraft.Wing.m"`` when the parent
+    is ``"Aircraft"``).  With ``lineage=False`` returns just the variable
+    name without any lineage.
     """
     if lineage:
+        if strip_prefix:
+            return vk.str_without(["units", f":MAGIC:{strip_prefix}"])
         return vk.str_without(["units"])
     return vk.str_without(["units", "lineage"])
 
@@ -349,10 +354,11 @@ def _process_term(top_vk, exp, coeff, ctx, visited, level_units):
         # If constants co-appear in the term (e.g. rho·V), show the full
         # expression so the budget is readable in physical terms.
         has_constants = any(vk in ctx.solution.constants for vk in exp)
+        parent_prefix = top_vk.lineagestr() if top_vk.lineage else None
         label = (
             _format_term_label(exp, coeff)
             if has_constants
-            else _vk_display(child_vk, lineage=True)
+            else _vk_display(child_vk, lineage=True, strip_prefix=parent_prefix)
         )
         node = BudgetNode(
             label=label,

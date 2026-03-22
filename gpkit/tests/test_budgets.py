@@ -202,7 +202,7 @@ class TestBuildBudgetBasic:
         assert b.total > 1000  # 15 kg → 15000 g
 
     def test_child_labels_include_model_context(self):
-        # Child labels must include lineage so "m" → "Aircraft.Wing.m", not just "m"
+        # Child labels must include lineage so "m" is not ambiguous
         model = Aircraft()
         sol, _ = solve(model)
         b = build_budget(sol, model, model.m)
@@ -210,6 +210,17 @@ class TestBuildBudgetBasic:
         assert "Wing" in wing_node.label
         spar_node = next(n for n in wing_node.children if abs(n.value - 10) < 1e-3)
         assert "Spar" in spar_node.label
+
+    def test_child_labels_drop_parent_lineage(self):
+        # Under Aircraft, the wing node should be "Wing.m" not "Aircraft.Wing.m"
+        # Under Wing, the spar node should be "Spar.m" not "Aircraft.Wing.Spar.m"
+        model = Aircraft()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        wing_node = b.children[0]
+        assert wing_node.label == "Wing.m"
+        spar_node = next(n for n in wing_node.children if abs(n.value - 10) < 1e-3)
+        assert spar_node.label == "Spar.m"
 
 
 # ---------------------------------------------------------------------------
