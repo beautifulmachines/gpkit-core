@@ -13,6 +13,10 @@ from gpkit.budgets import Budget, build_budget, find_budget_constraints
 
 
 class Spar(Model):
+    """Spar submodel fixture: single mass variable with a lower bound."""
+
+    m: Variable
+
     def setup(self):
         m_min = Variable("m_min", 10, "kg", "spar minimum mass")
         self.m = Variable("m", "kg", "spar mass")
@@ -21,6 +25,10 @@ class Spar(Model):
 
 
 class Skin(Model):
+    """Skin submodel fixture: single mass variable with a lower bound."""
+
+    m: Variable
+
     def setup(self):
         m_min = Variable("m_min", 5, "kg", "skin minimum mass")
         self.m = Variable("m", "kg", "skin mass")
@@ -29,6 +37,12 @@ class Skin(Model):
 
 
 class Wing(Model):
+    """Wing submodel fixture: mass budgeted across spar and skin."""
+
+    spar: Spar
+    skin: Skin
+    m: Variable
+
     def setup(self):
         self.spar = Spar()
         self.skin = Skin()
@@ -38,6 +52,11 @@ class Wing(Model):
 
 
 class Aircraft(Model):
+    """Top-level aircraft fixture: total mass budgeted by wing mass."""
+
+    wing: Wing
+    m: Variable
+
     def setup(self):
         self.wing = Wing()
         self.m = Variable("m", "kg", "total mass")
@@ -47,6 +66,9 @@ class Aircraft(Model):
 
 class AircraftWithMargin(Model):
     """Budget constraint includes a self-referential margin term."""
+
+    wing: Wing
+    m: Variable
 
     def setup(self):
         self.wing = Wing()
@@ -63,6 +85,9 @@ class SlackModel(Model):
     m_total is fixed at 100 kg; m_wing optimizes to its lower bound of 60 kg.
     The budget constraint m_total >= m_wing is slack (100 > 60).
     """
+
+    m_wing: Variable
+    m_total: Variable
 
     def setup(self):
         m_wing_min = Variable("m_wing_min", 60, "kg", "wing mass lower bound")
@@ -81,6 +106,7 @@ class SlackModel(Model):
 
 
 def solve(model):
+    """Solve *model* silently and return (solution, model)."""
     sol = model.solve(verbosity=0)
     return sol, model
 
@@ -91,6 +117,8 @@ def solve(model):
 
 
 class TestFindBudgetConstraints:
+    """Tests for find_budget_constraints()."""
+
     def test_wing_budget(self):
         model = Aircraft()
         sol, _ = solve(model)
@@ -124,6 +152,8 @@ class TestFindBudgetConstraints:
 
 
 class TestBuildBudgetBasic:
+    """Tests for build_budget() basic decomposition."""
+
     def test_returns_budget(self):
         model = Aircraft()
         sol, _ = solve(model)
@@ -178,6 +208,8 @@ class TestBuildBudgetBasic:
 
 
 class TestBuildBudgetMargin:
+    """Tests for build_budget() with self-referential margin terms."""
+
     def test_margin_term_present(self):
         model = AircraftWithMargin()
         sol, _ = solve(model)
@@ -208,12 +240,22 @@ class TestBuildBudgetMargin:
 
 
 class TestBudgetSlack:
+    """Tests for slack detection when a budget constraint is not tight."""
+
     def test_slack_node_added(self):
         model = SlackModel()
         sol, _ = solve(model)
         b = build_budget(sol, model, model.m_total)
         labels = [n.label for n in b.children]
         assert "[slack]" in labels
+
+    def test_slack_node_value(self):
+        model = SlackModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m_total)
+        slack_node = next(n for n in b.children if n.label == "[slack]")
+        # m_total=100 kg, m_wing=60 kg → slack = 40 kg
+        assert slack_node.value == pytest.approx(40.0, rel=1e-4)
 
 
 # ---------------------------------------------------------------------------
@@ -222,6 +264,8 @@ class TestBudgetSlack:
 
 
 class TestSolutionBudgetMethod:
+    """Tests for the Solution.budget() convenience method."""
+
     def test_method_returns_budget(self):
         model = Aircraft()
         sol, _ = solve(model)
@@ -242,6 +286,8 @@ class TestSolutionBudgetMethod:
 
 
 class TestBudgetRendering:
+    """Tests for Budget.text(), .markdown(), .to_dict(), and __repr__."""
+
     def test_text_contains_units(self):
         model = Aircraft()
         sol, _ = solve(model)
@@ -284,6 +330,8 @@ class TestBudgetRendering:
 
 
 class TestBudgetErrors:
+    """Tests for error handling in build_budget()."""
+
     def test_type_error_on_string(self):
         model = Aircraft()
         sol, _ = solve(model)

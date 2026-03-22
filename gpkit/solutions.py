@@ -8,6 +8,7 @@ from typing import List, Sequence
 
 from . import printing
 from .breakdowns import bdtable_gen
+from .budgets import build_budget
 from .varkey import VarKey
 from .varmap import VarMap
 
@@ -192,8 +193,6 @@ class Solution:
         Budget
             Call ``.text()`` or ``print(sol.budget(...))`` to display.
         """
-        from .budgets import build_budget
-
         model_ref = self.meta.get("model")
         model = model_ref() if callable(model_ref) else model_ref
         if model is None:

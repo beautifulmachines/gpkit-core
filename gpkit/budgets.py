@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from typing import Optional
 
 from .constraints.set import flatiter
+from .units import DimensionalityError
 from .varkey import VarKey
 
 # ---------------------------------------------------------------------------
@@ -222,11 +223,12 @@ def _vk_display(vk, lineage=False):
     """Return a display string for a VarKey.
 
     With ``lineage=True`` returns the full model-qualified path (e.g.
-    ``"Aircraft.Wing.m"``).  With ``lineage=False`` returns the same — we
-    always include the path to disambiguate variables with the same name in
-    different submodels.
+    ``"Aircraft.Wing.m"``).  With ``lineage=False`` returns just the
+    variable's own name without the lineage prefix.
     """
-    return vk.str_without(["units"])
+    if lineage:
+        return vk.str_without(["units"])
+    return vk.str_without(["units", "lineage"])
 
 
 def _collect_text_rows(nodes, rows, depth):
@@ -265,7 +267,92 @@ def _node_to_dict(node):
 # ---------------------------------------------------------------------------
 
 
-def _build_children(top_vk, lt, constraint, solution, model, display_units, visited):
+@dataclass
+class _BudgetCtx:
+    """Shared context passed through recursive budget-building calls."""
+
+    solution: object
+    model: object
+    display_units: str
+
+
+def _eval_term_val(exp, coeff, ctx):
+    """Evaluate a monomial term in *display_units*; return nan on unit errors."""
+    try:
+        term_qty = _eval_term_qty(exp, coeff, ctx.solution)
+        return float(term_qty.to(ctx.display_units).magnitude)
+    except (DimensionalityError, KeyError, AttributeError, TypeError, ValueError):
+        return float("nan")
+
+
+def _attach_sub_budget(node, child_vk, ctx, visited, term_val):
+    "Recursively attach sub-budget children to *node* if a budget constraint exists."
+    sub_matches = find_budget_constraints(ctx.model, child_vk, ctx.solution)
+    if not sub_matches:
+        return
+    if len(sub_matches) > 1:
+        warnings.warn(
+            f"Multiple budget constraints for {child_vk}; "
+            "using highest-sensitivity one.",
+            stacklevel=5,
+        )
+    sub_c, sub_lt = sub_matches[0][0], sub_matches[0][1]
+    node.children = _build_children(child_vk, sub_lt, sub_c, ctx, visited | {child_vk})
+    sub_sum = sum(c.value for c in node.children if c.label != "[slack]")
+    if term_val:
+        node.slack = max(0.0, (term_val - sub_sum) / term_val)
+
+
+def _process_term(top_vk, exp, coeff, ctx, visited):
+    """Build a single BudgetNode for one term in a budget constraint's RHS.
+
+    Parameters
+    ----------
+    top_vk : VarKey
+        The variable being decomposed (parent level).
+    exp : HashVector
+        Exponent dict for this monomial term.
+    coeff : float
+        Coefficient of this monomial term.
+    ctx : _BudgetCtx
+    visited : frozenset[VarKey]
+
+    Returns
+    -------
+    BudgetNode
+    """
+    is_self_ref = top_vk in exp
+    free_in_term = {vk for vk in exp if vk not in ctx.solution.constants}
+    term_val = _eval_term_val(exp, coeff, ctx)
+
+    # Simple case: single free var with exponent 1, coefficient 1, not self-referential
+    is_simple = (
+        not is_self_ref
+        and len(free_in_term) == 1
+        and abs(coeff - 1.0) < 1e-10
+        and exp.get(next(iter(free_in_term))) == 1
+    )
+
+    if is_simple:
+        child_vk = next(iter(free_in_term))
+        node = BudgetNode(
+            label=_vk_display(child_vk),
+            vk=child_vk,
+            value=term_val,
+            fraction=0.0,
+            slack=0.0,
+        )
+        if child_vk not in visited:
+            _attach_sub_budget(node, child_vk, ctx, visited, term_val)
+        return node
+
+    label = _format_term_label(exp, coeff)
+    if is_self_ref:
+        label += " [margin]"
+    return BudgetNode(label=label, vk=None, value=term_val, fraction=0.0, slack=0.0)
+
+
+def _build_children(top_vk, lt, constraint, ctx, visited):
     """Recursively build BudgetNode children from the lt side of a budget constraint.
 
     Parameters
@@ -276,9 +363,8 @@ def _build_children(top_vk, lt, constraint, solution, model, display_units, visi
         The right-hand side of the budget constraint (sum of components).
     constraint : SingleEquationConstraint
         The budget constraint (used for sensitivity check).
-    solution : Solution
-    model : Model
-    display_units : str
+    ctx : _BudgetCtx
+        Shared context (solution, model, display_units).
     visited : frozenset[VarKey]
         Guards against infinite recursion.
 
@@ -286,81 +372,17 @@ def _build_children(top_vk, lt, constraint, solution, model, display_units, visi
     -------
     list[BudgetNode]
     """
-    total_val = float(solution[top_vk].to(display_units).magnitude)
-    is_tight = abs(solution.sens.constraints.get(constraint, 0.0)) > 1e-5
+    total_val = float(ctx.solution[top_vk].to(ctx.display_units).magnitude)
+    is_tight = abs(ctx.solution.sens.constraints.get(constraint, 0.0)) > 1e-5
 
-    nodes = []
-    for exp, coeff in lt.hmap.items():
-        is_self_ref = top_vk in exp
-        free_in_term = {vk for vk in exp if vk not in solution.constants}
+    nodes = [
+        _process_term(top_vk, exp, coeff, ctx, visited)
+        for exp, coeff in lt.hmap.items()
+    ]
 
-        # Simple case: single free var, exp=1, coeff=1, not self-referential
-        is_simple = (
-            not is_self_ref
-            and len(free_in_term) == 1
-            and abs(coeff - 1.0) < 1e-10
-            and exp.get(next(iter(free_in_term))) == 1
-        )
-
-        # Evaluate term value with units
-        try:
-            term_qty = _eval_term_qty(exp, coeff, solution)
-            term_val = float(term_qty.to(display_units).magnitude)
-        except Exception:
-            term_val = float("nan")
-
-        if is_simple:
-            child_vk = next(iter(free_in_term))
-            node = BudgetNode(
-                label=_vk_display(child_vk),
-                vk=child_vk,
-                value=term_val,
-                fraction=0.0,
-                slack=0.0,
-            )
-            if child_vk not in visited:
-                sub_matches = find_budget_constraints(model, child_vk, solution)
-                if sub_matches:
-                    if len(sub_matches) > 1:
-                        warnings.warn(
-                            f"Multiple budget constraints for {child_vk}; "
-                            "using highest-sensitivity one.",
-                            stacklevel=4,
-                        )
-                    sub_c, sub_lt, _ = sub_matches[0]
-                    node.children = _build_children(
-                        child_vk,
-                        sub_lt,
-                        sub_c,
-                        solution,
-                        model,
-                        display_units,
-                        visited | {child_vk},
-                    )
-                    # Slack of child's sub-constraint
-                    sub_sum = sum(
-                        c.value for c in node.children if c.label != "[slack]"
-                    )
-                    if term_val:
-                        node.slack = max(0.0, (term_val - sub_sum) / term_val)
-        else:
-            label = _format_term_label(exp, coeff)
-            if is_self_ref:
-                label += " [margin]"
-            node = BudgetNode(
-                label=label,
-                vk=None,
-                value=term_val,
-                fraction=0.0,
-                slack=0.0,
-            )
-        nodes.append(node)
-
-    # Compute fractions relative to top_vk total
     for node in nodes:
         node.fraction = node.value / total_val if total_val else 0.0
 
-    # If constraint is slack, append an explicit [slack] node
     if not is_tight:
         children_sum = sum(n.value for n in nodes)
         slack_val = total_val - children_sum
@@ -438,10 +460,9 @@ def build_budget(solution, model, var, display_units=None):
 
     constraint, lt, _ = matches[0]
     total_val = float(solution[top_vk].to(display_units).magnitude)
+    ctx = _BudgetCtx(solution=solution, model=model, display_units=display_units)
 
-    children = _build_children(
-        top_vk, lt, constraint, solution, model, display_units, visited={top_vk}
-    )
+    children = _build_children(top_vk, lt, constraint, ctx, visited={top_vk})
 
     return Budget(
         top_vk=top_vk, total=total_val, units=display_units, children=children
