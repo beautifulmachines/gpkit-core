@@ -67,6 +67,27 @@ class TestModelGraph:
         assert t.submodels[0] is t.a
         assert t.submodels[1] is t.b
 
+    def test_dict_return_children_detected(self):
+        """Children inside a dict constraint return are found by _scan_for_children."""
+
+        class _MGInner(Model):
+            def setup(self):
+                x = Variable("x")
+                self.cost = x
+                return [x >= 1]
+
+        class _MGOuter(Model):
+            inner: "_MGInner"
+
+            def setup(self):
+                W = Variable("W")
+                self.inner = _MGInner()
+                self.cost = W
+                return {"constraints": [self.inner, W >= self.inner.cost * 1.1]}
+
+        m = _MGOuter()
+        assert m.submodels == [m.inner]
+
     def test_children_of_same_class_are_distinguishable(self):
         """Two children of the same class are distinguished by attr name."""
 
