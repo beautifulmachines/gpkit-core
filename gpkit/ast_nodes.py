@@ -140,4 +140,15 @@ def to_ast(obj):
         return obj.ast
     if hasattr(obj, "key"):
         return VarNode(obj.key)
+    # Variable-free nomial (e.g. units("lbf")): treat as a numeric constant.
+    # Units are tracked in hmap.units on the enclosing nomial, not the AST.
+    # Band-aid for #159: remove when #156 replaces unit Monomials with a thin
+    # wrapper class that never ends up as a raw AST child.
+    if hasattr(obj, "hmap"):
+        try:
+            ((exp, c),) = obj.hmap.items()
+            if not exp:  # empty HashVector = no variables
+                return ConstNode(float(c))
+        except (ValueError, TypeError):
+            pass
     return obj
