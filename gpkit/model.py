@@ -107,6 +107,9 @@ class Model(CostedConstraintSet):
                 if isinstance(items, Model):
                     if items not in self._children:
                         self._children.append(items)
+                elif isinstance(items, dict):
+                    for item in items.values():
+                        _scan_for_children(item)
                 elif isinstance(items, list):
                     for item in items:
                         _scan_for_children(item)
