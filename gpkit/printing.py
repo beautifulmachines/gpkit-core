@@ -231,44 +231,132 @@ class FreeVariables(SectionSpec):
 
 class Constants(SectionSpec):
     title = "Fixed Variables"
-    align = "><<<"
-    sortkey = staticmethod(lambda x: str(x[0]))
-    source = ItemSource("constants")
+    align = "><<<<"  # name(R), value(L), unit(L), sens-in-parens(L), label(L)
+    sortkey = staticmethod(lambda x: (-rounded_mag(x[1][1]), str(x[0])))
+    nearzero_tol = 1e-7
+
+    def items_from(self, ctx):
+        """Yield (varkey, (value, sensitivity)) for each fixed variable."""
+        constants = list(ctx.items(ItemSource("constants")))
+        sens_dict = dict(ctx.items(ItemSource("sens.variables")))
+        for key, val in constants:
+            sens = sens_dict.get(key, 0.0)
+            yield (key, (val, sens))
+
+    def _fmt_one_sens(self, x, p) -> str:
+        """Format a single sensitivity element: ~0 if near-zero, else +x."""
+        if abs(x) < self.nearzero_tol:
+            return "~0"
+        return f"{x:+.{p-1}g}".replace("+nan", "nan")
+
+    def _fmt_sens(self, sens) -> str:
+        """Format scalar sensitivity as (+x) or (~0)."""
+        if abs(sens) < self.nearzero_tol:
+            return "(~0)"
+        p = self.options.precision
+        return f"({sens:+.{p}g})"
+
+    def _fmt_vector_item(self, key, val, sens, name_w) -> list[str]:
+        """Format a vector constant as two lines: values then sensitivities below.
+
+        Elements are column-aligned: each position uses the width of whichever
+        of the value or sensitivity element is wider at that position.
+        """
+        p = self.options.precision
+        n = self.options.vecn
+        flat_val = np.asarray(val).ravel()
+        flat_sens = (
+            np.asarray(sens).ravel()
+            if np.shape(sens)
+            else np.full(flat_val.shape, float(sens))
+        )
+        val_strs = [self._fmt_one(x, p) for x in flat_val[:n]]
+        sens_strs = [self._fmt_one_sens(x, p) for x in flat_sens[:n]]
+        # per-position unified width so elements align vertically
+        widths = [max(len(v), len(s)) for v, s in zip(val_strs, sens_strs)]
+        dots = " ..." if flat_val.size > n else ""
+        val_body = "  ".join(v.ljust(w) for v, w in zip(val_strs, widths))
+        sens_body = "  ".join(s.ljust(w) for s, w in zip(sens_strs, widths))
+        name = key.str_without("lineage")
+        label = key.label or ""
+        name_col = f"{name:>{name_w}} :"
+        parts = [name_col, f"[ {val_body}{dots} ]", _unitstr(key), label]
+        line1 = self.col_sep.join(p for p in parts if p).rstrip()
+        sens_col = f"{'sens':>{name_w}} :"  # mirrors name_col structure
+        line2 = f"{sens_col}{self.col_sep}( {sens_body}{dots} )"
+        return [line1, line2]
+
+    def format(self, ctx) -> list[str]:
+        """Override to render vector constants as two vertically-aligned lines."""
+        items = [item for item in self.items_from(ctx) if self._passes_filter(item)]
+        if self.group_by_model:
+            bymod = _group_items_by_model(items)
+        else:
+            bymod = {"": items}
+
+        lines = []
+        for modelname, model_items in sorted(bymod.items()):
+            if self.sortkey:
+                model_items.sort(key=self.sortkey)
+
+            scalar_items = [(k, v) for k, v in model_items if not np.shape(v[0])]
+            vector_items = [(k, v) for k, v in model_items if np.shape(v[0])]
+
+            model_lines = []
+            if scalar_items:
+                rows = [self.row_from(item) for item in scalar_items]
+                model_lines.extend(
+                    _format_aligned_columns(rows, self.align, self.col_sep)
+                )
+            if vector_items:
+                name_w = max(
+                    max(len(k.str_without("lineage")) for k, _ in vector_items),
+                    len("sens"),
+                )
+                for key, (val, sens) in vector_items:
+                    model_lines.extend(self._fmt_vector_item(key, val, sens, name_w))
+
+            if modelname and model_lines:
+                lines.append(modelname)
+            lines.extend(model_lines)
+            lines.append("")
+
+        if not lines:
+            if self.options.empty is not None:
+                lines += [str(self.options.empty), ""]
+            else:
+                return lines
+
+        title_lines = [self.title, "-" * len(self.title)]
+        assert lines[-1] == ""
+        return title_lines + lines[:-1]
 
     def row_from(self, item):
-        """Extract [name, value, unit, label] for variable tables."""
+        """Return [name, value, unit, (sensitivity), label] row for scalars."""
+        key, (val, sens) = item
+        name = key.str_without("lineage")
+        label = key.label
+        return [
+            f"{name} :",
+            self._fmt_val(val),
+            _unitstr(key),
+            self._fmt_sens(sens),
+            label or "",
+        ]
+
+
+class Sweeps(SectionSpec):
+    title = "Swept Variables"
+    align = "><<<"
+    sortkey = staticmethod(lambda x: str(x[0]))
+    source = staticmethod(lambda s: getattr(s, "meta", {}).get("sweep_point", {}))
+
+    def row_from(self, item):
+        """Extract [name, value, unit, label] for swept variable tables."""
         key, val = item
         name = key.str_without("lineage")
         label = key.label
         return [f"{name} :", self._fmt_val(val), _unitstr(key), label]
-
-
-class Sweeps(Constants):
-    title = "Swept Variables"
-    source = staticmethod(lambda s: getattr(s, "meta", {}).get("sweep_point", {}))
-
-
-class Sensitivities(SectionSpec):
-    title = "Variable Sensitivities"
-    sortkey = staticmethod(lambda x: (-rounded_mag(x[1]), str(x[0])))
-    align = "><<"
-    pm = "+"
-    source = ItemSource("sens.variables")
-    nearzero_tol = 1e-7  # values below this display as "~0"
-
-    def _fmt_one(self, x, p, suff="") -> str:
-        if abs(x) < self.nearzero_tol:
-            return "~0"
-        return super()._fmt_one(x, p, suff)
-
-    def row_from(self, item):
-        """Extract [name, value, label] (no units!)."""
-        key, val = item
-        name = key.str_without("lineage")
-        label = key.label
-        if not np.shape(val) and abs(val) < self.nearzero_tol:
-            return [f"{name} :", "~0", label]
-        return [f"{name} :", self._fmt_val(val), label]
 
 
 class Constraints(SectionSpec):
@@ -363,7 +451,6 @@ SECTION_SPECS = {
     "freevariables": FreeVariables,
     "constants": Constants,
     "sweeps": Sweeps,
-    "sensitivities": Sensitivities,
     "tightest constraints": TightConstraints,
     "slack constraints": SlackConstraints,
 }
@@ -464,7 +551,6 @@ def table(
         "warnings",
         "freevariables",
         "constants",
-        "sensitivities",
         "tightest constraints",
     ),
     **options,

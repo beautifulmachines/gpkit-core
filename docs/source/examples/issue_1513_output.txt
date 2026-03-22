@@ -43,18 +43,10 @@ a[:] : [ 1  1 ]
 Fixed Variables
 ---------------
 System.Fleet2
-x[:] : [ 4 ]
-y[:] : [ 3  1 ]
-
-Variable Sensitivities
-----------------------
-System.Fleet2
-y[:] : [ nan  +0.25 ]
-x[:] : [ ~0 ]
-z[:] : [ ~0 ]
-
-System.Fleet2.Vehicle
-a[:] : [ ~0         ~0        ]
+y[:] : [ 3    1     ]
+sens : ( nan  +0.25 )
+x[:] : [ 4  ]
+sens : ( ~0 )
 
 Most Sensitive Constraints
 --------------------------
@@ -125,18 +117,10 @@ a[:] : [ 1  1  1  1  1  1 ]
 Fixed Variables
 ---------------
 System2.Fleet2
-x[:] : [ 4  4  4 ]
-y[:] : [ 3  3  3  1  1  1 ]
-
-Variable Sensitivities
-----------------------
-System2.Fleet2
-y[:] : [ nan  nan  nan  +0.0833  +0.0833  +0.0833 ]
-x[:] : [ ~0  ~0  ~0 ]
-z[:] : [ ~0  ~0  ~0 ]
-
-System2.Fleet2.Vehicle
-a[:] : [ ~0         ~0         ~0         ~0         ~0         ~0        ]
+y[:] : [ 3    3    3    1        1        1       ]
+sens : ( nan  nan  nan  +0.0833  +0.0833  +0.0833 )
+x[:] : [ 4   4   4  ]
+sens : ( ~0  ~0  ~0 )
 
 Most Sensitive Constraints
 --------------------------
@@ -173,22 +157,18 @@ x[2] : [ 12 ]
 Fixed Variables
 ---------------
 Cake.Simple
-y[0] : [ 1 ]
-y[1] : [ 2 ]
-y[2] : [ 3 ]
-z[0] : [ 1 ]
-z[1] : [ 4 ]
-z[2] : [ 9 ]
-
-Variable Sensitivities
-----------------------
-Cake.Simple
-y[2] : [ +1.05     ]
-y[1] : [ +0.5      ]
-y[0] : [ +0.15     ]
-x[0] : [ ~0        ]
-x[1] : [ ~0        ]
-x[2] : [ ~0        ]
+y[2] : [ 3     ]
+sens : ( +1.05 )
+y[1] : [ 2    ]
+sens : ( +0.5 )
+y[0] : [ 1     ]
+sens : ( +0.15 )
+z[0] : [ 1  ]
+sens : ( ~0 )
+z[1] : [ 4  ]
+sens : ( ~0 )
+z[2] : [ 9  ]
+sens : ( ~0 )
 
 Most Sensitive Constraints
 --------------------------

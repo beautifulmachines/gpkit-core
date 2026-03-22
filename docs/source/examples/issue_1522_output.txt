@@ -56,16 +56,10 @@ y[:] : [ 3  3  3  3  3 ]
 Fixed Variables
 ---------------
 Yum1.Cake.Pie
-x[:] : [ 2  2  2  2  2  3 ... ]
-z[:] : [ 1  1  1  1  1  1 ... ]
-
-Variable Sensitivities
-----------------------
-Yum1.Cake
-y[:] : [ ~0         ~0         ~0         ~0         ~0        ]
-
-Yum1.Cake.Pie
-x[:] : [ +7.12e-07  +7.12e-07  +7.12e-07  +7.12e-07  +7.12e-07  +0.2      ... ]
+x[:] : [ 2          2          2          2          2          3    ... ]
+sens : ( +7.12e-07  +7.12e-07  +7.12e-07  +7.12e-07  +7.12e-07  +0.2 ... )
+z[:] : [ 1   1   1   1   1   1  ... ]
+sens : ( ~0  ~0  ~0  ~0  ~0  ~0 ... )
 
 Most Sensitive Constraints
 --------------------------
@@ -105,16 +99,10 @@ y[:] : [ 3 ]
 Fixed Variables
 ---------------
 Yum2.Cake.Pie
-x[:] : [ 2  3 ]
-z[:] : [ 1  1 ]
-
-Variable Sensitivities
-----------------------
-Yum2.Cake
-y[:] : [ ~0        ]
-
-Yum2.Cake.Pie
-x[:] : [ ~0         +1        ]
+x[:] : [ 2   3  ]
+sens : ( ~0  +1 )
+z[:] : [ 1   1  ]
+sens : ( ~0  ~0 )
 
 Most Sensitive Constraints
 --------------------------
