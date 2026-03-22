@@ -2,7 +2,7 @@
 
 import pytest
 
-from gpkit import Model, Variable
+from gpkit import Model, Variable, units
 from gpkit.budgets import Budget, build_budget, find_budget_constraints
 
 # ---------------------------------------------------------------------------
@@ -345,3 +345,55 @@ class TestBudgetErrors:
         b = build_budget(sol, model, model.wing.spar.m)
         named_children = [n for n in b.children if n.vk is not None]
         assert len(named_children) == 0
+
+
+# ---------------------------------------------------------------------------
+# Tests: mixed units (issue #161)
+# ---------------------------------------------------------------------------
+
+
+class Cylinder(Model):
+    """Cylinder model with variables spanning different unit dimensions."""
+
+    def setup(self):
+        self.m = Variable("m", "kg", "mass")
+        V = Variable("V", "m^3", "volume")
+        rho = Variable("rho", 7800, "kg/m^3", "density")
+        L = Variable("L", 1, "m", "length")
+        A = Variable("A", "m^2", "cross-sectional area")
+        self.cost = self.m
+        return [
+            self.m >= rho * V,
+            V >= L * A,
+            A >= 0.01 * units("m^2"),
+        ]
+
+
+class TestBuildBudgetMixedUnits:
+    """Tests for budget() when sub-variables have different units than top variable."""
+
+    def test_no_crash(self):
+        # Should not raise pint.DimensionalityError (issue #161)
+        model = Cylinder()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        assert isinstance(b, Budget)
+
+    def test_total_correct(self):
+        model = Cylinder()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        # rho=7800 kg/m^3, L=1 m, A=0.01 m^2 → m = 78 kg
+        assert abs(b.total - 78.0) < 1e-4
+
+    def test_children_have_finite_values(self):
+        model = Cylinder()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        assert all(c.value == c.value for c in b.children)  # no NaN
+
+    def test_solution_budget_method(self):
+        model = Cylinder()
+        sol = model.solve(verbosity=0)
+        b = sol.budget(model.m)
+        assert isinstance(b, Budget)
