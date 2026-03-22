@@ -276,9 +276,7 @@ class TestVariable:
     def test_isinstance_public_variable(self):
         """Variable() should be isinstance of the public Variable (issue #114)"""
         v = Variable("v")
-        assert isinstance(
-            v, Variable
-        )  # Variable here is gpkit.Variable = VectorizableVariable
+        assert isinstance(v, Variable)
 
     def test_value(self):
         """Detailed tests for value kwarg of __init__"""
