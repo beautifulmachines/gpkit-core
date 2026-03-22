@@ -256,77 +256,72 @@ class Constants(SectionSpec):
         p = self.options.precision
         return f"({sens:+.{p}g})"
 
-    def _fmt_vector_item(self, key, val, sens, name_w) -> list[str]:
-        """Format a vector constant as two lines: values then sensitivities below.
+    def _fmt_vec_pair(self, flat_val, flat_sens, n, p):
+        """Build aligned value/sensitivity vector strings.
 
-        Elements are column-aligned: each position uses the width of whichever
-        of the value or sensitivity element is wider at that position.
+        Each element position uses the wider of its value or sensitivity string,
+        so value and sensitivity rows align vertically column by column.
+        Returns (val_vec, sens_vec) bracket/paren strings.
         """
-        p = self.options.precision
-        n = self.options.vecn
+        val_strs = [self._fmt_one(x, p) for x in flat_val[:n]]
+        sens_strs = [self._fmt_one_sens(x, p) for x in flat_sens[:n]]
+        widths = [max(len(v), len(s)) for v, s in zip(val_strs, sens_strs)]
+        dots = " ..." if flat_val.size > n else ""
+        val_body = "  ".join(v.ljust(w) for v, w in zip(val_strs, widths))
+        sens_body = "  ".join(s.ljust(w) for s, w in zip(sens_strs, widths))
+        return f"[ {val_body}{dots} ]", f"( {sens_body}{dots} )"
+
+    def _fmt_vector_item(self, key, val, sens, name_w) -> list[str]:
+        """Format a vector constant as two lines: values then sensitivities below."""
+        p, n = self.options.precision, self.options.vecn
         flat_val = np.asarray(val).ravel()
         flat_sens = (
             np.asarray(sens).ravel()
             if np.shape(sens)
             else np.full(flat_val.shape, float(sens))
         )
-        val_strs = [self._fmt_one(x, p) for x in flat_val[:n]]
-        sens_strs = [self._fmt_one_sens(x, p) for x in flat_sens[:n]]
-        # per-position unified width so elements align vertically
-        widths = [max(len(v), len(s)) for v, s in zip(val_strs, sens_strs)]
-        dots = " ..." if flat_val.size > n else ""
-        val_body = "  ".join(v.ljust(w) for v, w in zip(val_strs, widths))
-        sens_body = "  ".join(s.ljust(w) for s, w in zip(sens_strs, widths))
-        name = key.str_without("lineage")
-        label = key.label or ""
-        name_col = f"{name:>{name_w}} :"
-        parts = [name_col, f"[ {val_body}{dots} ]", _unitstr(key), label]
-        line1 = self.col_sep.join(p for p in parts if p).rstrip()
-        sens_col = f"{'sens':>{name_w}} :"  # mirrors name_col structure
-        line2 = f"{sens_col}{self.col_sep}( {sens_body}{dots} )"
-        return [line1, line2]
+        val_vec, sens_vec = self._fmt_vec_pair(flat_val, flat_sens, n, p)
+        name_col = f"{key.str_without('lineage'):>{name_w}} :"
+        parts = [name_col, val_vec, _unitstr(key), key.label or ""]
+        line1 = self.col_sep.join(x for x in parts if x).rstrip()
+        sens_col = f"{'sens':>{name_w}} :"
+        return [line1, f"{sens_col}{self.col_sep}{sens_vec}"]
+
+    def _format_model_group(self, model_items) -> list[str]:
+        """Render one model group: scalars column-aligned, vectors as two lines."""
+        scalar_items = [(k, v) for k, v in model_items if not np.shape(v[0])]
+        vector_items = [(k, v) for k, v in model_items if np.shape(v[0])]
+        lines = []
+        if scalar_items:
+            rows = [self.row_from(item) for item in scalar_items]
+            lines.extend(_format_aligned_columns(rows, self.align, self.col_sep))
+        if vector_items:
+            name_w = max(
+                max(len(k.str_without("lineage")) for k, _ in vector_items),
+                len("sens"),
+            )
+            for key, (val, sens) in vector_items:
+                lines.extend(self._fmt_vector_item(key, val, sens, name_w))
+        return lines
 
     def format(self, ctx) -> list[str]:
         """Override to render vector constants as two vertically-aligned lines."""
         items = [item for item in self.items_from(ctx) if self._passes_filter(item)]
-        if self.group_by_model:
-            bymod = _group_items_by_model(items)
-        else:
-            bymod = {"": items}
-
+        bymod = _group_items_by_model(items) if self.group_by_model else {"": items}
         lines = []
         for modelname, model_items in sorted(bymod.items()):
             if self.sortkey:
                 model_items.sort(key=self.sortkey)
-
-            scalar_items = [(k, v) for k, v in model_items if not np.shape(v[0])]
-            vector_items = [(k, v) for k, v in model_items if np.shape(v[0])]
-
-            model_lines = []
-            if scalar_items:
-                rows = [self.row_from(item) for item in scalar_items]
-                model_lines.extend(
-                    _format_aligned_columns(rows, self.align, self.col_sep)
-                )
-            if vector_items:
-                name_w = max(
-                    max(len(k.str_without("lineage")) for k, _ in vector_items),
-                    len("sens"),
-                )
-                for key, (val, sens) in vector_items:
-                    model_lines.extend(self._fmt_vector_item(key, val, sens, name_w))
-
+            model_lines = self._format_model_group(model_items)
             if modelname and model_lines:
                 lines.append(modelname)
             lines.extend(model_lines)
             lines.append("")
-
         if not lines:
             if self.options.empty is not None:
                 lines += [str(self.options.empty), ""]
             else:
                 return lines
-
         title_lines = [self.title, "-" * len(self.title)]
         assert lines[-1] == ""
         return title_lines + lines[:-1]
