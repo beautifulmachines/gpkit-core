@@ -350,7 +350,9 @@ def _process_term(top_vk, exp, coeff, ctx, visited, level_units):
         # expression so the budget is readable in physical terms.
         has_constants = any(vk in ctx.solution.constants for vk in exp)
         label = (
-            _format_term_label(exp, coeff) if has_constants else _vk_display(child_vk)
+            _format_term_label(exp, coeff)
+            if has_constants
+            else _vk_display(child_vk, lineage=True)
         )
         node = BudgetNode(
             label=label,

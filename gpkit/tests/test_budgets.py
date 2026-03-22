@@ -201,6 +201,16 @@ class TestBuildBudgetBasic:
         assert b.units == "g"
         assert b.total > 1000  # 15 kg → 15000 g
 
+    def test_child_labels_include_model_context(self):
+        # Child labels must include lineage so "m" → "Aircraft.Wing.m", not just "m"
+        model = Aircraft()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        wing_node = b.children[0]
+        assert "Wing" in wing_node.label
+        spar_node = next(n for n in wing_node.children if abs(n.value - 10) < 1e-3)
+        assert "Spar" in spar_node.label
+
 
 # ---------------------------------------------------------------------------
 # Tests: build_budget — margin / self-referential term
