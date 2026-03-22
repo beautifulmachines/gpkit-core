@@ -278,6 +278,21 @@ class TestVariable:
         v = Variable("v")
         assert isinstance(v, Variable)
 
+    def test_variable_reconstruction_not_vectorized(self):
+        """Variable(varkey) inside Vectorize must reconstruct, not create new fbox var.
+
+        Variable(vk) is the reconstruction idiom — "wrap this existing key".
+        The VarKey already encodes shape and lineage, so re-vectorizing is wrong.
+        Regression test for issue #156 (broken by #153 / commit 76625c4).
+        """
+        v = Variable("v")
+        with Vectorize(3):
+            reconstructed = Variable(v.key)
+        assert reconstructed.key is v.key, (
+            "Variable(varkey) inside Vectorize created a new variable "
+            f"(name={reconstructed.key.name!r}) instead of reconstructing the original"
+        )
+
     def test_value(self):
         """Detailed tests for value kwarg of __init__"""
         a = Variable("a")
