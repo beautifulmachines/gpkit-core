@@ -41,7 +41,7 @@ class Variable(Monomial):
     where $name is the vector's name and i is the VarKey's index.
     """
 
-    def __new__(cls, *args, **descr):
+    def __new__(cls, *args, **descr) -> "NomialArray | Variable":
         if Vectorize.vectorization and "idx" not in descr:
             shape = descr.pop("shape", ())
             return ArrayVariable.__new__(ArrayVariable, shape, *args, **descr)
@@ -74,6 +74,12 @@ class Variable(Monomial):
         self.__class__ = original_class
 
     __hash__ = NomialData.__hash__
+
+    def __getitem__(self, idx):
+        raise TypeError(
+            f"{self!r} is a scalar Variable and cannot be indexed. "
+            "Use Variable() inside a Vectorize context to create an array variable."
+        )
 
     def to(self, units):
         "Create new Signomial converted to new units"

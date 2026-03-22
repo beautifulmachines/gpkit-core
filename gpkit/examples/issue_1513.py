@@ -32,7 +32,7 @@ class Fleet2(Model):
         x = Variable("x")
 
         def myfun(c):
-            return [np.array(c[x]) - 1, np.ones(x.shape)]
+            return [np.array(c[x]) - 1, np.ones(())]
 
         with Vectorize(2):
             y = Variable("y", myfun)
