@@ -25,7 +25,7 @@ from gpkit.nomials.math import (
     nomial_from_ir,
 )
 from gpkit.tests.test_catalog import catalog_ids, load_catalog
-from gpkit.units import qty
+from gpkit.units import qty, units
 from gpkit.util.small_classes import EMPTY_HV, HashVector
 
 _CORE_CATALOG = load_catalog(__file__)
@@ -259,8 +259,6 @@ class TestASTNodes:
     def test_to_ast_unit_monomial_becomes_const(self):
         """units("lbf") is variable-free;
         to_ast should return ConstNode, not raw Monomial."""
-        from gpkit.units import units
-
         unit_mono = units("lbf")
         node = to_ast(unit_mono)
         assert isinstance(node, ConstNode)
@@ -868,8 +866,6 @@ class TestModelIR:
 
     def test_units_pow_fractional_to_ir(self):
         "Regression for #159: units(...)**<float> must not raise IRSerializationError."
-        from gpkit.units import units
-
         W = Variable("W", "lbf")
         W_eng = Variable("W_eng", "lbf")
         mfac = Variable("mfac", "-")
