@@ -15,6 +15,7 @@ from ..exceptions import (
 )
 from ..globals import NamedVariables
 from ..nomials import Posynomial, PosynomialInequality, Variable
+from ..solutions import _WeakModelRef
 from ..util.small_scripts import appendsolwarning, initsolwarning
 from ..varmap import VarMap
 from .gp import GeometricProgram
@@ -242,6 +243,7 @@ solutions and can be solved with 'Model.solve()'.""")
                 if verbosity > -1:
                     print(expl)
             self.result.meta["cost function"] = self.cost
+            self.result.meta["model"] = _WeakModelRef(self.model)
             del self.result.primal[self.slack.key]
             assert hasattr(self.result, "sens")  # not true for MIGP
             del self.result.sens.variables[self.slack.key]
