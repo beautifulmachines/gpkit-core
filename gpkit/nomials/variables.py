@@ -42,6 +42,8 @@ class Variable(Monomial):
     """
 
     def __new__(cls, *args, **descr) -> "NomialArray | Variable":
+        if args and isinstance(args[0], VarKey):
+            return object.__new__(cls)
         if Vectorize.vectorization and "idx" not in descr:
             shape = descr.pop("shape", ())
             return ArrayVariable.__new__(ArrayVariable, shape, *args, **descr)
