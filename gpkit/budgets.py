@@ -348,9 +348,55 @@ class _BudgetCtx:
     solution: object
     model: object
     display_units: str
+    level_units: str = ""
+    visited: frozenset = field(default_factory=frozenset)
 
 
-def _attach_sub_budget(node, child_vk, ctx, visited, term_val):
+@dataclass
+class _TermData:
+    """Per-monomial data assembled before building a BudgetNode."""
+
+    exp: object
+    phys_coeff: float
+    term_val: float
+    ast_label: Optional[str]
+
+
+def _make_term(mon, hmap_units, ast_labels, ctx):
+    """Build _TermData for one monomial term."""
+    (exp,) = mon.hmap.keys()
+    coeff = mon.hmap[exp]
+    ast_label = ast_labels.get(frozenset(exp.keys()))
+    phys_coeff = (
+        coeff if ast_label is not None else _physical_coeff(exp, coeff, hmap_units)
+    )
+    try:
+        term_val = float(ctx.solution[mon].to(ctx.level_units).magnitude)
+    except (DimensionalityError, KeyError, AttributeError, TypeError, ValueError):
+        term_val = float("nan")
+    return _TermData(
+        exp=exp, phys_coeff=phys_coeff, term_val=term_val, ast_label=ast_label
+    )
+
+
+def _slack_node(nodes, total_val, is_tight):
+    """Return a slack BudgetNode if the constraint is not tight, else None."""
+    if is_tight:
+        return None
+    children_sum = sum(n.value for n in nodes)
+    slack_val = total_val - children_sum
+    if not total_val or abs(slack_val / total_val) <= 1e-4:
+        return None
+    return BudgetNode(
+        label="[slack]",
+        vk=None,
+        value=slack_val,
+        fraction=slack_val / total_val,
+        slack=0.0,
+    )
+
+
+def _attach_sub_budget(node, child_vk, ctx):
     "Recursively attach sub-budget children to *node* if a budget constraint exists."
     sub_matches = find_budget_constraints(ctx.model, child_vk, ctx.solution)
     if not sub_matches:
@@ -363,9 +409,14 @@ def _attach_sub_budget(node, child_vk, ctx, visited, term_val):
         )
     sub_c, sub_lt = sub_matches[0][0], sub_matches[0][1]
     child_units = child_vk.unitrepr or "dimensionless"
-    node.children = _build_children(
-        child_vk, sub_lt, sub_c, ctx, visited | {child_vk}, level_units=child_units
+    sub_ctx = _BudgetCtx(
+        solution=ctx.solution,
+        model=ctx.model,
+        display_units=ctx.display_units,
+        level_units=child_units,
+        visited=ctx.visited | {child_vk},
     )
+    node.children = _build_children(child_vk, sub_lt, sub_c, sub_ctx)
     sub_sum = sum(c.value for c in node.children if c.label != "[slack]")
     try:
         child_val = float(ctx.solution[child_vk].to(child_units).magnitude)
@@ -375,150 +426,66 @@ def _attach_sub_budget(node, child_vk, ctx, visited, term_val):
         node.slack = max(0.0, (child_val - sub_sum) / child_val)
 
 
-def _process_term(
-    top_vk, exp, phys_coeff, term_val, ast_label, ctx, visited, level_units
-):
-    """Build a single BudgetNode for one term in a budget constraint's RHS.
-
-    Parameters
-    ----------
-    top_vk : VarKey
-        The variable being decomposed (parent level).
-    exp : HashVector
-        Exponent dict for this monomial term.
-    phys_coeff : float
-        Physical coefficient with unit-conversion factors stripped.  Used only
-        when *ast_label* is ``None`` (AST unavailable).
-    term_val : float
-        Pre-evaluated numerical value in *level_units*.
-    ast_label : str or None
-        Label derived from lt.ast (the symbolic pre-unit-conversion form).
-        When present this is used directly; when absent we fall back to
-        constructing a label from *phys_coeff*.
-    ctx : _BudgetCtx
-    visited : frozenset[VarKey]
-    level_units : str
-
-    Returns
-    -------
-    BudgetNode
-    """
-    is_self_ref = top_vk in exp
-    free_in_term = {vk for vk in exp if vk not in ctx.solution.constants}
-
+def _process_term(top_vk, term, ctx):
+    """Build a single BudgetNode for one term in a budget constraint's RHS."""
+    is_self_ref = top_vk in term.exp
+    free_in_term = {vk for vk in term.exp if vk not in ctx.solution.constants}
     parent_prefix = top_vk.lineagestr() if top_vk.lineage else None
-
     is_simple = (
         not is_self_ref
         and len(free_in_term) == 1
-        and exp.get(next(iter(free_in_term))) == 1
+        and term.exp.get(next(iter(free_in_term))) == 1
     )
-
     if is_simple:
         child_vk = next(iter(free_in_term))
-        if ast_label is not None:
-            label = ast_label
+        if term.ast_label is not None:
+            label = term.ast_label
         else:
-            # Fallback when no AST: use physical coefficient for label decisions.
-            has_constants = any(vk in ctx.solution.constants for vk in exp)
-            if has_constants or abs(phys_coeff - 1.0) > 1e-10:
-                label = _format_term_label(exp, phys_coeff, strip_prefix=parent_prefix)
+            has_constants = any(vk in ctx.solution.constants for vk in term.exp)
+            if has_constants or abs(term.phys_coeff - 1.0) > 1e-10:
+                label = _format_term_label(
+                    term.exp, term.phys_coeff, strip_prefix=parent_prefix
+                )
             else:
                 label = _vk_display(child_vk, lineage=True, strip_prefix=parent_prefix)
         node = BudgetNode(
-            label=label,
-            vk=child_vk,
-            value=term_val,
-            fraction=0.0,
-            slack=0.0,
+            label=label, vk=child_vk, value=term.term_val, fraction=0.0, slack=0.0
         )
         if (
-            child_vk not in visited
+            child_vk not in ctx.visited
             and child_vk.units is not None
-            and child_vk.units.is_compatible_with(level_units)
+            and child_vk.units.is_compatible_with(ctx.level_units)
         ):
-            _attach_sub_budget(node, child_vk, ctx, visited, term_val)
+            _attach_sub_budget(node, child_vk, ctx)
         return node
-
     label = (
-        ast_label
-        if ast_label is not None
-        else _format_term_label(exp, phys_coeff, strip_prefix=parent_prefix)
+        term.ast_label
+        if term.ast_label is not None
+        else _format_term_label(term.exp, term.phys_coeff, strip_prefix=parent_prefix)
     )
     if is_self_ref:
         label += " [margin]"
-    return BudgetNode(label=label, vk=None, value=term_val, fraction=0.0, slack=0.0)
+    return BudgetNode(
+        label=label, vk=None, value=term.term_val, fraction=0.0, slack=0.0
+    )
 
 
-def _build_children(top_vk, lt, constraint, ctx, visited, level_units=None):
-    """Recursively build BudgetNode children from the lt side of a budget constraint.
-
-    Parameters
-    ----------
-    top_vk : VarKey
-        The variable being decomposed at this level.
-    lt : Posynomial
-        The right-hand side of the budget constraint (sum of components).
-    constraint : SingleEquationConstraint
-        The budget constraint (used for sensitivity check).
-    ctx : _BudgetCtx
-        Shared context (solution, model, display_units).
-    visited : frozenset[VarKey]
-        Guards against infinite recursion.
-    level_units : str, optional
-        Units for values at this recursion level.  Defaults to ctx.display_units
-        (top-level call) but sub-levels pass the child variable's own units so
-        that cross-dimensional recursion (e.g. mass → volume → area) works.
-
-    Returns
-    -------
-    list[BudgetNode]
-    """
-    if level_units is None:
-        level_units = ctx.display_units
-    total_val = float(ctx.solution[top_vk].to(level_units).magnitude)
+def _build_children(top_vk, lt, constraint, ctx):
+    """Recursively build BudgetNode children from the lt side of a budget constraint."""
+    total_val = float(ctx.solution[top_vk].to(ctx.level_units).magnitude)
     is_tight = abs(ctx.solution.sens.constraints.get(constraint, 0.0)) > 1e-5
-
     parent_prefix = top_vk.lineagestr() if top_vk.lineage else None
     ast_labels = _ast_label_map(lt, strip_prefix=parent_prefix)
     hmap_units = lt.hmap.units
-
     nodes = []
     for mon in lt.chop():
-        (exp,) = mon.hmap.keys()
-        coeff = mon.hmap[exp]
-        ast_label = ast_labels.get(frozenset(exp.keys()))
-        phys_coeff = (
-            coeff if ast_label is not None else _physical_coeff(exp, coeff, hmap_units)
-        )
-        try:
-            term_qty = ctx.solution[mon]
-            term_val = float(term_qty.to(level_units).magnitude)
-        except (DimensionalityError, KeyError, AttributeError, TypeError, ValueError):
-            term_val = float("nan")
-        nodes.append(
-            _process_term(
-                top_vk, exp, phys_coeff, term_val, ast_label, ctx, visited, level_units
-            )
-        )
-
+        term = _make_term(mon, hmap_units, ast_labels, ctx)
+        nodes.append(_process_term(top_vk, term, ctx))
     for node in nodes:
         node.fraction = node.value / total_val if total_val else 0.0
-
-    if not is_tight:
-        children_sum = sum(n.value for n in nodes)
-        slack_val = total_val - children_sum
-        if total_val and abs(slack_val / total_val) > 1e-4:
-            nodes.append(
-                BudgetNode(
-                    label="[slack]",
-                    vk=None,
-                    value=slack_val,
-                    fraction=slack_val / total_val,
-                    slack=0.0,
-                )
-            )
-
+    slack = _slack_node(nodes, total_val, is_tight)
+    if slack:
+        nodes.append(slack)
     return nodes
 
 
@@ -582,9 +549,14 @@ def build_budget(solution, model, var, display_units=None):
 
     constraint, lt, _ = matches[0]
     total_val = float(solution[top_vk].to(display_units).magnitude)
-    ctx = _BudgetCtx(solution=solution, model=model, display_units=display_units)
-
-    children = _build_children(top_vk, lt, constraint, ctx, visited={top_vk})
+    ctx = _BudgetCtx(
+        solution=solution,
+        model=model,
+        display_units=display_units,
+        level_units=display_units,
+        visited=frozenset({top_vk}),
+    )
+    children = _build_children(top_vk, lt, constraint, ctx)
 
     return Budget(
         top_vk=top_vk, total=total_val, units=display_units, children=children

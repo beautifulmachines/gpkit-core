@@ -1,5 +1,7 @@
 """Tests for gpkit.budgets — variable budget computation and display."""
 
+# pylint: disable=attribute-defined-outside-init
+
 import pytest
 
 from gpkit import Model, Variable, units
@@ -426,17 +428,17 @@ class TestBudgetUnitMismatchCoeff:
 class Cylinder(Model):
     """Cylinder model with variables spanning different unit dimensions."""
 
-    def setup(self):
+    def setup(self):  # pylint: disable=attribute-defined-outside-init
         self.m = Variable("m", "kg", "mass")
-        V = Variable("V", "m^3", "volume")
+        vol = Variable("V", "m^3", "volume")
         rho = Variable("rho", 7800, "kg/m^3", "density")
-        L = Variable("L", 1, "m", "length")
-        A = Variable("A", "m^2", "cross-sectional area")
+        length = Variable("L", 1, "m", "length")
+        area = Variable("A", "m^2", "cross-sectional area")
         self.cost = self.m
         return [
-            self.m >= rho * V,
-            V >= L * A,
-            A >= 0.01 * units("m^2"),
+            self.m >= rho * vol,
+            vol >= length * area,
+            area >= 0.01 * units("m^2"),
         ]
 
 
@@ -493,7 +495,7 @@ class TestBuildBudgetMixedUnits:
 class MixedUnitCoeffModel(Model):
     """Constraint has terms in different units; hmap carries conversion factor."""
 
-    def setup(self):
+    def setup(self):  # pylint: disable=attribute-defined-outside-init
         self.m = Variable("m", "kg", "total mass")
         m_a = Variable("m_a", 1, "lbs", "component A (1 lb ≈ 0.4536 kg)")
         m_b = Variable("m_b", 1, "kg", "component B (1 kg)")
@@ -542,7 +544,7 @@ class TestMixedUnitCoeff:
 class PhysCoeffModel(Model):
     """Budget where one term has a genuine physical scale factor (0.25)."""
 
-    def setup(self):
+    def setup(self):  # pylint: disable=attribute-defined-outside-init
         self.m = Variable("m", "kg", "total mass")
         m_a = Variable("m_a", 4, "kg", "component A")
         m_b = Variable("m_b", 1, "kg", "component B")
