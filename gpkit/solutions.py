@@ -178,7 +178,7 @@ class Solution:
             lines += self.cost_breakdown() + self.model_sens_breakdown() + [""]
         return "\n".join(lines) + printing.table(self, **kwargs)
 
-    def budget(self, var, display_units=None):
+    def budget(self, var, display_units=None, depth=float("inf")):
         """Build and return a Budget breakdown for a variable.
 
         Parameters
@@ -187,6 +187,10 @@ class Solution:
             The top-level budget variable (e.g. ``aircraft.m_total``).
         display_units : str, optional
             Units for all displayed values.  Defaults to the variable's units.
+        depth : int or float, optional
+            Maximum expansion depth. ``depth=0`` returns only the top variable
+            with no children. ``depth=1`` expands one level of submodels.
+            Defaults to ``float('inf')`` (fully recursive).
 
         Returns
         -------
@@ -200,7 +204,7 @@ class Solution:
                 "No model in solution.meta. Ensure the solution was produced "
                 "by a current gpkit solve (meta['model'] is set at solve time)."
             )
-        return build_budget(self, model, var, display_units)
+        return build_budget(self, model, var, display_units, depth=depth)
 
     def cost_breakdown(self) -> str:
         "printable visualization of cost breakdown"

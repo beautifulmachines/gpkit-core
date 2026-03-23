@@ -2,6 +2,8 @@
 
 # pylint: disable=attribute-defined-outside-init
 
+import math
+
 import pytest
 
 from gpkit import Model, Variable, units
@@ -653,3 +655,52 @@ class TestBudgetNodeUnits:
         b = build_budget(sol, model, model.m_total)
         slack_node = next(n for n in b.children if n.label == "[slack]")
         assert slack_node.units == "kg"
+
+
+# ---------------------------------------------------------------------------
+# Tests: depth parameter
+# ---------------------------------------------------------------------------
+
+
+class TestBudgetDepth:
+    """Tests for build_budget() depth parameter."""
+
+    def test_depth_zero_no_children(self):
+        model = Aircraft()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m, depth=0)
+        assert not b.children
+
+    def test_depth_one_no_grandchildren(self):
+        model = Aircraft()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m, depth=1)
+        assert len(b.children) == 1
+        wing_node = b.children[0]
+        assert not wing_node.children
+
+    def test_depth_two_has_grandchildren(self):
+        model = Aircraft()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m, depth=2)
+        assert len(b.children) == 1
+        wing_node = b.children[0]
+        assert len(wing_node.children) == 2
+        for grandchild in wing_node.children:
+            assert not grandchild.children
+
+    def test_depth_inf_same_as_default(self):
+        model = Aircraft()
+        sol, _ = solve(model)
+        b_default = build_budget(sol, model, model.m)
+        b_inf = build_budget(sol, model, model.m, depth=math.inf)
+        assert len(b_default.children) == len(b_inf.children)
+        assert len(b_default.children[0].children) == len(b_inf.children[0].children)
+
+    def test_solution_budget_depth_kwarg(self):
+        """Solution.budget() accepts and respects depth=."""
+        model = Aircraft()
+        sol, _ = solve(model)
+        b = sol.budget(model.m, depth=1)
+        assert len(b.children) == 1
+        assert not b.children[0].children

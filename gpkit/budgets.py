@@ -422,7 +422,7 @@ def _slack_node(level_vals, total_val, is_tight, level_units):
     )
 
 
-def _attach_sub_budget(node, child_vk, ctx):
+def _attach_sub_budget(node, child_vk, ctx, remaining_depth=float("inf")):
     "Recursively attach sub-budget children to *node* if a budget constraint exists."
     sub_matches = find_budget_constraints(ctx.model, child_vk, ctx.solution)
     if not sub_matches:
@@ -442,12 +442,14 @@ def _attach_sub_budget(node, child_vk, ctx):
         level_units=child_units,
         visited=ctx.visited | {child_vk},
     )
-    node.children = _build_children(child_vk, sub_lt, sub_c, sub_ctx)
+    node.children = _build_children(
+        child_vk, sub_lt, sub_c, sub_ctx, remaining_depth=remaining_depth
+    )
     non_slack_frac = sum(c.fraction for c in node.children if c.label != "[slack]")
     node.slack = max(0.0, 1.0 - non_slack_frac)
 
 
-def _process_term(top_vk, term, ctx):
+def _process_term(top_vk, term, ctx, remaining_depth=float("inf")):
     """Build a single BudgetNode for one term in a budget constraint's RHS."""
     is_self_ref = top_vk in term.exp
     free_in_term = {vk for vk in term.exp if vk not in ctx.solution.constants}
@@ -492,8 +494,9 @@ def _process_term(top_vk, term, ctx):
             child_vk not in ctx.visited
             and child_vk.units is not None
             and child_vk.units.is_compatible_with(ctx.level_units)
+            and remaining_depth > 0
         ):
-            _attach_sub_budget(node, child_vk, ctx)
+            _attach_sub_budget(node, child_vk, ctx, remaining_depth=remaining_depth - 1)
         return node
     label = (
         term.ast_label
@@ -512,7 +515,7 @@ def _process_term(top_vk, term, ctx):
     )
 
 
-def _build_children(top_vk, lt, constraint, ctx):
+def _build_children(top_vk, lt, constraint, ctx, remaining_depth=float("inf")):
     """Recursively build BudgetNode children from the lt side of a budget constraint."""
     total_val = float(ctx.solution[top_vk].to(ctx.level_units).magnitude)
     is_tight = abs(ctx.solution.sens.constraints.get(constraint, 0.0)) > 1e-5
@@ -523,7 +526,7 @@ def _build_children(top_vk, lt, constraint, ctx):
     level_vals = []  # values in level_units for fraction computation
     for mon in lt.chop():
         term = _make_term(mon, lt.hmap.units, ast_labels, ctx)
-        nodes.append(_process_term(top_vk, term, ctx))
+        nodes.append(_process_term(top_vk, term, ctx, remaining_depth=remaining_depth))
         level_vals.append(term.term_val)
     for node, lv in zip(nodes, level_vals):
         node.fraction = lv / total_val if total_val else 0.0
@@ -545,7 +548,7 @@ def _resolve_vk(var):
     )
 
 
-def build_budget(solution, model, var, display_units=None):
+def build_budget(solution, model, var, display_units=None, depth=float("inf")):
     """Build a :class:`Budget` for a variable by scanning the model's constraints.
 
     Parameters
@@ -558,6 +561,10 @@ def build_budget(solution, model, var, display_units=None):
         The top-level budget variable (e.g. ``model.m_total``).
     display_units : str, optional
         Units for all displayed values.  Defaults to the variable's own units.
+    depth : int or float, optional
+        Maximum expansion depth. ``depth=0`` returns only the top variable with
+        no children. ``depth=1`` expands one level. Defaults to ``float('inf')``
+        (fully recursive, current behaviour).
 
     Returns
     -------
@@ -593,6 +600,10 @@ def build_budget(solution, model, var, display_units=None):
 
     constraint, lt, _ = matches[0]
     total_val = float(solution[top_vk].to(display_units).magnitude)
+
+    if depth == 0:
+        return Budget(top_vk=top_vk, total=total_val, units=display_units, children=[])
+
     ctx = _BudgetCtx(
         solution=solution,
         model=model,
@@ -600,7 +611,7 @@ def build_budget(solution, model, var, display_units=None):
         level_units=display_units,
         visited=frozenset({top_vk}),
     )
-    children = _build_children(top_vk, lt, constraint, ctx)
+    children = _build_children(top_vk, lt, constraint, ctx, remaining_depth=depth - 1)
 
     return Budget(
         top_vk=top_vk, total=total_val, units=display_units, children=children
