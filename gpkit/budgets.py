@@ -61,14 +61,6 @@ def _format_term_label(exp, coeff, strip_prefix=None):
     return "·".join(parts) if parts else f"{coeff:.4g}"
 
 
-def _eval_term_qty(exp, coeff, solution):
-    """Evaluate a single monomial term at the solution, returning a pint Quantity."""
-    val = float(coeff)
-    for vk, pow_ in exp.items():
-        val = val * (solution[vk] ** pow_)
-    return val
-
-
 # ---------------------------------------------------------------------------
 # Public API: constraint scanning
 # ---------------------------------------------------------------------------
@@ -287,17 +279,6 @@ class _BudgetCtx:
     display_units: str
 
 
-def _eval_term_val(exp, coeff, ctx, level_units=None):
-    """Evaluate a monomial term in *level_units*; return nan on unit errors."""
-    if level_units is None:
-        level_units = ctx.display_units
-    try:
-        term_qty = _eval_term_qty(exp, coeff, ctx.solution)
-        return float(term_qty.to(level_units).magnitude)
-    except (DimensionalityError, KeyError, AttributeError, TypeError, ValueError):
-        return float("nan")
-
-
 def _attach_sub_budget(node, child_vk, ctx, visited, term_val):
     "Recursively attach sub-budget children to *node* if a budget constraint exists."
     sub_matches = find_budget_constraints(ctx.model, child_vk, ctx.solution)
@@ -323,7 +304,7 @@ def _attach_sub_budget(node, child_vk, ctx, visited, term_val):
         node.slack = max(0.0, (child_val - sub_sum) / child_val)
 
 
-def _process_term(top_vk, exp, coeff, ctx, visited, level_units):
+def _process_term(top_vk, exp, coeff, term_val, ctx, visited, level_units):
     """Build a single BudgetNode for one term in a budget constraint's RHS.
 
     Parameters
@@ -333,11 +314,14 @@ def _process_term(top_vk, exp, coeff, ctx, visited, level_units):
     exp : HashVector
         Exponent dict for this monomial term.
     coeff : float
-        Coefficient of this monomial term.
+        Raw coefficient from the hmap (may include unit-conversion factors).
+    term_val : float
+        Pre-evaluated numerical value in *level_units* (computed by caller via
+        ``solution[mon].to(level_units).magnitude``).
     ctx : _BudgetCtx
     visited : frozenset[VarKey]
     level_units : str
-        Units to use when evaluating this term's value.
+        Units for *term_val*.
 
     Returns
     -------
@@ -345,15 +329,16 @@ def _process_term(top_vk, exp, coeff, ctx, visited, level_units):
     """
     is_self_ref = top_vk in exp
     free_in_term = {vk for vk in exp if vk not in ctx.solution.constants}
-    term_val = _eval_term_val(exp, coeff, ctx, level_units)
 
     parent_prefix = top_vk.lineagestr() if top_vk.lineage else None
 
-    # Simple case: single free var with exponent 1, coefficient 1, not self-referential
+    # Simple case: single free var with exponent 1, not self-referential.
+    # We do NOT require coeff == 1 here: in mixed-unit constraints NomialMap.__add__
+    # bakes a unit-conversion factor into the coefficient, so coeff may differ from
+    # 1.0 even for a plain variable term.
     is_simple = (
         not is_self_ref
         and len(free_in_term) == 1
-        and abs(coeff - 1.0) < 1e-10
         and exp.get(next(iter(free_in_term))) == 1
     )
 
@@ -417,10 +402,18 @@ def _build_children(top_vk, lt, constraint, ctx, visited, level_units=None):
     total_val = float(ctx.solution[top_vk].to(level_units).magnitude)
     is_tight = abs(ctx.solution.sens.constraints.get(constraint, 0.0)) > 1e-5
 
-    nodes = [
-        _process_term(top_vk, exp, coeff, ctx, visited, level_units)
-        for exp, coeff in lt.hmap.items()
-    ]
+    nodes = []
+    for mon in lt.chop():
+        (exp,) = mon.hmap.keys()
+        coeff = mon.hmap[exp]
+        try:
+            term_qty = ctx.solution[mon]
+            term_val = float(term_qty.to(level_units).magnitude)
+        except (DimensionalityError, KeyError, AttributeError, TypeError, ValueError):
+            term_val = float("nan")
+        nodes.append(
+            _process_term(top_vk, exp, coeff, term_val, ctx, visited, level_units)
+        )
 
     for node in nodes:
         node.fraction = node.value / total_val if total_val else 0.0

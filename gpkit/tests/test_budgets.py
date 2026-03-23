@@ -369,6 +369,56 @@ class TestBudgetErrors:
 
 
 # ---------------------------------------------------------------------------
+# Tests: unit-mismatch coefficient bug
+# ---------------------------------------------------------------------------
+
+
+class MixedUnitMass(Model):
+    """Budget constraint where variables have compatible but different mass units.
+
+    m (kg) >= m_pay (kg) + m_struct (g) — physically correct but GP coefficient
+    for m_struct will be 0.001 (g/kg), NOT 1.0.  The budget must show the
+    physical value (m_struct converted to kg), not 0.001 * m_struct_in_g.
+    """
+
+    def setup(self):
+        self.m = Variable("m", "kg", "total mass")
+        self.m_struct = Variable("m_struct", "g", "structural mass (in grams)")
+        m_pay = Variable("m_pay", 100, "kg", "payload")
+        f = Variable("f", 0.03, "-", "structural fraction")
+        self.cost = self.m
+        return [
+            self.m >= m_pay + self.m_struct,
+            self.m_struct >= f * self.m,
+        ]
+
+
+class TestBudgetUnitMismatchCoeff:
+    """GP hmap coefficient encodes unit conversion; budget must use physical value."""
+
+    def test_value_is_physical(self):
+        model = MixedUnitMass()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        struct_node = next(
+            n for n in b.children if n.vk is not None and "m_struct" in n.label
+        )
+        # physical value: m_struct in kg, not 0.001 * m_struct_in_g
+        expected = float(sol[model.m_struct].to("kg").magnitude)
+        assert abs(struct_node.value - expected) / expected < 1e-4
+
+    def test_label_has_no_spurious_coeff(self):
+        model = MixedUnitMass()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        struct_node = next(
+            n for n in b.children if n.vk is not None and "m_struct" in n.label
+        )
+        # label should not start with a numeric coefficient like "0.001·m_struct"
+        assert not struct_node.label[0].isdigit()
+
+
+# ---------------------------------------------------------------------------
 # Tests: mixed units (issue #161)
 # ---------------------------------------------------------------------------
 
@@ -433,3 +483,40 @@ class TestBuildBudgetMixedUnits:
         b = build_budget(sol, model, model.m)
         rho_v_node = b.children[0]
         assert rho_v_node.children == []
+
+
+# ---------------------------------------------------------------------------
+# Tests: mixed-unit coefficient (issue #162)
+# ---------------------------------------------------------------------------
+
+
+class MixedUnitCoeffModel(Model):
+    """Constraint has terms in different units; hmap carries conversion factor."""
+
+    def setup(self):
+        self.m = Variable("m", "kg", "total mass")
+        m_a = Variable("m_a", 1, "lbs", "component A (1 lb ≈ 0.4536 kg)")
+        m_b = Variable("m_b", 1, "kg", "component B (1 kg)")
+        self.cost = self.m
+        return [self.m >= m_a + m_b]
+
+
+class TestMixedUnitCoeff:
+    """Values must be correct when unit conversion is baked into hmap coefficient."""
+
+    def test_children_sum_to_total(self):
+        model = MixedUnitCoeffModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        child_sum = sum(n.value for n in b.children)
+        assert abs(child_sum - b.total) / b.total < 1e-4
+
+    def test_component_values_correct(self):
+        """m_a ≈ 0.4536 kg, m_b = 1.0 kg."""
+        model = MixedUnitCoeffModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        m_b_node = next(n for n in b.children if "m_b" in n.label)
+        assert m_b_node.value == pytest.approx(1.0, rel=1e-4)
+        m_a_node = next(n for n in b.children if "m_a" in n.label)
+        assert m_a_node.value == pytest.approx(0.45359237, rel=1e-4)
