@@ -315,7 +315,7 @@ class TestBudgetRendering:
         model = Aircraft()
         sol, _ = solve(model)
         b = build_budget(sol, model, model.m)
-        assert "kg" in b.text()
+        assert "[kg]" in b.text()
 
     def test_text_contains_percent(self):
         model = Aircraft()
@@ -329,7 +329,7 @@ class TestBudgetRendering:
         b = build_budget(sol, model, model.m)
         md = b.markdown()
         assert "| --- |" in md
-        assert "kg" in md
+        assert "[kg]" in md
 
     def test_to_dict(self):
         model = Aircraft()
@@ -625,8 +625,8 @@ class TestBudgetNodeUnits:
         sol, _ = solve(model)
         b = build_budget(sol, model, model.m)
         text = b.text()
-        assert "g" in text
-        assert "kg" in text
+        assert "[g]" in text
+        assert "[kg]" in text
 
     def test_markdown_units_column(self):
         """markdown() contains a Units column header and per-row units."""
@@ -635,7 +635,7 @@ class TestBudgetNodeUnits:
         b = build_budget(sol, model, model.m)
         md = b.markdown()
         assert "| Units |" in md
-        assert "| g |" in md or "g |" in md
+        assert "[g]" in md
 
     def test_to_dict_includes_units(self):
         """to_dict() includes a 'units' key on each child node."""

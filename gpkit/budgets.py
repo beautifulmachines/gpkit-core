@@ -246,7 +246,7 @@ class Budget:
         header = f"Budget  —  {top_label}"
 
         # Collect all rows as (indent_depth, label, value_str, units_str, pct_str)
-        rows = [(0, top_label, f"{self.total:.4g}", self.units, "100.0%")]
+        rows = [(0, top_label, f"{self.total:.4g}", f"[{self.units}]", "100.0%")]
         _collect_text_rows(self.children, rows, depth=1)
 
         # Compute column widths
@@ -261,7 +261,7 @@ class Budget:
             pad = lbl_w - depth * 2 - len(label)
             lines.append(
                 f"  {indent}{label}{' ' * pad}  "
-                f"{val_str:>{val_w}}  {units_str:<{unt_w}}  {pct_str:>{pct_w}}"
+                f"{val_str:>{val_w}}  {units_str:>{unt_w}}  {pct_str:>{pct_w}}"
             )
         return "\n".join(lines)
 
@@ -272,7 +272,7 @@ class Budget:
             "| Component | Value | Units | Fraction |",
             "| --- | ---: | :--- | ---: |",
             f"| **{top_label}** | **{self.total:.4g}** "
-            f"| **{self.units}** | **100.0%** |",
+            f"| **[{self.units}]** | **100.0%** |",
         ]
         _collect_md_rows(self.children, lines, depth=0)
         return "\n".join(lines)
@@ -322,7 +322,7 @@ def _collect_text_rows(nodes, rows, depth):
                 depth,
                 label,
                 f"{node.value:.4g}",
-                node.units,
+                f"[{node.units}]",
                 f"{node.fraction * 100:.1f}%",
             )
         )
@@ -337,7 +337,7 @@ def _collect_md_rows(nodes, lines, depth):
         if node.slack > 1e-4:
             label += f" *(slack {node.slack * 100:.1f}%)*"
         lines.append(
-            f"| {label} | {node.value:.4g} | {node.units} "
+            f"| {label} | {node.value:.4g} | [{node.units}] "
             f"| {node.fraction * 100:.1f}% |"
         )
         if node.children:
