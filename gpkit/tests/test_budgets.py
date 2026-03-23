@@ -2,6 +2,8 @@
 
 # pylint: disable=attribute-defined-outside-init
 
+import math
+
 import pytest
 
 from gpkit import Model, Variable, units
@@ -667,7 +669,7 @@ class TestBudgetDepth:
         model = Aircraft()
         sol, _ = solve(model)
         b = build_budget(sol, model, model.m, depth=0)
-        assert b.children == []
+        assert not b.children
 
     def test_depth_one_no_grandchildren(self):
         model = Aircraft()
@@ -675,7 +677,7 @@ class TestBudgetDepth:
         b = build_budget(sol, model, model.m, depth=1)
         assert len(b.children) == 1
         wing_node = b.children[0]
-        assert wing_node.children == []
+        assert not wing_node.children
 
     def test_depth_two_has_grandchildren(self):
         model = Aircraft()
@@ -685,11 +687,9 @@ class TestBudgetDepth:
         wing_node = b.children[0]
         assert len(wing_node.children) == 2
         for grandchild in wing_node.children:
-            assert grandchild.children == []
+            assert not grandchild.children
 
     def test_depth_inf_same_as_default(self):
-        import math
-
         model = Aircraft()
         sol, _ = solve(model)
         b_default = build_budget(sol, model, model.m)
@@ -703,4 +703,4 @@ class TestBudgetDepth:
         sol, _ = solve(model)
         b = sol.budget(model.m, depth=1)
         assert len(b.children) == 1
-        assert b.children[0].children == []
+        assert not b.children[0].children
