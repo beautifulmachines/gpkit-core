@@ -6,11 +6,11 @@ Installation
 1. If you are on Mac or Windows, we recommend installing `Anaconda <https://www.anaconda.com>`_. Alternatively, `install pip and create a virtual environment <https://packaging.python.org/en/latest/guides/installing-using-pip-and-virtual-environments/>`_.
 2. (optional) Install the MOSEK 9 solver with ``pip install Mosek``, then a license as described below
 3. (optional) Install the MOSEK 8 solver as described below
-4. Run ``pip install gpkit`` in the appropriate terminal or command prompt.
+4. Run ``pip install gpkit-core`` in the appropriate terminal or command prompt.
 5. Open a Python prompt and run ``import gpkit`` to finish installation and run unit tests.
 
-If you encounter any bugs please email ``gpkit@mit.edu``
-or `raise a GitHub issue <http://github.com/convexengineering/gpkit/issues/new>`_.
+If you encounter any bugs please
+`raise a GitHub issue <https://github.com/beautifulmachines/gpkit-core/issues/new>`_.
 
 
 Installing MOSEK 8
@@ -38,7 +38,7 @@ Windows
         - To do this, type ``gcc`` into a command prompt.
         - If you get ``executable not found``, then install the 64-bit version (x86_64 installer architecture dropdown option) with GCC version 6.4.0 or older of `mingw <http://sourceforge.net/projects/mingw-w64/>`_.
         - In an Anaconda command prompt (or equivalent), run ``cd C:\Program Files\mingw-w64\x86_64-6.4.0-posix-seh-rt_v5-rev0\`` (or whatever corresponds to the correct installation directory; note that if mingw is in ``Program Files (x86)`` instead of ``Program Files`` you've installed the 32-bit version by mistake)
-        - Run ``mingw-w64`` to add it to your executable path. For step 3 of the install process you'll need to run ``pip install gpkit`` from this prompt.
+        - Run ``mingw-w64`` to add it to your executable path. For step 3 of the install process you'll need to run ``pip install gpkit-core`` from this prompt.
     - Download `MOSEK 8 <https://www.mosek.com/downloads/>`_, then:
         - Follow `these steps for Windows <http://docs.mosek.com/7.0/toolsinstall/Windows_installation.html>`_.
     - If applicable, request an `academic license file <https://www.mosek.com/products/academic-licenses/>`_ and put it in ``C:\Users\(your_username)\mosek\``
@@ -54,18 +54,17 @@ You may need to rebuild GPkit if any of the following occur:
 To rebuild GPkit run ``python -c "from gpkit.build import rebuild; rebuild()"``.
 
 If that doesn't solve your issue then try the following:
-  - ``pip uninstall gpkit``
-  - ``pip install --no-cache-dir --no-deps gpkit``
-  - ``python -c "import gpkit.tests; gpkit.tests.run()"``
-  - If any tests fail, please email ``gpkit@mit.edu`` or `raise a GitHub issue <http://github.com/convexengineering/gpkit/issues/new>`_.
+  - ``pip uninstall gpkit-core``
+  - ``pip install --no-cache-dir --no-deps gpkit-core``
+  - ``make test``
+  - If any tests fail, please `raise a GitHub issue <https://github.com/beautifulmachines/gpkit-core/issues/new>`_.
 
 
 Bleeding-edge installations
 ===========================
 
-Active developers may wish to install the `latest GPkit <http://github.com/convexengineering/gpkit>`_ directly from Github. To do so,
+Active developers may wish to install the `latest GPkit <https://github.com/beautifulmachines/gpkit-core>`_ directly from Github. To do so,
 
-  1. ``pip uninstall gpkit`` to uninstall your existing GPkit.
-  2. ``git clone https://github.com/convexengineering/gpkit.git``
-  3. ``pip install -e gpkit`` to install that directory as your environment-wide GPkit.
-  4. ``cd ..; python -c "import gpkit.tests; gpkit.tests.run()"`` to test your installation from a non-local directory.
+  1. ``git clone https://github.com/beautifulmachines/gpkit-core.git``
+  2. ``cd gpkit-core && uv sync`` to create an isolated environment and install all dependencies.
+  3. ``make test`` to verify your installation.

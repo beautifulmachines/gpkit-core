@@ -30,9 +30,8 @@ To incorporate new solvers at a later date, run `gpkit.build()`.
 If you encounter any bugs or issues using GPkit, please open a new issue at
 https://github.com/beautifulmachines/gpkit-core/issues/new.
 
-Finally, we hope you find our documentation (https://gpkit.readthedocs.io/) and
-engineering-design models (https://github.com/beautifulmachines/gpkit-models/)
-useful for your own applications.
+We hope you find the engineering-design models at
+https://github.com/beautifulmachines/gpkit-models/ useful for your own applications.
 
 Enjoy!
 """)

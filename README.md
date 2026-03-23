@@ -1,20 +1,33 @@
-[<img src="http://gpkit.rtfd.org/en/latest/_images/gplogo.png" width=110 alt="GPkit" />](http://gpkit.readthedocs.org/)
+# GPkit
 
-**[Documentation](http://gpkit.readthedocs.org/)** | [Install instructions](http://gpkit.readthedocs.org/en/latest/installation.html) | [Examples](http://gpkit.readthedocs.org/en/latest/examples.html) | [Glossary](https://gpkit.readthedocs.io/en/latest/autodoc/gpkit.html) | [Citing GPkit](http://gpkit.readthedocs.org/en/latest/citinggpkit.html)
+GPkit is a Python package for defining and solving geometric programming (GP) models.
+It provides symbolic variables with physical units, composable constraint sets, and
+interfaces to convex solvers — delivering reliable, globally-optimal solutions to
+engineering design problems.
 
-GPkit is a Python package for defining and manipulating
-geometric programming models, abstracting away the backend solver.
-Supported solvers are
-[mosek](http://mosek.com)
-and [cvxopt](http://cvxopt.org/).
+[![Test Status](https://github.com/beautifulmachines/gpkit-core/actions/workflows/tests.yml/badge.svg)](https://github.com/beautifulmachines/gpkit-core/actions/workflows/tests.yml)
+[![Lint Status](https://github.com/beautifulmachines/gpkit-core/actions/workflows/lint.yml/badge.svg)](https://github.com/beautifulmachines/gpkit-core/actions/workflows/lint.yml)
 
-[![Test Status](https://github.com/whoburg/gpkit/actions/workflows/tests.yml/badge.svg)](https://github.com/whoburg/gpkit/actions/workflows/tests.yml)
-[![Lint Status](https://github.com/whoburg/gpkit/actions/workflows/lint.yml/badge.svg)](https://github.com/whoburg/gpkit/actions/workflows/lint.yml)
+## Installation
+
+```bash
+pip install gpkit-core
+```
+
+Supported solvers: [MOSEK](https://www.mosek.com) and [cvxopt](https://cvxopt.org)
+(cvxopt is open source and installed by default).
+
+## Documentation
+
+See [docs/](docs/) for full documentation including getting started, modeling
+conventions, and examples.
 
 ## Contributing
 
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details on how to set up your development environment and submit pull requests.
+We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for setup and
+workflow details.
 
 ## Acknowledgments
 
-Originally developed with Ned Burnell, whose extensive contributions were foundational to the early design.
+Originally developed with Ned Burnell, whose extensive contributions were
+foundational to the early design.

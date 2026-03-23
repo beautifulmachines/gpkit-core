@@ -154,9 +154,7 @@ pytest gpkit/tests/test_specific_file.py
 
 ## Getting Help
 
-- Check the [documentation](https://gpkit.readthedocs.io/)
 - Open an issue on GitHub
-- Join our [discussion forum](https://github.com/beautifulmachines/gpkit-core/discussions)
 
 ## License
 

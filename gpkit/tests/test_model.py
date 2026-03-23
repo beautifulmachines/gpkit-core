@@ -86,7 +86,7 @@ class TestGP:
         assert sol.cost == pytest.approx(2 * np.sqrt(2), abs=10 ** (-get_ndig(solver)))
 
     def test_dup_eq_constraint(self, solver):
-        # from https://github.com/convexengineering/gpkit/issues/1551
+        # regression test for issue #1551
         a = Variable("a", 1)
         b = Variable("b")
         c = Variable("c", 2)
