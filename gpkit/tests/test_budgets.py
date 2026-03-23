@@ -578,3 +578,78 @@ class TestPhysCoeff:
         b = build_budget(sol, model, model.m)
         child_sum = sum(n.value for n in b.children)
         assert abs(child_sum - b.total) / b.total < 1e-4
+
+
+# ---------------------------------------------------------------------------
+# Tests: per-row units column
+# ---------------------------------------------------------------------------
+
+
+class TestBudgetNodeUnits:
+    """Each BudgetNode carries its own units; mixed-unit budgets show per-row units."""
+
+    def test_uniform_units_all_kg(self):
+        """Aircraft budget: all nodes in kg, units column shows kg everywhere."""
+        model = Aircraft()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        wing_node = b.children[0]
+        assert wing_node.units == "kg"
+        for child in wing_node.children:
+            assert child.units == "kg"
+
+    def test_mixed_unit_node_shows_native_units(self):
+        """m_struct (declared in g) should have units='g' and value in grams."""
+        model = MixedUnitMass()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        struct_node = next(
+            n for n in b.children if n.vk is not None and "m_struct" in n.label
+        )
+        assert struct_node.units == "g"
+        # Value in grams should be ~1000x the kg value
+        kg_val = float(sol[model.m_struct].to("kg").magnitude)
+        assert struct_node.value == pytest.approx(kg_val * 1000, rel=1e-3)
+
+    def test_fraction_consistent_across_units(self):
+        """Fractions sum to 1 regardless of per-row units."""
+        model = MixedUnitMass()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        frac_sum = sum(n.fraction for n in b.children)
+        assert abs(frac_sum - 1.0) < 1e-4
+
+    def test_text_units_column(self):
+        """text() output contains a units column with per-row units."""
+        model = MixedUnitMass()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        text = b.text()
+        assert "g" in text
+        assert "kg" in text
+
+    def test_markdown_units_column(self):
+        """markdown() contains a Units column header and per-row units."""
+        model = MixedUnitMass()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        md = b.markdown()
+        assert "| Units |" in md
+        assert "| g |" in md or "g |" in md
+
+    def test_to_dict_includes_units(self):
+        """to_dict() includes a 'units' key on each child node."""
+        model = Aircraft()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        child_dict = b.to_dict()["children"][0]
+        assert "units" in child_dict
+        assert child_dict["units"] == "kg"
+
+    def test_slack_node_units(self):
+        """Slack node units match the budget level units."""
+        model = SlackModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m_total)
+        slack_node = next(n for n in b.children if n.label == "[slack]")
+        assert slack_node.units == "kg"
