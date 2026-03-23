@@ -6,60 +6,32 @@ Thank you for your interest in contributing to gpkit-core! This guide will help 
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.11 or higher
 - Git
-- A virtual environment manager (recommended: `venv` or `conda`)
+- [uv](https://docs.astral.sh/uv/getting-started/installation/)
 
-### Setting Up the Development Environment
+### Setting Up
 
-1. **Clone the Repository**
+1. **Clone the repository**
    ```bash
    git clone https://github.com/beautifulmachines/gpkit-core.git
    cd gpkit-core
    ```
 
-2. **Create and Activate a Virtual Environment**
-
-   Using `venv`:
+2. **Install dependencies**
    ```bash
-   python -m venv .venv
-   source .venv/bin/activate  # On Unix/macOS
-   # or
-   .venv\Scripts\activate  # On Windows
+   uv sync
    ```
 
-   Using `conda`:
+3. **Install git hooks** (recommended — runs formatting and linting on each commit)
    ```bash
-   conda create -n gpkit-core python=3.11
-   conda activate gpkit-core
+   uv run pre-commit install
    ```
 
-3. **Install Development Dependencies**
-
-   Install the package in editable mode with development dependencies:
+4. **Verify**
    ```bash
-   make install-dev
+   make test
    ```
-
-   This will install:
-   - Core dependencies
-   - Code quality tools (black, isort, pylint, flake8)
-   - Testing tools (pytest)
-
-4. **Verify Installation**
-   ```bash
-   python -c "import gpkit; print(gpkit.__version__)"
-   ```
-
-### Git Hooks (recommended)
-
-```bash
-uv sync
-uv run pre-commit install
-```
-
-This runs formatting and linting automatically on each commit.
-You can also run checks manually: `make format && make lint`
 
 ## Development Workflow
 
@@ -84,14 +56,14 @@ make lint
 
 ### Running Tests
 
-We use pytest for testing. To run the test suite:
+To run the full test suite:
 ```bash
 make test
 ```
 
 To run specific tests:
 ```bash
-pytest gpkit/tests/test_specific_file.py
+uv run pytest gpkit/tests/test_specific_file.py
 ```
 
 ### Making Changes
@@ -131,33 +103,23 @@ pytest gpkit/tests/test_specific_file.py
 - Update relevant documentation when making changes
 - Build and test documentation locally:
   ```bash
-  cd docs
-  make html
+  cd docs && make html
   ```
 
 ## Common Issues and Solutions
 
-### Build Issues
-- If you encounter build issues, try:
-  ```bash
-  make clean
-  make install-dev
-  ```
-
 ### Test Failures
-- Ensure all dependencies are installed
+- Ensure all dependencies are installed: `uv sync`
 - Check if you have the required solvers installed
 - Run tests with verbose output:
   ```bash
-  pytest -v
+  uv run pytest -v
   ```
 
 ## Getting Help
 
-- Check the [documentation](https://gpkit.readthedocs.io/)
 - Open an issue on GitHub
-- Join our [discussion forum](https://github.com/beautifulmachines/gpkit-core/discussions)
 
 ## License
 
-By contributing to GPkit-Core, you agree that your contributions will be licensed under the project's MIT License. 
+By contributing to gpkit-core, you agree that your contributions will be licensed under the project's MIT License.

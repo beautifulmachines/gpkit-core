@@ -1,7 +1,6 @@
 Visualization and Interaction
 *****************************
 
-Code in this section uses the `CE solar model <https://github.com/convexengineering/solar/tree/gpkitdocs>`_ except where noted otherwise.
 
 Model and Variable Breakdowns
 =============================

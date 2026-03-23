@@ -37,13 +37,9 @@ def load_settings(path=None, trybuild=True):
 =============
 Build failed!  :(
 =============
-You may need to install a solver and then `import gpkit` again;
-see https://gpkit.readthedocs.io/en/latest/installation.html
-for troubleshooting details.
-
-But before you go, please post the output above
-(starting from "Found no installed solvers, beginning a build.")
-to gpkit@mit.edu or https://github.com/convexengineering/gpkit/issues/new
+You may need to install a solver and then `import gpkit` again.
+Please post the output above to
+https://github.com/beautifulmachines/gpkit-core/issues/new
 so we can prevent others from having to see this message.
 
         Thanks!  :)

@@ -1,12 +1,6 @@
 Examples
 ********
 
-iPython Notebook Examples
-=========================
-
-More examples, including some with in-depth explanations and interactive visualizations, can be seen `on nbviewer <http://nbviewer.ipython.org/github/convexengineering/gpkit/tree/master/docs/source/ipynb/>`_.
-
-
 A Trivial GP
 ============
 The most trivial GP we can think of:
