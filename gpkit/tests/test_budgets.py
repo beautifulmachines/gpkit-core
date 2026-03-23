@@ -520,3 +520,58 @@ class TestMixedUnitCoeff:
         assert m_b_node.value == pytest.approx(1.0, rel=1e-4)
         m_a_node = next(n for n in b.children if "m_a" in n.label)
         assert m_a_node.value == pytest.approx(0.45359237, rel=1e-4)
+
+    def test_labels_show_physical_coeff(self):
+        """Pure unit-conversion terms should NOT show a numeric coefficient."""
+        model = MixedUnitCoeffModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        # m_a and m_b each appear with coefficient 1 in the original expression —
+        # neither label should start with a digit (no spurious "0.4536·m_a")
+        for node in b.children:
+            assert not node.label[
+                0
+            ].isdigit(), f"spurious coeff in label: {node.label!r}"
+
+
+# ---------------------------------------------------------------------------
+# Tests: physical coefficient preserved in label (issue #163)
+# ---------------------------------------------------------------------------
+
+
+class PhysCoeffModel(Model):
+    """Budget where one term has a genuine physical scale factor (0.25)."""
+
+    def setup(self):
+        self.m = Variable("m", "kg", "total mass")
+        m_a = Variable("m_a", 4, "kg", "component A")
+        m_b = Variable("m_b", 1, "kg", "component B")
+        self.cost = self.m
+        # 0.25 is a real physical factor, not a unit artifact
+        return [self.m >= 0.25 * m_a + m_b]
+
+
+class TestPhysCoeff:
+    """Physical coefficients (not unit conversions) must appear in the label."""
+
+    def test_coeff_shown_in_label(self):
+        model = PhysCoeffModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        # 0.25*m_a contributes 0.25*4 = 1 kg; label should mention 0.25
+        m_a_node = next(n for n in b.children if "m_a" in n.label)
+        assert "0.25" in m_a_node.label
+
+    def test_value_correct(self):
+        model = PhysCoeffModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        m_a_node = next(n for n in b.children if "m_a" in n.label)
+        assert m_a_node.value == pytest.approx(1.0, rel=1e-4)  # 0.25 * 4 kg
+
+    def test_children_sum_to_total(self):
+        model = PhysCoeffModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        child_sum = sum(n.value for n in b.children)
+        assert abs(child_sum - b.total) / b.total < 1e-4

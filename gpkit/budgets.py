@@ -19,8 +19,9 @@ import warnings
 from dataclasses import dataclass, field
 from typing import Optional
 
+from .ast_nodes import ExprNode, VarNode
 from .constraints.set import flatiter
-from .units import DimensionalityError
+from .units import DimensionalityError, qty
 from .varkey import VarKey
 
 # ---------------------------------------------------------------------------
@@ -59,6 +60,76 @@ def _format_term_label(exp, coeff, strip_prefix=None):
             name = vk.str_without(["lineage"])
         parts.append(name if pow_ == 1 else f"{name}^{pow_:.4g}")
     return "·".join(parts) if parts else f"{coeff:.4g}"
+
+
+def _collect_sum_terms(node):
+    """Flatten nested 'add' AST nodes into a list of per-addend subtrees."""
+    if isinstance(node, ExprNode) and node.op == "add":
+        result = []
+        for child in node.children:
+            result.extend(_collect_sum_terms(child))
+        return result
+    return [node]
+
+
+def _vks_of_ast_term(node):
+    """Return frozenset of VarKeys referenced in a monomial AST term."""
+    if isinstance(node, VarNode):
+        return frozenset({node.varkey})
+    if isinstance(node, ExprNode) and node.op in ("mul", "div"):
+        vks = set()
+        for child in node.children:
+            vks.update(_vks_of_ast_term(child))
+        return frozenset(vks)
+    if isinstance(node, ExprNode) and node.op == "pow":
+        return _vks_of_ast_term(node.children[0])
+    return frozenset()
+
+
+def _ast_label_map(lt, strip_prefix=None):
+    """Build a {frozenset(varkeys): label_str} map from lt.ast.
+
+    Returns an empty dict when lt has no AST (caller falls back to
+    _physical_coeff).  The label is generated with units excluded and,
+    when *strip_prefix* is given, the model's lineage prefix stripped so
+    only the relative path is shown.
+    """
+    if lt.ast is None:
+        return {}
+    excluded = ["units"]
+    if strip_prefix:
+        excluded.append(f":MAGIC:{strip_prefix}")
+    result = {}
+    for term in _collect_sum_terms(lt.ast):
+        vks = _vks_of_ast_term(term)
+        if vks:
+            result[vks] = term.str_without(excluded)
+    return result
+
+
+def _physical_coeff(exp, coeff, hmap_units):
+    """Return *coeff* with the unit-conversion factor divided out.
+
+    NomialMap.__add__ embeds a ``float(other.units / self.units)`` factor
+    into each coefficient when combining terms with different units.  This
+    helper reverses that so the displayed coefficient matches what the user
+    wrote in the original expression.
+
+    Falls back to the raw *coeff* if units are absent or conversion fails.
+    """
+    if not hmap_units:
+        return coeff
+    try:
+        natural = qty("dimensionless")
+        for vk, pow_ in exp.items():
+            if vk.unitrepr:
+                natural = natural * qty(vk.unitrepr) ** pow_
+        conversion = float(natural.to(hmap_units).magnitude)
+        if abs(conversion) > 1e-15:
+            return coeff / conversion
+    except (DimensionalityError, AttributeError, TypeError, ValueError):
+        pass
+    return coeff
 
 
 # ---------------------------------------------------------------------------
@@ -304,7 +375,9 @@ def _attach_sub_budget(node, child_vk, ctx, visited, term_val):
         node.slack = max(0.0, (child_val - sub_sum) / child_val)
 
 
-def _process_term(top_vk, exp, coeff, term_val, ctx, visited, level_units):
+def _process_term(
+    top_vk, exp, phys_coeff, term_val, ast_label, ctx, visited, level_units
+):
     """Build a single BudgetNode for one term in a budget constraint's RHS.
 
     Parameters
@@ -313,15 +386,18 @@ def _process_term(top_vk, exp, coeff, term_val, ctx, visited, level_units):
         The variable being decomposed (parent level).
     exp : HashVector
         Exponent dict for this monomial term.
-    coeff : float
-        Raw coefficient from the hmap (may include unit-conversion factors).
+    phys_coeff : float
+        Physical coefficient with unit-conversion factors stripped.  Used only
+        when *ast_label* is ``None`` (AST unavailable).
     term_val : float
-        Pre-evaluated numerical value in *level_units* (computed by caller via
-        ``solution[mon].to(level_units).magnitude``).
+        Pre-evaluated numerical value in *level_units*.
+    ast_label : str or None
+        Label derived from lt.ast (the symbolic pre-unit-conversion form).
+        When present this is used directly; when absent we fall back to
+        constructing a label from *phys_coeff*.
     ctx : _BudgetCtx
     visited : frozenset[VarKey]
     level_units : str
-        Units for *term_val*.
 
     Returns
     -------
@@ -332,10 +408,6 @@ def _process_term(top_vk, exp, coeff, term_val, ctx, visited, level_units):
 
     parent_prefix = top_vk.lineagestr() if top_vk.lineage else None
 
-    # Simple case: single free var with exponent 1, not self-referential.
-    # We do NOT require coeff == 1 here: in mixed-unit constraints NomialMap.__add__
-    # bakes a unit-conversion factor into the coefficient, so coeff may differ from
-    # 1.0 even for a plain variable term.
     is_simple = (
         not is_self_ref
         and len(free_in_term) == 1
@@ -344,14 +416,15 @@ def _process_term(top_vk, exp, coeff, term_val, ctx, visited, level_units):
 
     if is_simple:
         child_vk = next(iter(free_in_term))
-        # If constants co-appear in the term (e.g. rho·V), show the full
-        # expression so the budget is readable in physical terms.
-        has_constants = any(vk in ctx.solution.constants for vk in exp)
-        label = (
-            _format_term_label(exp, coeff, strip_prefix=parent_prefix)
-            if has_constants
-            else _vk_display(child_vk, lineage=True, strip_prefix=parent_prefix)
-        )
+        if ast_label is not None:
+            label = ast_label
+        else:
+            # Fallback when no AST: use physical coefficient for label decisions.
+            has_constants = any(vk in ctx.solution.constants for vk in exp)
+            if has_constants or abs(phys_coeff - 1.0) > 1e-10:
+                label = _format_term_label(exp, phys_coeff, strip_prefix=parent_prefix)
+            else:
+                label = _vk_display(child_vk, lineage=True, strip_prefix=parent_prefix)
         node = BudgetNode(
             label=label,
             vk=child_vk,
@@ -367,7 +440,11 @@ def _process_term(top_vk, exp, coeff, term_val, ctx, visited, level_units):
             _attach_sub_budget(node, child_vk, ctx, visited, term_val)
         return node
 
-    label = _format_term_label(exp, coeff, strip_prefix=parent_prefix)
+    label = (
+        ast_label
+        if ast_label is not None
+        else _format_term_label(exp, phys_coeff, strip_prefix=parent_prefix)
+    )
     if is_self_ref:
         label += " [margin]"
     return BudgetNode(label=label, vk=None, value=term_val, fraction=0.0, slack=0.0)
@@ -402,17 +479,27 @@ def _build_children(top_vk, lt, constraint, ctx, visited, level_units=None):
     total_val = float(ctx.solution[top_vk].to(level_units).magnitude)
     is_tight = abs(ctx.solution.sens.constraints.get(constraint, 0.0)) > 1e-5
 
+    parent_prefix = top_vk.lineagestr() if top_vk.lineage else None
+    ast_labels = _ast_label_map(lt, strip_prefix=parent_prefix)
+    hmap_units = lt.hmap.units
+
     nodes = []
     for mon in lt.chop():
         (exp,) = mon.hmap.keys()
         coeff = mon.hmap[exp]
+        ast_label = ast_labels.get(frozenset(exp.keys()))
+        phys_coeff = (
+            coeff if ast_label is not None else _physical_coeff(exp, coeff, hmap_units)
+        )
         try:
             term_qty = ctx.solution[mon]
             term_val = float(term_qty.to(level_units).magnitude)
         except (DimensionalityError, KeyError, AttributeError, TypeError, ValueError):
             term_val = float("nan")
         nodes.append(
-            _process_term(top_vk, exp, coeff, term_val, ctx, visited, level_units)
+            _process_term(
+                top_vk, exp, phys_coeff, term_val, ast_label, ctx, visited, level_units
+            )
         )
 
     for node in nodes:
