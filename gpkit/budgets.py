@@ -257,10 +257,9 @@ class Budget:
 
         lines = [header, "-" * len(header)]
         for depth, label, val_str, units_str, pct_str in rows:
-            indent = "  " * depth
-            pad = lbl_w - depth * 2 - len(label)
             lines.append(
-                f"  {indent}{label}{' ' * pad}  "
+                f"  {'  ' * depth}{label}"
+                f"{' ' * (lbl_w - depth * 2 - len(label))}  "
                 f"{val_str:>{val_w}}  {units_str:>{unt_w}}  {pct_str:>{pct_w}}"
             )
         return "\n".join(lines)
@@ -517,13 +516,13 @@ def _build_children(top_vk, lt, constraint, ctx):
     """Recursively build BudgetNode children from the lt side of a budget constraint."""
     total_val = float(ctx.solution[top_vk].to(ctx.level_units).magnitude)
     is_tight = abs(ctx.solution.sens.constraints.get(constraint, 0.0)) > 1e-5
-    parent_prefix = top_vk.lineagestr() if top_vk.lineage else None
-    ast_labels = _ast_label_map(lt, strip_prefix=parent_prefix)
-    hmap_units = lt.hmap.units
+    ast_labels = _ast_label_map(
+        lt, strip_prefix=top_vk.lineagestr() if top_vk.lineage else None
+    )
     nodes = []
     level_vals = []  # values in level_units for fraction computation
     for mon in lt.chop():
-        term = _make_term(mon, hmap_units, ast_labels, ctx)
+        term = _make_term(mon, lt.hmap.units, ast_labels, ctx)
         nodes.append(_process_term(top_vk, term, ctx))
         level_vals.append(term.term_val)
     for node, lv in zip(nodes, level_vals):
