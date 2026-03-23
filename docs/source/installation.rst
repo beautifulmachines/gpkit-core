@@ -7,7 +7,7 @@ Installation
 2. (optional) Install the MOSEK 9 solver with ``pip install Mosek``, then a license as described below
 3. (optional) Install the MOSEK 8 solver as described below
 4. Run ``pip install gpkit-core`` in the appropriate terminal or command prompt.
-5. Open a Python prompt and run ``import gpkit`` to finish installation and run unit tests.
+5. Open a Python prompt and run ``import gpkit`` to verify installation.
 
 If you encounter any bugs please
 `raise a GitHub issue <https://github.com/beautifulmachines/gpkit-core/issues/new>`_.
