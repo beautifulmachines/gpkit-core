@@ -1,8 +1,10 @@
 """Tests for gpkit.budgets — variable budget computation and display."""
 
+# pylint: disable=attribute-defined-outside-init
+
 import pytest
 
-from gpkit import Model, Variable
+from gpkit import Model, Variable, units
 from gpkit.budgets import Budget, build_budget, find_budget_constraints
 
 # ---------------------------------------------------------------------------
@@ -201,6 +203,27 @@ class TestBuildBudgetBasic:
         assert b.units == "g"
         assert b.total > 1000  # 15 kg → 15000 g
 
+    def test_child_labels_include_model_context(self):
+        # Child labels must include lineage so "m" is not ambiguous
+        model = Aircraft()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        wing_node = b.children[0]
+        assert "Wing" in wing_node.label
+        spar_node = next(n for n in wing_node.children if abs(n.value - 10) < 1e-3)
+        assert "Spar" in spar_node.label
+
+    def test_child_labels_drop_parent_lineage(self):
+        # Under Aircraft, the wing node should be "Wing.m" not "Aircraft.Wing.m"
+        # Under Wing, the spar node should be "Spar.m" not "Aircraft.Wing.Spar.m"
+        model = Aircraft()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        wing_node = b.children[0]
+        assert wing_node.label == "Wing.m"
+        spar_node = next(n for n in wing_node.children if abs(n.value - 10) < 1e-3)
+        assert spar_node.label == "Spar.m"
+
 
 # ---------------------------------------------------------------------------
 # Tests: build_budget — margin / self-referential term
@@ -345,3 +368,288 @@ class TestBudgetErrors:
         b = build_budget(sol, model, model.wing.spar.m)
         named_children = [n for n in b.children if n.vk is not None]
         assert len(named_children) == 0
+
+
+# ---------------------------------------------------------------------------
+# Tests: unit-mismatch coefficient bug
+# ---------------------------------------------------------------------------
+
+
+class MixedUnitMass(Model):
+    """Budget constraint where variables have compatible but different mass units.
+
+    m (kg) >= m_pay (kg) + m_struct (g) — physically correct but GP coefficient
+    for m_struct will be 0.001 (g/kg), NOT 1.0.  The budget must show the
+    physical value (m_struct converted to kg), not 0.001 * m_struct_in_g.
+    """
+
+    def setup(self):
+        self.m = Variable("m", "kg", "total mass")
+        self.m_struct = Variable("m_struct", "g", "structural mass (in grams)")
+        m_pay = Variable("m_pay", 100, "kg", "payload")
+        f = Variable("f", 0.03, "-", "structural fraction")
+        self.cost = self.m
+        return [
+            self.m >= m_pay + self.m_struct,
+            self.m_struct >= f * self.m,
+        ]
+
+
+class TestBudgetUnitMismatchCoeff:
+    """GP hmap coefficient encodes unit conversion; budget must use physical value."""
+
+    def test_value_is_physical(self):
+        model = MixedUnitMass()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        struct_node = next(
+            n for n in b.children if n.vk is not None and "m_struct" in n.label
+        )
+        # m_struct is declared in grams; value should be in g, not the hmap coefficient
+        assert struct_node.units == "g"
+        expected_g = float(sol[model.m_struct].to("g").magnitude)
+        assert abs(struct_node.value - expected_g) / expected_g < 1e-4
+
+    def test_label_has_no_spurious_coeff(self):
+        model = MixedUnitMass()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        struct_node = next(
+            n for n in b.children if n.vk is not None and "m_struct" in n.label
+        )
+        # label should not start with a numeric coefficient like "0.001·m_struct"
+        assert not struct_node.label[0].isdigit()
+
+
+# ---------------------------------------------------------------------------
+# Tests: mixed units (issue #161)
+# ---------------------------------------------------------------------------
+
+
+class Cylinder(Model):
+    """Cylinder model with variables spanning different unit dimensions."""
+
+    def setup(self):  # pylint: disable=attribute-defined-outside-init
+        self.m = Variable("m", "kg", "mass")
+        vol = Variable("V", "m^3", "volume")
+        rho = Variable("rho", 7800, "kg/m^3", "density")
+        length = Variable("L", 1, "m", "length")
+        area = Variable("A", "m^2", "cross-sectional area")
+        self.cost = self.m
+        return [
+            self.m >= rho * vol,
+            vol >= length * area,
+            area >= 0.01 * units("m^2"),
+        ]
+
+
+class TestBuildBudgetMixedUnits:
+    """Tests for budget() when sub-variables have different units than top variable."""
+
+    def test_no_crash(self):
+        # Should not raise pint.DimensionalityError (issue #161)
+        model = Cylinder()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        assert isinstance(b, Budget)
+
+    def test_total_correct(self):
+        model = Cylinder()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        # rho=7800 kg/m^3, L=1 m, A=0.01 m^2 → m = 78 kg
+        assert abs(b.total - 78.0) < 1e-4
+
+    def test_children_have_finite_values(self):
+        model = Cylinder()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        assert all(c.value == c.value for c in b.children)  # no NaN
+
+    def test_solution_budget_method(self):
+        model = Cylinder()
+        sol = model.solve(verbosity=0)
+        b = sol.budget(model.m)
+        assert isinstance(b, Budget)
+
+    def test_label_includes_constants(self):
+        # m >= rho*V: child label should show "rho·V", not just "V"
+        model = Cylinder()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        assert any("rho" in c.label for c in b.children)
+
+    def test_no_cross_unit_recursion(self):
+        # rho·V contributes to m, but V (m^3) != m (kg): should not recurse into V
+        model = Cylinder()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        rho_v_node = b.children[0]
+        assert rho_v_node.children == []
+
+
+# ---------------------------------------------------------------------------
+# Tests: mixed-unit coefficient (issue #162)
+# ---------------------------------------------------------------------------
+
+
+class MixedUnitCoeffModel(Model):
+    """Constraint has terms in different units; hmap carries conversion factor."""
+
+    def setup(self):  # pylint: disable=attribute-defined-outside-init
+        self.m = Variable("m", "kg", "total mass")
+        m_a = Variable("m_a", 1, "lbs", "component A (1 lb ≈ 0.4536 kg)")
+        m_b = Variable("m_b", 1, "kg", "component B (1 kg)")
+        self.cost = self.m
+        return [self.m >= m_a + m_b]
+
+
+class TestMixedUnitCoeff:
+    """Values must be correct when unit conversion is baked into hmap coefficient."""
+
+    def test_children_sum_to_total(self):
+        model = MixedUnitCoeffModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        child_sum = sum(n.value for n in b.children)
+        assert abs(child_sum - b.total) / b.total < 1e-4
+
+    def test_component_values_correct(self):
+        """m_a ≈ 0.4536 kg, m_b = 1.0 kg."""
+        model = MixedUnitCoeffModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        m_b_node = next(n for n in b.children if "m_b" in n.label)
+        assert m_b_node.value == pytest.approx(1.0, rel=1e-4)
+        m_a_node = next(n for n in b.children if "m_a" in n.label)
+        assert m_a_node.value == pytest.approx(0.45359237, rel=1e-4)
+
+    def test_labels_show_physical_coeff(self):
+        """Pure unit-conversion terms should NOT show a numeric coefficient."""
+        model = MixedUnitCoeffModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        # m_a and m_b each appear with coefficient 1 in the original expression —
+        # neither label should start with a digit (no spurious "0.4536·m_a")
+        for node in b.children:
+            assert not node.label[
+                0
+            ].isdigit(), f"spurious coeff in label: {node.label!r}"
+
+
+# ---------------------------------------------------------------------------
+# Tests: physical coefficient preserved in label (issue #163)
+# ---------------------------------------------------------------------------
+
+
+class PhysCoeffModel(Model):
+    """Budget where one term has a genuine physical scale factor (0.25)."""
+
+    def setup(self):  # pylint: disable=attribute-defined-outside-init
+        self.m = Variable("m", "kg", "total mass")
+        m_a = Variable("m_a", 4, "kg", "component A")
+        m_b = Variable("m_b", 1, "kg", "component B")
+        self.cost = self.m
+        # 0.25 is a real physical factor, not a unit artifact
+        return [self.m >= 0.25 * m_a + m_b]
+
+
+class TestPhysCoeff:
+    """Physical coefficients (not unit conversions) must appear in the label."""
+
+    def test_coeff_shown_in_label(self):
+        model = PhysCoeffModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        # 0.25*m_a contributes 0.25*4 = 1 kg; label should mention 0.25
+        m_a_node = next(n for n in b.children if "m_a" in n.label)
+        assert "0.25" in m_a_node.label
+
+    def test_value_correct(self):
+        model = PhysCoeffModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        m_a_node = next(n for n in b.children if "m_a" in n.label)
+        assert m_a_node.value == pytest.approx(1.0, rel=1e-4)  # 0.25 * 4 kg
+
+    def test_children_sum_to_total(self):
+        model = PhysCoeffModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        child_sum = sum(n.value for n in b.children)
+        assert abs(child_sum - b.total) / b.total < 1e-4
+
+
+# ---------------------------------------------------------------------------
+# Tests: per-row units column
+# ---------------------------------------------------------------------------
+
+
+class TestBudgetNodeUnits:
+    """Each BudgetNode carries its own units; mixed-unit budgets show per-row units."""
+
+    def test_uniform_units_all_kg(self):
+        """Aircraft budget: all nodes in kg, units column shows kg everywhere."""
+        model = Aircraft()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        wing_node = b.children[0]
+        assert wing_node.units == "kg"
+        for child in wing_node.children:
+            assert child.units == "kg"
+
+    def test_mixed_unit_node_shows_native_units(self):
+        """m_struct (declared in g) should have units='g' and value in grams."""
+        model = MixedUnitMass()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        struct_node = next(
+            n for n in b.children if n.vk is not None and "m_struct" in n.label
+        )
+        assert struct_node.units == "g"
+        # Value in grams should be ~1000x the kg value
+        kg_val = float(sol[model.m_struct].to("kg").magnitude)
+        assert struct_node.value == pytest.approx(kg_val * 1000, rel=1e-3)
+
+    def test_fraction_consistent_across_units(self):
+        """Fractions sum to 1 regardless of per-row units."""
+        model = MixedUnitMass()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        frac_sum = sum(n.fraction for n in b.children)
+        assert abs(frac_sum - 1.0) < 1e-4
+
+    def test_text_units_column(self):
+        """text() output contains a units column with per-row units."""
+        model = MixedUnitMass()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        text = b.text()
+        assert "[g]" in text
+        assert "[kg]" in text
+
+    def test_markdown_units_column(self):
+        """markdown() contains a Units column header and per-row units."""
+        model = MixedUnitMass()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        md = b.markdown()
+        assert "| Units |" in md
+        assert "[g]" in md
+
+    def test_to_dict_includes_units(self):
+        """to_dict() includes a 'units' key on each child node."""
+        model = Aircraft()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        child_dict = b.to_dict()["children"][0]
+        assert "units" in child_dict
+        assert child_dict["units"] == "kg"
+
+    def test_slack_node_units(self):
+        """Slack node units match the budget level units."""
+        model = SlackModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m_total)
+        slack_node = next(n for n in b.children if n.label == "[slack]")
+        assert slack_node.units == "kg"
