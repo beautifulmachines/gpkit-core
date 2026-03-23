@@ -315,7 +315,7 @@ class TestBudgetRendering:
         model = Aircraft()
         sol, _ = solve(model)
         b = build_budget(sol, model, model.m)
-        assert "[kg]" in b.text()
+        assert "kg" in b.text()
 
     def test_text_contains_percent(self):
         model = Aircraft()
@@ -329,7 +329,7 @@ class TestBudgetRendering:
         b = build_budget(sol, model, model.m)
         md = b.markdown()
         assert "| --- |" in md
-        assert "[kg]" in md
+        assert "kg" in md
 
     def test_to_dict(self):
         model = Aircraft()
@@ -405,9 +405,10 @@ class TestBudgetUnitMismatchCoeff:
         struct_node = next(
             n for n in b.children if n.vk is not None and "m_struct" in n.label
         )
-        # physical value: m_struct in kg, not 0.001 * m_struct_in_g
-        expected = float(sol[model.m_struct].to("kg").magnitude)
-        assert abs(struct_node.value - expected) / expected < 1e-4
+        # m_struct is declared in grams; value should be in g, not the hmap coefficient
+        assert struct_node.units == "g"
+        expected_g = float(sol[model.m_struct].to("g").magnitude)
+        assert abs(struct_node.value - expected_g) / expected_g < 1e-4
 
     def test_label_has_no_spurious_coeff(self):
         model = MixedUnitMass()

@@ -188,13 +188,17 @@ class BudgetNode:
         The underlying VarKey for simple named-variable nodes; ``None`` for
         compound / expression nodes.
     value : float
-        Numerical value in the budget's display units.
+        Numerical value in *units* (the node's own per-row units).
     fraction : float
         Fraction of the top-level budget total (0–1).
     slack : float
         Relative slack of *this node's own* budget constraint (0.0 = tight).
         Only non-zero when the node has children derived from a sub-budget
         constraint that is not fully binding.
+    units : str
+        Units for *value* — the node's own declared units (e.g. ``"g"`` for a
+        variable specified in grams even when the budget level is ``"kg"``).
+        Compound and slack nodes use the budget level units.
     children : list[BudgetNode]
         Sub-decomposition of this node, populated when the node's variable
         has its own budget constraint.
@@ -205,6 +209,7 @@ class BudgetNode:
     value: float
     fraction: float
     slack: float
+    units: str = ""
     children: list = field(default_factory=list)
 
 
@@ -238,24 +243,25 @@ class Budget:
     def text(self) -> str:
         """Return an aligned-column plain-text budget table."""
         top_label = _vk_display(self.top_vk, lineage=True)
-        header = f"Budget [{self.units}]  —  {top_label}"
+        header = f"Budget  —  {top_label}"
 
-        # Collect all rows as (indent_depth, label, value_str, pct_str)
-        rows = [(0, top_label, f"{self.total:.4g}", "100.0%")]
+        # Collect all rows as (indent_depth, label, value_str, units_str, pct_str)
+        rows = [(0, top_label, f"{self.total:.4g}", self.units, "100.0%")]
         _collect_text_rows(self.children, rows, depth=1)
 
-        # Compute column widths (r = (depth, label, val_str, pct_str))
+        # Compute column widths
         lbl_w = max(r[0] * 2 + len(r[1]) for r in rows)
         val_w = max(len(r[2]) for r in rows)
-        pct_w = max(len(r[3]) for r in rows)
+        unt_w = max(len(r[3]) for r in rows)
+        pct_w = max(len(r[4]) for r in rows)
 
         lines = [header, "-" * len(header)]
-        for depth, label, val_str, pct_str in rows:
+        for depth, label, val_str, units_str, pct_str in rows:
             indent = "  " * depth
             pad = lbl_w - depth * 2 - len(label)
             lines.append(
                 f"  {indent}{label}{' ' * pad}  "
-                f"{val_str:>{val_w}}  {pct_str:>{pct_w}}"
+                f"{val_str:>{val_w}}  {units_str:<{unt_w}}  {pct_str:>{pct_w}}"
             )
         return "\n".join(lines)
 
@@ -263,9 +269,10 @@ class Budget:
         """Return a GitHub-flavored markdown budget table."""
         top_label = _vk_display(self.top_vk, lineage=True)
         lines = [
-            f"| Component | Value [{self.units}] | Fraction |",
-            "| --- | ---: | ---: |",
-            f"| **{top_label}** | **{self.total:.4g}** | **100.0%** |",
+            "| Component | Value | Units | Fraction |",
+            "| --- | ---: | :--- | ---: |",
+            f"| **{top_label}** | **{self.total:.4g}** "
+            f"| **{self.units}** | **100.0%** |",
         ]
         _collect_md_rows(self.children, lines, depth=0)
         return "\n".join(lines)
@@ -310,7 +317,15 @@ def _collect_text_rows(nodes, rows, depth):
         label = node.label
         if node.slack > 1e-4:
             label += f"  (slack {node.slack * 100:.1f}%)"
-        rows.append((depth, label, f"{node.value:.4g}", f"{node.fraction * 100:.1f}%"))
+        rows.append(
+            (
+                depth,
+                label,
+                f"{node.value:.4g}",
+                node.units,
+                f"{node.fraction * 100:.1f}%",
+            )
+        )
         if node.children:
             _collect_text_rows(node.children, rows, depth + 1)
 
@@ -321,7 +336,10 @@ def _collect_md_rows(nodes, lines, depth):
         label = f"{indent}{node.label}"
         if node.slack > 1e-4:
             label += f" *(slack {node.slack * 100:.1f}%)*"
-        lines.append(f"| {label} | {node.value:.4g} | {node.fraction * 100:.1f}% |")
+        lines.append(
+            f"| {label} | {node.value:.4g} | {node.units} "
+            f"| {node.fraction * 100:.1f}% |"
+        )
         if node.children:
             _collect_md_rows(node.children, lines, depth + 1)
 
@@ -330,6 +348,7 @@ def _node_to_dict(node):
     return {
         "label": node.label,
         "value": node.value,
+        "units": node.units,
         "fraction": node.fraction,
         "slack": node.slack,
         "children": [_node_to_dict(c) for c in node.children],
@@ -360,6 +379,7 @@ class _TermData:
     phys_coeff: float
     term_val: float
     ast_label: Optional[str]
+    term_qty: object = None  # pint Quantity from solution[mon], or None on failure
 
 
 def _make_term(mon, hmap_units, ast_labels, ctx):
@@ -370,20 +390,26 @@ def _make_term(mon, hmap_units, ast_labels, ctx):
     phys_coeff = (
         coeff if ast_label is not None else _physical_coeff(exp, coeff, hmap_units)
     )
+    term_qty = None
     try:
-        term_val = float(ctx.solution[mon].to(ctx.level_units).magnitude)
+        term_qty = ctx.solution[mon]
+        term_val = float(term_qty.to(ctx.level_units).magnitude)
     except (DimensionalityError, KeyError, AttributeError, TypeError, ValueError):
         term_val = float("nan")
     return _TermData(
-        exp=exp, phys_coeff=phys_coeff, term_val=term_val, ast_label=ast_label
+        exp=exp,
+        phys_coeff=phys_coeff,
+        term_val=term_val,
+        ast_label=ast_label,
+        term_qty=term_qty,
     )
 
 
-def _slack_node(nodes, total_val, is_tight):
+def _slack_node(level_vals, total_val, is_tight, level_units):
     """Return a slack BudgetNode if the constraint is not tight, else None."""
     if is_tight:
         return None
-    children_sum = sum(n.value for n in nodes)
+    children_sum = sum(level_vals)
     slack_val = total_val - children_sum
     if not total_val or abs(slack_val / total_val) <= 1e-4:
         return None
@@ -393,6 +419,7 @@ def _slack_node(nodes, total_val, is_tight):
         value=slack_val,
         fraction=slack_val / total_val,
         slack=0.0,
+        units=level_units,
     )
 
 
@@ -417,13 +444,8 @@ def _attach_sub_budget(node, child_vk, ctx):
         visited=ctx.visited | {child_vk},
     )
     node.children = _build_children(child_vk, sub_lt, sub_c, sub_ctx)
-    sub_sum = sum(c.value for c in node.children if c.label != "[slack]")
-    try:
-        child_val = float(ctx.solution[child_vk].to(child_units).magnitude)
-    except (DimensionalityError, KeyError, AttributeError, TypeError, ValueError):
-        child_val = None
-    if child_val:
-        node.slack = max(0.0, (child_val - sub_sum) / child_val)
+    non_slack_frac = sum(c.fraction for c in node.children if c.label != "[slack]")
+    node.slack = max(0.0, 1.0 - non_slack_frac)
 
 
 def _process_term(top_vk, term, ctx):
@@ -448,8 +470,24 @@ def _process_term(top_vk, term, ctx):
                 )
             else:
                 label = _vk_display(child_vk, lineage=True, strip_prefix=parent_prefix)
+        # Use the child variable's own declared units for per-row display
+        native_units = child_vk.unitrepr or ctx.level_units
+        if native_units != ctx.level_units and term.term_qty is not None:
+            try:
+                native_val = float(term.term_qty.to(native_units).magnitude)
+            except (DimensionalityError, AttributeError, TypeError, ValueError):
+                native_units = ctx.level_units
+                native_val = term.term_val
+        else:
+            native_units = ctx.level_units
+            native_val = term.term_val
         node = BudgetNode(
-            label=label, vk=child_vk, value=term.term_val, fraction=0.0, slack=0.0
+            label=label,
+            vk=child_vk,
+            value=native_val,
+            fraction=0.0,
+            slack=0.0,
+            units=native_units,
         )
         if (
             child_vk not in ctx.visited
@@ -466,7 +504,12 @@ def _process_term(top_vk, term, ctx):
     if is_self_ref:
         label += " [margin]"
     return BudgetNode(
-        label=label, vk=None, value=term.term_val, fraction=0.0, slack=0.0
+        label=label,
+        vk=None,
+        value=term.term_val,
+        fraction=0.0,
+        slack=0.0,
+        units=ctx.level_units,
     )
 
 
@@ -478,12 +521,14 @@ def _build_children(top_vk, lt, constraint, ctx):
     ast_labels = _ast_label_map(lt, strip_prefix=parent_prefix)
     hmap_units = lt.hmap.units
     nodes = []
+    level_vals = []  # values in level_units for fraction computation
     for mon in lt.chop():
         term = _make_term(mon, hmap_units, ast_labels, ctx)
         nodes.append(_process_term(top_vk, term, ctx))
-    for node in nodes:
-        node.fraction = node.value / total_val if total_val else 0.0
-    slack = _slack_node(nodes, total_val, is_tight)
+        level_vals.append(term.term_val)
+    for node, lv in zip(nodes, level_vals):
+        node.fraction = lv / total_val if total_val else 0.0
+    slack = _slack_node(level_vals, total_val, is_tight, ctx.level_units)
     if slack:
         nodes.append(slack)
     return nodes
