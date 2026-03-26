@@ -1,8 +1,5 @@
 "Save, load, and apply gpkit substitutions via TOML files."
 
-# pylint: disable=duplicate-code
-# intentional reuse of _format_number / _parse_var_spec patterns
-
 import tomllib
 import warnings
 from pathlib import Path
@@ -10,7 +7,7 @@ from pathlib import Path
 from ..nomials.map import DIMLESS_QUANTITY
 from ..units import qty
 from ._parser import TomlParseError, _parse_var_spec
-from ._printer import _format_number
+from ._printer import _emit_lines, _format_number
 
 # Marker key written to every subs file so load_subs can reject wrong files.
 _GPKIT_SUBS_KEY = "_gpkit_subs"
@@ -85,13 +82,7 @@ def save_subs(model, path=None):
             lines.extend(var_lines)
             lines.append("")
 
-    result = "\n".join(lines)
-
-    if path is not None:
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(result)
-
-    return result
+    return _emit_lines(lines, path)
 
 
 def load_subs(path):
