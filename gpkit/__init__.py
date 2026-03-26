@@ -1,6 +1,6 @@
 "GP and SP modeling package"
 
-__version__ = "0.2.7"
+__version__ = "0.2.8"
 
 from .constraints.set import ConstraintSet
 from .constraints.sigeq import SignomialEquality
