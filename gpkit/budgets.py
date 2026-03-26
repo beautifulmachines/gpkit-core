@@ -87,24 +87,30 @@ def _vks_of_ast_term(node):
 
 
 def _ast_label_map(lt, strip_prefix=None):
-    """Build a {frozenset(varkeys): label_str} map from lt.ast.
+    """Build label and is_var_node maps from lt.ast.
 
-    Returns an empty dict when lt has no AST (caller falls back to
-    _physical_coeff).  The label is generated with units excluded and,
-    when *strip_prefix* is given, the model's lineage prefix stripped so
-    only the relative path is shown.
+    Returns a pair ``(labels, is_var)`` where both are
+    ``{frozenset(varkeys): value}`` dicts.  ``labels`` maps to the display
+    string for each addend term; ``is_var`` maps to ``True`` when the AST
+    term is a bare VarNode (user wrote the variable directly, no scaling)
+    and ``False`` otherwise.  Both dicts are empty when lt has no AST.
+
+    When *strip_prefix* is given (a lineagestr of the parent model), that
+    prefix is removed from variable names so only the relative path is shown.
     """
     if lt.ast is None:
-        return {}
+        return {}, {}
     excluded = ["units"]
     if strip_prefix:
         excluded.append(f":MAGIC:{strip_prefix}")
-    result = {}
+    labels = {}
+    is_var = {}
     for term in _collect_sum_terms(lt.ast):
         vks = _vks_of_ast_term(term)
         if vks:
-            result[vks] = term.str_without(excluded)
-    return result
+            labels[vks] = term.str_without(excluded)
+            is_var[vks] = isinstance(term, VarNode)
+    return labels, is_var
 
 
 def _physical_coeff(exp, coeff, hmap_units):
@@ -122,8 +128,8 @@ def _physical_coeff(exp, coeff, hmap_units):
     try:
         natural = qty("dimensionless")
         for vk, pow_ in exp.items():
-            if vk.unitrepr:
-                natural = natural * qty(vk.unitrepr) ** pow_
+            if vk.units is not None:
+                natural = natural * vk.units**pow_
         conversion = float(natural.to(hmap_units).magnitude)
         if abs(conversion) > 1e-15:
             return coeff / conversion
@@ -378,14 +384,17 @@ class _TermData:
     phys_coeff: float
     term_val: float
     ast_label: Optional[str]
+    is_var_node: Optional[bool] = None  # True iff AST term is a bare VarNode
     term_qty: object = None  # pint Quantity from solution[mon], or None on failure
 
 
-def _make_term(mon, hmap_units, ast_labels, ctx):
+def _make_term(mon, hmap_units, ast_labels, ast_is_var, ctx):
     """Build _TermData for one monomial term."""
     (exp,) = mon.hmap.keys()
     coeff = mon.hmap[exp]
-    ast_label = ast_labels.get(frozenset(exp.keys()))
+    vks = frozenset(exp.keys())
+    ast_label = ast_labels.get(vks)
+    is_var_node = ast_is_var.get(vks)
     phys_coeff = (
         coeff if ast_label is not None else _physical_coeff(exp, coeff, hmap_units)
     )
@@ -400,25 +409,8 @@ def _make_term(mon, hmap_units, ast_labels, ctx):
         phys_coeff=phys_coeff,
         term_val=term_val,
         ast_label=ast_label,
+        is_var_node=is_var_node,
         term_qty=term_qty,
-    )
-
-
-def _slack_node(level_vals, total_val, is_tight, level_units):
-    """Return a slack BudgetNode if the constraint is not tight, else None."""
-    if is_tight:
-        return None
-    children_sum = sum(level_vals)
-    slack_val = total_val - children_sum
-    if not total_val or abs(slack_val / total_val) <= 1e-4:
-        return None
-    return BudgetNode(
-        label="[slack]",
-        vk=None,
-        value=slack_val,
-        fraction=slack_val / total_val,
-        slack=0.0,
-        units=level_units,
     )
 
 
@@ -434,7 +426,7 @@ def _attach_sub_budget(node, child_vk, ctx, remaining_depth=float("inf")):
             stacklevel=5,
         )
     sub_c, sub_lt = sub_matches[0][0], sub_matches[0][1]
-    child_units = child_vk.unitrepr or "dimensionless"
+    child_units = child_vk.unitrepr if child_vk.unitrepr != "-" else "dimensionless"
     sub_ctx = _BudgetCtx(
         solution=ctx.solution,
         model=ctx.model,
@@ -472,7 +464,9 @@ def _process_term(top_vk, term, ctx, remaining_depth=float("inf")):
             else:
                 label = _vk_display(child_vk, lineage=True, strip_prefix=parent_prefix)
         # Use the child variable's own declared units for per-row display
-        native_units = child_vk.unitrepr or ctx.level_units
+        native_units = (
+            child_vk.unitrepr if child_vk.unitrepr != "-" else ctx.level_units
+        )
         if native_units != ctx.level_units and term.term_qty is not None:
             try:
                 native_val = float(term.term_qty.to(native_units).magnitude)
@@ -490,8 +484,10 @@ def _process_term(top_vk, term, ctx, remaining_depth=float("inf")):
             slack=0.0,
             units=native_units,
         )
+        can_recurse = term.ast_label is None or term.is_var_node is True
         if (
-            child_vk not in ctx.visited
+            can_recurse
+            and child_vk not in ctx.visited
             and child_vk.units is not None
             and child_vk.units.is_compatible_with(ctx.level_units)
             and remaining_depth > 0
@@ -519,20 +515,28 @@ def _build_children(top_vk, lt, constraint, ctx, remaining_depth=float("inf")):
     """Recursively build BudgetNode children from the lt side of a budget constraint."""
     total_val = float(ctx.solution[top_vk].to(ctx.level_units).magnitude)
     is_tight = abs(ctx.solution.sens.constraints.get(constraint, 0.0)) > 1e-5
-    ast_labels = _ast_label_map(
+    ast_labels, ast_is_var = _ast_label_map(
         lt, strip_prefix=top_vk.lineagestr() if top_vk.lineage else None
     )
     nodes = []
-    level_vals = []  # values in level_units for fraction computation
     for mon in lt.chop():
-        term = _make_term(mon, lt.hmap.units, ast_labels, ctx)
-        nodes.append(_process_term(top_vk, term, ctx, remaining_depth=remaining_depth))
-        level_vals.append(term.term_val)
-    for node, lv in zip(nodes, level_vals):
-        node.fraction = lv / total_val if total_val else 0.0
-    slack = _slack_node(level_vals, total_val, is_tight, ctx.level_units)
-    if slack:
-        nodes.append(slack)
+        term = _make_term(mon, lt.hmap.units, ast_labels, ast_is_var, ctx)
+        node = _process_term(top_vk, term, ctx, remaining_depth=remaining_depth)
+        node.fraction = term.term_val / total_val if total_val else 0.0
+        nodes.append(node)
+    if not is_tight and total_val:
+        slack_frac = 1.0 - sum(n.fraction for n in nodes)
+        if abs(slack_frac) > 1e-4:
+            nodes.append(
+                BudgetNode(
+                    label="[slack]",
+                    vk=None,
+                    value=slack_frac * total_val,
+                    fraction=slack_frac,
+                    slack=0.0,
+                    units=ctx.level_units,
+                )
+            )
     return nodes
 
 
@@ -582,7 +586,7 @@ def build_budget(solution, model, var, display_units=None, depth=float("inf")):
     top_vk = _resolve_vk(var)
 
     if display_units is None:
-        display_units = top_vk.unitrepr or "dimensionless"
+        display_units = top_vk.unitrepr if top_vk.unitrepr != "-" else "dimensionless"
 
     matches = find_budget_constraints(model, top_vk, solution)
     if not matches:
