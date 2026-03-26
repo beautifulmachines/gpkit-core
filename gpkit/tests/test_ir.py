@@ -1297,6 +1297,20 @@ class TestIRRoundTrip:
         assert not ir_diff(ir, ir)
 
 
+# ── Monomial substitution serialization ───────────────────────────────
+
+
+def test_to_ir_monomial_substitution():
+    """to_ir() must not crash when a substitution value is a Monomial (e.g.
+    created by multiplying a scalar by a units() expression).  Regression
+    test for the bug where float(Monomial) raised TypeError."""
+    C3 = Variable("C3", "km^2/s^2")
+    C3min = Variable("C3min", "km^2/s^2")
+    m = Model(C3, [C3 >= C3min], {C3min: 9.0 * units("km^2/s^2")})
+    ir = m.to_ir()
+    assert ir["substitutions"][C3min.key.ref] == pytest.approx(9.0)
+
+
 # ── gpkit-core catalog round-trip ─────────────────────────────────────
 
 

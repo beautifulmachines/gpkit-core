@@ -15,6 +15,7 @@ from .exceptions import (
     VariableNotFound,
 )
 from .nomials import Monomial, Variable
+from .nomials.map import DIMLESS_QUANTITY
 from .nomials.math import constraint_from_ir, nomial_from_ir
 from .programs.gp import GeometricProgram
 from .programs.prog_factories import progify, solvify
@@ -237,6 +238,13 @@ class Model(CostedConstraintSet):
         for vk, val in self.substitutions.items():
             if callable(val):
                 continue
+            if hasattr(
+                val, "hmap"
+            ):  # constant Monomial or future GPkitUnit wrapper (#156)
+                assert not any(
+                    val.hmap.keys()
+                ), "substitution value should not contain variables"
+                (val,) = val.hmap.to(vk.units or DIMLESS_QUANTITY).values()
             subs_ir[vk.ref] = float(val)
 
         ir = {

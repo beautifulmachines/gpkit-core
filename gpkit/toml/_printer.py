@@ -404,13 +404,7 @@ def to_toml(
         _emit_single_model(ir, lines)
 
     lines.append("")
-    result = "\n".join(lines)
-
-    if path is not None:
-        with open(path, "w", encoding="utf-8") as f:
-            f.write(result)
-
-    return result
+    return _emit_lines(lines, path)
 
 
 def _emit_single_model(ir, lines):  # pylint: disable=too-many-locals
@@ -587,6 +581,15 @@ def _emit_model_section(
         lines.append("]")
 
     lines.append("")
+
+
+def _emit_lines(lines, path):
+    """Join lines, optionally write to path, and return the string."""
+    result = "\n".join(lines)
+    if path is not None:
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(result)
+    return result
 
 
 def _format_var_line(name, value, units, label):
