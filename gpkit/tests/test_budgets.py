@@ -704,3 +704,90 @@ class TestBudgetDepth:
         b = sol.budget(model.m, depth=1)
         assert len(b.children) == 1
         assert not b.children[0].children
+
+
+# ---------------------------------------------------------------------------
+# Tests: dimensionless top-level budget variable (Bug 1)
+# ---------------------------------------------------------------------------
+
+
+class DimensionlessBudgetModel(Model):
+    """Budget where the top-level variable is dimensionless."""
+
+    def setup(self):  # pylint: disable=attribute-defined-outside-init
+        self.f = Variable("f", "-", "total fraction")
+        f_a = Variable("f_a", "-", "fraction a")
+        f_b = Variable("f_b", "-", "fraction b")
+        self.cost = self.f
+        return [
+            self.f >= f_a + f_b,
+            f_a >= Variable("f_a_min", 0.3, "-"),
+            f_b >= Variable("f_b_min", 0.4, "-"),
+        ]
+
+
+class TestDimensionlessBudget:
+    """build_budget() must not crash when the top-level variable has no units."""
+
+    def test_no_crash(self):
+        model = DimensionlessBudgetModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.f)
+        assert isinstance(b, Budget)
+
+    def test_units_is_dimensionless(self):
+        model = DimensionlessBudgetModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.f)
+        assert b.units == "dimensionless"
+
+    def test_total_correct(self):
+        model = DimensionlessBudgetModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.f)
+        assert abs(b.total - 0.7) < 1e-4  # f_a_min=0.3, f_b_min=0.4 → f=0.7
+
+
+# ---------------------------------------------------------------------------
+# Tests: scaled term does not recurse (Bug 2)
+# ---------------------------------------------------------------------------
+
+
+class ScaledTermModel(Model):
+    """Budget constraint has a term f_scale * m_sub where f_scale is a constant.
+
+    m_sub has its own budget constraint. The f_scale * m_sub node must NOT
+    have children — recursing into m_sub's budget would produce sub-totals
+    that don't match the scaled node value.
+    """
+
+    def setup(self):  # pylint: disable=attribute-defined-outside-init
+        f_scale = Variable("f_scale", 0.5, "-", "scaling factor")
+        self.m_sub = Variable("m_sub", "kg", "sub mass")
+        m_sub_min = Variable("m_sub_min", 10, "kg")
+        self.m = Variable("m", "kg", "total mass")
+        self.cost = self.m
+        return [
+            self.m >= f_scale * self.m_sub,
+            self.m_sub >= m_sub_min,
+        ]
+
+
+class TestScaledTermNoRecursion:
+    """Scaled terms (f * m_sub) must be leaf nodes, not recursed into."""
+
+    def test_scaled_node_has_no_children(self):
+        model = ScaledTermModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        assert len(b.children) == 1
+        scaled_node = b.children[0]
+        assert scaled_node.children == []
+
+    def test_scaled_node_value_correct(self):
+        """Node value is 0.5 * 10 = 5 kg, not 10 kg."""
+        model = ScaledTermModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        scaled_node = b.children[0]
+        assert scaled_node.value == pytest.approx(5.0, rel=1e-4)
