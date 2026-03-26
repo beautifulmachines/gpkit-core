@@ -87,9 +87,9 @@ class TestSaveSubs:
                 mu = Variable("mu", "km^2/s^2")
                 r = Variable("r", "km")
                 self.cost = r
-                return [r >= r, mu >= mu], {
+                return [r >= r, mu >= mu], {  # pylint: disable=comparison-with-itself
                     mu: 9.0 * units("km^2/s^2")
-                }  # pylint: disable=comparison-with-itself
+                }
 
         model = Orbit()
         toml_str = save_subs(model)
@@ -105,9 +105,9 @@ class TestSaveSubs:
                 """Set up with a callable substitution."""
                 x = Variable("x", "m")
                 self.cost = x
-                return [x >= x], {
+                return [x >= x], {  # pylint: disable=comparison-with-itself
                     x: lambda _: 1.0
-                }  # pylint: disable=comparison-with-itself
+                }
 
         model = SweepModel()
         toml_str = save_subs(model)
