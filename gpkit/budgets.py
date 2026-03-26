@@ -414,24 +414,6 @@ def _make_term(mon, hmap_units, ast_labels, ast_is_var, ctx):
     )
 
 
-def _slack_node(level_vals, total_val, is_tight, level_units):
-    """Return a slack BudgetNode if the constraint is not tight, else None."""
-    if is_tight:
-        return None
-    children_sum = sum(level_vals)
-    slack_val = total_val - children_sum
-    if not total_val or abs(slack_val / total_val) <= 1e-4:
-        return None
-    return BudgetNode(
-        label="[slack]",
-        vk=None,
-        value=slack_val,
-        fraction=slack_val / total_val,
-        slack=0.0,
-        units=level_units,
-    )
-
-
 def _attach_sub_budget(node, child_vk, ctx, remaining_depth=float("inf")):
     "Recursively attach sub-budget children to *node* if a budget constraint exists."
     sub_matches = find_budget_constraints(ctx.model, child_vk, ctx.solution)
@@ -502,8 +484,9 @@ def _process_term(top_vk, term, ctx, remaining_depth=float("inf")):
             slack=0.0,
             units=native_units,
         )
+        can_recurse = term.ast_label is None or term.is_var_node is True
         if (
-            (term.ast_label is None or term.is_var_node is True)
+            can_recurse
             and child_vk not in ctx.visited
             and child_vk.units is not None
             and child_vk.units.is_compatible_with(ctx.level_units)
@@ -536,16 +519,24 @@ def _build_children(top_vk, lt, constraint, ctx, remaining_depth=float("inf")):
         lt, strip_prefix=top_vk.lineagestr() if top_vk.lineage else None
     )
     nodes = []
-    level_vals = []  # values in level_units for fraction computation
     for mon in lt.chop():
         term = _make_term(mon, lt.hmap.units, ast_labels, ast_is_var, ctx)
-        nodes.append(_process_term(top_vk, term, ctx, remaining_depth=remaining_depth))
-        level_vals.append(term.term_val)
-    for node, lv in zip(nodes, level_vals):
-        node.fraction = lv / total_val if total_val else 0.0
-    slack = _slack_node(level_vals, total_val, is_tight, ctx.level_units)
-    if slack:
-        nodes.append(slack)
+        node = _process_term(top_vk, term, ctx, remaining_depth=remaining_depth)
+        node.fraction = term.term_val / total_val if total_val else 0.0
+        nodes.append(node)
+    if not is_tight and total_val:
+        slack_frac = 1.0 - sum(n.fraction for n in nodes)
+        if abs(slack_frac) > 1e-4:
+            nodes.append(
+                BudgetNode(
+                    label="[slack]",
+                    vk=None,
+                    value=slack_frac * total_val,
+                    fraction=slack_frac,
+                    slack=0.0,
+                    units=ctx.level_units,
+                )
+            )
     return nodes
 
 
