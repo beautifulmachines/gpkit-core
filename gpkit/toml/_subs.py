@@ -7,10 +7,24 @@ from pathlib import Path
 from ..nomials.map import DIMLESS_QUANTITY
 from ..units import qty
 from ._parser import TomlParseError, _parse_var_spec
-from ._printer import _emit_lines, _format_number
+from ._printer import _emit_lines
 
 # Marker key written to every subs file so load_subs can reject wrong files.
 _GPKIT_SUBS_KEY = "_gpkit_subs"
+
+
+def _format_subs_number(v):
+    """Format a float for a subs file, preserving full round-trip precision.
+
+    Uses repr() rather than :.4g so that parameter values with more than 4
+    significant figures (e.g. g = 9.80665 m/s²) are not silently truncated.
+    Clean integers are still written without a decimal point (5000, not 5000.0).
+    """
+    if isinstance(v, int):
+        return str(v)
+    if isinstance(v, float) and v == int(v) and abs(v) < 1e15:
+        return str(int(v))
+    return repr(v)
 
 
 def _lineage_path(model):
@@ -72,10 +86,10 @@ def save_subs(model, path=None):
                 continue
             unit_str = vk.unitrepr if vk.unitrepr and vk.unitrepr != "-" else None
             if unit_str:
-                spec = f"{_format_number(fval)} {unit_str}"
+                spec = f"{_format_subs_number(fval)} {unit_str}"
                 var_lines.append(f'{vk.name} = "{spec}"')
             else:
-                var_lines.append(f"{vk.name} = {_format_number(fval)}")
+                var_lines.append(f"{vk.name} = {_format_subs_number(fval)}")
 
         if var_lines:
             lines.append(f"[{path_str}]")

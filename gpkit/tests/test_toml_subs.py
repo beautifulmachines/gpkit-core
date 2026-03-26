@@ -122,6 +122,22 @@ class TestSaveSubs:
         assert path.exists()
         assert path.read_text(encoding="utf-8") == returned
 
+    def test_save_subs_precision(self):
+        """Values with more than 4 sig figs are preserved exactly."""
+
+        class PhysicsModel(Model):
+            """Model with a high-precision physical constant."""
+
+            def setup(self):
+                """Set up with gravitational acceleration."""
+                g = Variable("g", 9.80665, "m/s^2", "gravitational acceleration")
+                self.cost = g
+                return [g >= g]  # pylint: disable=comparison-with-itself
+
+        model = PhysicsModel()
+        toml_str = save_subs(model)
+        assert "9.80665" in toml_str
+
     def test_save_subs_no_subs(self):
         """Model with no substituted variables produces only the header."""
         model = FreeVarsModel()
