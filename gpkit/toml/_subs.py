@@ -1,5 +1,8 @@
 "Save, load, and apply gpkit substitutions via TOML files."
 
+# pylint: disable=duplicate-code
+# intentional reuse of _format_number / _parse_var_spec patterns
+
 import tomllib
 import warnings
 from pathlib import Path
