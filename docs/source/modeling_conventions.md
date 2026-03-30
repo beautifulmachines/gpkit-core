@@ -312,6 +312,27 @@ the caller from the concrete Perf class, which is useful when the Perf class may
 or swapped. For simple cases with one fixed Perf class, calling `WingAero(wing, state)` directly
 is also fine.
 
+**Perf does not own its Component.** A Perf model receives the Component as a `setup()`
+argument — it does not include the Component in its returned constraint list. Component and
+Perf are siblings, not parent-child.
+
+Why it matters: when a multi-condition model vectorizes Perf with `Vectorize(N)`, the
+Component is shared across all N conditions. If Perf returned the Component in its
+constraints, the Component would be pulled into the vectorization and its variables would
+become N-element arrays — almost certainly wrong.
+
+```python
+# CORRECT — wing used but not owned; remains scalar when WingAero is vectorized
+class WingAero(Model):
+    def setup(self, wing, state):
+        return [...]    # wing not in this list
+
+# WRONG — wing returned in constraints; gets vectorized with WingAero
+class WingAero(Model):
+    def setup(self, wing, state):
+        return [wing, ...]    # anti-pattern
+```
+
 ---
 
 ## 5. Multi-Condition Analysis
@@ -848,6 +869,83 @@ class Wing(Model):
 
 ---
 
+### 9.6 Anonymous Top-Level Model
+
+When the top-level model doesn't own any variables — its only job is to combine a Component
+and its Perf into a solvable problem — it can be an anonymous `Model(cost, [...])`:
+
+```python
+wing = Wing()
+state = FlightState()
+perf = WingAero(wing, state)
+M = Model(perf.D, [wing, state, perf])
+sol = M.solve()
+```
+
+This is idiomatic when there's no inter-segment coupling, no mission-level variables, and no
+reason to name the top-level glue. A named subclass adds value when the top-level owns
+variables (takeoff fuel, total mass) or appears in a catalog/registry.
+
+`apply_subs()`, `to_ir()`, and `model.walk()` all work correctly: the anonymous model has
+no lineage, but its named children are fully traversable.
+
+---
+
+### 9.7 Variable Ownership Level
+
+A variable belongs to the model whose constraints are primarily responsible for bounding it.
+The question of where to declare a variable often comes up when a quantity is naturally
+accessible at multiple levels of the hierarchy.
+
+**The vectorization test.** Ask: "if this sub-model were vectorized across N conditions,
+should this variable become a length-N vector?" If yes, own it in the sub-model — it will
+vectorize automatically with the model that owns it. If it should stay scalar regardless of
+how many sub-model instances exist, own it at a higher level.
+
+Example: a `Powerplant` contains an `Alternator`. The alternator output power `P_elec` is
+per-operating-condition — it should vectorize if the powerplant is used across N flight
+segments. Own it in `Alternator`.
+
+**Alias-up for ergonomics.** A higher-level model can expose a sub-model's variable as an
+instance attribute without changing ownership:
+
+```python
+class Powerplant(Model):
+    def setup(self):
+        self.alternator = Alternator()
+        self.motor = Motor()
+        self.P_elec = self.alternator.P_elec  # alias — same Variable object, no copy
+        return [self.alternator, self.motor, ...]
+```
+
+`powerplant.P_elec` and `powerplant.alternator.P_elec` are the same `Variable` object.
+Constraints written with either reference are automatically linked.
+
+**Own-high, pass-down** — for the rarer case where a variable is genuinely a system-level
+quantity whose constraints are split across sub-models. Own the variable at the higher level
+and pass it to sub-model `setup()` methods as an argument:
+
+```python
+class Powerplant(Model):
+    P_net = Var("W", "net output power")   # a Powerplant-level design variable
+
+    def setup(self):
+        self.alternator = Alternator()
+        self.converter = Converter(self.alternator, self.P_net)  # pass down
+        # Converter.setup(self, alternator, P_net) uses P_net in its constraints
+        # P_net lives at Powerplant level and stays scalar if Powerplant is vectorized
+        return [self.alternator, self.converter, ...]
+```
+
+Use own-high/pass-down when the variable represents a system output that should not
+vectorize with a sub-model, or when multiple sub-models must share a single variable
+that neither "owns" independently.
+
+**Rule of thumb:** Own low, alias up. The alias-up pattern gives ergonomic access at higher
+levels without compromising the variable's natural home or its vectorization behavior.
+
+---
+
 ## Quick Reference
 
 | Concept | Signature | Typical contents |
@@ -871,6 +969,10 @@ class Wing(Model):
 | Vectorize an orchestrator | `with Vectorize(N): self.fs = FlightState()` inside orchestrator `setup()` |
 | Accumulate a consumable total | `self.W_fuel >= self.be.W_fuel.sum()` |
 | Chain state continuity across N elements | `self.perf.W_end[:-1] >= self.perf.W_start[1:]` |
+| Anonymous top-level (no owned variables) | `Model(cost, [component, perf])` — no subclass needed |
+| Expose sub-model variable at higher level | `self.P_elec = self.alternator.P_elec` (alias-up, same object) |
+| Variable that should vectorize with Perf | Declare with `Var` in the Perf model |
+| Variable that should stay scalar | Own it higher; pass its owner as a `setup()` argument |
 
 ---
 

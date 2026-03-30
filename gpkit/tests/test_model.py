@@ -824,6 +824,17 @@ class TestModelNoSolve:
         for var in ("h", "w", "d"):
             assert len(M.varkeys.by_name(var)) == 1
 
+    def test_anonymous_top_level_walks_children(self):
+        """Model(cost, [sub1, sub2]) should detect and walk children."""
+        box = Box()
+        area_bounds = BoxAreaBounds(box)
+        M = Model(box.V, [box, area_bounds])
+        assert box in M._children
+        assert area_bounds in M._children
+        walked = list(M.walk())
+        assert box in walked
+        assert area_bounds in walked
+
     def test_duplicate_submodel_varnames(self):
         w = Widget()
         # w has two Sub models, both with their own variable m
