@@ -829,8 +829,8 @@ class TestModelNoSolve:
         box = Box()
         area_bounds = BoxAreaBounds(box)
         M = Model(box.V, [box, area_bounds])
-        assert box in M._children
-        assert area_bounds in M._children
+        assert box in M.submodels
+        assert area_bounds in M.submodels
         walked = list(M.walk())
         assert box in walked
         assert area_bounds in walked
