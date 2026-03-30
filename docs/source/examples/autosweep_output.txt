@@ -23,13 +23,11 @@ Optimal Cost
 ------------
 A² : [ 0.333  1      123   ] [m⁴]
 
-Free Variables
---------------
+Solution
+--------
 A : [ 0.577  1      11.1  ] [m²]
-
-Fixed Variables
----------------
- w : [ 1   3      10 ] [m]
+ - constants -
+w : [ 1   3      10 ] [m]
 sens ( +1  +2.47  +4 )
 
 Most Sensitive Constraints

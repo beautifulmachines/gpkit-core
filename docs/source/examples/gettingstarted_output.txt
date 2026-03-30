@@ -20,8 +20,8 @@ Optimal Cost
 ------------
 1/(x·y·z) : 0.005511
 
-Free Variables
---------------
+Solution
+--------
 x : 8.165
 y : 4.082
 z : 5.443

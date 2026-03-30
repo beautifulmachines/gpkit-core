@@ -13,23 +13,60 @@ Unexpectedly Loose Constraints:
 0.7884 >= 0.7769 : V_{f_{avail}} ≥ V_f  (in 1 of 3 solutions)
 0.9585 >= 0.9187 : V_{f_{avail}} ≥ V_f  (in 1 of 3 solutions)
 
-Free Variables
---------------
-       (CDA0) : [ 0.05      0.05      0.05     ] [m²]  fuselage drag area
-            A : [ 12.4      3.78      2.35     ]       aspect ratio
-          C_D : [ 0.0136    0.011     0.0099   ]       drag coefficient
-          C_L : [ 0.327     0.162     0.121    ]       lift coefficient of wing
-          C_f : [ 0.00343   0.00284   0.00261  ]       skin friction coefficient
-            D : [ 466       774       1e+03    ] [N]   total drag force
-          L/D : [ 24.1      14.8      12.2     ]       lift-to-drag ratio
-           Re : [ 4.64e+06  1.21e+07  1.83e+07 ]       Reynold's number
-            S : [ 22        29.7      35.6     ] [m²]  total wing area
-   T_{flight} : [ 16.6      13.4      12.3     ] [h]   flight time
-            V : [ 50.3      62.1      67.9     ] [m/s] cruising speed
-          V_f : [ 0.577     0.777     0.919    ] [m³]  fuel volume
-V_{f_{avail}} : [ 0.589     0.788     0.958    ] [m³]  fuel volume available
-            W : [ 1.35e+04  1.45e+04  1.59e+04 ] [N]   total aircraft weight
-          W_f : [ 4.63e+03  6.23e+03  7.36e+03 ] [N]   fuel weight
-          W_w : [ 2.65e+03  2.05e+03  2.29e+03 ] [N]   wing weight
-     W_w_strc : [ 1.33e+03  269       151      ] [N]   wing structural weight
-     W_w_surf : [ 1.32e+03  1.78e+03  2.14e+03 ] [N]   wing skin weight
+Solution
+--------
+             (CDA0) : [ 0.05      0.05      0.05     ] [m²]     fuselage drag area
+                  A : [ 12.4      3.78      2.35     ]          aspect ratio
+                C_D : [ 0.0136    0.011     0.0099   ]          drag coefficient
+                C_L : [ 0.327     0.162     0.121    ]          lift coefficient of wing
+                C_f : [ 0.00343   0.00284   0.00261  ]          skin friction coefficient
+                  D : [ 466       774       1e+03    ] [N]      total drag force
+                L/D : [ 24.1      14.8      12.2     ]          lift-to-drag ratio
+                 Re : [ 4.64e+06  1.21e+07  1.83e+07 ]          Reynold's number
+                  S : [ 22        29.7      35.6     ] [m²]     total wing area
+         T_{flight} : [ 16.6      13.4      12.3     ] [h]      flight time
+                  V : [ 50.3      62.1      67.9     ] [m/s]    cruising speed
+                V_f : [ 0.577     0.777     0.919    ] [m³]     fuel volume
+      V_{f_{avail}} : [ 0.589     0.788     0.958    ] [m³]     fuel volume available
+                  W : [ 1.35e+04  1.45e+04  1.59e+04 ] [N]      total aircraft weight
+                W_f : [ 4.63e+03  6.23e+03  7.36e+03 ] [N]      fuel weight
+                W_w : [ 2.65e+03  2.05e+03  2.29e+03 ] [N]      wing weight
+           W_w_strc : [ 1.33e+03  269       151      ] [N]      wing structural weight
+           W_w_surf : [ 1.32e+03  1.78e+03  2.14e+03 ] [N]      wing skin weight
+ - constants -
+              Range : [ 3e+03      3e+03     3e+03    ] [km]     aircraft range
+                 sens ( +1.38      +1.14     +1.15    )
+               TSFC : [ 0.6        0.6       0.6      ] [1/h]    thrust specific fuel consumption
+                 sens ( +1.38      +1.14     +1.15    )
+            V_{min} : [ 25         25        25       ] [m/s]    takeoff speed
+                 sens ( -1.35      ~0        ~0       )
+(\frac{S}{S_{wet}}) : [ 2.08       2.08      2.08     ]          wetted area ratio
+                 sens ( +0.848     +0.715    +0.738   )
+                  k : [ 1.17       1.17      1.17     ]          form factor
+                 sens ( +0.848     +0.715    +0.738   )
+                W_0 : [ 6.25e+03   6.25e+03  6.25e+03 ] [N]      aircraft weight excluding wing
+                 sens ( +0.729     +0.279    +0.26    )
+          C_{L,max} : [ 1.6        1.6       1.6      ]          max CL with flaps down
+                 sens ( -0.677     ~0        ~0       )
+               \rho : [ 1.23       1.23      1.23     ] [kg/m³]  density of air
+                 sens ( -0.0709    +0.498    +0.503   )
+               \tau : [ 0.12       0.12      0.12     ]          airfoil thickness to chord ratio
+                 sens ( -0.146     -0.331    -0.343   )
+           V_f_wing : [ 0.1        0.3       0.5      ] [m³]     fuel volume in the wing
+                 sens ( +4.58e-07  +0.319    +0.336   )
+                  e : [ 0.92       0.92      0.92     ]          Oswald efficiency factor
+                 sens ( -0.303     -0.249    -0.251   )
+           V_f_fuse : [ 0.5        0.5       0.5      ] [m³]     fuel volume in the fuselage
+                 sens ( +0.259     +0.177    +0.165   )
+                \mu : [ 1.78e-05   1.78e-05  1.78e-05 ] [kg/m/s] viscosity of air
+                 sens ( +0.17      +0.143    +0.148   )
+            N_{ult} : [ 3.3        3.3       3.3      ]          ultimate load factor
+                 sens ( +0.146     +0.0118   +0.00623 )
+     W_{W_{coeff1}} : [ 2e-05      2e-05     2e-05    ] [1/m]    wing weight coefficent 1
+                 sens ( +0.146     +0.0118   +0.00623 )
+     W_{W_{coeff2}} : [ 60         60        60       ] [Pa]     wing weight coefficent 2
+                 sens ( +0.144     +0.0784   +0.0884  )
+             \rho_f : [ 817        817       817      ] [kg/m³]  density of fuel
+                 sens ( +0.0284    +0.00231  +0.00122 )
+                  g : [ 9.81       9.81      9.81     ] [m/s²]   gravitational acceleration
+                 sens ( +0.0284    +0.00231  +0.00122 )

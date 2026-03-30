@@ -80,7 +80,7 @@ class Sensitivities:
         raise NotImplementedError
 
 
-SUMMARY_TABLES = ("sweeps", "cost", "warnings", "freevariables")
+SUMMARY_TABLES = ("sweeps", "cost", "warnings", "solution")
 
 
 @dataclass(frozen=True, slots=True)

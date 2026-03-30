@@ -84,6 +84,23 @@ class TestSolution:
         assert msol[x] == spsol[x]
         assert msol[x] == gpsol[x]
 
+    def test_solution_section(self):
+        """Solution table has a single combined 'Solution' section."""
+        x = Variable("x", "m", "free variable")
+        c = Variable("c", 2.0, "m", "fixed variable")
+        m = Model(x, [x >= c])
+        sol = m.solve(verbosity=0)
+        tab = sol.table()
+        assert "Solution" in tab
+        assert "Free Variables" not in tab
+        assert "Fixed Variables" not in tab
+        # fixed var sensitivity appears in the table
+        assert "(+" in tab or "(~0)" in tab
+        # free var appears before " - constants -", fixed var after
+        sol_section = tab[tab.index("Solution") :]
+        assert sol_section.index("x") < sol_section.index("- constants -")
+        assert sol_section.index("c") > sol_section.index("- constants -")
+
     def test_result_access(self):
         """Test result table access from SP solution"""
         x = Variable("x")

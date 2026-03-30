@@ -38,18 +38,32 @@ Optimal Cost
 ------------
 D : 303.1 [N]
 
-Free Variables
---------------
-  A : 8.46            aspect ratio
-C_D : 0.02059         Drag coefficient of wing
-C_L : 0.4988          Lift coefficent of wing
-C_f : 0.003599        skin friction coefficient
-  D : 303.1     [N]   total drag force
- Re : 3.675e+06       Reynold's number
-  S : 16.44     [m²]  total wing area
-  V : 38.15     [m/s] cruising speed
-  W : 7341      [N]   total aircraft weight
-W_w : 2401      [N]   wing weight
+Solution
+--------
+                  A : 8.46                          aspect ratio
+                C_D : 0.02059                       Drag coefficient of wing
+                C_L : 0.4988                        Lift coefficent of wing
+                C_f : 0.003599                      skin friction coefficient
+                  D : 303.1     [N]                 total drag force
+                 Re : 3.675e+06                     Reynold's number
+                  S : 16.44     [m²]                total wing area
+                  V : 38.15     [m/s]               cruising speed
+                  W : 7341      [N]                 total aircraft weight
+                W_w : 2401      [N]                 wing weight
+ - constants -
+                W_0 : 4940      [N]      (+1.011)   aircraft weight excluding wing
+                  e : 0.95               (-0.4785)  Oswald efficiency factor
+(\frac{S}{S_{wet}}) : 2.05               (+0.4299)  wetted area ratio
+                  k : 1.2                (+0.4299)  form factor
+            V_{min} : 22        [m/s]    (-0.3678)  takeoff speed
+            N_{ult} : 3.8                (+0.2903)  ultimate load factor
+     W_{W_{coeff1}} : 8.71e-05  [1/m]    (+0.2903)  Wing Weight Coefficent 1
+               \tau : 0.12               (-0.2903)  airfoil thickness to chord ratio
+               \rho : 1.23      [kg/m³]  (-0.2269)  density of air
+          C_{L,max} : 1.5                (-0.1839)  max CL with flaps down
+     W_{W_{coeff2}} : 45.24     [Pa]     (+0.1303)  Wing Weight Coefficent 2
+             (CDA0) : 0.031     [m²]     (+0.09156) fuselage drag area
+                \mu : 1.78e-05  [kg/m/s] (+0.08599) viscosity of air
 
 Cost Change
 -----------
@@ -65,17 +79,46 @@ Optimal Cost
 ------------
 D : [ 338  396  294  326 ] [N]
 
-Free Variables
---------------
-  A : [ 6.2       4.77      8.84      7.16     ]      aspect ratio
-C_D : [ 0.0146    0.0123    0.0196    0.0157   ]      Drag coefficient of wing
-C_L : [ 0.296     0.198     0.463     0.31     ]      Lift coefficent of wing
-C_f : [ 0.00333   0.00314   0.00361   0.00342  ]      skin friction coefficient
-  D : [ 338       396       294       326      ] [N]  total drag force
- Re : [ 5.38e+06  7.24e+06  3.63e+06  4.75e+06 ]      Reynold's number
-  S : [ 18.6      17.3      12.1      11.2     ] [m²] total wing area
-  W : [ 6.85e+03  6.4e+03   6.97e+03  6.44e+03 ] [N]  total aircraft weight
-W_w : [ 1.91e+03  1.46e+03  2.03e+03  1.5e+03  ] [N]  wing weight
+Solution
+--------
+                  A : [ 6.2       4.77      8.84      7.16     ]          aspect ratio
+                C_D : [ 0.0146    0.0123    0.0196    0.0157   ]          Drag coefficient of wing
+                C_L : [ 0.296     0.198     0.463     0.31     ]          Lift coefficent of wing
+                C_f : [ 0.00333   0.00314   0.00361   0.00342  ]          skin friction coefficient
+                  D : [ 338       396       294       326      ] [N]      total drag force
+                 Re : [ 5.38e+06  7.24e+06  3.63e+06  4.75e+06 ]          Reynold's number
+                  S : [ 18.6      17.3      12.1      11.2     ] [m²]     total wing area
+                  W : [ 6.85e+03  6.4e+03   6.97e+03  6.44e+03 ] [N]      total aircraft weight
+                W_w : [ 1.91e+03  1.46e+03  2.03e+03  1.5e+03  ] [N]      wing weight
+ - constants -
+            V_{min} : [ 20        20        25        25       ] [m/s]    takeoff speed
+                 sens ( -0.822    -1.04     -0.415    -0.705   )
+                  V : [ 45        55        45        55       ] [m/s]    cruising speed
+                 sens ( +0.589    +0.975    +0.249    +0.746   )
+                W_0 : [ 4.94e+03  4.94e+03  4.94e+03  4.94e+03 ] [N]      aircraft weight excluding wing
+                 sens ( +0.919    +0.845    +0.947    +0.847   )
+(\frac{S}{S_{wet}}) : [ 2.05      2.05      2.05      2.05     ]          wetted area ratio
+                 sens ( +0.561    +0.63     +0.454    +0.536   )
+                  k : [ 1.2       1.2       1.2       1.2      ]          form factor
+                 sens ( +0.561    +0.63     +0.454    +0.536   )
+          C_{L,max} : [ 1.5       1.5       1.5       1.5      ]          max CL with flaps down
+                 sens ( -0.411    -0.521    -0.207    -0.353   )
+                  e : [ 0.95      0.95      0.95      0.95     ]          Oswald efficiency factor
+                 sens ( -0.325    -0.225    -0.415    -0.287   )
+            N_{ult} : [ 3.8       3.8       3.8       3.8      ]          ultimate load factor
+                 sens ( +0.179    +0.108    +0.247    +0.155   )
+     W_{W_{coeff1}} : [ 8.71e-05  8.71e-05  8.71e-05  8.71e-05 ] [1/m]    Wing Weight Coefficent 1
+                 sens ( +0.179    +0.108    +0.247    +0.155   )
+               \tau : [ 0.12      0.12      0.12      0.12     ]          airfoil thickness to chord ratio
+                 sens ( -0.179    -0.108    -0.247    -0.155   )
+             (CDA0) : [ 0.031     0.031     0.031     0.031    ] [m²]     fuselage drag area
+                 sens ( +0.114    +0.146    +0.131    +0.177   )
+               \rho : [ 1.23      1.23      1.23      1.23     ] [kg/m³]  density of air
+                 sens ( -0.172    -0.097    -0.129    -0.0331  )
+     W_{W_{coeff2}} : [ 45.2      45.2      45.2      45.2     ] [Pa]     Wing Weight Coefficent 2
+                 sens ( +0.141    +0.126    +0.0911   +0.0787  )
+                \mu : [ 1.78e-05  1.78e-05  1.78e-05  1.78e-05 ] [kg/m/s] viscosity of air
+                 sens ( +0.112    +0.126    +0.0907   +0.107   )
 Cost Change
 -----------
 D : [ +11.5%   +30.7%   -2.9%    +7.54%  ]

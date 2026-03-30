@@ -20,8 +20,8 @@ Optimal Cost
 ------------
 x : 0.9
 
-Free Variables
---------------
+Solution
+--------
 x : 0.9
 y : 0.1
 
