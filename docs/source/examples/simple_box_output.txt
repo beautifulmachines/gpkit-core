@@ -34,7 +34,7 @@ Box
       d : 8.17  [m]               depth
       h : 8.163 [m]               height
       w : 4.081 [m]               width
- - constants -
+...constants
  A_wall : 200   [m²] (-1.5)       upper limit, wall area
   alpha : 2          (+0.5)       lower limit, wall aspect ratio
   gamma : 2          (+0.0002986) lower limit, floor aspect ratio

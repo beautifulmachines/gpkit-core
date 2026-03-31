@@ -87,14 +87,14 @@ Aircraft
 W : 144.1 [lbf]  weight
 
 Aircraft.Fuselage
- - constants -
+...constants
 W : 100 [lbf] (+0.9695) weight
 
 Aircraft.Wing
   S : 44.14 [ft²]               surface area
   W : 44.14 [lbf]               weight
   c : 1.279 [ft]                mean chord
- - constants -
+...constants
   A : 27              (-0.6716) aspect ratio
 rho : 1     [lbf/ft²] (+0.4279) areal density
 
@@ -107,12 +107,12 @@ CD[:] : [ 0.019     0.0189    0.0189    0.0188   ]       drag coefficient
 CL[:] : [ 1.01      1         1         1        ]       lift coefficient
  D[:] : [ 2.74      2.73      2.72      2.72     ] [lbf] drag force
 Re[:] : [ 3.65e+05  3.65e+05  3.65e+05  3.65e+05 ]       Reynold's number
- - constants -
+...constants
  e[:] : [ 0.9     0.9     0.9     0.9    ]       Oswald efficiency
    sens ( -0.176  -0.176  -0.175  -0.175 )
 
 Mission.FlightSegment.FlightState
- - constants -
+...constants
   V[:] : [ 40        40        40        40       ] [kn]     true airspeed
     sens ( -0.215    -0.214    -0.214    -0.213   )
 rho[:] : [ 0.74      0.74      0.74      0.74     ] [kg/m³]  air density

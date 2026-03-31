@@ -36,7 +36,7 @@ Solution
 --------
 System.Fleet2
 z[:] : [ 1 ]
- - constants -
+...constants
 y[:] : [ 3    1     ]
   sens ( nan  +0.25 )
 x[:] : [ 4  ]
@@ -107,7 +107,7 @@ Solution
 --------
 System2.Fleet2
 z[:] : [ 1  1  1 ]
- - constants -
+...constants
 y[:] : [ 3    3    3    1        1        1       ]
   sens ( nan  nan  nan  +0.0833  +0.0833  +0.0833 )
 x[:] : [ 4   4   4  ]
@@ -147,7 +147,7 @@ Cake.Simple
 x[0] : [ 2  ]
 x[1] : [ 6  ]
 x[2] : [ 12 ]
- - constants -
+...constants
 y[2] : [ 3     ]
   sens ( +1.05 )
 y[1] : [ 2     ]

@@ -33,7 +33,7 @@ Solution
                 W_w : [ 2.65e+03  2.05e+03  2.29e+03 ] [N]      wing weight
            W_w_strc : [ 1.33e+03  269       151      ] [N]      wing structural weight
            W_w_surf : [ 1.32e+03  1.78e+03  2.14e+03 ] [N]      wing skin weight
- - constants -
+...constants
               Range : [ 3e+03      3e+03     3e+03    ] [km]     aircraft range
                  sens ( +1.38      +1.14     +1.15    )
                TSFC : [ 0.6        0.6       0.6      ] [1/h]    thrust specific fuel consumption

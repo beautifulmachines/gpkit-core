@@ -62,7 +62,7 @@ All constraints relaxed by 42%
 Solution
 --------
     x : 1.414
- - constants -
+...constants
 x_max : 1      (-0.5)
 x_min : 2      (+0.5)
 
@@ -139,7 +139,7 @@ Relaxed Constraints:
 Solution
 --------
     x : 1
- - constants -
+...constants
 x_min : 2  (+1)
 x_max : 1  (-0.99)
 
@@ -224,7 +224,7 @@ x_max : 1
 x_min : 2
 
 Relax2.OriginalValues
- - constants -
+...constants
 x_max : 1  (~0)
 x_min : 2  (~0)
 

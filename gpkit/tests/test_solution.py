@@ -96,10 +96,10 @@ class TestSolution:
         assert "Fixed Variables" not in tab
         # fixed var sensitivity appears in the table
         assert "(+" in tab or "(~0)" in tab
-        # free var appears before " - constants -", fixed var after
+        # free var appears before "...constants", fixed var after
         sol_section = tab[tab.index("Solution") :]
-        assert sol_section.index("x") < sol_section.index("- constants -")
-        assert sol_section.index("c") > sol_section.index("- constants -")
+        assert sol_section.index("x") < sol_section.index("...constants")
+        assert sol_section.index("c") > sol_section.index("...constants")
 
     def test_result_access(self):
         """Test result table access from SP solution"""
