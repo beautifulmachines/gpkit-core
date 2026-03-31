@@ -458,7 +458,7 @@ class SolutionSection(Constants):
                 ).rstrip()
             )
         if scalar_fixed or vec_fixed:
-            lines.append(" - constants -")
+            lines.append("-constants-")
         lines.extend(aligned[len(scalar_free) :])
         self._fmt_col_widths = self._vec_col_widths(vec_fixed)
         for key, (val, sens) in vec_fixed:
