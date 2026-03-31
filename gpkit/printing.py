@@ -234,6 +234,10 @@ class Constants(SectionSpec):
     align = "><<<<"  # name(R), value(L), unit(L), sens-in-parens(L), label(L)
     sortkey = staticmethod(lambda x: (-rounded_mag(x[1][1]), str(x[0])))
     nearzero_tol = 1e-7
+    _fmt_unit_w = 0  # overridden per-group by SolutionSection._format_model_group
+    _fmt_col_widths = (
+        None  # overridden per-group by SolutionSection._format_model_group
+    )
 
     def items_from(self, ctx):
         """Yield (varkey, (value, sensitivity)) for each fixed variable."""
@@ -256,13 +260,15 @@ class Constants(SectionSpec):
         p = self.options.precision
         return f"({sens:+.{p}g})"
 
-    def _fmt_vec_pair(self, flat_val, flat_sens, n, p, col_widths=None):
+    def _fmt_vec_pair(self, flat_val, flat_sens):
         """Build aligned value/sensitivity vector strings.
 
         Each element position uses the wider of its value or sensitivity string,
         so value and sensitivity rows align vertically column by column.
         Returns (val_vec, sens_vec) bracket/paren strings.
         """
+        n, p = self.options.vecn, self.options.precision
+        col_widths = getattr(self, "_fmt_col_widths", None)
         val_strs = [self._fmt_one(x, p) for x in flat_val[:n]]
         sens_strs = [self._fmt_one_sens(x, p) for x in flat_sens[:n]]
         min_ws = col_widths or [0] * len(val_strs)
@@ -274,20 +280,18 @@ class Constants(SectionSpec):
         sens_body = "  ".join(s.ljust(w) for s, w in zip(sens_strs, widths))
         return f"[ {val_body}{dots} ]", f"( {sens_body}{dots} )"
 
-    def _fmt_vector_item(
-        self, key, val, sens, name_w, unit_w=0, col_widths=None
-    ) -> list[str]:
+    def _fmt_vector_item(self, key, val, sens, name_w) -> list[str]:
         """Format a vector constant as two lines: values then sensitivities below."""
-        p, n = self.options.precision, self.options.vecn
         flat_val = np.asarray(val).ravel()
         flat_sens = (
             np.asarray(sens).ravel()
             if np.shape(sens)
             else np.full(flat_val.shape, float(sens))
         )
-        val_vec, sens_vec = self._fmt_vec_pair(flat_val, flat_sens, n, p, col_widths)
+        val_vec, sens_vec = self._fmt_vec_pair(flat_val, flat_sens)
         name_col = f"{key.str_without('lineage'):>{name_w}} :"
-        parts = [name_col, val_vec, _unitstr(key).ljust(unit_w), key.label or ""]
+        unit = _unitstr(key).ljust(self._fmt_unit_w)
+        parts = [name_col, val_vec, unit, key.label or ""]
         line1 = self.col_sep.join(x for x in parts if x).rstrip()
         sens_col = f"{'sens':>{name_w + 2}}"
         return [line1, f"{sens_col}{self.col_sep}{sens_vec}"]
@@ -388,6 +392,14 @@ class SolutionSection(Constants):
                 )
         return widths
 
+    def _fmt_free_vec(self, val, vw) -> str:
+        """Format a free vector value with uniform element width vw."""
+        n, p = self.options.vecn, self.options.precision
+        flat = np.asarray(val).ravel()
+        body = "  ".join(self._fmt_one(x, p).ljust(vw) for x in flat[:n])
+        dots = " ..." if flat.size > n else ""
+        return f"[ {body}{dots} ]"
+
     def _format_model_group(self, model_items) -> list[str]:
         """Free vars (alphabetical) then fixed vars (by magnitude)."""
         scalar_free = sorted(
@@ -407,42 +419,39 @@ class SolutionSection(Constants):
             key=lambda x: (-rounded_mag(x[1][1]), str(x[0])),
         )
         name_w = max((len(k.str_without("lineage")) for k, _ in model_items), default=0)
-        unit_w = max((len(_unitstr(k)) for k, _ in vec_free + vec_fixed), default=0)
-        # Global element width for free vectors
         vw = self._max_val_width([(k, v[0]) for k, v in vec_free])
-
-        # _row pre-pads name to name_w so scalars and vectors share the same column.
-        def _row(item):
-            key, (val, sens) = item
-            return [
-                f"{key.str_without('lineage'):>{name_w}} :",
-                self._fmt_val(val),
-                _unitstr(key),
-                "" if sens is None else self._fmt_sens(sens),
-                key.label or "",
-            ]
-
+        # Instance attrs communicate formatting to _fmt_vector_item/_fmt_vec_pair.
+        self._fmt_unit_w = max(
+            (len(_unitstr(k)) for k, _ in vec_free + vec_fixed), default=0
+        )
         # Run all scalars together for shared column widths, split at the boundary.
         aligned = (
             _format_aligned_columns(
-                [_row(i) for i in scalar_free + scalar_fixed], self.align, self.col_sep
+                [
+                    [
+                        f"{k.str_without('lineage'):>{name_w}} :",
+                        self._fmt_val(v[0]),
+                        _unitstr(k),
+                        "" if v[1] is None else self._fmt_sens(v[1]),
+                        k.label or "",
+                    ]
+                    for k, v in scalar_free + scalar_fixed
+                ],
+                self.align,
+                self.col_sep,
             )
             if scalar_free or scalar_fixed
             else []
         )
         lines = list(aligned[: len(scalar_free)])
-        p, n = self.options.precision, self.options.vecn
         for key, (val, _) in vec_free:
-            flat = np.asarray(val).ravel()
-            body = "  ".join(self._fmt_one(x, p).ljust(vw) for x in flat[:n])
-            dots = " ..." if flat.size > n else ""
             lines.append(
                 self.col_sep.join(
                     x
                     for x in [
                         f"{key.str_without('lineage'):>{name_w}} :",
-                        f"[ {body}{dots} ]",
-                        _unitstr(key).ljust(unit_w),
+                        self._fmt_free_vec(val, vw),
+                        _unitstr(key).ljust(self._fmt_unit_w),
                         key.label or "",
                     ]
                     if x
@@ -451,11 +460,9 @@ class SolutionSection(Constants):
         if scalar_fixed or vec_fixed:
             lines.append(" - constants -")
         lines.extend(aligned[len(scalar_free) :])
-        col_widths = self._vec_col_widths(vec_fixed)
+        self._fmt_col_widths = self._vec_col_widths(vec_fixed)
         for key, (val, sens) in vec_fixed:
-            lines.extend(
-                super()._fmt_vector_item(key, val, sens, name_w, unit_w, col_widths)
-            )
+            lines.extend(super()._fmt_vector_item(key, val, sens, name_w))
         return lines
 
 
