@@ -137,8 +137,8 @@ class TestLoadSimpleBox:
 
         assert float(next(iter(toml_sol.primal.values()))) > 0
         # Both solutions should have same table structure
-        assert "Free Variables" in toml_sol.table()
-        assert "Free Variables" in py_sol.table()
+        assert "Solution" in toml_sol.table()
+        assert "Solution" in py_sol.table()
 
 
 # ---------------------------------------------------------------------------
@@ -161,7 +161,7 @@ class TestLoadSimpleFlight:
     def test_solves(self, model):
         """Model solves without error."""
         sol = model.solve(verbosity=0)
-        assert "Free Variables" in sol.table()
+        assert "Solution" in sol.table()
 
     def test_drag_positive(self, model):
         """Optimal drag should be positive."""
@@ -190,7 +190,7 @@ class TestLoadBeam:
     def test_solves(self, model):
         """Model solves without error."""
         sol = model.solve(verbosity=0)
-        assert "Free Variables" in sol.table()
+        assert "Solution" in sol.table()
 
     def test_tip_displacement_reasonable(self, model):
         """Tip displacement w[N-1] should be positive and finite."""
@@ -215,7 +215,7 @@ class TestLoadWaterTank:
     def test_solves(self, model):
         """Model solves without error."""
         sol = model.solve(verbosity=0)
-        assert "Free Variables" in sol.table()
+        assert "Solution" in sol.table()
 
     def test_cube_symmetry(self, model):
         """Optimal water tank should be a cube (all dimensions equal)."""

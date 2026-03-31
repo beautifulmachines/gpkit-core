@@ -59,17 +59,15 @@ WARNINGS
 Relaxed Constraints:
 All constraints relaxed by 42%
 
-Free Variables
---------------
-x : 1.414
+Solution
+--------
+    x : 1.414
+...constants
+x_max : 1      (-0.5)
+x_min : 2      (+0.5)
 
 Relax
 C : 1.414
-
-Fixed Variables
----------------
-x_max : 1  (-0.5)
-x_min : 2  (+0.5)
 
 Most Sensitive Constraints
 --------------------------
@@ -138,17 +136,15 @@ Relaxed Constraints:
    1:  100% relaxed, from     x >= x_min
                        to x_min <= 2·x
 
-Free Variables
---------------
-x : 1
+Solution
+--------
+    x : 1
+...constants
+x_min : 2  (+1)
+x_max : 1  (-0.99)
 
 Relax1
 C[:] : [ 1  2 ]
-
-Fixed Variables
----------------
-x_min : 2  (+1)
-x_max : 1  (-0.99)
 
 Most Sensitive Constraints
 --------------------------
@@ -217,8 +213,8 @@ WARNINGS
 Relaxed Constants:
   x_min: relaxed from 2 to 1
 
-Free Variables
---------------
+Solution
+--------
     x : 1
 x_max : 1
 x_min : 1
@@ -227,9 +223,8 @@ Relax2
 x_max : 1
 x_min : 2
 
-Fixed Variables
----------------
 Relax2.OriginalValues
+...constants
 x_max : 1  (~0)
 x_min : 2  (~0)
 

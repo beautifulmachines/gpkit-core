@@ -234,6 +234,10 @@ class Constants(SectionSpec):
     align = "><<<<"  # name(R), value(L), unit(L), sens-in-parens(L), label(L)
     sortkey = staticmethod(lambda x: (-rounded_mag(x[1][1]), str(x[0])))
     nearzero_tol = 1e-7
+    _fmt_unit_w = 0  # overridden per-group by SolutionSection._format_model_group
+    _fmt_col_widths = (
+        None  # overridden per-group by SolutionSection._format_model_group
+    )
 
     def items_from(self, ctx):
         """Yield (varkey, (value, sensitivity)) for each fixed variable."""
@@ -256,16 +260,21 @@ class Constants(SectionSpec):
         p = self.options.precision
         return f"({sens:+.{p}g})"
 
-    def _fmt_vec_pair(self, flat_val, flat_sens, n, p):
+    def _fmt_vec_pair(self, flat_val, flat_sens):
         """Build aligned value/sensitivity vector strings.
 
         Each element position uses the wider of its value or sensitivity string,
         so value and sensitivity rows align vertically column by column.
         Returns (val_vec, sens_vec) bracket/paren strings.
         """
+        n, p = self.options.vecn, self.options.precision
+        col_widths = getattr(self, "_fmt_col_widths", None)
         val_strs = [self._fmt_one(x, p) for x in flat_val[:n]]
         sens_strs = [self._fmt_one_sens(x, p) for x in flat_sens[:n]]
-        widths = [max(len(v), len(s)) for v, s in zip(val_strs, sens_strs)]
+        min_ws = col_widths or [0] * len(val_strs)
+        widths = [
+            max(len(v), len(s), mw) for v, s, mw in zip(val_strs, sens_strs, min_ws)
+        ]
         dots = " ..." if flat_val.size > n else ""
         val_body = "  ".join(v.ljust(w) for v, w in zip(val_strs, widths))
         sens_body = "  ".join(s.ljust(w) for s, w in zip(sens_strs, widths))
@@ -273,16 +282,16 @@ class Constants(SectionSpec):
 
     def _fmt_vector_item(self, key, val, sens, name_w) -> list[str]:
         """Format a vector constant as two lines: values then sensitivities below."""
-        p, n = self.options.precision, self.options.vecn
         flat_val = np.asarray(val).ravel()
         flat_sens = (
             np.asarray(sens).ravel()
             if np.shape(sens)
             else np.full(flat_val.shape, float(sens))
         )
-        val_vec, sens_vec = self._fmt_vec_pair(flat_val, flat_sens, n, p)
+        val_vec, sens_vec = self._fmt_vec_pair(flat_val, flat_sens)
         name_col = f"{key.str_without('lineage'):>{name_w}} :"
-        parts = [name_col, val_vec, _unitstr(key), key.label or ""]
+        unit = _unitstr(key).ljust(self._fmt_unit_w)
+        parts = [name_col, val_vec, unit, key.label or ""]
         line1 = self.col_sep.join(x for x in parts if x).rstrip()
         sens_col = f"{'sens':>{name_w + 2}}"
         return [line1, f"{sens_col}{self.col_sep}{sens_vec}"]
@@ -338,6 +347,123 @@ class Constants(SectionSpec):
             self._fmt_sens(sens),
             label or "",
         ]
+
+
+class SolutionSection(Constants):
+    """Combined free + fixed variables, grouped by submodel.
+
+    Inherits Constants to reuse all vector formatting logic; extends it to
+    also yield free variables (with a None sensitivity sentinel) so that a
+    single aligned table can display both optimized outputs and fixed inputs.
+    """
+
+    title = "Solution"
+    sortkey = None  # sorting is handled per sub-group in _format_model_group
+
+    def items_from(self, ctx):
+        """Yield (varkey, (value, sensitivity)) for all variables.
+
+        Free variables use None as a sentinel for the sensitivity field.
+        """
+        for key, val in ctx.items(ItemSource("primal")):
+            yield (key, (val, None))
+        yield from super().items_from(ctx)  # fixed vars with sensitivities
+
+    def _vec_col_widths(self, vec_items):
+        """Per-column element widths (max over all rows) for aligned vector printing."""
+        sizes = {np.asarray(v[0]).size for _, v in vec_items if np.shape(v[0])}
+        if len(sizes) != 1:
+            return None
+        n = min(list(sizes)[0], self.options.vecn)
+        p = self.options.precision
+        widths = [0] * n
+        for _, (val, sens) in vec_items:
+            flat_val = np.asarray(val).ravel()
+            flat_sens = (
+                np.asarray(sens).ravel()
+                if np.shape(sens)
+                else np.full(flat_val.shape, float(sens))
+            )
+            for j in range(min(flat_val.size, n)):
+                widths[j] = max(
+                    widths[j],
+                    len(self._fmt_one(flat_val[j], p)),
+                    len(self._fmt_one_sens(flat_sens[j], p)),
+                )
+        return widths
+
+    def _fmt_free_vec(self, val, vw) -> str:
+        """Format a free vector value with uniform element width vw."""
+        n, p = self.options.vecn, self.options.precision
+        flat = np.asarray(val).ravel()
+        body = "  ".join(self._fmt_one(x, p).ljust(vw) for x in flat[:n])
+        dots = " ..." if flat.size > n else ""
+        return f"[ {body}{dots} ]"
+
+    def _format_model_group(self, model_items) -> list[str]:
+        """Free vars (alphabetical) then fixed vars (by magnitude)."""
+        scalar_free = sorted(
+            [(k, v) for k, v in model_items if v[1] is None and not np.shape(v[0])],
+            key=lambda x: str(x[0]),
+        )
+        scalar_fixed = sorted(
+            [(k, v) for k, v in model_items if v[1] is not None and not np.shape(v[0])],
+            key=lambda x: (-rounded_mag(x[1][1]), str(x[0])),
+        )
+        vec_free = sorted(
+            [(k, v) for k, v in model_items if v[1] is None and np.shape(v[0])],
+            key=lambda x: str(x[0]),
+        )
+        vec_fixed = sorted(
+            [(k, v) for k, v in model_items if v[1] is not None and np.shape(v[0])],
+            key=lambda x: (-rounded_mag(x[1][1]), str(x[0])),
+        )
+        name_w = max((len(k.str_without("lineage")) for k, _ in model_items), default=0)
+        vw = self._max_val_width([(k, v[0]) for k, v in vec_free])
+        # Instance attrs communicate formatting to _fmt_vector_item/_fmt_vec_pair.
+        self._fmt_unit_w = max(
+            (len(_unitstr(k)) for k, _ in vec_free + vec_fixed), default=0
+        )
+        # Run all scalars together for shared column widths, split at the boundary.
+        aligned = (
+            _format_aligned_columns(
+                [
+                    [
+                        f"{k.str_without('lineage'):>{name_w}} :",
+                        self._fmt_val(v[0]),
+                        _unitstr(k),
+                        "" if v[1] is None else self._fmt_sens(v[1]),
+                        k.label or "",
+                    ]
+                    for k, v in scalar_free + scalar_fixed
+                ],
+                self.align,
+                self.col_sep,
+            )
+            if scalar_free or scalar_fixed
+            else []
+        )
+        lines = list(aligned[: len(scalar_free)])
+        for key, (val, _) in vec_free:
+            lines.append(
+                self.col_sep.join(
+                    x
+                    for x in [
+                        f"{key.str_without('lineage'):>{name_w}} :",
+                        self._fmt_free_vec(val, vw),
+                        _unitstr(key).ljust(self._fmt_unit_w),
+                        key.label or "",
+                    ]
+                    if x
+                ).rstrip()
+            )
+        if scalar_fixed or vec_fixed:
+            lines.append("...constants")
+        lines.extend(aligned[len(scalar_free) :])
+        self._fmt_col_widths = self._vec_col_widths(vec_fixed)
+        for key, (val, sens) in vec_fixed:
+            lines.extend(super()._fmt_vector_item(key, val, sens, name_w))
+        return lines
 
 
 class Sweeps(SectionSpec):
@@ -443,8 +569,9 @@ class DiffFreeVariables(DiffSection):
 SECTION_SPECS = {
     "cost": Cost,
     "warnings": Warnings,
-    "freevariables": FreeVariables,
-    "constants": Constants,
+    "solution": SolutionSection,
+    "freevariables": FreeVariables,  # kept: sgp.py backward compat
+    "constants": Constants,  # kept: public API + base class
     "sweeps": Sweeps,
     "tightest constraints": TightConstraints,
     "slack constraints": SlackConstraints,
@@ -544,8 +671,7 @@ def table(
         "sweeps",
         "cost",
         "warnings",
-        "freevariables",
-        "constants",
+        "solution",
         "tightest constraints",
     ),
     **options,

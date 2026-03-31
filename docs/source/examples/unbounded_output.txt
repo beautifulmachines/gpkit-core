@@ -22,6 +22,6 @@ Arbitrarily Bounded Variables:
  sensitive to upper bound of 1e+30: x
    value near upper bound of 1e+30: x
 
-Free Variables
---------------
+Solution
+--------
 x : 1e+30

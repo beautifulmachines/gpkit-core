@@ -28,22 +28,19 @@ Optimal Cost
 ------------
 1/(Box.h·Box.w·Box.d) : 0.003674 [1/m³]
 
-Free Variables
---------------
+Solution
+--------
 Box
-d : 8.17  [m] depth
-h : 8.163 [m] height
-w : 4.081 [m] width
-
-Fixed Variables
----------------
-Box
- A_wall : 200 [m²] (-1.5)       upper limit, wall area
-  alpha : 2        (+0.5)       lower limit, wall aspect ratio
-  gamma : 2        (+0.0002986) lower limit, floor aspect ratio
-A_floor : 50  [m²] (~0)         upper limit, floor area
-   beta : 10       (~0)         upper limit, wall aspect ratio
-  delta : 10       (~0)         upper limit, floor aspect ratio
+      d : 8.17  [m]               depth
+      h : 8.163 [m]               height
+      w : 4.081 [m]               width
+...constants
+ A_wall : 200   [m²] (-1.5)       upper limit, wall area
+  alpha : 2          (+0.5)       lower limit, wall aspect ratio
+  gamma : 2          (+0.0002986) lower limit, floor aspect ratio
+A_floor : 50    [m²] (~0)         upper limit, floor area
+   beta : 10         (~0)         upper limit, wall aspect ratio
+  delta : 10         (~0)         upper limit, floor aspect ratio
 
 Most Sensitive Constraints
 --------------------------

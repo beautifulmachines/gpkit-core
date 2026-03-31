@@ -196,7 +196,7 @@ class TestExamples:
         sol.table()
         with open("solution.pkl", "rb") as fil:
             sol_loaded = pickle.load(fil)
-        assert "Free Variables" in sol_loaded.table()
+        assert "Solution" in sol_loaded.table()
         os.remove("solution.pkl")
 
         sweepsol = m.sweep({example.AC.fuse.W: (50, 100, 150)}, verbosity=0)

@@ -17,8 +17,8 @@ Optimal Cost
 ------------
 Test.x : 1
 
-Free Variables
---------------
+Solution
+--------
 Test
 x : 1
 __________
@@ -50,7 +50,7 @@ Optimal Cost
 ------------
 Test1.x[:].prod() : 2
 
-Free Variables
---------------
+Solution
+--------
 Test1
 x[:] : [ 1  2  1 ]
