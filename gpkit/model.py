@@ -119,6 +119,12 @@ class Model(CostedConstraintSet):
                 else:
                     constraints = cs
             cost = self.cost
+            # Populate _cgroups: dict setup() -> named constraint groups; else None.
+            # Use `is None` checks everywhere (not falsy) — empty dict is a valid groups map.
+            if isinstance(constraints, dict):
+                self._cgroups = dict(constraints)
+            else:
+                self._cgroups = None
             _scan_for_children(constraints)
             # Map attribute names to child models (for get_var() path resolution)
             for attr_name, val in list(self.__dict__.items()):
@@ -128,6 +134,7 @@ class Model(CostedConstraintSet):
             if args and not substitutions:
                 # backwards compatibility: substitutions as third argument
                 (substitutions,) = args
+            self._cgroups = None
             _scan_for_children(constraints or [])
 
         cost = cost or Monomial(1)
@@ -156,6 +163,30 @@ class Model(CostedConstraintSet):
         for child in self._children:
             yield child
             yield from child.walk()
+
+    @classmethod
+    def description(cls):
+        """Return model description metadata.
+
+        Returns a dict with keys: summary (str), assumptions (list[str]),
+        references (list[str]).  Override in subclasses to provide structured
+        descriptions.  The base implementation falls back to the class docstring
+        for the summary field.
+        """
+        # Walk the MRO to find the first non-Model class that has an explicit
+        # docstring (not inherited from Model itself).
+        docstring = ""
+        for klass in cls.__mro__:
+            if klass is Model:
+                break
+            if klass.__doc__:
+                docstring = klass.__doc__
+                break
+        return {
+            "summary": docstring.strip(),
+            "assumptions": [],
+            "references": [],
+        }
 
     def get_var(self, path: str):
         """Resolve a dotted attribute path to a Variable object.
