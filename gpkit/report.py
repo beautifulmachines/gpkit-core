@@ -121,6 +121,52 @@ def _render_constraint(c) -> str:
         return repr(c)
 
 
+# ── Core builder helpers ──────────────────────────────────────────────────────
+
+
+def _build_var_entries(model, solution, substitutions) -> List[VarEntry]:
+    """Build VarEntry list from model.unique_varkeys."""
+    entries = []
+    for vk in sorted(model.unique_varkeys, key=lambda v: v.name):
+        entries.append(
+            VarEntry(
+                name=vk.name,
+                latex=vk.latex() if callable(getattr(vk, "latex", None)) else vk.name,
+                value=_resolve_var_value(
+                    vk, solution=solution, substitutions=substitutions, model=model
+                ),
+                sensitivity=_resolve_sensitivity(vk, solution=solution),
+                units=vk.unitrepr or "-",
+                label=vk.label or "",
+            )
+        )
+    return entries
+
+
+def _build_constraint_groups(model) -> List[CGroup]:
+    """Build CGroup list from model.cgroups or a single unnamed group."""
+    if model.cgroups is not None:
+        return [
+            CGroup(
+                label=label,
+                constraints=[
+                    _render_constraint(c)
+                    for c in (items if isinstance(items, list) else [items])
+                ],
+            )
+            for label, items in model.cgroups.items()
+        ]
+    own = []
+    try:
+        for item in model:
+            # Skip child models (unique_varkeys is set only on Model instances).
+            if not hasattr(item, "unique_varkeys"):
+                own.append(_render_constraint(item))
+    except TypeError:
+        pass
+    return [CGroup(label="", constraints=own)] if own else []
+
+
 # ── Core builder ─────────────────────────────────────────────────────────────
 
 
@@ -139,106 +185,37 @@ def build_report_ir(
         If provided, variable entries include solved values and sensitivities.
     substitutions : dict, optional
         One-off value overrides without mutating model.substitutions.
-        Keys are VarKey objects.
-
-    Returns
-    -------
-    ReportSection
-        Root of the IR tree (children correspond to model.submodels).
     """
-    title = type(model).__name__
-
-    # Description metadata from Model.description() classmethod
-    desc_meta = type(model).description()
-    description = desc_meta.get("summary", "")
-    assumptions = list(desc_meta.get("assumptions", []))
-
-    # Build VarEntry list from model.unique_varkeys
-    variables: List[VarEntry] = []
-    for vk in sorted(model.unique_varkeys, key=lambda v: v.name):
-        val = _resolve_var_value(
-            vk, solution=solution, substitutions=substitutions, model=model
-        )
-        sens = _resolve_sensitivity(vk, solution=solution)
-        units_str = vk.unitrepr or "-"
-        latex_str = vk.latex() if callable(getattr(vk, "latex", None)) else vk.name
-        variables.append(
-            VarEntry(
-                name=vk.name,
-                latex=latex_str,
-                value=val,
-                sensitivity=sens,
-                units=units_str,
-                label=vk.label or "",
-            )
-        )
-
-    # Build CGroup list from _cgroups or a single unnamed group
-    constraint_groups: List[CGroup] = []
-    cgroups = getattr(model, "_cgroups", None)
-    if cgroups is not None:
-        # Named groups from dict-returning setup()
-        for label, items in cgroups.items():
-            flat_items = items if isinstance(items, list) else [items]
-            rendered = [_render_constraint(c) for c in flat_items]
-            constraint_groups.append(CGroup(label=label, constraints=rendered))
-    else:
-        # Single unnamed group containing all model-level constraints
-        # Use the model's own constraint list (direct, not flattened into children)
-        own_constraints = []
-        try:
-            # CostedConstraintSet is a list; iterate top-level items
-            for item in model:
-                # Skip child models (they appear in children, not cgroups).
-                # unique_varkeys is set only on Model instances.
-                if hasattr(item, "unique_varkeys"):
-                    continue
-                own_constraints.append(_render_constraint(item))
-        except TypeError:
-            pass
-        if own_constraints:
-            constraint_groups.append(CGroup(label="", constraints=own_constraints))
-
-    # Recurse into direct children (submodels)
-    children = [
-        build_report_ir(child, solution=solution, substitutions=substitutions)
-        for child in model.submodels
-    ]
-
+    desc = type(model).description()
     return ReportSection(
-        title=title,
-        description=description,
-        assumptions=assumptions,
-        variables=variables,
-        constraint_groups=constraint_groups,
-        children=children,
+        title=type(model).__name__,
+        description=desc.get("summary", ""),
+        assumptions=list(desc.get("assumptions", [])),
+        variables=_build_var_entries(model, solution, substitutions),
+        constraint_groups=_build_constraint_groups(model),
+        children=[
+            build_report_ir(child, solution=solution, substitutions=substitutions)
+            for child in model.submodels
+        ],
     )
 
 
 # ── Renderer dispatcher ───────────────────────────────────────────────────────
 
 
-def render_report(
-    ir: ReportSection, format: str = "text"
-):  # pylint: disable=redefined-builtin
+def render_report(ir: ReportSection, fmt: str = "text") -> "dict | str":
     """Dispatch to the appropriate format renderer.
 
     Parameters
     ----------
     ir : ReportSection
         The root IR produced by build_report_ir().
-    format : str
-        Output format. Currently only "dict" is implemented.
-        "text", "md", and "latex" backends will be added in Plans 03 and 04.
-
-    Returns
-    -------
-    dict | str
-        The rendered report in the requested format.
+    fmt : str
+        Output format: "dict", "text", "md", or "latex".
     """
-    if format == "dict":
+    if fmt == "dict":
         return ir.to_dict()
     raise ValueError(
-        f"Format '{format}' not yet implemented. "
+        f"Format '{fmt}' not yet implemented. "
         "Available formats: 'dict', 'text', 'md', 'latex'."
     )

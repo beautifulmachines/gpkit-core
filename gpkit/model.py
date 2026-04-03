@@ -28,7 +28,10 @@ from .varkey import VarKey
 from .varmap import VarMap
 
 
-class Model(CostedConstraintSet):
+class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attributes
+    # Model carries GP state (cost, lineage, unique_varkeys, computed),
+    # tree state (_children, _child_attrs), and report state (cgroups,
+    # vectorized_block). Tracked in github.com/beautifulmachines/gpkit-core/issues/172.
     """Symbolic representation of an optimization problem.
 
     The Model class is used both directly to create models with constants and
@@ -75,10 +78,9 @@ class Model(CostedConstraintSet):
         # pylint: disable=keyword-arg-before-vararg
         setup_vars = None
         substitutions = kwargs.pop("substitutions", None)  # reserved keyword
-        # Stamp _vectorized_block at construction time: True if this model is
-        # being created inside a Vectorize context (used by report infrastructure
-        # to collapse N same-type sibling sections into one labeled section).
-        self._vectorized_block = bool(Vectorize.vectorization)
+        # True if created inside a Vectorize context — report uses this to
+        # collapse N same-type sibling sections into one labeled section.
+        self.vectorized_block = bool(Vectorize.vectorization)
         # Initialize _children and _child_attrs unconditionally so that flat
         # Model(cost, constraints) calls also have the attribute (empty list).
         self._children = []
@@ -103,13 +105,7 @@ class Model(CostedConstraintSet):
             # lineage holds the (name, num) environment a model was created in,
             # including its own (name, num), and those of models above it
             with NamedVariables(self.__class__.__name__) as (self.lineage, setup_vars):
-                # instantiate Var descriptors before setup() so self.x works
-                seen = set()
-                for klass in type(self).__mro__:
-                    for var in getattr(klass, "_own_var_fields", ()):
-                        if var._name not in seen:
-                            seen.add(var._name)
-                            var._create(self)
+                self._instantiate_var_descriptors()
                 args = (
                     tuple(arg for arg in [cost, constraints] if arg is not None) + args
                 )
@@ -119,12 +115,12 @@ class Model(CostedConstraintSet):
                 else:
                     constraints = cs
             cost = self.cost
-            # Populate _cgroups: dict setup() -> named constraint groups; else None.
-            # Use `is None` checks everywhere — empty dict is a valid groups map.
+            # Named constraint groups from dict setup(); None for list setup().
+            # Use `is None` checks — empty dict is a valid groups map.
             if isinstance(constraints, dict):
-                self._cgroups = dict(constraints)
+                self.cgroups = dict(constraints)
             else:
-                self._cgroups = None
+                self.cgroups = None
             _scan_for_children(constraints)
             # Map attribute names to child models (for get_var() path resolution)
             for attr_name, val in list(self.__dict__.items()):
@@ -134,7 +130,7 @@ class Model(CostedConstraintSet):
             if args and not substitutions:
                 # backwards compatibility: substitutions as third argument
                 (substitutions,) = args
-            self._cgroups = None
+            self.cgroups = None
             _scan_for_children(constraints or [])
 
         cost = cost or Monomial(1)
@@ -152,6 +148,15 @@ class Model(CostedConstraintSet):
         for var, fn in self.computed.items():
             key = getattr(var, "key", var)
             result.primal[key] = fn(result)
+
+    def _instantiate_var_descriptors(self):
+        """Create Var descriptor fields on self before setup() runs."""
+        seen = set()
+        for klass in type(self).__mro__:
+            for var in getattr(klass, "_own_var_fields", ()):
+                if var.name not in seen:
+                    seen.add(var.name)
+                    var.create(self)
 
     @property
     def submodels(self):
@@ -338,30 +343,23 @@ class Model(CostedConstraintSet):
         ir_doc = json.loads(Path(path).read_text(encoding="utf-8"))
         return cls.from_ir(ir_doc)
 
-    def report(self, solution=None, format="text", substitutions=None):
+    def report(self, solution=None, fmt="text", substitutions=None):
         """Build a hierarchical report for this model.
 
         Parameters
         ----------
         solution : Solution, optional
             If provided, variable tables include solved values and sensitivities.
-        format : str
-            Output format. One of "dict" (JSON-serializable), "text", "md",
-            "latex". Text/md/latex backends are added in Plans 03 and 04.
+        fmt : str
+            Output format: "dict", "text", "md", or "latex".
         substitutions : dict, optional
-            One-off substitution override without mutating model.substitutions.
-            Keys are VarKey objects.
-
-        Returns
-        -------
-        dict | str
-            Rendered report in the requested format.
+            One-off value overrides without mutating model.substitutions.
         """
         # pylint: disable=import-outside-toplevel
         from .report import build_report_ir, render_report
 
         ir = build_report_ir(self, solution=solution, substitutions=substitutions)
-        return render_report(ir, format=format)
+        return render_report(ir, fmt=fmt)
 
     gp = progify(GeometricProgram)
     solve = solvify(progify(GeometricProgram, "solve"))

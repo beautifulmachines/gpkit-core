@@ -1,5 +1,8 @@
 """Tests for GP and SP classes"""
 
+# pylint: disable=too-many-lines  # reporting tests (cgroups, description) belong
+# in test_report.py
+
 import sys
 from io import StringIO
 
@@ -985,7 +988,8 @@ class TestVar:
 
 
 def test_vectorized_block_marker():
-    """Vectorize stamps _vectorized_block on models created inside its context."""
+    """Vectorize stamps vectorized_block on models created inside its context."""
+
     class _VBLeaf(Model):
         def setup(self):
             x = Variable("x_vb")
@@ -1000,20 +1004,21 @@ def test_vectorized_block_marker():
 
     m = _VBParent()
     # Parent is NOT vectorized
-    assert not m._vectorized_block
+    assert not m.vectorized_block
     # Child created inside Vectorize IS vectorized
     assert len(m.submodels) == 1
     child = m.submodels[0]
-    assert child._vectorized_block
+    assert child.vectorized_block
 
 
 # ── Task 1: _cgroups from dict setup() ──────────────────────────────────────
 
+
 class TestCGroups:
-    """Tests for _cgroups populated from dict-returning setup() methods."""
+    """Tests for cgroups populated from dict-returning setup() methods."""
 
     def test_cgroups_from_dict_setup(self):
-        """setup() returning a dict populates _cgroups with the same mapping."""
+        """setup() returning a dict populates cgroups with the same mapping."""
 
         class _CGDictModel(Model):
             def setup(self):
@@ -1025,13 +1030,13 @@ class TestCGroups:
                 return {"Drag": [c1, c2], "Lift": [c3]}
 
         m = _CGDictModel()
-        assert m._cgroups is not None
-        assert set(m._cgroups.keys()) == {"Drag", "Lift"}
-        assert len(m._cgroups["Drag"]) == 2
-        assert len(m._cgroups["Lift"]) == 1
+        assert m.cgroups is not None
+        assert set(m.cgroups.keys()) == {"Drag", "Lift"}
+        assert len(m.cgroups["Drag"]) == 2
+        assert len(m.cgroups["Lift"]) == 1
 
     def test_cgroups_none_for_list_setup(self):
-        """setup() returning a list leaves _cgroups as None (not an empty dict)."""
+        """setup() returning a list leaves cgroups as None (not an empty dict)."""
 
         class _CGListModel(Model):
             def setup(self):
@@ -1039,10 +1044,10 @@ class TestCGroups:
                 return [x >= 1]
 
         m = _CGListModel()
-        assert m._cgroups is None
+        assert m.cgroups is None
 
     def test_scan_for_children_dict(self):
-        """setup() returning a dict containing child Models registers them in _children."""
+        """setup() returning a dict with child Models registers them in _children."""
 
         class _CGChild(Model):
             def setup(self):
@@ -1061,6 +1066,7 @@ class TestCGroups:
 
 
 # ── Task 1: Model.description() classmethod ─────────────────────────────────
+
 
 class TestModelDescription:
     """Tests for Model.description() classmethod."""
@@ -1087,7 +1093,7 @@ class TestModelDescription:
         assert len(d["references"]) == 1
 
     def test_model_description_docstring_fallback(self):
-        """Model with docstring but no description() override returns docstring as summary."""
+        """Model with a docstring returns it as the description summary."""
 
         class _DescDocstring(Model):
             """Wing structural model with spar and skin."""
@@ -1098,11 +1104,11 @@ class TestModelDescription:
 
         d = _DescDocstring.description()
         assert d["summary"] == "Wing structural model with spar and skin."
-        assert d["assumptions"] == []
-        assert d["references"] == []
+        assert not d["assumptions"]
+        assert not d["references"]
 
     def test_model_description_none(self):
-        """Model without description() override and without docstring returns empty summary."""
+        """Model without a docstring returns an empty summary."""
 
         class _DescNone(Model):
             def setup(self):
