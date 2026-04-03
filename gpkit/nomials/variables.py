@@ -66,6 +66,10 @@ class Variable(Monomial):
                     descr["units"] = arg
                 elif isinstance(arg, Strings) and "label" not in descr:
                     descr["label"] = arg
+            # Remap 'latex' kwarg to 'latex_override' (avoids conflict with
+            # VarKey.latex() method name while preserving user-facing API)
+            if "latex" in descr:
+                descr["latex_override"] = descr.pop("latex")
             addmodelstodescr(descr, addtonamedvars=self)
             self.key = VarKey(**descr)
         hmap = NomialMap({HashVector({self.key: 1}): 1.0})

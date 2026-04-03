@@ -56,6 +56,39 @@ def latex_unitstr(units):
     return utf if utf != r"~\mathrm{-}" else ""
 
 
+_GREEK = {
+    "alpha": r"\alpha", "beta": r"\beta", "gamma": r"\gamma",
+    "delta": r"\delta", "epsilon": r"\epsilon", "eta": r"\eta",
+    "theta": r"\theta", "lambda": r"\lambda", "mu": r"\mu",
+    "nu": r"\nu", "xi": r"\xi", "pi": r"\pi", "rho": r"\rho",
+    "sigma": r"\sigma", "tau": r"\tau", "phi": r"\phi",
+    "chi": r"\chi", "psi": r"\psi", "omega": r"\omega",
+    "inf": r"\infty", "infty": r"\infty",
+    # Uppercase
+    "Gamma": r"\Gamma", "Delta": r"\Delta", "Theta": r"\Theta",
+    "Lambda": r"\Lambda", "Xi": r"\Xi", "Pi": r"\Pi",
+    "Sigma": r"\Sigma", "Phi": r"\Phi", "Psi": r"\Psi", "Omega": r"\Omega",
+}
+
+
+def varname_to_latex_base(name: str) -> str:
+    """Convert a variable name to a LaTeX base string.
+
+    - Pure Greek: 'rho' -> r'\\rho'
+    - Underscore split: 'm_wet' -> r'm_{\\text{wet}}'
+    - Greek + underscore: 'rho_inf' -> r'\\rho_{\\infty}'
+    - Already escaped (starts with '\\'): return as-is
+    """
+    if name.startswith("\\"):
+        return name  # already LaTeX — do not double-convert
+    if "_" in name:
+        parts = name.split("_", 1)
+        base = _GREEK.get(parts[0], parts[0])
+        sub = _GREEK.get(parts[1], r"\text{" + parts[1] + "}")
+        return base + "_{" + sub + "}"
+    return _GREEK.get(name, name)
+
+
 def strify(val, excluded):
     "Turns a value into as pretty a string as possible."
     if isinstance(val, Numbers):
