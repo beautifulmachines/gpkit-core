@@ -982,3 +982,26 @@ class TestVar:
                 return []
 
         assert isinstance(_M.x, Var)
+
+
+def test_vectorized_block_marker():
+    """Vectorize stamps _vectorized_block on models created inside its context."""
+    class _VBLeaf(Model):
+        def setup(self):
+            x = Variable("x_vb")
+            return [x >= 1]
+
+    class _VBParent(Model):
+        def setup(self):
+            with Vectorize(5):
+                leaf = _VBLeaf()
+            y = Variable("y_vb")
+            return [y >= 1, leaf]
+
+    m = _VBParent()
+    # Parent is NOT vectorized
+    assert not m._vectorized_block
+    # Child created inside Vectorize IS vectorized
+    assert len(m.submodels) == 1
+    child = m.submodels[0]
+    assert child._vectorized_block

@@ -22,7 +22,7 @@ from .programs.prog_factories import progify, solvify
 from .programs.sgp import SequentialGeometricProgram
 from .solutions import SolutionSequence
 from .tools.autosweep import autosweep_1d
-from .util.globals import NamedVariables
+from .util.globals import NamedVariables, Vectorize
 from .var import Var
 from .varkey import VarKey
 from .varmap import VarMap
@@ -75,6 +75,10 @@ class Model(CostedConstraintSet):
         # pylint: disable=keyword-arg-before-vararg
         setup_vars = None
         substitutions = kwargs.pop("substitutions", None)  # reserved keyword
+        # Stamp _vectorized_block at construction time: True if this model is
+        # being created inside a Vectorize context (used by report infrastructure
+        # to collapse N same-type sibling sections into one labeled section).
+        self._vectorized_block = bool(Vectorize.vectorization)
         # Initialize _children and _child_attrs unconditionally so that flat
         # Model(cost, constraints) calls also have the attribute (empty list).
         self._children = []
