@@ -13,20 +13,20 @@ from typing import Any, List, Optional
 class VarEntry:
     """A variable row in a report section."""
 
-    name: str           # display name (from VarKey.name)
-    latex: str          # LaTeX rendering (from VarKey.latex())
-    value: Any          # float | Quantity | None (resolved per D-17 priority)
+    name: str  # display name (from VarKey.name)
+    latex: str  # LaTeX rendering (from VarKey.latex())
+    value: Any  # float | Quantity | None (resolved per D-17 priority)
     sensitivity: Optional[float]  # shadow price from solution, or None
-    units: str          # unit string
-    label: str          # human label (from VarKey.label or "")
+    units: str  # unit string
+    label: str  # human label (from VarKey.label or "")
 
 
 @dataclass
 class CGroup:
     """A named constraint group within a report section."""
 
-    label: str          # "" for unnamed groups
-    constraints: list   # list of constraint string representations
+    label: str  # "" for unnamed groups
+    constraints: list  # list of constraint string representations
 
 
 @dataclass
@@ -35,9 +35,9 @@ class ReportSection:
 
     title: str
     description: str
-    assumptions: list           # list of str
-    variables: list             # list of VarEntry
-    constraint_groups: list     # list of CGroup
+    assumptions: list  # list of str
+    variables: list  # list of VarEntry
+    constraint_groups: list  # list of CGroup
     children: list = field(default_factory=list)  # list of ReportSection
 
     def to_dict(self) -> dict:
@@ -66,6 +66,7 @@ class ReportSection:
 
 
 # ── Value helpers ─────────────────────────────────────────────────────────────
+
 
 def _serialize_value(val: Any) -> Any:
     """Make a value JSON-serializable."""
@@ -111,6 +112,7 @@ def _resolve_sensitivity(vk, solution=None) -> Optional[float]:
 
 # ── Constraint rendering ──────────────────────────────────────────────────────
 
+
 def _render_constraint(c) -> str:
     """Render a single constraint as a string."""
     try:
@@ -120,6 +122,7 @@ def _render_constraint(c) -> str:
 
 
 # ── Core builder ─────────────────────────────────────────────────────────────
+
 
 def build_report_ir(
     model,
@@ -186,8 +189,9 @@ def build_report_ir(
         try:
             # CostedConstraintSet is a list; iterate top-level items
             for item in model:
-                # Skip child models (they appear in children, not cgroups)
-                if hasattr(item, "setup") or hasattr(item, "unique_varkeys"):
+                # Skip child models (they appear in children, not cgroups).
+                # unique_varkeys is set only on Model instances.
+                if hasattr(item, "unique_varkeys"):
                     continue
                 own_constraints.append(_render_constraint(item))
         except TypeError:
@@ -213,7 +217,10 @@ def build_report_ir(
 
 # ── Renderer dispatcher ───────────────────────────────────────────────────────
 
-def render_report(ir: ReportSection, format: str = "text"):  # pylint: disable=redefined-builtin
+
+def render_report(
+    ir: ReportSection, format: str = "text"
+):  # pylint: disable=redefined-builtin
     """Dispatch to the appropriate format renderer.
 
     Parameters
@@ -233,6 +240,5 @@ def render_report(ir: ReportSection, format: str = "text"):  # pylint: disable=r
         return ir.to_dict()
     raise ValueError(
         f"Format '{format}' not yet implemented. "
-        "Available formats: 'dict'. "
-        "Text/md/latex backends are added in Plans 03 and 04."
+        "Available formats: 'dict', 'text', 'md', 'latex'."
     )

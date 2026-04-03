@@ -120,7 +120,7 @@ class Model(CostedConstraintSet):
                     constraints = cs
             cost = self.cost
             # Populate _cgroups: dict setup() -> named constraint groups; else None.
-            # Use `is None` checks everywhere (not falsy) — empty dict is a valid groups map.
+            # Use `is None` checks everywhere — empty dict is a valid groups map.
             if isinstance(constraints, dict):
                 self._cgroups = dict(constraints)
             else:
@@ -173,18 +173,9 @@ class Model(CostedConstraintSet):
         descriptions.  The base implementation falls back to the class docstring
         for the summary field.
         """
-        # Walk the MRO to find the first non-Model class that has an explicit
-        # docstring (not inherited from Model itself).
-        docstring = ""
-        for klass in cls.__mro__:
-            if klass is Model:
-                break
-            if klass.__doc__:
-                docstring = klass.__doc__
-                break
         return {
-            "summary": docstring.strip(),
-            "assumptions": [],
+            "summary": (cls.__doc__ or "").strip(),
+            "assumptions": [],  # discrete modeling choices, separate from prose summary
             "references": [],
         }
 
@@ -368,6 +359,7 @@ class Model(CostedConstraintSet):
         """
         # pylint: disable=import-outside-toplevel
         from .report import build_report_ir, render_report
+
         ir = build_report_ir(self, solution=solution, substitutions=substitutions)
         return render_report(ir, format=format)
 
