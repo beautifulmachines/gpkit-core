@@ -347,6 +347,30 @@ class Model(CostedConstraintSet):
         ir_doc = json.loads(Path(path).read_text(encoding="utf-8"))
         return cls.from_ir(ir_doc)
 
+    def report(self, solution=None, format="text", substitutions=None):
+        """Build a hierarchical report for this model.
+
+        Parameters
+        ----------
+        solution : Solution, optional
+            If provided, variable tables include solved values and sensitivities.
+        format : str
+            Output format. One of "dict" (JSON-serializable), "text", "md",
+            "latex". Text/md/latex backends are added in Plans 03 and 04.
+        substitutions : dict, optional
+            One-off substitution override without mutating model.substitutions.
+            Keys are VarKey objects.
+
+        Returns
+        -------
+        dict | str
+            Rendered report in the requested format.
+        """
+        # pylint: disable=import-outside-toplevel
+        from .report import build_report_ir, render_report
+        ir = build_report_ir(self, solution=solution, substitutions=substitutions)
+        return render_report(ir, format=format)
+
     gp = progify(GeometricProgram)
     solve = solvify(progify(GeometricProgram, "solve"))
 
