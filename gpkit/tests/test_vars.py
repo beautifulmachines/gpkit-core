@@ -403,3 +403,42 @@ class TestArrayVariable:
         """Make sure string looks something like a numpy array"""
         x = ArrayVariable((2, 4), "x")
         assert str(x) == "x[:]"
+
+
+class TestVarKeyLatex:
+    """Tests for VarKey.latex() Greek/subscript auto-conversion."""
+
+    def test_varkey_latex_greek(self):
+        """VarKey('rho').latex() returns string containing \\rho."""
+        vk = VarKey("rho")
+        result = vk.latex()
+        assert "\\rho" in result
+
+        vk2 = VarKey("alpha")
+        result2 = vk2.latex()
+        assert "\\alpha" in result2
+
+    def test_varkey_latex_underscore(self):
+        """VarKey('m_wet').latex() returns string containing m_{\\text{wet}}."""
+        vk = VarKey("m_wet")
+        result = vk.latex()
+        assert "m_{\\text{wet}}" in result
+
+    def test_varkey_latex_recursive(self):
+        """VarKey('rho_inf').latex() returns string containing \\rho_{\\infty}."""
+        vk = VarKey("rho_inf")
+        result = vk.latex()
+        assert "\\rho_{\\infty}" in result
+
+    def test_varkey_latex_already_escaped(self):
+        """VarKey('\\\\rho').latex() does NOT double-escape (no '\\\\\\\\rho')."""
+        vk = VarKey("\\rho")
+        result = vk.latex()
+        assert "\\\\rho" not in result
+        assert "\\rho" in result
+
+    def test_varkey_latex_plain(self):
+        """VarKey('x').latex() returns 'x' — no Greek, no underscore, unchanged."""
+        vk = VarKey("x")
+        result = vk.latex()
+        assert result == "x"

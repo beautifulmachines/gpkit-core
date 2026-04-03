@@ -6,7 +6,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from .units import qty
-from .util.repr_conventions import ReprMixin
+from .util.repr_conventions import ReprMixin, latexify
 from .util.small_classes import Count
 
 _lineage_ctx: ContextVar[dict] = ContextVar("lineage_ctx", default={})
@@ -234,7 +234,7 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
 
     def latex(self, excluded=()):
         "Returns latex representation."
-        name = self.name
+        name = latexify(self.name)
         if "vec" not in excluded and "idx" not in excluded and self.shape:
             name = "\\vec{%s}" % name
         if "idx" not in excluded and self.idx:
