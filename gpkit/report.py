@@ -182,7 +182,7 @@ def _build_var_entries(model, solution, substitutions) -> List[VarEntry]:
     variables in other sections are irrelevant (e.g. m_cap stays m_cap even
     if wing.spar.cap.m and tail.spar.cap.m both exist in the full model).
     """
-    lineage_map = model._get_lineage_map()
+    lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
     entries = []
     with lineage_display_context(lineage_map):
         for vk in sorted(model.unique_varkeys, key=lambda v: v.name):
@@ -287,6 +287,28 @@ def _fmt_sensitivity(sens) -> str:
         return str(sens)
 
 
+def _text_var_rows(variables: list) -> list:
+    """Build column-aligned rows for variables section in text output."""
+    rows = []
+    for ve in variables:
+        rows.append(
+            [
+                ve.name,
+                _fmt_value(ve.value),
+                _fmt_sensitivity(ve.sensitivity),
+                ve.units,
+                ve.label,
+            ]
+        )
+    return _format_aligned_columns(rows, "<<<<<", "  ")
+
+
+def _text_constraint_rows(constraints: list) -> list:
+    """Build aligned rows for a constraint group in text output."""
+    c_rows = [_split_constraint_str(_render_constraint(c)) for c in constraints]
+    return _format_aligned_columns(c_rows, "<<", "  ")
+
+
 def render_text(ir: "ReportSection", indent: int = 0) -> str:
     """Render a ReportSection tree as hierarchical plain text.
 
@@ -322,19 +344,7 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
     # Variables table
     if ir.variables:
         lines.append(f"{pad}  Variables")
-        rows = []
-        for ve in ir.variables:
-            rows.append(
-                [
-                    ve.name,
-                    _fmt_value(ve.value),
-                    _fmt_sensitivity(ve.sensitivity),
-                    ve.units,
-                    ve.label,
-                ]
-            )
-        aligned = _format_aligned_columns(rows, "<<<<<", "  ")
-        for row_line in aligned:
+        for row_line in _text_var_rows(ir.variables):
             lines.append(f"{pad}    {row_line}")
         lines.append("")
 
@@ -343,23 +353,13 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
         group_header = f"Constraints ({cg.label})" if cg.label else "Constraints"
         lines.append(f"{pad}  {group_header}")
         if cg.constraints:
-            # Build aligned (lhs, op, rhs) from constraint objects
-            constraint_rows = []
-            for c in cg.constraints:
-                c_str = _render_constraint(c)
-                # Try to split on standard operators for alignment
-                # Each constraint str() typically has form "lhs >= rhs" or "lhs == rhs"
-                split_result = _split_constraint_str(c_str)
-                constraint_rows.append(split_result)
-            aligned = _format_aligned_columns(constraint_rows, "<<", "  ")
-            for row_line in aligned:
+            for row_line in _text_constraint_rows(cg.constraints):
                 lines.append(f"{pad}    {row_line}")
         lines.append("")
 
     # Children (recursive)
     for child in ir.children:
-        child_text = render_text(child, indent=indent + 1)
-        lines.append(child_text)
+        lines.append(render_text(child, indent=indent + 1))
 
     return "\n".join(lines)
 
@@ -381,6 +381,15 @@ def _split_constraint_str(c_str: str):
 
 
 # ── Markdown renderer ────────────────────────────────────────────────────────
+
+
+def _md_var_row(ve: "VarEntry") -> str:
+    """Format one VarEntry as a markdown pipe-table row."""
+    name_cell = f"${ve.latex}$" if ve.latex else ve.name
+    return (
+        f"| {name_cell} | {_fmt_value(ve.value)}"
+        f" | {_fmt_sensitivity(ve.sensitivity)} | {ve.units} | {ve.label} |"
+    )
 
 
 def render_markdown(ir: "ReportSection", level: int = 1) -> str:
@@ -420,16 +429,7 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
         lines.append("| Variable | Value | Sensitivity | Units | Label |")
         lines.append("|----------|-------|-------------|-------|-------|")
         for ve in ir.variables:
-            name_cell = f"${ve.latex}$" if ve.latex else ve.name
-            value_cell = _fmt_value(ve.value)
-            sens_cell = _fmt_sensitivity(ve.sensitivity)
-            units_cell = ve.units
-            label_cell = ve.label
-            row = (
-                f"| {name_cell} | {value_cell}"
-                f" | {sens_cell} | {units_cell} | {label_cell} |"
-            )
-            lines.append(row)
+            lines.append(_md_var_row(ve))
         lines.append("")
 
     # Constraint groups
