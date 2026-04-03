@@ -406,7 +406,7 @@ class TestArrayVariable:
 
 
 class TestVarKeyLatex:
-    """Tests for VarKey.latex() Greek/subscript auto-conversion and explicit latex= field."""
+    """Tests for VarKey.latex() Greek/subscript auto-conversion."""
 
     def test_varkey_latex_greek(self):
         """VarKey('rho').latex() returns string containing \\rho."""
@@ -430,15 +430,6 @@ class TestVarKeyLatex:
         result = vk.latex()
         assert "\\rho_{\\infty}" in result
 
-    def test_varkey_latex_explicit_wins(self):
-        """Explicit latex_override kwarg always overrides auto-conversion."""
-        vk = VarKey("x", latex_override="\\hat{x}")
-        result = vk.latex()
-        assert result == "\\hat{x}"
-        # Variable-level: latex= kwarg is remapped to latex_override
-        v = Variable("x", latex="\\hat{x}")
-        assert v.key.latex() == "\\hat{x}"
-
     def test_varkey_latex_already_escaped(self):
         """VarKey('\\\\rho').latex() does NOT double-escape (no '\\\\\\\\rho')."""
         vk = VarKey("\\rho")
@@ -451,16 +442,3 @@ class TestVarKeyLatex:
         vk = VarKey("x")
         result = vk.latex()
         assert result == "x"
-
-    def test_varkey_pickle_latex(self):
-        """VarKey with latex_override survives pickle round-trip."""
-        import pickle
-        vk = VarKey("x", latex_override="\\hat{x}")
-        vk2 = pickle.loads(pickle.dumps(vk))
-        assert vk2.latex() == "\\hat{x}"
-
-    def test_varkey_ir_latex(self):
-        """VarKey with latex_override survives to_ir()/from_ir() round-trip."""
-        vk = VarKey("x", latex_override="\\hat{x}")
-        vk2 = VarKey.from_ir(vk.to_ir())
-        assert vk2.latex() == "\\hat{x}"

@@ -57,21 +57,44 @@ def latex_unitstr(units):
 
 
 _GREEK = {
-    "alpha": r"\alpha", "beta": r"\beta", "gamma": r"\gamma",
-    "delta": r"\delta", "epsilon": r"\epsilon", "eta": r"\eta",
-    "theta": r"\theta", "lambda": r"\lambda", "mu": r"\mu",
-    "nu": r"\nu", "xi": r"\xi", "pi": r"\pi", "rho": r"\rho",
-    "sigma": r"\sigma", "tau": r"\tau", "phi": r"\phi",
-    "chi": r"\chi", "psi": r"\psi", "omega": r"\omega",
-    "inf": r"\infty", "infty": r"\infty",
+    "alpha": r"\alpha",
+    "beta": r"\beta",
+    "gamma": r"\gamma",
+    "delta": r"\delta",
+    "epsilon": r"\epsilon",
+    "eta": r"\eta",
+    "theta": r"\theta",
+    "lambda": r"\lambda",
+    "mu": r"\mu",
+    "nu": r"\nu",
+    "xi": r"\xi",
+    "pi": r"\pi",
+    "rho": r"\rho",
+    "sigma": r"\sigma",
+    "tau": r"\tau",
+    "phi": r"\phi",
+    "chi": r"\chi",
+    "psi": r"\psi",
+    "omega": r"\omega",
+    "zeta": r"\zeta",
+    "kappa": r"\kappa",
+    "inf": r"\infty",
+    "infty": r"\infty",
     # Uppercase
-    "Gamma": r"\Gamma", "Delta": r"\Delta", "Theta": r"\Theta",
-    "Lambda": r"\Lambda", "Xi": r"\Xi", "Pi": r"\Pi",
-    "Sigma": r"\Sigma", "Phi": r"\Phi", "Psi": r"\Psi", "Omega": r"\Omega",
+    "Gamma": r"\Gamma",
+    "Delta": r"\Delta",
+    "Theta": r"\Theta",
+    "Lambda": r"\Lambda",
+    "Xi": r"\Xi",
+    "Pi": r"\Pi",
+    "Sigma": r"\Sigma",
+    "Phi": r"\Phi",
+    "Psi": r"\Psi",
+    "Omega": r"\Omega",
 }
 
 
-def varname_to_latex_base(name: str) -> str:
+def latexify(name: str) -> str:
     """Convert a variable name to a LaTeX base string.
 
     - Pure Greek: 'rho' -> r'\\rho'

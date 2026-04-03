@@ -6,7 +6,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from .units import qty
-from .util.repr_conventions import ReprMixin
+from .util.repr_conventions import ReprMixin, latexify
 from .util.small_classes import Count
 
 _lineage_ctx: ContextVar[dict] = ContextVar("lineage_ctx", default={})
@@ -52,7 +52,6 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
     units: Any = None
     unitrepr: str = ""  # preserved through replace(); set from units if empty
     label: str = ""
-    latex_override: str = ""  # explicit LaTeX override; if non-empty, used verbatim in latex()
     idx: tuple = None
     shape: tuple = ()
     veckey: "VarKey" = None
@@ -122,7 +121,6 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
             "lineage": self.lineage or None,
             "units": self.unitrepr if self.unitrepr != "-" else None,
             "label": self.label or None,
-            "latex": self.latex_override or None,
             "idx": self.idx,
             "shape": self.shape or None,
             "value": value,
@@ -132,10 +130,6 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
 
     def __setstate__(self, state):
         """Unpickle: reconstruct VarKey from state dict."""
-        # Remap 'latex' key (serialized form) to 'latex_override' (field name)
-        if "latex" in state:
-            state = dict(state)
-            state["latex_override"] = state.pop("latex")
         new_vk = VarKey(**state)
         # pylint: disable=no-member  # __dataclass_fields__ exists on dataclasses
         for name in self.__dataclass_fields__:
@@ -208,8 +202,6 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
             ir["units"] = self.unitrepr
         if self.label:
             ir["label"] = self.label
-        if self.latex_override:
-            ir["latex"] = self.latex_override
         if self.idx is not None:
             ir["idx"] = list(self.idx)
         if self.shape:
@@ -227,8 +219,6 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
             kwargs["units"] = ir_dict["units"]
         if "label" in ir_dict:
             kwargs["label"] = ir_dict["label"]
-        if "latex" in ir_dict:
-            kwargs["latex_override"] = ir_dict["latex"]
         if "idx" in ir_dict:
             kwargs["idx"] = tuple(ir_dict["idx"])
         if "shape" in ir_dict:
@@ -244,13 +234,7 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
 
     def latex(self, excluded=()):
         "Returns latex representation."
-        # Explicit latex_override field always wins (per D-05, D-07)
-        explicit = self.latex_override
-        if explicit:
-            return explicit
-        # Auto-convert name using Greek/subscript intelligence
-        from .util.repr_conventions import varname_to_latex_base  # pylint: disable=import-outside-toplevel
-        name = varname_to_latex_base(self.name)
+        name = latexify(self.name)
         if "vec" not in excluded and "idx" not in excluded and self.shape:
             name = "\\vec{%s}" % name
         if "idx" not in excluded and self.idx:
