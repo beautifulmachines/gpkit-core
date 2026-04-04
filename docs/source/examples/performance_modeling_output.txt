@@ -83,46 +83,33 @@ Mission.FlightSegment.AircraftP.Wfuel[0] : 1.091 [lbf]
 
 Solution
 --------
-Aircraft
-W : 144.1 [lbf]  weight
+      AircraftP
+        Wburn[:] : [ 0.274  0.273  0.272  0.272 ] [lbf]  segment fuel burn
+        Wfuel[:] : [ 1.09   0.817  0.544  0.272 ] [lbf]  fuel weight
 
-Aircraft.Fuselage
-...constants
-W : 100 [lbf] (+0.9695) weight
+      FlightState
+        ...constants
+              V[:] : [ 40        40        40        40       ] [kn]      true airspeed
+             mu[:] : [ 1.63e-05  1.63e-05  1.63e-05  1.63e-05 ] [N·s/m²]  dynamic viscosity
+            rho[:] : [ 0.74      0.74      0.74      0.74     ] [kg/m³]   air density
 
-Aircraft.Wing
-  S : 44.14 [ft²]               surface area
-  W : 44.14 [lbf]               weight
-  c : 1.279 [ft]                mean chord
-...constants
-  A : 27              (-0.6716) aspect ratio
-rho : 1     [lbf/ft²] (+0.4279) areal density
+  Aircraft
+    W : 144.1 [lbf]  weight
 
-Mission.FlightSegment.AircraftP
-Wburn[:] : [ 0.274  0.273  0.272  0.272 ] [lbf] segment fuel burn
-Wfuel[:] : [ 1.09   0.817  0.544  0.272 ] [lbf] fuel weight
+    Fuselage
+      ...constants
+               W : 100 [lbf] (+0.97) weight
 
-Mission.FlightSegment.AircraftP.WingAero
-CD[:] : [ 0.019     0.0189    0.0189    0.0188   ]       drag coefficient
-CL[:] : [ 1.01      1         1         1        ]       lift coefficient
- D[:] : [ 2.74      2.73      2.72      2.72     ] [lbf] drag force
-Re[:] : [ 3.65e+05  3.65e+05  3.65e+05  3.65e+05 ]       Reynold's number
-...constants
- e[:] : [ 0.9     0.9     0.9     0.9    ]       Oswald efficiency
-   sens ( -0.176  -0.176  -0.175  -0.175 )
+    Wing
+               S : 44.14 [ft²]              surface area
+               W : 44.14 [lbf]              weight
+               c : 1.279 [ft]               mean chord
+      ...constants
+               A : 27              (-0.672) aspect ratio
+             rho : 1     [lbf/ft²] (+0.428) areal density
 
-Mission.FlightSegment.FlightState
-...constants
-  V[:] : [ 40        40        40        40       ] [kn]     true airspeed
-    sens ( -0.215    -0.214    -0.214    -0.213   )
-rho[:] : [ 0.74      0.74      0.74      0.74     ] [kg/m³]  air density
-    sens ( -0.115    -0.115    -0.114    -0.114   )
- mu[:] : [ 1.63e-05  1.63e-05  1.63e-05  1.63e-05 ] [N·s/m²] dynamic viscosity
-    sens ( +0.0152   +0.0152   +0.0152   +0.0153  )
 
-Insensitive Constraints (below 1e-05)
--------------------------------------
-(none)
+
 Cost Change
 -----------
 Mission.FlightSegment.AircraftP.Wfuel[0] : +101.3% (2.196lbf vs 1.091lbf)

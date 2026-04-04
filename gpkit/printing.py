@@ -6,6 +6,7 @@ from typing import Any, Callable, Iterable, List, Sequence, Tuple
 
 import numpy as np
 
+from .report import SolutionTable  # pylint: disable=unused-import  # re-exported
 from .util.repr_conventions import unitstr
 
 Item = tuple[Any, Any]
@@ -676,9 +677,22 @@ def table(
     ),
     **options,
 ) -> str:
-    """Render a simple text table for a Solution or SolutionSequence."""
+    """Render a simple text table for a Solution or SolutionSequence.
+
+    For single Solution objects, delegates to SolutionTable (report.py) for
+    variable display, then appends constraint sensitivity via SectionSpec.
+    For SolutionSequence objects, uses the full SectionSpec pipeline.
+    """
+    if _looks_like_solution(obj):
+        st_kwargs = {
+            k: v
+            for k, v in options.items()
+            if k in ("precision", "topn", "vecn", "vec_width")
+        }
+        return SolutionTable(obj, **st_kwargs).text(tables=tables)
+    # SolutionSequence: use full SectionSpec pipeline
     opt = PrintOptions(**options)
-    ctx = SolutionContext(obj) if _looks_like_solution(obj) else SequenceContext(obj)
+    ctx = SequenceContext(obj)
     blocks: list[str] = []
     for table_name in tables:
         sec = SECTION_SPECS[table_name](options=opt)

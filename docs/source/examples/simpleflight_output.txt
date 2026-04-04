@@ -40,30 +40,30 @@ D : 303.1 [N]
 
 Solution
 --------
-                  A : 8.46                          aspect ratio
-                C_D : 0.02059                       Drag coefficient of wing
-                C_L : 0.4988                        Lift coefficent of wing
-                C_f : 0.003599                      skin friction coefficient
-                  D : 303.1     [N]                 total drag force
-                 Re : 3.675e+06                     Reynold's number
-                  S : 16.44     [m²]                total wing area
-                  V : 38.15     [m/s]               cruising speed
-                  W : 7341      [N]                 total aircraft weight
-                W_w : 2401      [N]                 wing weight
-...constants
-                W_0 : 4940      [N]      (+1.011)   aircraft weight excluding wing
-                  e : 0.95               (-0.4785)  Oswald efficiency factor
-(\frac{S}{S_{wet}}) : 2.05               (+0.4299)  wetted area ratio
-                  k : 1.2                (+0.4299)  form factor
-            V_{min} : 22        [m/s]    (-0.3678)  takeoff speed
-            N_{ult} : 3.8                (+0.2903)  ultimate load factor
-     W_{W_{coeff1}} : 8.71e-05  [1/m]    (+0.2903)  Wing Weight Coefficent 1
-               \tau : 0.12               (-0.2903)  airfoil thickness to chord ratio
-               \rho : 1.23      [kg/m³]  (-0.2269)  density of air
-          C_{L,max} : 1.5                (-0.1839)  max CL with flaps down
-     W_{W_{coeff2}} : 45.24     [Pa]     (+0.1303)  Wing Weight Coefficent 2
-             (CDA0) : 0.031     [m²]     (+0.09156) fuselage drag area
-                \mu : 1.78e-05  [kg/m/s] (+0.08599) viscosity of air
+                  A : 8.46                         aspect ratio
+                C_D : 0.02059                      Drag coefficient of wing
+                C_L : 0.4988                       Lift coefficent of wing
+                C_f : 0.003599                     skin friction coefficient
+                  D : 303.1     [N]                total drag force
+                 Re : 3.675e+06                    Reynold's number
+                  S : 16.44     [m²]               total wing area
+                  V : 38.15     [m/s]              cruising speed
+                  W : 7341      [N]                total aircraft weight
+                W_w : 2401      [N]                wing weight
+         ...constants
+             (CDA0) : 0.031     [m²]     (+0.0916) fuselage drag area
+(\frac{S}{S_{wet}}) : 2.05               (+0.43)   wetted area ratio
+          C_{L,max} : 1.5                (-0.184)  max CL with flaps down
+            N_{ult} : 3.8                (+0.29)   ultimate load factor
+            V_{min} : 22        [m/s]    (-0.368)  takeoff speed
+                W_0 : 4940      [N]      (+1.01)   aircraft weight excluding wing
+     W_{W_{coeff1}} : 8.71e-05  [1/m]    (+0.29)   Wing Weight Coefficent 1
+     W_{W_{coeff2}} : 45.24     [Pa]     (+0.13)   Wing Weight Coefficent 2
+                \mu : 1.78e-05  [kg/m/s] (+0.086)  viscosity of air
+               \rho : 1.23      [kg/m³]  (-0.227)  density of air
+               \tau : 0.12               (-0.29)   airfoil thickness to chord ratio
+                  e : 0.95               (-0.479)  Oswald efficiency factor
+                  k : 1.2                (+0.43)   form factor
 
 Cost Change
 -----------

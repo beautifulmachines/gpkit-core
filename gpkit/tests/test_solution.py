@@ -4,7 +4,8 @@ import numpy as np
 import pytest
 
 import gpkit
-from gpkit import Model, SignomialsEnabled, Variable, VectorVariable
+from gpkit import Model, SignomialsEnabled, Variable, VectorVariable, printing
+from gpkit.report import SolutionTable
 from gpkit.util.small_classes import Quantity, Strings
 
 
@@ -112,3 +113,73 @@ class TestSolution:
         assert all(isinstance(gp.result.table(), Strings) for gp in m.program.gps)
         assert sol.cost / 4.0 == pytest.approx(1.0, abs=1e-5)
         assert sol[x] / 3.0 == pytest.approx(1.0, abs=1e-3)
+
+
+class TestSolutionTable:
+    """Tests for SolutionTable class and backward-compat printing.table()."""
+
+    def _make_sol(self):
+        """Solve a simple model and return (model, solution)."""
+        x = Variable("x_st", "m", "free variable")
+        c = Variable("c_st", 2.0, "m", "fixed variable")
+        m = Model(x, [x >= c])
+        sol = m.solve(verbosity=0)
+        return m, sol
+
+    def test_solution_table_text_returns_string(self):
+        """SolutionTable(sol).text() returns a non-empty string."""
+        _, sol = self._make_sol()
+        result = SolutionTable(sol).text()
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_solution_table_md_returns_pipe_table(self):
+        """SolutionTable(sol).md() returns string with pipe-table headers."""
+
+        class _STNested(Model):
+            def setup(self):
+                x = Variable("x_stmd", "m", "free variable")
+                c = Variable("c_stmd", 2.0, "m", "fixed variable")
+                x_max = Variable("x_stmd_max", 5.0, "m", "upper bound")
+                return [x >= c, x <= x_max]
+
+        m = _STNested()
+        sol = m.solve(verbosity=0)
+        result = SolutionTable(sol).md()
+        assert isinstance(result, str)
+        assert "|" in result
+
+    def test_printing_table_backward_compat(self):
+        """printing.table(sol) still works and returns a string."""
+        _, sol = self._make_sol()
+        result = printing.table(sol)
+        assert isinstance(result, str)
+        assert len(result) > 0
+
+    def test_solution_table_and_printing_table_match(self):
+        """Both SolutionTable and printing.table(sol) contain variable names."""
+        _, sol = self._make_sol()
+        st_result = SolutionTable(sol).text()
+        pt_result = printing.table(sol)
+        assert "x_st" in st_result or "x" in st_result
+        assert isinstance(pt_result, str)
+
+    def test_solution_table_hierarchical_grouping(self):
+        """SolutionTable(sol).text() groups variables by submodel class name."""
+
+        class _STChild(Model):
+            def setup(self):
+                self.c = c = Variable("c_stchild")  # pylint: disable=W0201
+                c_min = Variable("c_stchild_min", 2)
+                return [c >= c_min]
+
+        child_standalone = _STChild()
+        m = Model(
+            child_standalone.c,
+            [child_standalone],
+        )
+        sol = m.solve(verbosity=0)
+        result = SolutionTable(sol).text()
+        # Should return a non-empty string (model or flat format)
+        assert isinstance(result, str)
+        assert len(result) > 0

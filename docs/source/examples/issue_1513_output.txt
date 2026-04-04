@@ -34,16 +34,15 @@ System.Fleet2.z[0] : 1
 
 Solution
 --------
-System.Fleet2
-z[:] : [ 1 ]
-...constants
-y[:] : [ 3    1     ]
-  sens ( nan  +0.25 )
-x[:] : [ 4  ]
-  sens ( ~0 )
+  Fleet2
+          z[:] : [ 1 ]
+    ...constants
+          x[:] : [ 4 ]
+          y[:] : [ 3  1 ]
 
-System.Fleet2.Vehicle
-a[:] : [ 1  1 ]
+    Vehicle
+      a[:] : [ 1  1 ]
+
 
 Most Sensitive Constraints
 --------------------------
@@ -105,16 +104,15 @@ System2.Fleet2.z[:].sum() : 3
 
 Solution
 --------
-System2.Fleet2
-z[:] : [ 1  1  1 ]
-...constants
-y[:] : [ 3    3    3    1        1        1       ]
-  sens ( nan  nan  nan  +0.0833  +0.0833  +0.0833 )
-x[:] : [ 4   4   4  ]
-  sens ( ~0  ~0  ~0 )
+  Fleet2
+          z[:] : [ 1  1  1 ]
+    ...constants
+          x[:] : [ 4  4  4 ]
+          y[:] : [ 3  3  3  1  1  1 ]
 
-System2.Fleet2.Vehicle
-a[:] : [ 1  1  1  1  1  1 ]
+    Vehicle
+      a[:] : [ 1  1  1  1  1  1 ]
+
 
 Most Sensitive Constraints
 --------------------------

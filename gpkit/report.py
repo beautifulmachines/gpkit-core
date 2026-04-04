@@ -8,6 +8,7 @@ functions of the IR.
 from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
+from .util.repr_conventions import unitstr as _unitstr
 from .varkey import lineage_display_context
 
 # ── Print options ─────────────────────────────────────────────────────────────
@@ -17,9 +18,9 @@ from .varkey import lineage_display_context
 class PrintOptions:
     """Options controlling report/solution formatting."""
 
-    precision: int = 3
+    precision: int = 4  # match printing.py default for backward compat
     topn: int = 10
-    vecn: int = 3
+    vecn: int = 6  # match printing.py default
     vec_width: int = 0
 
 
@@ -88,12 +89,15 @@ class ReportSection:
     assumptions: list  # list of str
     variables: list  # list of VarEntry
     constraint_groups: list  # list of CGroup
+    lineage_path: str = ""  # dotted path e.g. "Aircraft.Wing"; used in section headers
     children: list = field(default_factory=list)  # list of ReportSection
+    lineage_map: dict = field(default_factory=dict)  # VarKey→depth; NOT in to_dict
 
     def to_dict(self) -> dict:
         """JSON-serializable dict (for format='dict' and future API)."""
         return {
             "title": self.title,
+            "lineage_path": self.lineage_path,
             "description": self.description,
             "assumptions": list(self.assumptions),
             "variables": [
@@ -147,15 +151,24 @@ def _resolve_var_value(vk, solution=None, substitutions=None, model=None):
     return getattr(vk, "value", None)
 
 
-def _resolve_sensitivity(vk, solution=None) -> Optional[float]:
-    """Get sensitivity (shadow price) for a variable from solution."""
+def _resolve_sensitivity(vk, solution=None):
+    """Get sensitivity (shadow price) for a variable from solution.
+
+    Returns float for scalar variables, numpy array for vector variables,
+    or None if unavailable.
+    """
     if solution is None:
         return None
     try:
+        import numpy as np  # pylint: disable=import-outside-toplevel
+
         sens_vars = solution.sens.variables
-        if vk in sens_vars:
-            return float(sens_vars[vk])
-        return None
+        if vk not in sens_vars:
+            return None
+        raw = sens_vars[vk]
+        mag = getattr(raw, "magnitude", raw)
+        arr = np.asarray(mag)
+        return arr if arr.shape else float(arr)
     except (AttributeError, KeyError, TypeError):
         return None
 
@@ -164,11 +177,11 @@ def _resolve_sensitivity(vk, solution=None) -> Optional[float]:
 
 
 def _render_constraint(c) -> str:
-    """Render a single constraint as a string."""
+    """Render a constraint, stripping units but respecting active lineage context."""
     try:
+        return c.str_without({"units"})
+    except AttributeError:
         return str(c)
-    except Exception:  # pylint: disable=broad-except
-        return repr(c)
 
 
 # ── Core builder helpers ──────────────────────────────────────────────────────
@@ -178,26 +191,39 @@ def _build_var_entries(model, solution, substitutions) -> List[VarEntry]:
     """Build VarEntry list from model.unique_varkeys.
 
     Variable names are disambiguated within the section scope using
-    _get_lineage_map(), so siblings in this section are disambiguated but
-    variables in other sections are irrelevant (e.g. m_cap stays m_cap even
-    if wing.spar.cap.m and tail.spar.cap.m both exist in the full model).
+    _get_lineage_map(). Vector variables (multiple indexed VarKeys sharing a
+    veckey) are collapsed into a single VarEntry with an array-shaped value.
     """
     lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
     entries = []
+    seen_veckeys: set = set()
     with lineage_display_context(lineage_map):
         for vk in sorted(model.unique_varkeys, key=lambda v: v.name):
+            if vk.veckey is not None:
+                # Indexed element — represent entire vector via its veckey once.
+                if vk.veckey in seen_veckeys:
+                    continue
+                seen_veckeys.add(vk.veckey)
+                display_vk = vk.veckey
+            else:
+                display_vk = vk
             entries.append(
                 VarEntry(
-                    name=vk.str_without(),
+                    name=display_vk.str_without(),
                     latex=(
-                        vk.latex() if callable(getattr(vk, "latex", None)) else vk.name
+                        display_vk.latex()
+                        if callable(getattr(display_vk, "latex", None))
+                        else display_vk.name
                     ),
                     value=_resolve_var_value(
-                        vk, solution=solution, substitutions=substitutions, model=model
+                        display_vk,
+                        solution=solution,
+                        substitutions=substitutions,
+                        model=model,
                     ),
-                    sensitivity=_resolve_sensitivity(vk, solution=solution),
-                    units=vk.unitrepr or "-",
-                    label=vk.label or "",
+                    sensitivity=_resolve_sensitivity(display_vk, solution=solution),
+                    units=display_vk.unitrepr or "-",
+                    label=display_vk.label or "",
                 )
             )
     return entries
@@ -248,12 +274,19 @@ def build_report_ir(
         One-off value overrides without mutating model.substitutions.
     """
     desc = type(model).description()
+    lineage = getattr(model, "lineage", None) or ()
+    lineage_path = (
+        ".".join(name for name, _ in lineage) if lineage else type(model).__name__
+    )
+    lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
     return ReportSection(
         title=type(model).__name__,
         description=desc.get("summary", ""),
         assumptions=list(desc.get("assumptions", [])),
+        lineage_path=lineage_path,
         variables=_build_var_entries(model, solution, substitutions),
         constraint_groups=_build_constraint_groups(model),
+        lineage_map=lineage_map,
         children=[
             build_report_ir(child, solution=solution, substitutions=substitutions)
             for child in model.submodels
@@ -266,36 +299,89 @@ def build_report_ir(
 _INDENT = "  "
 
 
-def _fmt_value(val, precision: int = 3) -> str:
-    """Format a variable value for display."""
+def _fmt_value(val, precision: int = 4, vecn: int = 6, col_widths=()) -> str:
+    """Format a variable value for display, handling scalars and arrays.
+
+    col_widths is a per-column list of minimum widths so that element position i
+    across all vector rows in the same table renders at the same width.
+    """
+    import numpy as np  # pylint: disable=import-outside-toplevel
+
     if val is None:
         return "-"
+    mag = getattr(val, "magnitude", val)
     try:
-        f = float(val)
-        return f"{f:.{precision}g}"
+        arr = np.asarray(mag)
+        if arr.shape:
+            flat = arr.ravel()
+            shown = [f"{x:.{precision}g}" for x in flat[:vecn]]
+            body = "  ".join(
+                s.ljust(col_widths[i]) if i < len(col_widths) else s
+                for i, s in enumerate(shown)
+            )
+            dots = " ..." if flat.size > vecn else ""
+            return f"[ {body}{dots} ]"
+        return f"{float(arr):.{precision}g}"
     except (TypeError, ValueError):
-        return str(val)
+        return str(mag)
 
 
-def _fmt_sensitivity(sens) -> str:
-    """Format a sensitivity value for display."""
+def _fmt_sensitivity(sens, vecn: int = 6, col_widths=()) -> str:
+    """Format a sensitivity value for display, handling scalars and arrays."""
+    import numpy as np  # pylint: disable=import-outside-toplevel
+
     if sens is None:
         return "-"
+    mag = getattr(sens, "magnitude", sens)
     try:
-        return f"{float(sens):+.2g}"
+        arr = np.asarray(mag)
+        if arr.shape:
+            flat = arr.ravel()
+            shown = [f"{x:+.2g}" for x in flat[:vecn]]
+            body = "  ".join(
+                s.ljust(col_widths[i]) if i < len(col_widths) else s
+                for i, s in enumerate(shown)
+            )
+            dots = " ..." if flat.size > vecn else ""
+            return f"( {body}{dots} )"
+        return f"{float(arr):+.2g}"
     except (TypeError, ValueError):
-        return str(sens)
+        return str(mag)
 
 
-def _text_var_rows(variables: list) -> list:
-    """Build column-aligned rows for variables section in text output."""
+def _text_var_rows(variables: list, precision: int = 4, vecn: int = 6) -> list:
+    """Build column-aligned rows for variables section in text output.
+
+    Computes a uniform vec_width across all vector entries so that element
+    columns stay aligned when multiple vectors share the same table.
+    """
+    import numpy as np  # pylint: disable=import-outside-toplevel
+
+    # Pre-scan: compute per-column max element widths across all vector values.
+    # col_widths[i] = max formatted width of element i across all vector rows.
+    col_widths: list = []
+    for ve in variables:
+        mag = getattr(ve.value, "magnitude", ve.value)
+        try:
+            arr = np.asarray(mag)
+            if arr.shape:
+                elems = [f"{x:.{precision}g}" for x in arr.ravel()[:vecn]]
+                while len(col_widths) < len(elems):
+                    col_widths.append(0)
+                for i, s in enumerate(elems):
+                    col_widths[i] = max(col_widths[i], len(s))
+        except (TypeError, ValueError):
+            pass
+
     rows = []
     for ve in variables:
         rows.append(
             [
                 ve.name,
-                _fmt_value(ve.value),
-                _fmt_sensitivity(ve.sensitivity),
+                _fmt_value(
+                    ve.value, precision=precision, vecn=vecn, col_widths=col_widths
+                ),
+                _fmt_sensitivity(ve.sensitivity, vecn=vecn, col_widths=col_widths),
                 ve.units,
                 ve.label,
             ]
@@ -303,9 +389,15 @@ def _text_var_rows(variables: list) -> list:
     return _format_aligned_columns(rows, "<<<<<", "  ")
 
 
-def _text_constraint_rows(constraints: list) -> list:
-    """Build aligned rows for a constraint group in text output."""
-    c_rows = [_split_constraint_str(_render_constraint(c)) for c in constraints]
+def _text_constraint_rows(constraints: list, lineage_map: dict = None) -> list:
+    """Build aligned rows for a constraint group in text output.
+
+    lineage_map is the section's _get_lineage_map() result; activating it
+    makes variable names in constraints use section-local abbreviations.
+    """
+    ctx = lineage_display_context(lineage_map or {})
+    with ctx:
+        c_rows = [_split_constraint_str(_render_constraint(c)) for c in constraints]
     return _format_aligned_columns(c_rows, "<<", "  ")
 
 
@@ -326,8 +418,9 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
     pad = _INDENT * indent
     lines: list = []
 
-    # Section header (model class name)
-    lines.append(f"{pad}{ir.title}")
+    # Section header: use lineage path for nested models (shows where in tree)
+    header = ir.lineage_path if indent > 0 else ir.title
+    lines.append(f"{pad}{header}")
 
     # Description
     if ir.description:
@@ -353,7 +446,7 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
         group_header = f"Constraints ({cg.label})" if cg.label else "Constraints"
         lines.append(f"{pad}  {group_header}")
         if cg.constraints:
-            for row_line in _text_constraint_rows(cg.constraints):
+            for row_line in _text_constraint_rows(cg.constraints, ir.lineage_map):
                 lines.append(f"{pad}    {row_line}")
         lines.append("")
 
@@ -474,3 +567,333 @@ def render_report(ir: "ReportSection", fmt: str = "text") -> "dict | str":
         f"Format '{fmt}' not yet implemented. "
         "Available formats: 'dict', 'text', 'md', 'latex'."
     )
+
+
+# ── SolutionTable ─────────────────────────────────────────────────────────────
+
+
+class SolutionTable:
+    """Formatted display of a Solution or SolutionSequence.
+
+    Replaces printing.table() internally. Provides .text() and .md() methods.
+    Hierarchical grouping by model tree (not by lineage strings) per RPT-08.
+    """
+
+    def __init__(self, solution, options=None, **kwargs):
+        """Create a SolutionTable.
+
+        Parameters
+        ----------
+        solution : Solution or SolutionSequence
+        options : PrintOptions, optional
+            If not provided, a PrintOptions is created from kwargs
+            (precision, topn, vecn, vec_width).
+        """
+        self._sol = solution
+        if options is not None:
+            self._options = options
+        else:
+            self._options = PrintOptions(
+                **{
+                    k: v
+                    for k, v in kwargs.items()
+                    if k in ("precision", "topn", "vecn", "vec_width")
+                }
+            )
+
+    def _get_model(self):
+        """Retrieve the model from solution.meta, if available."""
+        meta = getattr(self._sol, "meta", {})
+        model_ref = meta.get("model")
+        if callable(model_ref):
+            return model_ref()
+        return model_ref
+
+    def _fmt_val(self, val, col_widths=()) -> str:
+        """Format a solution value for display (magnitude only, no units).
+
+        col_widths[i] is the minimum width for element i, so all vector rows
+        in the same table align vertically column-by-column.
+        """
+        import numpy as np  # pylint: disable=import-outside-toplevel
+
+        p = self._options.precision
+        if val is None:
+            return "-"
+        mag = getattr(val, "magnitude", val)
+        try:
+            if np.shape(mag):
+                flat = np.asarray(mag).ravel()
+                shown = flat[: self._options.vecn]
+                body = "  ".join(
+                    (
+                        f"{x:.{p-1}g}".ljust(col_widths[i])
+                        if i < len(col_widths)
+                        else f"{x:.{p-1}g}"
+                    )
+                    for i, x in enumerate(shown)
+                )
+                dots = " ..." if flat.size > self._options.vecn else ""
+                return f"[ {body}{dots} ]"
+            return f"{float(mag):.{p}g}"
+        except (TypeError, ValueError):
+            return str(mag)
+
+    def _compute_col_widths(self, varkeys) -> list:
+        """Per-column max element widths across all vector variables in varkeys."""
+        import numpy as np  # pylint: disable=import-outside-toplevel
+
+        p = self._options.precision
+        n = self._options.vecn
+        col_widths: list = []
+        for vk in varkeys:
+            val = self._get_var_value(vk)
+            if val is None:
+                continue
+            mag = getattr(val, "magnitude", val)
+            try:
+                if np.shape(mag):
+                    elems = [f"{x:.{p-1}g}" for x in np.asarray(mag).ravel()[:n]]
+                    while len(col_widths) < len(elems):
+                        col_widths.append(0)
+                    for i, s in enumerate(elems):
+                        col_widths[i] = max(col_widths[i], len(s))
+            except (TypeError, ValueError):
+                pass
+        return col_widths
+
+    _NEARZERO_TOL = 1e-2  # sensitivities below this display as (~0)
+
+    def _fmt_sens(self, sens) -> str:
+        """Format a sensitivity for display.
+
+        Sensitivities below _NEARZERO_TOL are displayed as '(~0)' to avoid
+        cluttering the table with numerical noise.
+        """
+        if sens is None:
+            return ""
+        try:
+            val = float(sens)
+            if abs(val) < self._NEARZERO_TOL:
+                return "(~0)"
+            p = self._options.precision
+            return f"({val:+.{p-1}g})"
+        except (TypeError, ValueError):
+            return str(sens)
+
+    def _get_var_value(self, vk):
+        """Get a variable's value from the solution."""
+        try:
+            return self._sol[vk]
+        except (KeyError, TypeError):
+            return None
+
+    def _get_sensitivity(self, vk):
+        """Get a variable's sensitivity from the solution."""
+        try:
+            return float(self._sol.sens.variables[vk])
+        except (AttributeError, KeyError, TypeError):
+            return None
+
+    def _var_row(self, vk, show_sensitivity: bool = True, col_widths=()) -> list:
+        """Build one display row for a variable."""
+        val = self._get_var_value(vk)
+        sens = self._get_sensitivity(vk) if show_sensitivity else None
+        name = vk.str_without("lineage")
+        unit = _unitstr(vk, into="[%s]", dimless="")
+        label = vk.label or ""
+        return [
+            f"{name} :",
+            self._fmt_val(val, col_widths),
+            unit,
+            self._fmt_sens(sens),
+            label,
+        ]
+
+    def _is_constant(self, vk) -> bool:
+        """True if vk is a constant (in sol.constants), False if free (sol.primal).
+
+        For veckeys (vector parent keys), checks if the veckey is in constants
+        (VarMap supports veckey look-up directly).
+        """
+        constants = getattr(self._sol, "constants", {})
+        return vk in constants
+
+    def _collapsed_varkeys(self, raw_varkeys):
+        """Collapse vector element VarKeys to their parent veckeys.
+
+        model.unique_varkeys contains individual element VarKeys for vector
+        variables (e.g. M[0], M[1] ...). This method deduplicates them by
+        returning each parent veckey once, preserving scalar varkeys as-is.
+        The order is preserved (first-seen order for veckeys).
+        """
+        seen = set()
+        result = []
+        for vk in raw_varkeys:
+            parent = getattr(vk, "veckey", None)
+            if parent is not None:
+                if parent not in seen:
+                    seen.add(parent)
+                    result.append(parent)
+            else:
+                if vk not in seen:
+                    seen.add(vk)
+                    result.append(vk)
+        return result
+
+    def _render_model_section_text(self, model, indent: int = 0) -> list:
+        """Render one model's variables as text lines (recursive).
+
+        Variables are split into free (sol.primal) and constants (sol.constants),
+        with a '...constants' separator, matching the SolutionSection SectionSpec
+        format expected by existing tests (test_solution_section).
+        Vector variables are collapsed to their parent veckey for display.
+        """
+        lines = []
+        pad = "  " * indent
+        raw_varkeys = sorted(model.unique_varkeys, key=lambda v: v.name)
+        varkeys = self._collapsed_varkeys(raw_varkeys)
+        if varkeys:
+            lines.append(f"{pad}{type(model).__name__}")
+            free_vks = sorted(
+                [vk for vk in varkeys if not self._is_constant(vk)],
+                key=lambda v: v.name,
+            )
+            const_vks = sorted(
+                [vk for vk in varkeys if self._is_constant(vk)],
+                key=lambda v: (-abs(self._get_sensitivity(v) or 0), v.name),
+            )
+            col_widths = self._compute_col_widths(varkeys)
+            all_rows = [
+                self._var_row(vk, show_sensitivity=False, col_widths=col_widths)
+                for vk in free_vks
+            ]
+            if const_vks:
+                all_rows.append(["...constants", "", "", "", ""])
+                all_rows.extend(
+                    self._var_row(vk, show_sensitivity=True, col_widths=col_widths)
+                    for vk in const_vks
+                )
+            aligned = _format_aligned_columns(
+                all_rows, "><<<< "[0:5] if all_rows else None, " "
+            )
+            lines.extend(f"{pad}  {row}" for row in aligned)
+            lines.append("")
+        for child in model.submodels:
+            lines.extend(self._render_model_section_text(child, indent + 1))
+        return lines
+
+    def _spec_section(self, table_name) -> str:
+        """Render a single named SectionSpec section for this solution."""
+        from . import printing  # pylint: disable=import-outside-toplevel
+
+        opt = printing.PrintOptions(
+            precision=self._options.precision,
+            topn=self._options.topn,
+            vecn=self._options.vecn,
+            vec_width=self._options.vec_width if self._options.vec_width else None,
+        )
+        ctx = printing.SolutionContext(self._sol)
+        if table_name not in printing.SECTION_SPECS:
+            return ""
+        sec = printing.SECTION_SPECS[table_name](options=opt)
+        sec_lines = sec.format(ctx)
+        return "\n".join(sec_lines) if sec_lines else ""
+
+    def text(self, tables=None) -> str:
+        """Plain text solution table, grouped by submodel using model tree.
+
+        Non-variable sections (cost, warnings, tightest constraints) use the
+        SectionSpec pipeline for full fidelity. The variable ('solution')
+        section uses model-tree grouping when a model reference is available,
+        falling back to a flat VarMap display otherwise.
+        """
+        if tables is None:
+            tables = ("sweeps", "cost", "warnings", "solution", "tightest constraints")
+        blocks = []
+        for table_name in tables:
+            if table_name in ("solution", "freevariables", "constants"):
+                # Variable section: use tree-based or flat rendering
+                model = self._get_model()
+                var_block = ""
+                if model is not None:
+                    var_lines = self._render_model_section_text(model)
+                    if var_lines:
+                        var_block = "Solution\n--------\n" + "\n".join(var_lines)
+                if not var_block:
+                    var_block = self._flat_text()
+                if var_block:
+                    blocks.append(var_block)
+            else:
+                section = self._spec_section(table_name)
+                if section:
+                    blocks.append(section)
+        return "\n\n".join(blocks)
+
+    def _flat_text(self) -> str:
+        """Flat fallback: render all variables directly from solution VarMaps."""
+        lines = ["Solution", "--------"]
+        rows = []
+        # primal (free) variables
+        primal = getattr(self._sol, "primal", {})
+        constants = getattr(self._sol, "constants", {})
+        sens_vars = {}
+        try:
+            sens_vars = dict(self._sol.sens.variables.items())
+        except (AttributeError, TypeError):
+            pass
+        for vk, val in sorted(primal.items(), key=lambda kv: str(kv[0])):
+            name = vk.str_without("lineage")
+            unit = _unitstr(vk, into="[%s]", dimless="")
+            label = vk.label or ""
+            rows.append([f"{name} :", self._fmt_val(val), unit, "", label])
+        if constants:
+            rows.append(["...constants", "", "", "", ""])
+        for vk, val in sorted(constants.items(), key=lambda kv: str(kv[0])):
+            name = vk.str_without("lineage")
+            unit = _unitstr(vk, into="[%s]", dimless="")
+            label = vk.label or ""
+            sens = sens_vars.get(vk)
+            sens_str = self._fmt_sens(sens)
+            rows.append([f"{name} :", self._fmt_val(val), unit, sens_str, label])
+        lines.extend(_format_aligned_columns(rows, "><<<<" if rows else None, " "))
+        return "\n".join(lines)
+
+    def md(self, tables=None) -> str:  # pylint: disable=unused-argument
+        """Markdown solution table with pipe-table format."""
+        model = self._get_model()
+        lines = []
+        if model is not None:
+            lines.extend(self._render_model_section_md(model))
+        else:
+            # Fall back: plain text wrapped in a code block
+            lines.append("```")
+            lines.append(self.text())
+            lines.append("```")
+        return "\n".join(lines)
+
+    def _render_model_section_md(self, model, level: int = 1) -> list:
+        """Render one model's variables as markdown lines (recursive)."""
+        lines = []
+        varkeys = sorted(model.unique_varkeys, key=lambda v: v.name)
+        if varkeys:
+            hdr = "#" * min(level, 6)
+            lines.append(f"{hdr} {type(model).__name__}")
+            lines.append("")
+            lines.append("| Variable | Value | Sensitivity | Units | Label |")
+            lines.append("|----------|-------|-------------|-------|-------|")
+            for vk in varkeys:
+                val = self._get_var_value(vk)
+                sens = self._get_sensitivity(vk)
+                name = vk.str_without("lineage")
+                unit = _unitstr(vk, into="%s", dimless="-")
+                label = vk.label or ""
+                sens_str = f"{float(sens):+.2g}" if sens is not None else "-"
+                lines.append(
+                    f"| {name} | {self._fmt_val(val)}"
+                    f" | {sens_str} | {unit} | {label} |"
+                )
+            lines.append("")
+        for child in model.submodels:
+            lines.extend(self._render_model_section_md(child, level + 1))
+        return lines

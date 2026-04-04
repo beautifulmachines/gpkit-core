@@ -20,7 +20,8 @@ Test.x : 1
 Solution
 --------
 Test
-x : 1
+  x : 1
+
 __________
 
 VECTORIZED
@@ -52,5 +53,6 @@ Test1.x[:].prod() : 2
 
 Solution
 --------
-Test1
-x[:] : [ 1  2  1 ]
+Test
+  x[:] : [ 1  2  1 ]
+
