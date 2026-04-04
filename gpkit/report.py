@@ -8,6 +8,7 @@ functions of the IR.
 from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
+from .util.small_scripts import try_str_without
 from .varkey import lineage_display_context
 
 # ── Column alignment helper ───────────────────────────────────────────────────
@@ -81,6 +82,9 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
     variables: list  # list of VarEntry
     constraint_groups: list  # list of CGroup
     lineage_path: str = ""  # dotted path e.g. "Aircraft.Wing"
+    magic_prefix: str = (
+        ""  # model.lineagestr() — stripped from variable names in renderers
+    )
     children: list = field(default_factory=list)  # list of ReportSection
     lineage_map: dict = field(default_factory=dict)  # NOT in to_dict
 
@@ -89,6 +93,7 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
         return {
             "title": self.title,
             "lineage_path": self.lineage_path,
+            "magic_prefix": self.magic_prefix,
             "description": self.description,
             "assumptions": list(self.assumptions),
             "variables": [
@@ -272,6 +277,7 @@ def build_report_ir(
         description="[description]",
         assumptions=[],
         lineage_path=lineage_path,
+        magic_prefix=model.lineagestr(),
         variables=_build_var_entries(model, solution, substitutions),
         constraint_groups=_build_constraint_groups(model),
         lineage_map=lineage_map,
@@ -519,14 +525,16 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
         lines.append("")
 
     # Constraint groups
+    excluded = ("units", ":MAGIC:" + ir.magic_prefix) if ir.magic_prefix else ("units",)
     for cg in ir.constraint_groups:
         group_header = f"**Constraints: {cg.label}**" if cg.label else "**Constraints**"
         lines.append(group_header)
         lines.append("")
-        for c in cg.constraints:
-            c_str = _render_constraint(c)
-            lines.append(f"$${c_str}$$")
-            lines.append("")
+        with lineage_display_context(ir.lineage_map):
+            for c in cg.constraints:
+                c_latex = try_str_without(c, excluded, latex=True)
+                lines.append(f"$${c_latex}$$")
+                lines.append("")
 
     # Children (recursive)
     for child in ir.children:
