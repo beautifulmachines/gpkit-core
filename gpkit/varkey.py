@@ -240,7 +240,28 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
         if "idx" not in excluded and self.idx:
             name = "{%s}_{%s}" % (name, ",".join(map(str, self.idx)))
         if "lineage" not in excluded and self.lineage:
-            name = "{%s}_{%s}" % (name, self.lineagestr("modelnums" not in excluded))
+            namespace = list(self.lineage)  # [(model_name, model_num), ...]
+            # Strip leading prefix via :MAGIC: exclusions (mirrors str_without)
+            for ex in excluded:
+                if ex[:7] == ":MAGIC:":
+                    for seg in ex[7:].split("."):
+                        if not namespace:
+                            break
+                        n, num = namespace[0]
+                        if (f"{n}{num}" if num else n) == seg:
+                            namespace = namespace[1:]
+                        else:
+                            break
+            # Respect lineage_display_context depth (mirrors str_without)
+            depth = _lineage_ctx.get().get(self)
+            if depth is None and self.veckey:
+                depth = _lineage_ctx.get().get(self.veckey)
+            if depth is not None:
+                namespace = namespace[-depth:] if depth > 0 else []
+            # Format remaining sub-lineage as lowercase \text{} subscript
+            if namespace:
+                sub = ",".join(n.lower() for n, _ in namespace)
+                name = "{%s}_{\\text{%s}}" % (name, sub)
         return name
 
     def __eq__(self, other):

@@ -182,16 +182,19 @@ def _build_var_entries(model, solution, substitutions) -> List[VarEntry]:
     """Build VarEntry list from model.unique_varkeys.
 
     Variable names are disambiguated within the section scope using
-    _get_lineage_map(). Vector variables (multiple indexed VarKeys sharing a
-    veckey) are collapsed into a single VarEntry with an array-shaped value.
+    _get_lineage_map(). The model's own lineage is stripped from all display
+    names so that variables show only their sub-model context (e.g. "Cap.m"
+    not "Aircraft.Wing.Spar.Cap.m" within the Spar section).
+    Vector variables are collapsed into a single VarEntry with an array value.
     """
     lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
+    model_prefix = model.lineagestr()
+    excluded = {":MAGIC:" + model_prefix} if model_prefix else set()
     entries = []
     seen_veckeys: set = set()
     with lineage_display_context(lineage_map):
         for vk in sorted(model.unique_varkeys, key=lambda v: v.name):
             if vk.veckey is not None:
-                # Indexed element — represent entire vector via its veckey once.
                 if vk.veckey in seen_veckeys:
                     continue
                 seen_veckeys.add(vk.veckey)
@@ -200,12 +203,8 @@ def _build_var_entries(model, solution, substitutions) -> List[VarEntry]:
                 display_vk = vk
             entries.append(
                 VarEntry(
-                    name=display_vk.str_without(),
-                    latex=(
-                        display_vk.latex()
-                        if callable(getattr(display_vk, "latex", None))
-                        else display_vk.name
-                    ),
+                    name=display_vk.str_without(excluded),
+                    latex=display_vk.latex(excluded),
                     value=_resolve_var_value(
                         display_vk,
                         solution=solution,
@@ -265,14 +264,13 @@ def build_report_ir(
     substitutions : dict, optional
         One-off value overrides without mutating model.substitutions.
     """
-    desc = type(model).description()
     own_name = type(model).__name__
     lineage_path = f"{_parent_path}.{own_name}" if _parent_path else own_name
     lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
     return ReportSection(
         title=own_name,
-        description=desc.get("summary", ""),
-        assumptions=list(desc.get("assumptions", [])),
+        description="[description]",
+        assumptions=[],
         lineage_path=lineage_path,
         variables=_build_var_entries(model, solution, substitutions),
         constraint_groups=_build_constraint_groups(model),
