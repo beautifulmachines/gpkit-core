@@ -252,6 +252,7 @@ def build_report_ir(
     model,
     solution=None,
     substitutions: Optional[dict] = None,
+    _parent_path: str = "",
 ) -> ReportSection:
     """Build a ReportSection tree from *model*.
 
@@ -265,13 +266,11 @@ def build_report_ir(
         One-off value overrides without mutating model.substitutions.
     """
     desc = type(model).description()
-    lineage = getattr(model, "lineage", None) or ()
-    lineage_path = (
-        ".".join(name for name, _ in lineage) if lineage else type(model).__name__
-    )
+    own_name = type(model).__name__
+    lineage_path = f"{_parent_path}.{own_name}" if _parent_path else own_name
     lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
     return ReportSection(
-        title=type(model).__name__,
+        title=own_name,
         description=desc.get("summary", ""),
         assumptions=list(desc.get("assumptions", [])),
         lineage_path=lineage_path,
@@ -279,7 +278,12 @@ def build_report_ir(
         constraint_groups=_build_constraint_groups(model),
         lineage_map=lineage_map,
         children=[
-            build_report_ir(child, solution=solution, substitutions=substitutions)
+            build_report_ir(
+                child,
+                solution=solution,
+                substitutions=substitutions,
+                _parent_path=lineage_path,
+            )
             for child in model.submodels
         ],
     )
