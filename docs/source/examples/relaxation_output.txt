@@ -61,11 +61,13 @@ All constraints relaxed by 42%
 
 Solution
 --------
-         C : 1.414
-         x : 1.414
+    x : 1.414
 ...constants
-     x_max : 1      (-0.5)
-     x_min : 2      (+0.5)
+x_max : 1      (-0.5)
+x_min : 2      (+0.5)
+
+Relax
+C : 1.414
 
 Most Sensitive Constraints
 --------------------------
@@ -136,12 +138,13 @@ Relaxed Constraints:
 
 Solution
 --------
-      C[0] : 1
-      C[1] : 2
-         x : 1
+    x : 1
 ...constants
-     x_max : 1  (-0.99)
-     x_min : 2  (+1)
+x_min : 2  (+1)
+x_max : 1  (-0.99)
+
+Relax1
+C[:] : [ 1  2 ]
 
 Most Sensitive Constraints
 --------------------------
@@ -212,14 +215,18 @@ Relaxed Constants:
 
 Solution
 --------
-     x_max : 1
-     x_min : 2
-         x : 1
-     x_max : 1
-     x_min : 1
+    x : 1
+x_max : 1
+x_min : 1
+
+Relax2
+x_max : 1
+x_min : 2
+
+Relax2.OriginalValues
 ...constants
-     x_max : 1
-     x_min : 2
+x_max : 1  (~0)
+x_min : 2  (~0)
 
 Most Sensitive Constraints
 --------------------------

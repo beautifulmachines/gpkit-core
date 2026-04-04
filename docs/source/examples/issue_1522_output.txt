@@ -50,14 +50,15 @@ Yum1.Cake.y[:].sum() : 15
 
 Solution
 --------
-  Cake
-    y[:] : [ 3  3  3  3  3 ]
+Yum1.Cake
+y[:] : [ 3  3  3  3  3 ]
 
-    Pie
-      ...constants
-            x[:] : [ 2  2  2  2  2  3 ... ]
-            z[:] : [ 1  1  1  1  1  1 ... ]
-
+Yum1.Cake.Pie
+...constants
+x[:] : [ 2          2          2          2          2          3    ... ]
+  sens ( +7.12e-07  +7.12e-07  +7.12e-07  +7.12e-07  +7.12e-07  +0.2 ... )
+z[:] : [ 1          1          1          1          1          1    ... ]
+  sens ( ~0         ~0         ~0         ~0         ~0         ~0   ... )
 
 Most Sensitive Constraints
 --------------------------
@@ -91,14 +92,15 @@ Yum2.Cake.y[:].sum() : 3
 
 Solution
 --------
-  Cake
-    y[:] : [ 3 ]
+Yum2.Cake
+y[:] : [ 3 ]
 
-    Pie
-      ...constants
-            x[:] : [ 2  3 ]
-            z[:] : [ 1  1 ]
-
+Yum2.Cake.Pie
+...constants
+x[:] : [ 2   3  ]
+  sens ( ~0  +1 )
+z[:] : [ 1   1  ]
+  sens ( ~0  ~0 )
 
 Most Sensitive Constraints
 --------------------------
