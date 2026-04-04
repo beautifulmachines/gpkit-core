@@ -83,6 +83,16 @@ class Nomial(NomialData):
 
     def latex(self, excluded=()):
         "Latex representation, parsing `excluded` just as .str_without does"
+        if hasattr(self, "key"):
+            return self.key.latex(excluded)
+        if "ast" not in excluded and self.ast:
+            excluded_inner = frozenset({"units"}.union(excluded))
+            ast_latex = self.ast.latex(excluded_inner)
+            if "units" in excluded:
+                return ast_latex
+            units = self.unitstr(r"\mathrm{~\left[ %s \right]}", ":L~")
+            units_tf = units.replace("frac", "tfrac").replace(r"\cdot", r"\cdot ")
+            return ast_latex + units_tf
         mstrs = []
         for exp, c in self.hmap.items():
             pos_vars, neg_vars = [], []

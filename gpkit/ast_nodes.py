@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from .exceptions import IRSerializationError
-from .util.repr_conventions import _render_ast_node
+from .util.repr_conventions import _render_ast_node, _render_ast_node_latex
 
 if TYPE_CHECKING:
     from .varkey import VarKey
@@ -39,6 +39,9 @@ class VarNode(ASTNode):
     def str_without(self, excluded=()):
         return self.varkey.str_without(excluded)
 
+    def latex(self, excluded=()):
+        return self.varkey.latex(excluded)
+
     def to_ir(self):
         return {"node": "var", "ref": self.ref}
 
@@ -51,6 +54,9 @@ class ConstNode(ASTNode):
 
     def str_without(self, excluded=()):
         return f"{self.value:.3g}"
+
+    def latex(self, excluded=()):
+        return f"{self.value:.4g}"
 
     def to_ir(self):
         return {"node": "const", "value": self.value}
@@ -74,6 +80,9 @@ class ExprNode(ASTNode):
 
     def str_without(self, excluded=()):
         return _render_ast_node(self, excluded)
+
+    def latex(self, excluded=()):
+        return _render_ast_node_latex(self, excluded)
 
     def to_ir(self):
         return {

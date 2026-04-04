@@ -100,7 +100,7 @@ class TestMonomial:  # pylint: disable=unnecessary-negation,comparison-with-itse
         x = Variable("x")
         m = Monomial({"x": 2, "y": -1}, 5).latex()
         assert isinstance(m, str)
-        assert (5 * x).latex() == "5x"
+        assert (5 * x).latex() == "5 x"
 
     def test_str_with_units(self):
         "Make sure __str__() works when units are involved"
@@ -251,7 +251,7 @@ class TestSignomial:
         with SignomialsEnabled():
             if sys.platform[:3] != "win":
                 assert str(1 - x - y**2 - 1) == "1 - x - y² - 1"
-            assert (1 - x / y**2).latex() == "-\\frac{x}{y^{2}} + 1"
+            assert (1 - x / y**2).latex() == "1 - \\frac{x}{y^{2}}"
             _ = hash(1 - x / y**2)
         with pytest.raises(TypeError):
             _ = x - y
