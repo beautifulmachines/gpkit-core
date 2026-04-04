@@ -107,7 +107,10 @@ def latexify(name: str) -> str:
     if "_" in name:
         parts = name.split("_", 1)
         base = _GREEK.get(parts[0], parts[0])
-        sub = _GREEK.get(parts[1], r"\text{" + parts[1].replace("_", r"\_") + "}")
+        if "_" in parts[1] or parts[1] in _GREEK:
+            sub = latexify(parts[1])  # nested/Greek → already math, no \text{}
+        else:
+            sub = r"\text{" + parts[1] + "}"
         return base + "_{" + sub + "}"
     return _GREEK.get(name, name)
 

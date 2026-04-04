@@ -57,6 +57,7 @@ class VarEntry:
     sensitivity: Optional[float]  # shadow price from solution, or None
     units: str  # unit string
     label: str  # human label (from VarKey.label or "")
+    source: str = ""  # lineagestr() for cross-model referenced vars; "" for local
 
 
 @dataclass
@@ -104,6 +105,7 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
                     "sensitivity": v.sensitivity,
                     "units": v.units,
                     "label": v.label,
+                    "source": v.source,
                 }
                 for v in self.variables
             ],
@@ -183,14 +185,54 @@ def _render_constraint(c) -> str:
 # ── Core builder helpers ──────────────────────────────────────────────────────
 
 
-def _build_var_entries(model, solution, substitutions) -> List[VarEntry]:
-    """Build VarEntry list from model.unique_varkeys.
+def _collect_constraint_varkeys(constraint_groups: List[CGroup]) -> set:
+    """Collect all VarKeys appearing in local constraint groups.
 
-    Variable names are disambiguated within the section scope using
-    _get_lineage_map(). The model's own lineage is stripped from all display
-    names so that variables show only their sub-model context (e.g. "Cap.m"
-    not "Aircraft.Wing.Spar.Cap.m" within the Spar section).
-    Vector variables are collapsed into a single VarEntry with an array value.
+    Note: ConstraintSet.constrained_varkeys() (set.py) does the same concept
+    but operates over model.vks, which aggregates the entire subtree including
+    child models. Here we only touch the leaf constraints already filtered by
+    _build_constraint_groups, giving us just this level's own equations.
+    ConstraintSet has unique_varkeys as a class attribute, so hasattr() returns
+    True for all ConstraintSet/Model instances — _build_constraint_groups
+    already excluded them, leaving only leaf ScalarSingleEquationConstraints
+    whose .vks is exactly the variables in that one equation.
+    """
+    vkeys: set = set()
+    for cg in constraint_groups:
+        for c in cg.constraints:
+            if hasattr(c, "vks"):
+                vkeys.update(c.vks)
+    return vkeys
+
+
+def _disambiguate_latex(display_vk, taken: set) -> str:
+    """Return the minimal-depth latex for display_vk that doesn't appear in taken.
+
+    Starts at depth=0 (base symbol only) and adds one more lineage component
+    as a subscript per step until the name is unique. Local vars win because
+    their names are pre-loaded into taken before this is called.
+    """
+    max_depth = len(getattr(display_vk, "lineage", ()) or ())
+    for depth in range(0, max_depth + 1):
+        with lineage_display_context({display_vk: depth}):
+            candidate = display_vk.latex(("units",))
+        if candidate not in taken:
+            return candidate
+    return display_vk.latex(("units",))  # exhausted — use full lineage
+
+
+def _build_var_entries(
+    model, solution, substitutions, extra_vks=None
+) -> List[VarEntry]:
+    """Build VarEntry list from model.unique_varkeys, then cross-model extras.
+
+    Local variables: names disambiguated within the section scope using
+    _get_lineage_map(); model's own lineage stripped so only sub-model context
+    is shown. Vector variables collapsed to a single VarEntry.
+
+    Cross-model variables (extra_vks): latex disambiguated against local names
+    by progressively adding lineage subscript components until unique. Full
+    dotted name stored in VarEntry.source for display in brackets.
     """
     lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
     model_prefix = model.lineagestr()
@@ -221,6 +263,35 @@ def _build_var_entries(model, solution, substitutions) -> List[VarEntry]:
                     label=display_vk.label or "",
                 )
             )
+
+    if extra_vks:
+        owned_display = {(vk.veckey or vk) for vk in model.unique_varkeys}
+        taken_latex = {ve.latex for ve in entries}
+        cross_seen: set = set()
+        for vk in sorted(extra_vks, key=lambda v: v.name):
+            display_vk = vk.veckey if vk.veckey is not None else vk
+            if display_vk in owned_display or display_vk in cross_seen:
+                continue
+            cross_seen.add(display_vk)
+            vk_latex = _disambiguate_latex(display_vk, taken_latex)
+            taken_latex.add(vk_latex)
+            entries.append(
+                VarEntry(
+                    name=display_vk.str_without(()),
+                    latex=vk_latex,
+                    value=_resolve_var_value(
+                        display_vk,
+                        solution=solution,
+                        substitutions=substitutions,
+                        model=model,
+                    ),
+                    sensitivity=_resolve_sensitivity(display_vk, solution=solution),
+                    units=display_vk.unitrepr or "-",
+                    label=display_vk.label or "",
+                    source=display_vk.lineagestr(),
+                )
+            )
+
     return entries
 
 
@@ -272,14 +343,20 @@ def build_report_ir(
     own_name = type(model).__name__
     lineage_path = f"{_parent_path}.{own_name}" if _parent_path else own_name
     lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
+    cgroups = _build_constraint_groups(model)
     return ReportSection(
         title=own_name,
         description="[description]",
         assumptions=[],
         lineage_path=lineage_path,
         magic_prefix=model.lineagestr(),
-        variables=_build_var_entries(model, solution, substitutions),
-        constraint_groups=_build_constraint_groups(model),
+        variables=_build_var_entries(
+            model,
+            solution,
+            substitutions,
+            extra_vks=_collect_constraint_varkeys(cgroups) - model.unique_varkeys,
+        ),
+        constraint_groups=cgroups,
         lineage_map=lineage_map,
         children=[
             build_report_ir(
@@ -477,7 +554,10 @@ def _split_constraint_str(c_str: str):
 
 def _md_var_row(ve: "VarEntry") -> str:
     """Format one VarEntry as a markdown pipe-table row."""
-    name_cell = f"${ve.latex}$" if ve.latex else ve.name
+    if ve.source:
+        name_cell = f"${ve.latex}$ [{ve.source}]"
+    else:
+        name_cell = f"${ve.latex}$" if ve.latex else ve.name
     return (
         f"| {name_cell} | {_fmt_value(ve.value)}"
         f" | {_fmt_sensitivity(ve.sensitivity)} | {ve.units} | {ve.label} |"
@@ -518,10 +598,16 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
 
     # Variable pipe table
     if ir.variables:
+        local_vars = [ve for ve in ir.variables if not ve.source]
+        ref_vars = [ve for ve in ir.variables if ve.source]
         lines.append("| Variable | Value | Sensitivity | Units | Label |")
         lines.append("|----------|-------|-------------|-------|-------|")
-        for ve in ir.variables:
+        for ve in local_vars:
             lines.append(_md_var_row(ve))
+        if ref_vars:
+            lines.append("| **— referenced —** | | | | |")
+            for ve in ref_vars:
+                lines.append(_md_var_row(ve))
         lines.append("")
 
     # Constraint groups
