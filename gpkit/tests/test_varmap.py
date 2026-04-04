@@ -178,10 +178,10 @@ class TestVarMap:
         # all elements registered, none have values
         assert veckey not in vm
         assert "v_novalue" not in vm
-        # set one element — veckey now partially populated
+        # set one element — veckey still not "in" because getitem would fail
         vm[vks[0]] = 10
         assert vks[0] in vm
-        assert veckey in vm  # partial vector: getitem returns [10, nan, nan]
+        assert veckey not in vm  # partial: _data missing vks[1], vks[2]
         # set all elements
         vm[vks[1]] = 20
         vm[vks[2]] = 30
