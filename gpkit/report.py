@@ -67,17 +67,22 @@ class CGroup:
 
 
 @dataclass
-class ReportSection:
-    """Format-independent intermediate representation for model reports."""
+class ReportSection:  # pylint: disable=too-many-instance-attributes
+    """Format-independent intermediate representation for model reports.
+
+    lineage_map is a rendering hint (VarKey→display-depth) that allows
+    the text renderer to use section-local variable name abbreviations in
+    constraints. It is not semantic data and is excluded from to_dict().
+    """
 
     title: str
     description: str
     assumptions: list  # list of str
     variables: list  # list of VarEntry
     constraint_groups: list  # list of CGroup
-    lineage_path: str = ""  # dotted path e.g. "Aircraft.Wing"; used in section headers
+    lineage_path: str = ""  # dotted path e.g. "Aircraft.Wing"
     children: list = field(default_factory=list)  # list of ReportSection
-    lineage_map: dict = field(default_factory=dict)  # VarKey→depth; NOT in to_dict
+    lineage_map: dict = field(default_factory=dict)  # NOT in to_dict
 
     def to_dict(self) -> dict:
         """JSON-serializable dict (for format='dict' and future API)."""
