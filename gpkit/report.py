@@ -309,14 +309,17 @@ def _build_constraint_groups(model) -> List[CGroup]:
             )
             for label, items in model.cgroups.items()
         ]
-    own = []
-    try:
-        for item in model:
-            # Skip child models (unique_varkeys is set only on Model instances).
-            if not hasattr(item, "unique_varkeys"):
-                own.append(item)
-    except TypeError:
-        pass
+
+    def _collect_own(container):
+        for item in container:
+            if hasattr(item, "unique_varkeys"):
+                continue  # skip child Models and ConstraintSets
+            elif isinstance(item, (list, tuple)):
+                yield from _collect_own(item)
+            else:
+                yield item
+
+    own = list(_collect_own(model))
     return [CGroup(label="", constraints=own)] if own else []
 
 

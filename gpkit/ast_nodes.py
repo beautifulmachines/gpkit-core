@@ -40,6 +40,7 @@ class VarNode(ASTNode):
         return self.varkey.str_without(excluded)
 
     def latex(self, excluded=()):
+        "Render this variable node as a LaTeX string."
         return self.varkey.latex(excluded)
 
     def to_ir(self):
@@ -55,7 +56,8 @@ class ConstNode(ASTNode):
     def str_without(self, excluded=()):
         return f"{self.value:.3g}"
 
-    def latex(self, excluded=()):
+    def latex(self, _excluded=()):
+        "Render this constant as a LaTeX string."
         return f"{self.value:.4g}"
 
     def to_ir(self):
@@ -82,6 +84,7 @@ class ExprNode(ASTNode):
         return _render_ast_node(self, excluded)
 
     def latex(self, excluded=()):
+        "Render this expression node as a LaTeX string."
         return _render_ast_node_latex(self, excluded)
 
     def to_ir(self):
