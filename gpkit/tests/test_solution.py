@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 
 import gpkit
-from gpkit import Model, SignomialsEnabled, Variable, VectorVariable
+from gpkit import Model, SignomialsEnabled, Variable, VectorVariable, printing
 from gpkit.util.small_classes import Quantity, Strings
 
 
@@ -112,3 +112,14 @@ class TestSolution:
         assert all(isinstance(gp.result.table(), Strings) for gp in m.program.gps)
         assert sol.cost / 4.0 == pytest.approx(1.0, abs=1e-5)
         assert sol[x] / 3.0 == pytest.approx(1.0, abs=1e-3)
+
+
+def test_printing_table_backward_compat():
+    """printing.table(sol) still works and returns a string."""
+    x = Variable("x_st", "m", "free variable")
+    c = Variable("c_st", 2.0, "m", "fixed variable")
+    m = Model(x, [x >= c])
+    sol = m.solve(verbosity=0)
+    result = printing.table(sol)
+    assert isinstance(result, str)
+    assert len(result) > 0

@@ -8,7 +8,7 @@ import json
 import pytest
 
 from gpkit import Model, SignomialsEnabled, Variable, VarKey, VectorVariable
-from gpkit.ast_nodes import ConstNode, ExprNode, VarNode, ast_from_ir, to_ast
+from gpkit.ast_nodes import ConstNode, ExprNode, UnitsNode, VarNode, ast_from_ir, to_ast
 from gpkit.constraints import ArrayConstraint
 from gpkit.constraints.set import build_model_tree
 from gpkit.exceptions import IRSerializationError
@@ -256,13 +256,13 @@ class TestASTNodes:
         node = VarNode(x.key)
         assert to_ast(node) is node
 
-    def test_to_ast_unit_monomial_becomes_const(self):
-        """units("lbf") is variable-free;
-        to_ast should return ConstNode, not raw Monomial."""
+    def test_to_ast_unit_monomial_becomes_units_node(self):
+        """units("lbf") is variable-free with magnitude 1;
+        to_ast should return UnitsNode, not raw Monomial."""
         unit_mono = units("lbf")
         node = to_ast(unit_mono)
-        assert isinstance(node, ConstNode)
-        assert node.value == pytest.approx(1.0)
+        assert isinstance(node, UnitsNode)
+        assert "lbf" in str(node.units) or "force_pound" in str(node.units)
 
     def test_nested_ast(self):
         """Compound expressions produce nested ExprNode trees."""

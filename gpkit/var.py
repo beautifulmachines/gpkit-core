@@ -24,7 +24,7 @@ class Var:  # pylint: disable=too-few-public-methods
 
     Notes
     -----
-    - Lineage is correct because _create() runs inside NamedVariables context.
+    - Lineage is correct because create() runs inside NamedVariables context.
     - Reserved names (cost, lineage, setup, substitutions, unique_varkeys, vks)
       and names starting with '_var_' cannot be used.
     - For vector variables whose length comes from a setup() argument, use
@@ -39,7 +39,7 @@ class Var:  # pylint: disable=too-few-public-methods
         self.label = label
         self.value = value
         self.latex = latex
-        self._name: str | None = None
+        self.name: str | None = None
 
     def __set_name__(self, owner, name):
         if name.startswith("_var_") or name in _RESERVED_NAMES:
@@ -48,7 +48,7 @@ class Var:  # pylint: disable=too-few-public-methods
                 f"Reserved names: {sorted(_RESERVED_NAMES)} "
                 f"and any name starting with '_var_'."
             )
-        self._name = name
+        self.name = name
 
     @overload
     def __get__(self, obj: None, objtype: type) -> "Var": ...
@@ -59,17 +59,17 @@ class Var:  # pylint: disable=too-few-public-methods
     def __get__(self, obj, objtype=None):
         if obj is None:
             return self
-        return obj.__dict__.get(f"_var_{self._name}")
+        return obj.__dict__.get(f"_var_{self.name}")
 
-    def _create(self, obj):
+    def create(self, obj):
         """Create the Variable instance on obj, inside a NamedVariables context."""
-        key = f"_var_{self._name}"
+        key = f"_var_{self.name}"
         if key in obj.__dict__:
             raise RuntimeError(
-                f"Variable '{self._name}' already initialized on {obj!r}. "
+                f"Variable '{self.name}' already initialized on {obj!r}. "
                 "Possible duplicate Var declarations in the MRO."
             )
-        args = [self._name]
+        args = [self.name]
         if self.value is not None:
             args.append(self.value)
         args.extend([self.units, self.label])

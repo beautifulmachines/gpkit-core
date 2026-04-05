@@ -22,13 +22,16 @@ from .programs.prog_factories import progify, solvify
 from .programs.sgp import SequentialGeometricProgram
 from .solutions import SolutionSequence
 from .tools.autosweep import autosweep_1d
-from .util.globals import NamedVariables
+from .util.globals import NamedVariables, Vectorize
 from .var import Var
 from .varkey import VarKey
 from .varmap import VarMap
 
 
-class Model(CostedConstraintSet):
+class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attributes
+    # Model carries GP state (cost, lineage, unique_varkeys, computed),
+    # tree state (_children, _child_attrs), and report state (cgroups,
+    # vectorized_block). Tracked in github.com/beautifulmachines/gpkit-core/issues/172.
     """Symbolic representation of an optimization problem.
 
     The Model class is used both directly to create models with constants and
@@ -75,6 +78,9 @@ class Model(CostedConstraintSet):
         # pylint: disable=keyword-arg-before-vararg
         setup_vars = None
         substitutions = kwargs.pop("substitutions", None)  # reserved keyword
+        # True if created inside a Vectorize context — report uses this to
+        # collapse N same-type sibling sections into one labeled section.
+        self.vectorized_block = bool(Vectorize.vectorization)
         # Initialize _children and _child_attrs unconditionally so that flat
         # Model(cost, constraints) calls also have the attribute (empty list).
         self._children = []
@@ -99,13 +105,7 @@ class Model(CostedConstraintSet):
             # lineage holds the (name, num) environment a model was created in,
             # including its own (name, num), and those of models above it
             with NamedVariables(self.__class__.__name__) as (self.lineage, setup_vars):
-                # instantiate Var descriptors before setup() so self.x works
-                seen = set()
-                for klass in type(self).__mro__:
-                    for var in getattr(klass, "_own_var_fields", ()):
-                        if var._name not in seen:
-                            seen.add(var._name)
-                            var._create(self)
+                self._instantiate_var_descriptors()
                 args = (
                     tuple(arg for arg in [cost, constraints] if arg is not None) + args
                 )
@@ -115,6 +115,12 @@ class Model(CostedConstraintSet):
                 else:
                     constraints = cs
             cost = self.cost
+            # Named constraint groups from dict setup(); None for list setup().
+            # Use `is None` checks — empty dict is a valid groups map.
+            if isinstance(constraints, dict):
+                self.cgroups = dict(constraints)
+            else:
+                self.cgroups = None
             _scan_for_children(constraints)
             # Map attribute names to child models (for get_var() path resolution)
             for attr_name, val in list(self.__dict__.items()):
@@ -124,6 +130,7 @@ class Model(CostedConstraintSet):
             if args and not substitutions:
                 # backwards compatibility: substitutions as third argument
                 (substitutions,) = args
+            self.cgroups = None
             _scan_for_children(constraints or [])
 
         cost = cost or Monomial(1)
@@ -142,6 +149,15 @@ class Model(CostedConstraintSet):
             key = getattr(var, "key", var)
             result.primal[key] = fn(result)
 
+    def _instantiate_var_descriptors(self):
+        """Create Var descriptor fields on self before setup() runs."""
+        seen = set()
+        for klass in type(self).__mro__:
+            for var in getattr(klass, "_own_var_fields", ()):
+                if var.name not in seen:
+                    seen.add(var.name)
+                    var.create(self)
+
     @property
     def submodels(self):
         """Direct child models in setup() definition order."""
@@ -152,6 +168,21 @@ class Model(CostedConstraintSet):
         for child in self._children:
             yield child
             yield from child.walk()
+
+    @classmethod
+    def description(cls):
+        """Return model description metadata.
+
+        Returns a dict with keys: summary (str), assumptions (list[str]),
+        references (list[str]).  Override in subclasses to provide structured
+        descriptions.  The base implementation falls back to the class docstring
+        for the summary field.
+        """
+        return {
+            "summary": (cls.__doc__ or "").strip(),
+            "assumptions": [],  # discrete modeling choices, separate from prose summary
+            "references": [],
+        }
 
     def get_var(self, path: str):
         """Resolve a dotted attribute path to a Variable object.
@@ -311,6 +342,24 @@ class Model(CostedConstraintSet):
         """Load a Model from a JSON IR file."""
         ir_doc = json.loads(Path(path).read_text(encoding="utf-8"))
         return cls.from_ir(ir_doc)
+
+    def report(self, solution=None, fmt="text", substitutions=None):
+        """Build a hierarchical report for this model.
+
+        Parameters
+        ----------
+        solution : Solution, optional
+            If provided, variable tables include solved values and sensitivities.
+        fmt : str
+            Output format: "dict", "text", "md", or "latex".
+        substitutions : dict, optional
+            One-off value overrides without mutating model.substitutions.
+        """
+        # pylint: disable=import-outside-toplevel
+        from .report import build_report_ir, render_report
+
+        ir = build_report_ir(self, solution=solution, substitutions=substitutions)
+        return render_report(ir, fmt=fmt)
 
     gp = progify(GeometricProgram)
     solve = solvify(progify(GeometricProgram, "solve"))
