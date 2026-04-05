@@ -9,6 +9,7 @@ from gpkit.report import (
     CGroup,
     ReportSection,
     VarEntry,
+    _md_escape,
     build_report_ir,
     render_markdown,
     render_text,
@@ -467,3 +468,11 @@ class TestRenderMarkdown:
         out = render_markdown(ir)
         assert "beam theory" in out
         assert "isotropic material" in out
+
+    def test_md_escape_special_characters(self):
+        """_md_escape backslash-escapes markdown-special characters."""
+        assert _md_escape("C_L") == r"C\_L"
+        assert _md_escape("a*b") == r"a\*b"
+        assert _md_escape("col|sep") == r"col\|sep"
+        assert _md_escape("no specials") == "no specials"
+        assert _md_escape("a_b*c|d") == r"a\_b\*c\|d"

@@ -555,12 +555,20 @@ def _split_constraint_str(c_str: str):
 # ── Markdown renderer ────────────────────────────────────────────────────────
 
 
+def _md_escape(text: str) -> str:
+    r"""Escape characters that have special meaning in markdown pipe tables."""
+    for ch in ("\\", "|", "*", "_", "`", "~", "[", "]", "<", ">"):
+        text = text.replace(ch, "\\" + ch)
+    return text
+
+
 def _md_var_row(ve: "VarEntry") -> str:
     """Format one VarEntry as a markdown pipe-table row."""
-    name_cell = f"${ve.latex}$" if ve.latex else ve.name
+    name_cell = f"${ve.latex}$" if ve.latex else _md_escape(ve.name)
     return (
-        f"| {name_cell} | {ve.source} | {_fmt_value(ve.value)}"
-        f" | {_fmt_sensitivity(ve.sensitivity)} | {ve.units} | {ve.label} |"
+        f"| {name_cell} | {_md_escape(ve.source)} | {_fmt_value(ve.value)}"
+        f" | {_fmt_sensitivity(ve.sensitivity)} | {ve.units}"
+        f" | {_md_escape(ve.label)} |"
     )
 
 
