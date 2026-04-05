@@ -205,22 +205,6 @@ def _collect_constraint_varkeys(constraint_groups: List[CGroup]) -> set:
     return vkeys
 
 
-def _disambiguate_latex(display_vk, taken: set) -> str:
-    """Return the minimal-depth latex for display_vk that doesn't appear in taken.
-
-    Starts at depth=0 (base symbol only) and adds one more lineage component
-    as a subscript per step until the name is unique. Local vars win because
-    their names are pre-loaded into taken before this is called.
-    """
-    max_depth = len(getattr(display_vk, "lineage", ()) or ())
-    for depth in range(0, max_depth + 1):
-        with lineage_display_context({display_vk: depth}):
-            candidate = display_vk.latex(("units",))
-        if candidate not in taken:
-            return candidate
-    return display_vk.latex(("units",))  # exhausted — use full lineage
-
-
 def _build_var_entries(
     model, solution, substitutions, extra_vks=None
 ) -> List[VarEntry]:
@@ -266,31 +250,29 @@ def _build_var_entries(
 
     if extra_vks:
         owned_display = {(vk.veckey or vk) for vk in model.unique_varkeys}
-        taken_latex = {ve.latex for ve in entries}
         cross_seen: set = set()
-        for vk in sorted(extra_vks, key=lambda v: v.name):
-            display_vk = vk.veckey if vk.veckey is not None else vk
-            if display_vk in owned_display or display_vk in cross_seen:
-                continue
-            cross_seen.add(display_vk)
-            vk_latex = _disambiguate_latex(display_vk, taken_latex)
-            taken_latex.add(vk_latex)
-            entries.append(
-                VarEntry(
-                    name=display_vk.str_without(()),
-                    latex=vk_latex,
-                    value=_resolve_var_value(
-                        display_vk,
-                        solution=solution,
-                        substitutions=substitutions,
-                        model=model,
-                    ),
-                    sensitivity=_resolve_sensitivity(display_vk, solution=solution),
-                    units=display_vk.unitrepr or "-",
-                    label=display_vk.label or "",
-                    source=display_vk.lineagestr(),
+        with lineage_display_context(lineage_map):
+            for vk in sorted(extra_vks, key=lambda v: v.name):
+                display_vk = vk.veckey if vk.veckey is not None else vk
+                if display_vk in owned_display or display_vk in cross_seen:
+                    continue
+                cross_seen.add(display_vk)
+                entries.append(
+                    VarEntry(
+                        name=display_vk.str_without(excluded),
+                        latex=display_vk.latex(excluded),
+                        value=_resolve_var_value(
+                            display_vk,
+                            solution=solution,
+                            substitutions=substitutions,
+                            model=model,
+                        ),
+                        sensitivity=_resolve_sensitivity(display_vk, solution=solution),
+                        units=display_vk.unitrepr or "-",
+                        label=display_vk.label or "",
+                        source=display_vk.lineagestr(),
+                    )
                 )
-            )
 
     return entries
 
