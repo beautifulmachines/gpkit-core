@@ -557,12 +557,9 @@ def _split_constraint_str(c_str: str):
 
 def _md_var_row(ve: "VarEntry") -> str:
     """Format one VarEntry as a markdown pipe-table row."""
-    if ve.source:
-        name_cell = f"${ve.latex}$ [{ve.source}]"
-    else:
-        name_cell = f"${ve.latex}$" if ve.latex else ve.name
+    name_cell = f"${ve.latex}$" if ve.latex else ve.name
     return (
-        f"| {name_cell} | {_fmt_value(ve.value)}"
+        f"| {name_cell} | {ve.source} | {_fmt_value(ve.value)}"
         f" | {_fmt_sensitivity(ve.sensitivity)} | {ve.units} | {ve.label} |"
     )
 
@@ -601,16 +598,10 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
 
     # Variable pipe table
     if ir.variables:
-        local_vars = [ve for ve in ir.variables if not ve.source]
-        ref_vars = [ve for ve in ir.variables if ve.source]
-        lines.append("| Variable | Value | Sensitivity | Units | Label |")
-        lines.append("|----------|-------|-------------|-------|-------|")
-        for ve in local_vars:
+        lines.append("| Variable | Source | Value | Sensitivity | Units | Label |")
+        lines.append("|----------|--------|-------|-------------|-------|-------|")
+        for ve in ir.variables:
             lines.append(_md_var_row(ve))
-        if ref_vars:
-            lines.append("| **— referenced —** | | | | |")
-            for ve in ref_vars:
-                lines.append(_md_var_row(ve))
         lines.append("")
 
     # Constraint groups
