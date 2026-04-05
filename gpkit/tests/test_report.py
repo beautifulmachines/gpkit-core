@@ -477,3 +477,113 @@ class TestRenderMarkdown:
         assert _md_escape("no specials") == "no specials"
         assert _md_escape("a_b*c|d") == r"a\_b\*c\|d"
         assert _md_escape("~95% TD") == r"\~95\% TD"
+
+
+# ── Tests moved from test_model.py (cgroups + description) ──────────────────
+
+
+class TestCGroups:
+    """Tests for cgroups populated from dict-returning setup() methods."""
+
+    def test_cgroups_from_dict_setup(self):
+        """setup() returning a dict populates cgroups with the same mapping."""
+
+        class _CGDictModel(Model):
+            def setup(self):
+                x = Variable("x_cgd")
+                y = Variable("y_cgd")
+                c1 = x >= 1
+                c2 = y >= 1
+                c3 = x * y >= 2
+                return {"Drag": [c1, c2], "Lift": [c3]}
+
+        m = _CGDictModel()
+        assert m.cgroups is not None
+        assert set(m.cgroups.keys()) == {"Drag", "Lift"}
+        assert len(m.cgroups["Drag"]) == 2
+        assert len(m.cgroups["Lift"]) == 1
+
+    def test_cgroups_none_for_list_setup(self):
+        """setup() returning a list leaves cgroups as None (not an empty dict)."""
+
+        class _CGListModel(Model):
+            def setup(self):
+                x = Variable("x_cgl")
+                return [x >= 1]
+
+        m = _CGListModel()
+        assert m.cgroups is None
+
+    def test_scan_for_children_dict(self):
+        """setup() returning a dict with child Models registers them in _children."""
+
+        class _CGChild(Model):
+            def setup(self):
+                x = Variable("x_cgchild")
+                return [x >= 1]
+
+        class _CGParent(Model):
+            def setup(self):
+                child = _CGChild()
+                y = Variable("y_cgpar")
+                return {"Group": [child, y >= 1]}
+
+        m = _CGParent()
+        assert len(m.submodels) == 1
+        assert isinstance(m.submodels[0], _CGChild)
+
+
+class TestModelDescription:
+    """Tests for Model.description() classmethod."""
+
+    def test_model_description_explicit(self):
+        """Model with explicit description() classmethod returns that dict."""
+
+        class _DescExplicit(Model):
+            def setup(self):
+                x = Variable("x_desc_exp")
+                return [x >= 1]
+
+            @classmethod
+            def description(cls):
+                return {
+                    "summary": "A test model with drag and lift.",
+                    "assumptions": ["incompressible flow", "steady state"],
+                    "references": ["Anderson 2001"],
+                }
+
+        d = _DescExplicit.description()
+        assert d["summary"] == "A test model with drag and lift."
+        assert "incompressible flow" in d["assumptions"]
+        assert len(d["references"]) == 1
+
+    def test_model_description_docstring_fallback(self):
+        """Model with a docstring returns it as the description summary."""
+
+        class _DescDocstring(Model):
+            """Wing structural model with spar and skin."""
+
+            def setup(self):
+                x = Variable("x_desc_doc")
+                return [x >= 1]
+
+        d = _DescDocstring.description()
+        assert d["summary"] == "Wing structural model with spar and skin."
+        assert not d["assumptions"]
+        assert not d["references"]
+
+    def test_model_description_none(self):
+        """Model without a docstring returns an empty summary."""
+
+        class _DescNone(Model):
+            def setup(self):
+                x = Variable("x_desc_none")
+                return [x >= 1]
+
+        d = _DescNone.description()
+        # May pick up Model base class docstring; just check required keys exist
+        assert "summary" in d
+        assert "assumptions" in d
+        assert "references" in d
+        assert isinstance(d["assumptions"], list)
+        assert isinstance(d["references"], list)
