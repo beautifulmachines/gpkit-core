@@ -476,3 +476,4 @@ class TestRenderMarkdown:
         assert _md_escape("col|sep") == r"col\|sep"
         assert _md_escape("no specials") == "no specials"
         assert _md_escape("a_b*c|d") == r"a\_b\*c\|d"
+        assert _md_escape("~95% TD") == r"\~95\% TD"

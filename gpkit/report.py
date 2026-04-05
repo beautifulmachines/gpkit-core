@@ -557,7 +557,7 @@ def _split_constraint_str(c_str: str):
 
 def _md_escape(text: str) -> str:
     r"""Escape characters that have special meaning in markdown pipe tables."""
-    for ch in ("\\", "|", "*", "_", "`", "~", "[", "]", "<", ">"):
+    for ch in ("\\", "|", "*", "_", "`", "~", "[", "]", "<", ">", "%"):
         text = text.replace(ch, "\\" + ch)
     return text
 
