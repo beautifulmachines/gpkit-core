@@ -139,14 +139,54 @@ class TestVarMap:
     def test_register_keys(self, vm, x, y):
         vm[x] = 1
         vm.register_keys({y})
-        assert "y" in vm
+        # registered but no value: __contains__ must return False
+        assert y not in vm
+        assert "y" not in vm
         with pytest.raises(KeyError):
             _ = vm[y]
         with pytest.raises(KeyError):
             _ = vm["y"]
+        # after setting a value, both __contains__ and __getitem__ work
         vm["y"] = 6
         assert vm["y"] == 6
         assert vm[y] == 6
+        assert "y" in vm
+        assert y in vm
+
+    def test_contains_registered_no_value(self, vm):
+        """__contains__ must be False for every key type registered without a value.
+
+        Covers all key types: VarKey, str, veckey, Variable.  (issue #50)
+        """
+        # scalar VarKey
+        y = VarKey("y_reg")
+        vm.register_keys({y})
+        assert y not in vm  # VarKey path
+        assert "y_reg" not in vm  # str path
+        # Variable wrapping a registered-but-valueless key
+        v = Variable("z_reg")
+        vm.register_keys({v.key})
+        assert v not in vm  # Variable path (getattr .key)
+
+    def test_contains_veckey_no_value(self):
+        """veckey in VarMap must be False when no element has a value.  (issue #50)"""
+        v = VectorVariable(3, "v_novalue")
+        vm = VarMap()
+        vks = [v[i].key for i in range(3)]
+        vm.register_keys(set(vks))
+        veckey = vks[0].veckey
+        # all elements registered, none have values
+        assert veckey not in vm
+        assert "v_novalue" not in vm
+        # set one element — veckey still not "in" because getitem would fail
+        vm[vks[0]] = 10
+        assert vks[0] in vm
+        assert veckey not in vm  # partial: _data missing vks[1], vks[2]
+        # set all elements
+        vm[vks[1]] = 20
+        vm[vks[2]] = 30
+        assert veckey in vm
+        assert vm[veckey] == [10, 20, 30]
 
     def test_setitem_variable(self, vm):
         x = Variable("x")

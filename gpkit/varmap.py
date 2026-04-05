@@ -243,9 +243,14 @@ class VarMap(MutableMapping):
 
     def __contains__(self, key):
         key = getattr(key, "key", key)  # handle Variable case
-        if isinstance(key, str) or is_veckey(key):
-            return key in self.varset
-        return key in self._data
+        if not isinstance(key, str) and not is_veckey(key):
+            return key in self._data  # fast path: scalar VarKey
+        # string or veckey: resolve via VarSet, then check _data
+        try:
+            self.item(key)
+            return True
+        except KeyError:
+            return False
 
     def update(self, *args, **kwargs):  # pylint: disable=arguments-differ
         for k, v in dict(*args, **kwargs).items():
