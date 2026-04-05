@@ -152,7 +152,7 @@ def parenthesize(string, addi=True, mult=True):
 def _render_add(children, excluded):
     left = strify(children[0], excluded)
     right = strify(children[1], excluded)
-    if right[0] == "-":
+    if right and right[0] == "-":
         return f"{left} - {right[1:]}"
     return f"{left} + {right}"
 
@@ -160,9 +160,9 @@ def _render_add(children, excluded):
 def _render_mul(children, excluded):
     left = parenthesize(strify(children[0], excluded), mult=False)
     right = parenthesize(strify(children[1], excluded), mult=False)
-    if left == "1":
+    if left in ("1", ""):
         return right
-    if right == "1":
+    if right in ("1", ""):
         return left
     return f"{left}{MUL}{right}"
 
@@ -170,7 +170,7 @@ def _render_mul(children, excluded):
 def _render_div(children, excluded):
     left = parenthesize(strify(children[0], excluded), mult=False)
     right = parenthesize(strify(children[1], excluded))
-    if right == "1":
+    if right in ("1", ""):
         return left
     return f"{left}/{right}"
 
@@ -321,14 +321,17 @@ def _latex_render_mul(children, excluded):
     all_terms = []
     for child in children:
         all_terms.extend(_collect_mul_terms(child))
-    return " ".join(_latex_render_mul_term(t, excluded) for t in all_terms)
+    parts = [s for t in all_terms if (s := _latex_render_mul_term(t, excluded))]
+    return " ".join(parts) if parts else ""
 
 
 def _latex_render_div(children, excluded):
     num_terms, den_terms = _collect_frac_terms(children[0])
     den_terms.append(children[1])
-    num_str = " ".join(_latex_render_mul_term(t, excluded) for t in num_terms)
-    den_str = " ".join(_latex_strify(t, excluded) for t in den_terms)
+    num_parts = [s for t in num_terms if (s := _latex_render_mul_term(t, excluded))]
+    num_str = " ".join(num_parts) if num_parts else "1"
+    den_parts = [s for t in den_terms if (s := _latex_strify(t, excluded))]
+    den_str = " ".join(den_parts) if den_parts else "1"
     return rf"\frac{{{num_str}}}{{{den_str}}}"
 
 

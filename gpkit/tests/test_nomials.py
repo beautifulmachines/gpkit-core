@@ -102,6 +102,13 @@ class TestMonomial:  # pylint: disable=unnecessary-negation,comparison-with-itse
         assert isinstance(m, str)
         assert (5 * x).latex() == "5 x"
 
+    def test_latex_unit_constant_no_spurious_one(self):
+        "Unit-only constants (e.g. 4*m^2 / L) must not leave '1' artifacts"
+        L = Variable("L", "m", "length")
+        expr = 4 * gpkit.units.m**2 / L
+        latex = expr.latex(excluded=("units",))
+        assert latex == "\\frac{4}{L}"
+
     def test_str_with_units(self):
         "Make sure __str__() works when units are involved"
         S = Variable("S", units="m^2")  # pylint: disable=invalid-name

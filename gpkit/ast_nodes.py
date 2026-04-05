@@ -6,7 +6,12 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from .exceptions import IRSerializationError
-from .util.repr_conventions import _render_ast_node, _render_ast_node_latex
+from .util.repr_conventions import (
+    _render_ast_node,
+    _render_ast_node_latex,
+    latex_unitstr,
+    unitstr,
+)
 
 if TYPE_CHECKING:
     from .varkey import VarKey
@@ -62,6 +67,30 @@ class ConstNode(ASTNode):
 
     def to_ir(self):
         return {"node": "const", "value": self.value}
+
+
+@dataclass(frozen=True)
+class UnitsNode(ASTNode):
+    """A pure-units leaf in the expression tree (e.g. units.m, units.lbf).
+
+    Renders as the unit string so that expressions like ``4 * units.m``
+    display the physical units of the constant to the reader.
+    """
+
+    units: object  # pint Quantity
+
+    def str_without(self, excluded=()):
+        if "units" in excluded:
+            return ""
+        return unitstr(self.units, "[%s]")
+
+    def latex(self, excluded=()):
+        if "units" in excluded:
+            return ""
+        return latex_unitstr(self.units).lstrip("~")
+
+    def to_ir(self):
+        return {"node": "units", "units": str(self.units)}
 
 
 @dataclass(frozen=True)
@@ -148,19 +177,22 @@ def to_ast(obj):
     """
     if isinstance(obj, ASTNode):
         return obj
-    if hasattr(obj, "ast") and obj.ast is not None:
-        return obj.ast
-    if hasattr(obj, "key"):
-        return VarNode(obj.key)
-    # Variable-free nomial (e.g. units("lbf")): treat as a numeric constant.
-    # Units are tracked in hmap.units on the enclosing nomial, not the AST.
-    # Band-aid for #159: remove when #156 replaces unit Monomials with a thin
-    # wrapper class that never ends up as a raw AST child.
+    # Variable-free nomial (e.g. units("lbf") or 4*units("m^2")):
+    # collapse to a leaf node.  This runs before the .ast check so that
+    # unit arithmetic like units.m**2 (which builds an intermediate pow
+    # AST) is replaced with one flat node carrying the final units.
     if hasattr(obj, "hmap"):
         try:
             ((exp, c),) = obj.hmap.items()
             if not exp:  # empty HashVector = no variables
-                return ConstNode(float(c))
+                c_float = float(c)
+                if c_float == 1.0 and obj.hmap.units is not None:
+                    return UnitsNode(obj.hmap.units)
+                return ConstNode(c_float)
         except (ValueError, TypeError):
             pass
+    if hasattr(obj, "ast") and obj.ast is not None:
+        return obj.ast
+    if hasattr(obj, "key"):
+        return VarNode(obj.key)
     return obj
