@@ -104,8 +104,8 @@ class TestMonomial:  # pylint: disable=unnecessary-negation,comparison-with-itse
 
     def test_latex_unit_constant_no_spurious_one(self):
         "Unit-only constants (e.g. 4*m^2 / L) must not leave '1' artifacts"
-        L = Variable("L", "m", "length")
-        expr = 4 * gpkit.units.m**2 / L
+        length = Variable("L", "m", "length")
+        expr = 4 * gpkit.units.m**2 / length
         latex = expr.latex(excluded=("units",))
         assert latex == "\\frac{4}{L}"
 

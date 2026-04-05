@@ -295,7 +295,7 @@ def _build_constraint_groups(model) -> List[CGroup]:
         for item in container:
             if hasattr(item, "unique_varkeys"):
                 continue  # skip child Models and ConstraintSets
-            elif isinstance(item, (list, tuple)):
+            if isinstance(item, (list, tuple)):
                 yield from _collect_own(item)
             else:
                 yield item

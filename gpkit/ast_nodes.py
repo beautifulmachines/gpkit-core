@@ -85,6 +85,7 @@ class UnitsNode(ASTNode):
         return unitstr(self.units, "[%s]")
 
     def latex(self, excluded=()):
+        "Render this units node as a LaTeX string."
         if "units" in excluded:
             return ""
         return latex_unitstr(self.units).lstrip("~")
