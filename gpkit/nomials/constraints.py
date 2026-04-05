@@ -38,15 +38,14 @@ class SingleEquationConstraint(ReprMixin):
             "right": self.right.to_ir(),
         }
 
-    def latex(self, excluded="units"):
+    def latex(self, excluded="units", aligned=False):
         "Latex representation without attributes in excluded list"
-        return " ".join(
-            (
-                try_str_without(self.left, excluded, latex=True),
-                self.latex_opers[self.oper],
-                try_str_without(self.right, excluded, latex=True),
-            )
-        )
+        lhs = try_str_without(self.left, excluded, latex=True)
+        op = self.latex_opers[self.oper]
+        rhs = try_str_without(self.right, excluded, latex=True)
+        if aligned:
+            return f"{lhs} &{op} {rhs}"
+        return f"{lhs} {op} {rhs}"
 
 
 class ArrayConstraint(SingleEquationConstraint, list):

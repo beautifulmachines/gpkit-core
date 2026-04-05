@@ -8,7 +8,6 @@ functions of the IR.
 from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
-from .util.small_scripts import try_str_without
 from .varkey import lineage_display_context
 
 # ── Column alignment helper ───────────────────────────────────────────────────
@@ -601,10 +600,15 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
         lines.append(group_header)
         lines.append("")
         with lineage_display_context(ir.lineage_map):
+            lines.append("$$\\begin{aligned}")
             for c in cg.constraints:
-                c_latex = try_str_without(c, excluded, latex=True)
-                lines.append(f"$${c_latex}$$")
-                lines.append("")
+                if hasattr(c, "latex"):
+                    c_latex = c.latex(excluded, aligned=True)
+                else:
+                    c_latex = str(c)
+                lines.append(f"{c_latex} \\\\")
+            lines.append("\\end{aligned}$$")
+            lines.append("")
 
     # Children (recursive)
     for child in ir.children:
