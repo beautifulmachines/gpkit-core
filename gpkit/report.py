@@ -8,6 +8,7 @@ functions of the IR.
 from dataclasses import dataclass, field
 from typing import Any, List, Optional
 
+from .util.repr_conventions import unitstr
 from .varkey import lineage_display_context
 
 # ── Column alignment helper ───────────────────────────────────────────────────
@@ -242,7 +243,7 @@ def _build_var_entries(
                         model=model,
                     ),
                     sensitivity=_resolve_sensitivity(display_vk, solution=solution),
-                    units=display_vk.unitrepr or "-",
+                    units=unitstr(display_vk) or "-",
                     label=display_vk.label or "",
                 )
             )
@@ -267,7 +268,7 @@ def _build_var_entries(
                             model=model,
                         ),
                         sensitivity=_resolve_sensitivity(display_vk, solution=solution),
-                        units=display_vk.unitrepr or "-",
+                        units=unitstr(display_vk) or "-",
                         label=display_vk.label or "",
                         source=display_vk.lineagestr(),
                     )
