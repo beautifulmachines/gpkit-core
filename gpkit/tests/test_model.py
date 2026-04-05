@@ -1,5 +1,7 @@
 """Tests for GP and SP classes"""
 
+# pylint: disable=too-many-lines
+
 import sys
 from io import StringIO
 
