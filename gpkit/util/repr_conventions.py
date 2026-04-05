@@ -94,18 +94,41 @@ _GREEK = {
 }
 
 
+_LATEX_FUNCTIONS = {
+    "sin",
+    "cos",
+    "tan",
+    "cot",
+    "sec",
+    "csc",
+    "arcsin",
+    "arccos",
+    "arctan",
+    "sinh",
+    "cosh",
+    "tanh",
+    "log",
+    "ln",
+    "exp",
+}
+
+
 def latexify(name: str) -> str:
     """Convert a variable name to a LaTeX base string.
 
     - Pure Greek: 'rho' -> r'\\rho'
     - Underscore split: 'm_wet' -> r'm_{\\text{wet}}'
     - Greek + underscore: 'rho_inf' -> r'\\rho_{\\infty}'
+    - Math function + arg: 'tan_alpha' -> r'\\tan{\\alpha}'
     - Already escaped (starts with '\\'): return as-is
     """
     if name.startswith("\\"):
         return name  # already LaTeX — do not double-convert
     if "_" in name:
         parts = name.split("_", 1)
+        if parts[0] in _LATEX_FUNCTIONS:
+            arg = latexify(parts[1])
+            return "\\" + parts[0] + "{" + arg + "}"
         base = _GREEK.get(parts[0], parts[0])
         if "_" in parts[1] or parts[1] in _GREEK:
             sub = latexify(parts[1])  # nested/Greek → already math, no \text{}
