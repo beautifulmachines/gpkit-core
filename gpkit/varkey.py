@@ -6,7 +6,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from .units import qty
-from .util.repr_conventions import ReprMixin, latexify
+from .util.repr_conventions import ReprMixin, _extract_subscript, latexify
 from .util.small_classes import Count
 
 _lineage_ctx: ContextVar[dict] = ContextVar("lineage_ctx", default={})
@@ -25,6 +25,31 @@ def lineage_display_context(mapping):
 def necessarylineage(vk):
     """Display lineage depth for a VarKey in the current context."""
     return _lineage_ctx.get().get(vk)
+
+
+def _strip_magic_prefix(namespace, excluded):
+    """Strip leading lineage segments matched by :MAGIC: exclusion strings."""
+    for ex in excluded:
+        if ex[:7] != ":MAGIC:":
+            continue
+        for seg in ex[7:].split("."):
+            if not namespace:
+                break
+            n, num = namespace[0]
+            if (f"{n}{num}" if num else n) == seg:
+                namespace = namespace[1:]
+            else:
+                break
+    return namespace
+
+
+def _merge_lineage_sub(name, lineage_sub):
+    "Append lineage_sub into name's existing subscript, or add a new one."
+    extracted = _extract_subscript(name)
+    if extracted is not None:
+        base_name, existing_sub = extracted
+        return "%s_{%s,%s}" % (base_name, existing_sub, lineage_sub)
+    return "{%s}_{%s}" % (name, lineage_sub)
 
 
 @dataclass(frozen=True, eq=False)
@@ -240,28 +265,19 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
         if "idx" not in excluded and self.idx:
             name = "{%s}_{%s}" % (name, ",".join(map(str, self.idx)))
         if "lineage" not in excluded and self.lineage:
-            namespace = list(self.lineage)  # [(model_name, model_num), ...]
-            # Strip leading prefix via :MAGIC: exclusions (mirrors str_without)
-            for ex in excluded:
-                if ex[:7] == ":MAGIC:":
-                    for seg in ex[7:].split("."):
-                        if not namespace:
-                            break
-                        n, num = namespace[0]
-                        if (f"{n}{num}" if num else n) == seg:
-                            namespace = namespace[1:]
-                        else:
-                            break
+            namespace = _strip_magic_prefix(list(self.lineage), excluded)
             # Respect lineage_display_context depth (mirrors str_without)
             depth = _lineage_ctx.get().get(self)
             if depth is None and self.veckey:
                 depth = _lineage_ctx.get().get(self.veckey)
             if depth is not None:
                 namespace = namespace[-depth:] if depth > 0 else []
-            # Format remaining sub-lineage as lowercase \text{} subscript
+            # Merge lineage into any existing subscript (name first, lineage last)
             if namespace:
-                sub = ",".join(n.lower() for n, _ in namespace)
-                name = "{%s}_{\\text{%s}}" % (name, sub)
+                lineage_sub = ",".join(
+                    r"\text{" + n.lower() + "}" for n, _ in namespace
+                )
+                name = _merge_lineage_sub(name, lineage_sub)
         return name
 
     def __eq__(self, other):

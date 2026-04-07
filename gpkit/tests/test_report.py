@@ -440,7 +440,7 @@ class TestRenderMarkdown:
         m = _MdParent()
         result = m.report(fmt="md")
         assert "# _MdParent" in result
-        assert "## _MdChild" in result
+        assert "## _MdParent._MdChild" in result
 
     def test_report_md_with_solution(self):
         """model.report(solution=sol, fmt='md') puts variable values in pipe table."""

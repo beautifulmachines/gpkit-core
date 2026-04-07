@@ -466,6 +466,13 @@ def _compute_vec_col_widths(variables: list, precision: int, vecn: int) -> list:
     return col_widths
 
 
+def _var_name_cell(ve: "VarEntry") -> str:
+    "Name with inline source annotation for cross-model variables."
+    if ve.source:
+        return f"{ve.name} [{ve.source}]"
+    return ve.name
+
+
 def _text_free_var_rows(variables: list, precision: int = 4, vecn: int = 6) -> list:
     """Column-aligned rows for Optimized Variables: name | value | units | label."""
     col_widths = _compute_vec_col_widths(variables, precision, vecn)
@@ -473,7 +480,7 @@ def _text_free_var_rows(variables: list, precision: int = 4, vecn: int = 6) -> l
     for ve in variables:
         rows.append(
             [
-                ve.name,
+                _var_name_cell(ve),
                 _fmt_value(
                     ve.value, precision=precision, vecn=vecn, col_widths=col_widths
                 ),
@@ -492,7 +499,7 @@ def _text_fixed_var_rows(variables: list, precision: int = 4, vecn: int = 6) -> 
     for ve in variables:
         rows.append(
             [
-                ve.name,
+                _var_name_cell(ve),
                 _fmt_value(
                     ve.value, precision=precision, vecn=vecn, col_widths=col_widths
                 ),
@@ -533,8 +540,8 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
     pad = _INDENT * indent
     lines: list = []
 
-    # Section header: use lineage path for nested models (shows where in tree)
-    header = ir.lineage_path if indent > 0 else ir.title
+    # Section header: use full lineage path when available, else title
+    header = ir.lineage_path or ir.title
     lines.append(f"{pad}{header}")
 
     # Description
@@ -605,6 +612,68 @@ def _md_escape(text: str) -> str:
     return text
 
 
+def _md_free_var_table(variables: list) -> list:
+    "Markdown pipe-table lines for Optimized Variables (no sensitivity column)."
+    has_source = any(ve.source for ve in variables)
+    lines = []
+    if has_source:
+        lines += [
+            "| Variable | Source | Value | Units | Label |",
+            "|----------|--------|-------|-------|-------|",
+        ]
+    else:
+        lines += [
+            "| Variable | Value | Units | Label |",
+            "|----------|-------|-------|-------|",
+        ]
+    for ve in variables:
+        name_cell = f"${ve.latex}$" if ve.latex else _md_escape(ve.name)
+        if has_source:
+            lines.append(
+                f"| {name_cell} | {_md_escape(ve.source)}"
+                f" | {_fmt_value(ve.value)}"
+                f" | {ve.units} | {_md_escape(ve.label)} |"
+            )
+        else:
+            lines.append(
+                f"| {name_cell} | {_fmt_value(ve.value)}"
+                f" | {ve.units} | {_md_escape(ve.label)} |"
+            )
+    return lines
+
+
+def _md_fixed_var_table(variables: list) -> list:
+    "Markdown pipe-table lines for Fixed Variables (with sensitivity column)."
+    has_source = any(ve.source for ve in variables)
+    lines = []
+    if has_source:
+        lines += [
+            "| Variable | Source | Value | Units | Sensitivity | Label |",
+            "|----------|--------|-------|-------|-------------|-------|",
+        ]
+    else:
+        lines += [
+            "| Variable | Value | Units | Sensitivity | Label |",
+            "|----------|-------|-------|-------------|-------|",
+        ]
+    for ve in variables:
+        name_cell = f"${ve.latex}$" if ve.latex else _md_escape(ve.name)
+        if has_source:
+            lines.append(
+                f"| {name_cell} | {_md_escape(ve.source)}"
+                f" | {_fmt_value(ve.value)}"
+                f" | {ve.units} | {_fmt_sensitivity(ve.sensitivity)}"
+                f" | {_md_escape(ve.label)} |"
+            )
+        else:
+            lines.append(
+                f"| {name_cell} | {_fmt_value(ve.value)}"
+                f" | {ve.units} | {_fmt_sensitivity(ve.sensitivity)}"
+                f" | {_md_escape(ve.label)} |"
+            )
+    return lines
+
+
 def render_markdown(ir: "ReportSection", level: int = 1) -> str:
     """Render a ReportSection tree as Markdown.
 
@@ -622,8 +691,8 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
     hdr = "#" * min(level, 6)
     lines: list = []
 
-    # Heading
-    lines.append(f"{hdr} {ir.title}")
+    # Heading: use full lineage path when available, else title
+    lines.append(f"{hdr} {ir.lineage_path or ir.title}")
     lines.append("")
 
     # Description
@@ -641,29 +710,14 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
     if ir.free_variables:
         lines.append("**Optimized Variables**")
         lines.append("")
-        lines.append("| Variable | Value | Units | Label |")
-        lines.append("|----------|-------|-------|-------|")
-        for ve in ir.free_variables:
-            name_cell = f"${ve.latex}$" if ve.latex else _md_escape(ve.name)
-            lines.append(
-                f"| {name_cell} | {_fmt_value(ve.value)}"
-                f" | {ve.units} | {_md_escape(ve.label)} |"
-            )
+        lines.extend(_md_free_var_table(ir.free_variables))
         lines.append("")
 
     # Fixed Variables pipe table (value | units | sensitivity | label)
     if ir.fixed_variables:
         lines.append("**Fixed Variables**")
         lines.append("")
-        lines.append("| Variable | Value | Units | Sensitivity | Label |")
-        lines.append("|----------|-------|-------|-------------|-------|")
-        for ve in ir.fixed_variables:
-            name_cell = f"${ve.latex}$" if ve.latex else _md_escape(ve.name)
-            lines.append(
-                f"| {name_cell} | {_fmt_value(ve.value)}"
-                f" | {ve.units} | {_fmt_sensitivity(ve.sensitivity)}"
-                f" | {_md_escape(ve.label)} |"
-            )
+        lines.extend(_md_fixed_var_table(ir.fixed_variables))
         lines.append("")
 
     # Constraint groups
