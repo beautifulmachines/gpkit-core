@@ -123,7 +123,10 @@ _LATEX_PREFIXES = {
 
 def _latexify_sub_token(token: str) -> str:
     "Render a single subscript token as a LaTeX atom (Greek symbol or \\text{})."
-    return _GREEK.get(token, r"\text{" + token + "}")
+    result = _GREEK.get(token)
+    if result:
+        return result
+    return token if len(token) == 1 else r"\text{" + token + "}"
 
 
 def _extract_subscript(name: str):
@@ -164,7 +167,8 @@ def latexify(name: str) -> str:
         if parts[0] in _LATEX_PREFIXES:
             arg = latexify(parts[1])
             return "\\" + parts[0] + "{" + arg + "}"
-        base = _GREEK.get(parts[0], parts[0])
+        raw = parts[0]
+        base = _GREEK.get(raw, raw if len(raw) == 1 else r"\text{" + raw + "}")
         if not parts[1]:  # trailing underscore (e.g. "lambda_") — strip it
             return base
         # Flatten all underscore-separated tokens into a single comma-separated
@@ -172,7 +176,7 @@ def latexify(name: str) -> str:
         # each token is rendered independently as a Greek symbol or \text{}.
         sub = ",".join(_latexify_sub_token(t) for t in parts[1].split("_"))
         return base + "_{" + sub + "}"
-    return _GREEK.get(name, name)
+    return _GREEK.get(name, name if len(name) == 1 else r"\text{" + name + "}")
 
 
 def strify(val, excluded):

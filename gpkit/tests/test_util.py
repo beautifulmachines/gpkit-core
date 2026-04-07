@@ -82,11 +82,18 @@ class TestSmallScripts:
     def test_latexify_flat_multi_subscript(self):
         """Multi-underscore names produce flat comma-separated subscripts"""
         assert latexify("A_one_two") == r"A_{\text{one},\text{two}}"
-        assert latexify("C_L_max") == r"C_{\text{L},\text{max}}"
+        assert latexify("C_L_max") == r"C_{L,\text{max}}"  # single-char sub not wrapped
         assert latexify("rho_inf_ref") == r"\rho_{\infty,\text{ref}}"
         # single-underscore behaviour unchanged
         assert latexify("m_ref") == r"m_{\text{ref}}"
         assert latexify("rho_inf") == r"\rho_{\infty}"
+        # multi-char base, no underscore
+        assert latexify("CD") == r"\text{CD}"
+        assert latexify("CL") == r"\text{CL}"
+        # single-char subscript: no \text{} wrapping
+        assert latexify("C_L") == r"C_{L}"
+        # prefix arg that is multi-char
+        assert latexify("dot_CD") == r"\dot{\text{CD}}"
 
     def test_extract_subscript(self):
         """_extract_subscript correctly parses trailing _{...} from a LaTeX string."""
