@@ -390,27 +390,33 @@ def _fmt_value(val, precision: int = 4, vecn: int = 6, col_widths=()) -> str:
         return str(mag)
 
 
+_SENS_NEARZERO_TOL = 1e-7
+
+
 def _fmt_sensitivity(sens, vecn: int = 6, col_widths=()) -> str:
     """Format a sensitivity value for display, handling scalars and arrays."""
     import numpy as np  # pylint: disable=import-outside-toplevel
 
     if sens is None:
         return "-"
-    mag = getattr(sens, "magnitude", sens)
     try:
-        arr = np.asarray(mag)
+        arr = np.asarray(sens)
         if arr.shape:
             flat = arr.ravel()
-            shown = [f"{x:+.2g}" for x in flat[:vecn]]
+            shown = [
+                "~0" if abs(x) < _SENS_NEARZERO_TOL else f"{x:+.2g}"
+                for x in flat[:vecn]
+            ]
             body = "  ".join(
                 s.ljust(col_widths[i]) if i < len(col_widths) else s
                 for i, s in enumerate(shown)
             )
             dots = " ..." if flat.size > vecn else ""
             return f"( {body}{dots} )"
-        return f"{float(arr):+.2g}"
+        scalar = float(arr)
+        return "~0" if abs(scalar) < _SENS_NEARZERO_TOL else f"{scalar:+.2g}"
     except (TypeError, ValueError):
-        return str(mag)
+        return str(sens)
 
 
 def _text_var_rows(variables: list, precision: int = 4, vecn: int = 6) -> list:
