@@ -5,7 +5,7 @@ from collections.abc import MutableMapping
 
 import numpy as np
 
-from .units import Quantity
+from .units import Quantity, qty
 from .util.small_scripts import veclinkedfn
 
 
@@ -191,6 +191,11 @@ class VarMap(MutableMapping):
         key = self._varset.resolve(key)
         if isinstance(value, Quantity):
             value = value.to(key.units or "dimensionless").magnitude
+        elif hasattr(value, "hmap") and not any(value.hmap.keys()):
+            # Constant Monomial (e.g. 3*units("day")): extract plain coefficient.
+            # Non-constant Monomials (variables) pass through so solve-time
+            # validation can emit the appropriate error.
+            (value,) = value.hmap.to(key.units or qty("dimensionless")).values()
         if is_veckey(key):
             if key not in self._varset._by_vec:
                 raise NotImplementedError
