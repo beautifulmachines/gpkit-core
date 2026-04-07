@@ -6,10 +6,12 @@ functions of the IR.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
 from .util.repr_conventions import unitstr
+from .util.small_classes import Quantity
 from .varkey import lineage_display_context
+from .varmap import VarMap
 
 # ── Column alignment helper ───────────────────────────────────────────────────
 
@@ -53,7 +55,7 @@ class VarEntry:
 
     name: str  # display name (from VarKey.name)
     latex: str  # LaTeX rendering (from VarKey.latex())
-    value: Any  # float | Quantity | None (resolved per D-17 priority)
+    value: Any  # float | ndarray | None — never a pint Quantity
     sensitivity: Optional[float]  # shadow price from solution, or None
     units: str  # unit string
     label: str  # human label (from VarKey.label or "")
@@ -121,32 +123,31 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
 
 
 def _serialize_value(val: Any) -> Any:
-    """Make a value JSON-serializable."""
+    """Make a value JSON-serializable.
+
+    val must be a plain float, numpy array, or None — not a pint Quantity.
+    """
     if val is None:
         return None
+    if isinstance(val, Quantity):
+        raise TypeError(
+            f"_serialize_value received a pint Quantity ({val!r}); "
+            "VarEntry.value must be a plain numeric"
+        )
     try:
         return float(val)
     except (TypeError, ValueError):
         return str(val)
 
 
-def _resolve_var_value(vk, solution=None, substitutions=None, model=None):
-    """Resolve a variable's display value following priority:
-    solution > substitutions override > model.substitutions > vk.value
+def _value_units(vk, varmap: VarMap) -> Tuple[Any, str]:
+    """Get (magnitude, unit_str) for vk from varmap.
+
+    Both values come from the same pint Quantity returned by varmap.quantity(),
+    guaranteeing they are consistent.  Raises KeyError if vk is not in varmap.
     """
-    if solution is not None:
-        try:
-            return solution[vk]
-        except (KeyError, TypeError):
-            pass
-    if substitutions is not None:
-        if vk in substitutions:
-            return substitutions[vk]
-    if model is not None:
-        subs = getattr(model, "substitutions", {})
-        if vk in subs:
-            return subs[vk]
-    return getattr(vk, "value", None)
+    qty = varmap.quantity(vk)
+    return qty.magnitude, unitstr(qty) or "-"
 
 
 def _resolve_sensitivity(vk, solution=None):
@@ -205,9 +206,7 @@ def _collect_constraint_varkeys(constraint_groups: List[CGroup]) -> set:
     return vkeys
 
 
-def _build_var_entries(
-    model, solution, substitutions, extra_vks=None
-) -> List[VarEntry]:
+def _build_var_entries(model, solution, extra_vks=None) -> List[VarEntry]:
     """Build VarEntry list from model.unique_varkeys, then cross-model extras.
 
     Local variables: names disambiguated within the section scope using
@@ -218,6 +217,18 @@ def _build_var_entries(
     by progressively adding lineage subscript components until unique. Full
     dotted name stored in VarEntry.source for display in brackets.
     """
+    # Single VarMap for all value lookups.  solution.variables (primal +
+    # constants) covers the solved case; model.substitutions covers unsolved.
+    display_map: VarMap = (
+        solution.variables if solution is not None else model.substitutions
+    )
+
+    def _get_value_units(vk):
+        try:
+            return _value_units(vk, display_map)
+        except KeyError:
+            return None, unitstr(vk) or "-"
+
     lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
     model_prefix = model.lineagestr()
     excluded = {":MAGIC:" + model_prefix} if model_prefix else set()
@@ -232,18 +243,14 @@ def _build_var_entries(
                 display_vk = vk.veckey
             else:
                 display_vk = vk
+            value, units_str = _get_value_units(display_vk)
             entries.append(
                 VarEntry(
                     name=display_vk.str_without(excluded),
                     latex=display_vk.latex(excluded),
-                    value=_resolve_var_value(
-                        display_vk,
-                        solution=solution,
-                        substitutions=substitutions,
-                        model=model,
-                    ),
+                    value=value,
                     sensitivity=_resolve_sensitivity(display_vk, solution=solution),
-                    units=unitstr(display_vk) or "-",
+                    units=units_str,
                     label=display_vk.label or "",
                 )
             )
@@ -257,18 +264,14 @@ def _build_var_entries(
                 if display_vk in owned_display or display_vk in cross_seen:
                     continue
                 cross_seen.add(display_vk)
+                value, units_str = _get_value_units(display_vk)
                 entries.append(
                     VarEntry(
                         name=display_vk.str_without(excluded),
                         latex=display_vk.latex(excluded),
-                        value=_resolve_var_value(
-                            display_vk,
-                            solution=solution,
-                            substitutions=substitutions,
-                            model=model,
-                        ),
+                        value=value,
                         sensitivity=_resolve_sensitivity(display_vk, solution=solution),
-                        units=unitstr(display_vk) or "-",
+                        units=units_str,
                         label=display_vk.label or "",
                         source=display_vk.lineagestr(),
                     )
@@ -311,7 +314,6 @@ def _build_constraint_groups(model) -> List[CGroup]:
 def build_report_ir(
     model,
     solution=None,
-    substitutions: Optional[dict] = None,
     _parent_path: str = "",
 ) -> ReportSection:
     """Build a ReportSection tree from *model*.
@@ -322,8 +324,6 @@ def build_report_ir(
         Root model to report on.
     solution : Solution, optional
         If provided, variable entries include solved values and sensitivities.
-    substitutions : dict, optional
-        One-off value overrides without mutating model.substitutions.
     """
     own_name = type(model).__name__
     lineage_path = f"{_parent_path}.{own_name}" if _parent_path else own_name
@@ -338,18 +338,12 @@ def build_report_ir(
         variables=_build_var_entries(
             model,
             solution,
-            substitutions,
             extra_vks=_collect_constraint_varkeys(cgroups) - model.unique_varkeys,
         ),
         constraint_groups=cgroups,
         lineage_map=lineage_map,
         children=[
-            build_report_ir(
-                child,
-                solution=solution,
-                substitutions=substitutions,
-                _parent_path=lineage_path,
-            )
+            build_report_ir(child, solution=solution, _parent_path=lineage_path)
             for child in model.submodels
         ],
     )
@@ -363,6 +357,10 @@ _INDENT = "  "
 def _fmt_value(val, precision: int = 4, vecn: int = 6, col_widths=()) -> str:
     """Format a variable value for display, handling scalars and arrays.
 
+    val must be a plain float, numpy array, or None — not a pint Quantity.
+    _build_var_entries() pre-extracts magnitudes; callers constructing VarEntry
+    directly must do the same.
+
     col_widths is a per-column list of minimum widths so that element position i
     across all vector rows in the same table renders at the same width.
     """
@@ -370,7 +368,12 @@ def _fmt_value(val, precision: int = 4, vecn: int = 6, col_widths=()) -> str:
 
     if val is None:
         return "-"
-    mag = getattr(val, "magnitude", val)
+    if isinstance(val, Quantity):
+        raise TypeError(
+            f"_fmt_value received a pint Quantity ({val!r}); "
+            "extract .magnitude before storing in VarEntry.value"
+        )
+    mag = val
     try:
         arr = np.asarray(mag)
         if arr.shape:

@@ -4,16 +4,20 @@ import json
 
 import pytest
 
+import gpkit
 from gpkit import Model, Variable
 from gpkit.report import (
     CGroup,
     ReportSection,
     VarEntry,
+    _fmt_value,
     _md_escape,
+    _serialize_value,
     build_report_ir,
     render_markdown,
     render_text,
 )
+from gpkit.util.small_classes import Quantity
 
 # ── Dataclass structure ───────────────────────────────────────────────────────
 
@@ -194,21 +198,6 @@ class TestModelReport:
         assert "variables" in result
         assert "children" in result
 
-    def test_report_substitutions(self):
-        """model.report(fmt='dict', substitutions=...) uses override without mutation"""
-
-        class _RSSubst(Model):
-            def setup(self):
-                x = Variable("x_rssub")
-                return [x >= 1]
-
-        m = _RSSubst()
-        original_subs = dict(m.substitutions)
-        x_vk = next(iter(m.unique_varkeys))
-        result = m.report(fmt="dict", substitutions={x_vk: 42.0})
-        assert isinstance(result, dict)
-        assert m.substitutions == original_subs
-
     def test_report_unknown_format_raises(self):
         """model.report(fmt='unknown') raises ValueError."""
 
@@ -220,6 +209,39 @@ class TestModelReport:
         m = _RSFmt()
         with pytest.raises(ValueError, match="not yet implemented"):
             m.report(fmt="unknown_format_xyz")
+
+
+# ── Value / unit contract ─────────────────────────────────────────────────────
+
+
+class TestValueUnitsContract:
+    """_fmt_value and _serialize_value must never emit units; VarEntry.value
+    must always be a plain numeric, not a pint Quantity."""
+
+    def test_fmt_value_raises_for_quantity(self):
+        """`_fmt_value` must raise TypeError if given a pint Quantity."""
+        qty = gpkit.ureg.Quantity(3.0, "day")
+        with pytest.raises(TypeError):
+            _fmt_value(qty)
+
+    def test_serialize_value_raises_for_quantity(self):
+        """`_serialize_value` raises if given a pint Quantity."""
+        qty = gpkit.ureg.Quantity(3.0, "day")
+        with pytest.raises(TypeError):
+            _serialize_value(qty)
+
+    def test_var_entry_value_is_plain_float_after_solve(self):
+        """build_report_ir stores plain floats in VarEntry.value, never Quantities."""
+        x = Variable("x_plain", "m")
+        c = Variable("c_plain", 2.0, "m")
+        m = Model(x, [x >= c])
+        sol = m.solve(verbosity=0)
+        ir = build_report_ir(m, solution=sol)
+        all_ves = ir.variables + [ve for ch in ir.children for ve in ch.variables]
+        for ve in all_ves:
+            assert not isinstance(
+                ve.value, Quantity
+            ), f"VarEntry.value for {ve.name!r} is a Quantity; expected plain float"
 
 
 # ── Text format renderer ─────────────────────────────────────────────────────
@@ -308,22 +330,6 @@ class TestRenderText:
         result = m.report(solution=sol, fmt="text")
         assert isinstance(result, str)
         assert "x_tsol" in result
-
-    def test_report_text_substitutions(self):
-        """model.report(fmt='text', substitutions=...) does not mutate model."""
-
-        class _TxtSubst(Model):
-            def setup(self):
-                x = Variable("x_rssub2")
-                return [x >= 1]
-
-        m = _TxtSubst()
-        original_subs = dict(m.substitutions)
-        x_vk = next(iter(m.unique_varkeys))
-        result = m.report(fmt="text", substitutions={x_vk: 5.0})
-        assert isinstance(result, str)
-        # Model should not be mutated
-        assert m.substitutions == original_subs
 
     def test_render_text_direct(self):
         """render_text(ir) returns hierarchical text from a ReportSection IR."""
