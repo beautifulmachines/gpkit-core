@@ -209,6 +209,22 @@ def _collect_constraint_varkeys(constraint_groups: List[CGroup]) -> set:
     return vkeys
 
 
+def _make_var_entry(
+    display_vk, excluded, get_val_units, solution, source=""
+) -> VarEntry:
+    "Build a VarEntry for display_vk using the provided value-lookup callable."
+    value, units_str = get_val_units(display_vk)
+    return VarEntry(
+        name=display_vk.str_without(excluded),
+        latex=display_vk.latex(excluded),
+        value=value,
+        sensitivity=_resolve_sensitivity(display_vk, solution=solution),
+        units=units_str,
+        label=display_vk.label or "",
+        source=source,
+    )
+
+
 def _is_free_vk(display_vk, solution, model) -> bool:
     """Return True if display_vk is an optimized (free) variable.
 
@@ -261,15 +277,7 @@ def _build_split_var_entries(
                 display_vk = vk.veckey
             else:
                 display_vk = vk
-            value, units_str = _get_value_units(display_vk)
-            entry = VarEntry(
-                name=display_vk.str_without(excluded),
-                latex=display_vk.latex(excluded),
-                value=value,
-                sensitivity=_resolve_sensitivity(display_vk, solution=solution),
-                units=units_str,
-                label=display_vk.label or "",
-            )
+            entry = _make_var_entry(display_vk, excluded, _get_value_units, solution)
             if _is_free_vk(display_vk, solution, model):
                 free_entries.append(entry)
             else:
@@ -284,14 +292,11 @@ def _build_split_var_entries(
                 if display_vk in owned_display or display_vk in cross_seen:
                     continue
                 cross_seen.add(display_vk)
-                value, units_str = _get_value_units(display_vk)
-                entry = VarEntry(
-                    name=display_vk.str_without(excluded),
-                    latex=display_vk.latex(excluded),
-                    value=value,
-                    sensitivity=_resolve_sensitivity(display_vk, solution=solution),
-                    units=units_str,
-                    label=display_vk.label or "",
+                entry = _make_var_entry(
+                    display_vk,
+                    excluded,
+                    _get_value_units,
+                    solution,
                     source=display_vk.lineagestr(),
                 )
                 if _is_free_vk(display_vk, solution, model):

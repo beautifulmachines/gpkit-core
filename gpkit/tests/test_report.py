@@ -17,6 +17,7 @@ from gpkit.report import (
     render_markdown,
     render_text,
 )
+from gpkit.util.repr_conventions import unitstr
 from gpkit.util.small_classes import Quantity
 
 
@@ -167,19 +168,18 @@ class TestBuildReportIR:
 
     def test_var_entry_uses_pretty_unit_format(self):
         """build_report_ir uses platform-appropriate pretty format in VarEntry.units."""
-        from gpkit.util.repr_conventions import unitstr
 
         class _RSPrettyUnits(Model):
             def setup(self):
-                S = Variable("S_pu", "m^2")
-                S_min = Variable("S_min_pu", 1, "m^2")
-                return [S >= S_min]
+                area = Variable("S_pu", "m^2")
+                area_min = Variable("S_min_pu", 1, "m^2")
+                return [area >= area_min]
 
         m = _RSPrettyUnits()
         ir = build_report_ir(m)
         ve = _all_vars(ir)[0]
-        S_vk = next(vk for vk in m.unique_varkeys if vk.name == "S_pu")
-        assert ve.units == unitstr(S_vk)
+        area_vk = next(vk for vk in m.unique_varkeys if vk.name == "S_pu")
+        assert ve.units == unitstr(area_vk)
 
 
 # ── model.report() entry point ───────────────────────────────────────────────
