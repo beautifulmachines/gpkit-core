@@ -101,6 +101,7 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
     magic_prefix: str = (
         ""  # model.lineagestr() — stripped from variable names in renderers
     )
+    is_anonymous: bool = False  # True for bare Model(...) instances (no subclass name)
     children: list = field(default_factory=list)  # list of ReportSection
     lineage_map: dict = field(default_factory=dict)  # NOT in to_dict
 
@@ -110,6 +111,7 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
             "title": self.title,
             "lineage_path": self.lineage_path,
             "magic_prefix": self.magic_prefix,
+            "is_anonymous": self.is_anonymous,
             "description": self.description,
             "assumptions": list(self.assumptions),
             "free_variables": [_var_entry_to_dict(v) for v in self.free_variables],
@@ -351,8 +353,14 @@ def build_report_ir(
     solution : Solution, optional
         If provided, variable entries include solved values and sensitivities.
     """
-    own_name = type(model).__name__
-    lineage_path = f"{_parent_path}.{own_name}" if _parent_path else own_name
+    from .model import Model as _Model  # pylint: disable=import-outside-toplevel
+
+    is_anon = type(model) is _Model  # pylint: disable=unidiomatic-typecheck
+    own_name = "" if is_anon else type(model).__name__
+    if own_name:
+        lineage_path = f"{_parent_path}.{own_name}" if _parent_path else own_name
+    else:
+        lineage_path = _parent_path  # transparent: inherit parent path
     lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
     cgroups = _build_constraint_groups(model)
     free_vars, fixed_vars = _build_split_var_entries(
@@ -361,11 +369,12 @@ def build_report_ir(
         extra_vks=_collect_constraint_varkeys(cgroups) - model.unique_varkeys,
     )
     return ReportSection(
-        title=own_name,
+        title=own_name or "Model",
         description="[description]",
         assumptions=[],
         lineage_path=lineage_path,
         magic_prefix=model.lineagestr(),
+        is_anonymous=is_anon,
         free_variables=free_vars,
         fixed_variables=fixed_vars,
         constraint_groups=cgroups,
@@ -511,6 +520,19 @@ def _text_fixed_var_rows(variables: list, precision: int = 4, vecn: int = 6) -> 
     return _format_aligned_columns(rows, "<<<<<", "  ")
 
 
+def _text_cgroup_lines(constraint_groups: list, pad: str, lineage_map: dict) -> list:
+    "Build text lines for all constraint groups in a section."
+    lines = []
+    for cg in constraint_groups:
+        group_header = f"Constraints ({cg.label})" if cg.label else "Constraints"
+        lines.append(f"{pad}  {group_header}")
+        if cg.constraints:
+            for row_line in _text_constraint_rows(cg.constraints, lineage_map):
+                lines.append(f"{pad}    {row_line}")
+        lines.append("")
+    return lines
+
+
 def _text_constraint_rows(constraints: list, lineage_map: dict = None) -> list:
     """Build aligned rows for a constraint group in text output.
 
@@ -540,9 +562,13 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
     pad = _INDENT * indent
     lines: list = []
 
-    # Section header: use full lineage path when available, else title
-    header = ir.lineage_path or ir.title
-    lines.append(f"{pad}{header}")
+    if ir.is_anonymous:
+        # Transparent wrapper: no header, children rendered at the same level
+        child_indent = indent
+    else:
+        # Section header: full lineage path when available, else title
+        lines.append(f"{pad}{ir.lineage_path or ir.title}")
+        child_indent = indent + 1
 
     # Description
     if ir.description:
@@ -571,17 +597,11 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
         lines.append("")
 
     # Constraint groups
-    for cg in ir.constraint_groups:
-        group_header = f"Constraints ({cg.label})" if cg.label else "Constraints"
-        lines.append(f"{pad}  {group_header}")
-        if cg.constraints:
-            for row_line in _text_constraint_rows(cg.constraints, ir.lineage_map):
-                lines.append(f"{pad}    {row_line}")
-        lines.append("")
+    lines.extend(_text_cgroup_lines(ir.constraint_groups, pad, ir.lineage_map))
 
     # Children (recursive)
     for child in ir.children:
-        lines.append(render_text(child, indent=indent + 1))
+        lines.append(render_text(child, indent=child_indent))
 
     return "\n".join(lines)
 
@@ -691,9 +711,14 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
     hdr = "#" * min(level, 6)
     lines: list = []
 
-    # Heading: use full lineage path when available, else title
-    lines.append(f"{hdr} {ir.lineage_path or ir.title}")
-    lines.append("")
+    if ir.is_anonymous:
+        # Transparent wrapper: skip heading, children rendered at same level
+        child_level = level
+    else:
+        # Heading: use full lineage path when available, else title
+        lines.append(f"{hdr} {ir.lineage_path or ir.title}")
+        lines.append("")
+        child_level = level + 1
 
     # Description
     if ir.description:
@@ -739,7 +764,7 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
 
     # Children (recursive)
     for child in ir.children:
-        child_md = render_markdown(child, level=level + 1)
+        child_md = render_markdown(child, level=child_level)
         lines.append(child_md)
         lines.append("")
 

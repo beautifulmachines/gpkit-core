@@ -208,6 +208,27 @@ class TestModelReport:
         assert "fixed_variables" in result
         assert "children" in result
 
+    def test_anonymous_model_skips_model_header(self):
+        """Bare Model wrapper: no 'Model' header; children at top heading level."""
+
+        class _AnonChild(Model):
+            def setup(self):
+                return [Variable("span_anon") >= 1]
+
+        child = _AnonChild()
+        m = Model(child.cost, [child])
+        # text: no "Model" header line; child class at indent=0
+        txt = m.report(fmt="text")
+        assert "Model" not in txt
+        lines = txt.splitlines()
+        child_line = next(ln for ln in lines if "_AnonChild" in ln)
+        assert not child_line.startswith(" ")
+
+        # markdown: no "# Model" heading; child at # (level 1)
+        md = m.report(fmt="md")
+        assert "# Model" not in md
+        assert "# _AnonChild" in md
+
     def test_report_unknown_format_raises(self):
         """model.report(fmt='unknown') raises ValueError."""
 
