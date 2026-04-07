@@ -8,6 +8,7 @@ functions of the IR.
 from dataclasses import dataclass, field
 from typing import Any, List, Optional, Tuple
 
+from .constraints.tight import Tight
 from .util.repr_conventions import unitstr
 from .util.small_classes import Quantity
 from .varkey import lineage_display_context
@@ -324,8 +325,6 @@ def _build_constraint_groups(model) -> List[CGroup]:
         ]
 
     def _collect_own(container):
-        from .constraints.tight import Tight  # avoid circular import at module level
-
         for item in container:
             if isinstance(item, Tight):
                 yield from _collect_own(item)  # treat contents as bare constraints
