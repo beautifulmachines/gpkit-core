@@ -324,10 +324,14 @@ def _build_constraint_groups(model) -> List[CGroup]:
         ]
 
     def _collect_own(container):
+        from .constraints.tight import Tight  # avoid circular import at module level
+
         for item in container:
-            if hasattr(item, "unique_varkeys"):
+            if isinstance(item, Tight):
+                yield from _collect_own(item)  # treat contents as bare constraints
+            elif hasattr(item, "unique_varkeys"):
                 continue  # skip child Models and ConstraintSets
-            if isinstance(item, (list, tuple)):
+            elif isinstance(item, (list, tuple)):
                 yield from _collect_own(item)
             else:
                 yield item
