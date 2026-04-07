@@ -19,6 +19,12 @@ from gpkit.report import (
 )
 from gpkit.util.small_classes import Quantity
 
+
+def _all_vars(ir):
+    """All VarEntry objects in an IR section (free + fixed)."""
+    return ir.free_variables + ir.fixed_variables
+
+
 # ── Dataclass structure ───────────────────────────────────────────────────────
 
 
@@ -61,14 +67,16 @@ class TestReportDataclasses:
             title="Wing",
             description="Wing structural model",
             assumptions=["thin airfoil"],
-            variables=[ve],
+            free_variables=[ve],
+            fixed_variables=[],
             constraint_groups=[cg],
             children=[],
         )
         assert rs.title == "Wing"
         assert rs.description == "Wing structural model"
         assert rs.assumptions == ["thin airfoil"]
-        assert len(rs.variables) == 1
+        assert len(rs.free_variables) == 1
+        assert len(rs.fixed_variables) == 0
         assert len(rs.constraint_groups) == 1
         assert not rs.children
 
@@ -82,7 +90,8 @@ class TestReportDataclasses:
             title="Fuselage",
             description="fuselage drag model",
             assumptions=[],
-            variables=[ve],
+            free_variables=[ve],
+            fixed_variables=[],
             constraint_groups=[cg],
             children=[],
         )
@@ -93,7 +102,7 @@ class TestReportDataclasses:
         json_str = json.dumps(d)
         assert isinstance(json_str, str)
         restored = json.loads(json_str)
-        assert restored["variables"][0]["name"] == "x"
+        assert restored["free_variables"][0]["name"] == "x"
         assert restored["constraint_groups"][0]["label"] == "Aero"
 
 
@@ -117,7 +126,7 @@ class TestBuildReportIR:
         ir = build_report_ir(m)
         assert isinstance(ir, ReportSection)
         assert ir.title == "_RSSimple"
-        assert len(ir.variables) >= 1
+        assert len(_all_vars(ir)) >= 1
         assert not ir.children
 
     def test_build_report_ir_nested(self):
@@ -168,7 +177,7 @@ class TestBuildReportIR:
 
         m = _RSPrettyUnits()
         ir = build_report_ir(m)
-        ve = ir.variables[0]
+        ve = _all_vars(ir)[0]
         S_vk = next(vk for vk in m.unique_varkeys if vk.name == "S_pu")
         assert ve.units == unitstr(S_vk)
 
@@ -195,7 +204,8 @@ class TestModelReport:
         json_str = json.dumps(result)
         assert isinstance(json_str, str)
         assert "title" in result
-        assert "variables" in result
+        assert "free_variables" in result
+        assert "fixed_variables" in result
         assert "children" in result
 
     def test_report_unknown_format_raises(self):
@@ -237,7 +247,7 @@ class TestValueUnitsContract:
         m = Model(x, [x >= c])
         sol = m.solve(verbosity=0)
         ir = build_report_ir(m, solution=sol)
-        all_ves = ir.variables + [ve for ch in ir.children for ve in ch.variables]
+        all_ves = _all_vars(ir) + [ve for ch in ir.children for ve in _all_vars(ch)]
         for ve in all_ves:
             assert not isinstance(
                 ve.value, Quantity
@@ -341,7 +351,8 @@ class TestRenderText:
             title="Wing",
             description="Wing model",
             assumptions=["thin airfoil"],
-            variables=[ve],
+            free_variables=[ve],
+            fixed_variables=[],
             constraint_groups=[cg],
             children=[],
         )
@@ -357,7 +368,8 @@ class TestRenderText:
             title="Aircraft",
             description="",
             assumptions=["steady level flight", "rigid structure"],
-            variables=[],
+            free_variables=[],
+            fixed_variables=[],
             constraint_groups=[],
             children=[],
         )
@@ -455,7 +467,8 @@ class TestRenderMarkdown:
             title="Fuselage",
             description="Fuselage drag model",
             assumptions=[],
-            variables=[ve],
+            free_variables=[ve],
+            fixed_variables=[],
             constraint_groups=[cg],
             children=[],
         )
@@ -470,7 +483,8 @@ class TestRenderMarkdown:
             title="Propulsion",
             description="Turbofan engine sizing",
             assumptions=[],
-            variables=[],
+            free_variables=[],
+            fixed_variables=[],
             constraint_groups=[],
             children=[],
         )
@@ -483,7 +497,8 @@ class TestRenderMarkdown:
             title="Structural",
             description="",
             assumptions=["beam theory", "isotropic material"],
-            variables=[],
+            free_variables=[],
+            fixed_variables=[],
             constraint_groups=[],
             children=[],
         )

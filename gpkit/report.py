@@ -70,6 +70,18 @@ class CGroup:
     constraints: list  # raw constraint objects; to_dict() serializes via str()
 
 
+def _var_entry_to_dict(v) -> dict:
+    return {
+        "name": v.name,
+        "latex": v.latex,
+        "value": _serialize_value(v.value),
+        "sensitivity": v.sensitivity,
+        "units": v.units,
+        "label": v.label,
+        "source": v.source,
+    }
+
+
 @dataclass
 class ReportSection:  # pylint: disable=too-many-instance-attributes
     """Format-independent intermediate representation for model reports.
@@ -82,7 +94,8 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
     title: str
     description: str
     assumptions: list  # list of str
-    variables: list  # list of VarEntry
+    free_variables: list  # list of VarEntry — optimized by the solver
+    fixed_variables: list  # list of VarEntry — prescribed constants
     constraint_groups: list  # list of CGroup
     lineage_path: str = ""  # dotted path e.g. "Aircraft.Wing"
     magic_prefix: str = (
@@ -99,18 +112,8 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
             "magic_prefix": self.magic_prefix,
             "description": self.description,
             "assumptions": list(self.assumptions),
-            "variables": [
-                {
-                    "name": v.name,
-                    "latex": v.latex,
-                    "value": _serialize_value(v.value),
-                    "sensitivity": v.sensitivity,
-                    "units": v.units,
-                    "label": v.label,
-                    "source": v.source,
-                }
-                for v in self.variables
-            ],
+            "free_variables": [_var_entry_to_dict(v) for v in self.free_variables],
+            "fixed_variables": [_var_entry_to_dict(v) for v in self.fixed_variables],
             "constraint_groups": [
                 {"label": cg.label, "constraints": [str(c) for c in cg.constraints]}
                 for cg in self.constraint_groups
@@ -206,19 +209,32 @@ def _collect_constraint_varkeys(constraint_groups: List[CGroup]) -> set:
     return vkeys
 
 
-def _build_var_entries(model, solution, extra_vks=None) -> List[VarEntry]:
-    """Build VarEntry list from model.unique_varkeys, then cross-model extras.
+def _is_free_vk(display_vk, solution, model) -> bool:
+    """Return True if display_vk is an optimized (free) variable.
+
+    With a solution: free iff the key appears in solution.primal.
+    Without a solution: free iff the key has no substitution in the model.
+    """
+    if solution is not None:
+        return display_vk in solution.primal
+    return display_vk not in model.substitutions
+
+
+def _build_split_var_entries(
+    model, solution, extra_vks=None
+) -> Tuple[List[VarEntry], List[VarEntry]]:
+    """Build (free_entries, fixed_entries) from model.unique_varkeys.
+
+    free_entries  — Optimized Variables: solved by the optimizer (no sens shown).
+    fixed_entries — Fixed Variables: prescribed constants with sensitivities.
 
     Local variables: names disambiguated within the section scope using
     _get_lineage_map(); model's own lineage stripped so only sub-model context
     is shown. Vector variables collapsed to a single VarEntry.
 
-    Cross-model variables (extra_vks): latex disambiguated against local names
-    by progressively adding lineage subscript components until unique. Full
-    dotted name stored in VarEntry.source for display in brackets.
+    Cross-model variables (extra_vks): full dotted name stored in
+    VarEntry.source for display in brackets.
     """
-    # Single VarMap for all value lookups.  solution.variables (primal +
-    # constants) covers the solved case; model.substitutions covers unsolved.
     display_map: VarMap = (
         solution.variables if solution is not None else model.substitutions
     )
@@ -232,8 +248,10 @@ def _build_var_entries(model, solution, extra_vks=None) -> List[VarEntry]:
     lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
     model_prefix = model.lineagestr()
     excluded = {":MAGIC:" + model_prefix} if model_prefix else set()
-    entries = []
+    free_entries: List[VarEntry] = []
+    fixed_entries: List[VarEntry] = []
     seen_veckeys: set = set()
+
     with lineage_display_context(lineage_map):
         for vk in sorted(model.unique_varkeys, key=lambda v: v.name):
             if vk.veckey is not None:
@@ -244,16 +262,18 @@ def _build_var_entries(model, solution, extra_vks=None) -> List[VarEntry]:
             else:
                 display_vk = vk
             value, units_str = _get_value_units(display_vk)
-            entries.append(
-                VarEntry(
-                    name=display_vk.str_without(excluded),
-                    latex=display_vk.latex(excluded),
-                    value=value,
-                    sensitivity=_resolve_sensitivity(display_vk, solution=solution),
-                    units=units_str,
-                    label=display_vk.label or "",
-                )
+            entry = VarEntry(
+                name=display_vk.str_without(excluded),
+                latex=display_vk.latex(excluded),
+                value=value,
+                sensitivity=_resolve_sensitivity(display_vk, solution=solution),
+                units=units_str,
+                label=display_vk.label or "",
             )
+            if _is_free_vk(display_vk, solution, model):
+                free_entries.append(entry)
+            else:
+                fixed_entries.append(entry)
 
     if extra_vks:
         owned_display = {(vk.veckey or vk) for vk in model.unique_varkeys}
@@ -265,19 +285,21 @@ def _build_var_entries(model, solution, extra_vks=None) -> List[VarEntry]:
                     continue
                 cross_seen.add(display_vk)
                 value, units_str = _get_value_units(display_vk)
-                entries.append(
-                    VarEntry(
-                        name=display_vk.str_without(excluded),
-                        latex=display_vk.latex(excluded),
-                        value=value,
-                        sensitivity=_resolve_sensitivity(display_vk, solution=solution),
-                        units=units_str,
-                        label=display_vk.label or "",
-                        source=display_vk.lineagestr(),
-                    )
+                entry = VarEntry(
+                    name=display_vk.str_without(excluded),
+                    latex=display_vk.latex(excluded),
+                    value=value,
+                    sensitivity=_resolve_sensitivity(display_vk, solution=solution),
+                    units=units_str,
+                    label=display_vk.label or "",
+                    source=display_vk.lineagestr(),
                 )
+                if _is_free_vk(display_vk, solution, model):
+                    free_entries.append(entry)
+                else:
+                    fixed_entries.append(entry)
 
-    return entries
+    return free_entries, fixed_entries
 
 
 def _build_constraint_groups(model) -> List[CGroup]:
@@ -329,17 +351,19 @@ def build_report_ir(
     lineage_path = f"{_parent_path}.{own_name}" if _parent_path else own_name
     lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
     cgroups = _build_constraint_groups(model)
+    free_vars, fixed_vars = _build_split_var_entries(
+        model,
+        solution,
+        extra_vks=_collect_constraint_varkeys(cgroups) - model.unique_varkeys,
+    )
     return ReportSection(
         title=own_name,
         description="[description]",
         assumptions=[],
         lineage_path=lineage_path,
         magic_prefix=model.lineagestr(),
-        variables=_build_var_entries(
-            model,
-            solution,
-            extra_vks=_collect_constraint_varkeys(cgroups) - model.unique_varkeys,
-        ),
+        free_variables=free_vars,
+        fixed_variables=fixed_vars,
         constraint_groups=cgroups,
         lineage_map=lineage_map,
         children=[
@@ -419,21 +443,14 @@ def _fmt_sensitivity(sens, vecn: int = 6, col_widths=()) -> str:
         return str(sens)
 
 
-def _text_var_rows(variables: list, precision: int = 4, vecn: int = 6) -> list:
-    """Build column-aligned rows for variables section in text output.
-
-    Computes a uniform vec_width across all vector entries so that element
-    columns stay aligned when multiple vectors share the same table.
-    """
+def _compute_vec_col_widths(variables: list, precision: int, vecn: int) -> list:
+    """Pre-scan vector values to compute per-column widths for alignment."""
     import numpy as np  # pylint: disable=import-outside-toplevel
 
-    # Pre-scan: compute per-column max element widths across all vector values.
-    # col_widths[i] = max formatted width of element i across all vector rows.
     col_widths: list = []
     for ve in variables:
-        mag = getattr(ve.value, "magnitude", ve.value)
         try:
-            arr = np.asarray(mag)
+            arr = np.asarray(ve.value)
             if arr.shape:
                 elems = [f"{x:.{precision}g}" for x in arr.ravel()[:vecn]]
                 while len(col_widths) < len(elems):
@@ -442,7 +459,12 @@ def _text_var_rows(variables: list, precision: int = 4, vecn: int = 6) -> list:
                     col_widths[i] = max(col_widths[i], len(s))
         except (TypeError, ValueError):
             pass
+    return col_widths
 
+
+def _text_free_var_rows(variables: list, precision: int = 4, vecn: int = 6) -> list:
+    """Column-aligned rows for Optimized Variables: name | value | units | label."""
+    col_widths = _compute_vec_col_widths(variables, precision, vecn)
     rows = []
     for ve in variables:
         rows.append(
@@ -451,8 +473,27 @@ def _text_var_rows(variables: list, precision: int = 4, vecn: int = 6) -> list:
                 _fmt_value(
                     ve.value, precision=precision, vecn=vecn, col_widths=col_widths
                 ),
-                _fmt_sensitivity(ve.sensitivity, vecn=vecn, col_widths=col_widths),
                 ve.units,
+                ve.label,
+            ]
+        )
+    return _format_aligned_columns(rows, "<<<<", "  ")
+
+
+def _text_fixed_var_rows(variables: list, precision: int = 4, vecn: int = 6) -> list:
+    """Column-aligned rows for Fixed Variables:
+    name | value | units | sensitivity | label."""
+    col_widths = _compute_vec_col_widths(variables, precision, vecn)
+    rows = []
+    for ve in variables:
+        rows.append(
+            [
+                ve.name,
+                _fmt_value(
+                    ve.value, precision=precision, vecn=vecn, col_widths=col_widths
+                ),
+                ve.units,
+                _fmt_sensitivity(ve.sensitivity),
                 ve.label,
             ]
         )
@@ -504,10 +545,17 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
             lines.append(f"{pad}    - {assumption}")
         lines.append("")
 
-    # Variables table
-    if ir.variables:
-        lines.append(f"{pad}  Variables")
-        for row_line in _text_var_rows(ir.variables):
+    # Optimized Variables table (primal — no sensitivity column)
+    if ir.free_variables:
+        lines.append(f"{pad}  Optimized Variables")
+        for row_line in _text_free_var_rows(ir.free_variables):
+            lines.append(f"{pad}    {row_line}")
+        lines.append("")
+
+    # Fixed Variables table (constants — value | units | sensitivity | label)
+    if ir.fixed_variables:
+        lines.append(f"{pad}  Fixed Variables")
+        for row_line in _text_fixed_var_rows(ir.fixed_variables):
             lines.append(f"{pad}    {row_line}")
         lines.append("")
 
@@ -553,16 +601,6 @@ def _md_escape(text: str) -> str:
     return text
 
 
-def _md_var_row(ve: "VarEntry") -> str:
-    """Format one VarEntry as a markdown pipe-table row."""
-    name_cell = f"${ve.latex}$" if ve.latex else _md_escape(ve.name)
-    return (
-        f"| {name_cell} | {_md_escape(ve.source)} | {_fmt_value(ve.value)}"
-        f" | {_fmt_sensitivity(ve.sensitivity)} | {ve.units}"
-        f" | {_md_escape(ve.label)} |"
-    )
-
-
 def render_markdown(ir: "ReportSection", level: int = 1) -> str:
     """Render a ReportSection tree as Markdown.
 
@@ -595,12 +633,33 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
         lines.append(f"**Assumptions:** {assumption_str}")
         lines.append("")
 
-    # Variable pipe table
-    if ir.variables:
-        lines.append("| Variable | Source | Value | Sensitivity | Units | Label |")
-        lines.append("|----------|--------|-------|-------------|-------|-------|")
-        for ve in ir.variables:
-            lines.append(_md_var_row(ve))
+    # Optimized Variables pipe table (no sensitivity column)
+    if ir.free_variables:
+        lines.append("**Optimized Variables**")
+        lines.append("")
+        lines.append("| Variable | Value | Units | Label |")
+        lines.append("|----------|-------|-------|-------|")
+        for ve in ir.free_variables:
+            name_cell = f"${ve.latex}$" if ve.latex else _md_escape(ve.name)
+            lines.append(
+                f"| {name_cell} | {_fmt_value(ve.value)}"
+                f" | {ve.units} | {_md_escape(ve.label)} |"
+            )
+        lines.append("")
+
+    # Fixed Variables pipe table (value | units | sensitivity | label)
+    if ir.fixed_variables:
+        lines.append("**Fixed Variables**")
+        lines.append("")
+        lines.append("| Variable | Value | Units | Sensitivity | Label |")
+        lines.append("|----------|-------|-------|-------------|-------|")
+        for ve in ir.fixed_variables:
+            name_cell = f"${ve.latex}$" if ve.latex else _md_escape(ve.name)
+            lines.append(
+                f"| {name_cell} | {_fmt_value(ve.value)}"
+                f" | {ve.units} | {_fmt_sensitivity(ve.sensitivity)}"
+                f" | {_md_escape(ve.label)} |"
+            )
         lines.append("")
 
     # Constraint groups
