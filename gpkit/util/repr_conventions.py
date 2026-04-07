@@ -65,6 +65,7 @@ _GREEK = {
     "eta": r"\eta",
     "theta": r"\theta",
     "lambda": r"\lambda",
+    "lamda": r"\lambda",  # Python keyword workaround
     "mu": r"\mu",
     "nu": r"\nu",
     "xi": r"\xi",
@@ -94,7 +95,8 @@ _GREEK = {
 }
 
 
-_LATEX_FUNCTIONS = {
+_LATEX_PREFIXES = {
+    # trig / math functions
     "sin",
     "cos",
     "tan",
@@ -110,6 +112,12 @@ _LATEX_FUNCTIONS = {
     "log",
     "ln",
     "exp",
+    # LaTeX accents
+    "dot",
+    "ddot",
+    # operator-prefix Greeks
+    "Delta",
+    "Sigma",
 }
 
 
@@ -126,10 +134,12 @@ def latexify(name: str) -> str:
         return name  # already LaTeX — do not double-convert
     if "_" in name:
         parts = name.split("_", 1)
-        if parts[0] in _LATEX_FUNCTIONS:
+        if parts[0] in _LATEX_PREFIXES:
             arg = latexify(parts[1])
             return "\\" + parts[0] + "{" + arg + "}"
         base = _GREEK.get(parts[0], parts[0])
+        if not parts[1]:  # trailing underscore (e.g. "lambda_") — strip it
+            return base
         if "_" in parts[1] or parts[1] in _GREEK:
             sub = latexify(parts[1])  # nested/Greek → already math, no \text{}
         else:

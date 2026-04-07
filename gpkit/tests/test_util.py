@@ -3,7 +3,7 @@
 import pytest
 
 from gpkit import Variable, units
-from gpkit.util.repr_conventions import unitstr
+from gpkit.util.repr_conventions import latexify, unitstr
 from gpkit.util.small_classes import HashVector
 
 
@@ -69,6 +69,21 @@ class TestSmallScripts:
         assert unitstr(x.key) in footstrings
         assert unitstr(Variable("y"), dimless="---") == "---"
         assert unitstr(None, dimless="--") == "--"
+
+    def test_latexify_prefix_operators(self):
+        """dot accents and operator-prefix Greeks render as prefix, not subscript."""
+        assert latexify("dot_m") == r"\dot{m}"
+        assert latexify("dot_m_ref") == r"\dot{m_{\text{ref}}}"
+        assert latexify("ddot_x") == r"\ddot{x}"
+        assert latexify("Delta_V") == r"\Delta{V}"
+        assert latexify("Delta_T_ref") == r"\Delta{T_{\text{ref}}}"
+        assert latexify("Sigma_F") == r"\Sigma{F}"
+
+    def test_latexify_lambda_workarounds(self):
+        """lamda and lambda_ both render as \\lambda (Python keyword workarounds)."""
+        assert latexify("lamda") == r"\lambda"
+        assert latexify("lambda_") == r"\lambda"
+        assert latexify("lambda_dry") == r"\lambda_{\text{dry}}"  # preserved
 
     def test_pint_366(self):
         # test for https://github.com/hgrecco/pint/issues/366
