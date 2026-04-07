@@ -262,8 +262,7 @@ def _build_split_var_entries(
             return None, unitstr(vk) or "-"
 
     lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
-    _pfx = model.lineagestr()
-    excluded = {":MAGIC:" + _pfx} if _pfx else set()
+    excluded = {":MAGIC:" + model.lineagestr()} if model.lineagestr() else set()
     free_entries: List[VarEntry] = []
     fixed_entries: List[VarEntry] = []
     seen_veckeys: set = set()
