@@ -6,44 +6,14 @@ functions of the IR.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Tuple
 
+from .constraints.tight import Tight
+from .printing import _format_aligned_columns
+from .util.repr_conventions import unitstr
+from .util.small_classes import Quantity
 from .varkey import lineage_display_context
-
-# ── Column alignment helper ───────────────────────────────────────────────────
-
-
-def _format_aligned_columns(
-    rows: list,  # each row is a list of column strings
-    col_alignments: str,  # '<' left, '>' right, one char per column
-    col_sep: str = " ",
-) -> list:
-    """Align arbitrary columns with dynamic widths.
-
-    Input: list of rows, where each row is a list of column strings.
-    Output: list of formatted/aligned lines.
-
-    Does NOT sort - expects pre-sorted input.
-    """
-    if not rows:
-        return []
-    ncols_set = set(len(r) for r in rows)
-    if len(ncols_set) != 1:
-        # Rows have different column counts — fall back to simple join
-        return [col_sep.join(str(c) for c in row).rstrip() for row in rows]
-    (ncols,) = ncols_set
-    if col_alignments is None:
-        col_alignments = "<" * ncols
-    assert len(col_alignments) == ncols
-    widths = [max(len(str(row[i])) for row in rows) for i in range(ncols)]
-    formatted = []
-    for row in rows:
-        parts = [
-            f"{str(cell):{align}{width}}"
-            for cell, width, align in zip(row, widths, col_alignments)
-        ]
-        formatted.append(col_sep.join(parts).rstrip())
-    return formatted
+from .varmap import VarMap
 
 
 @dataclass
@@ -52,11 +22,23 @@ class VarEntry:
 
     name: str  # display name (from VarKey.name)
     latex: str  # LaTeX rendering (from VarKey.latex())
-    value: Any  # float | Quantity | None (resolved per D-17 priority)
+    value: Any  # float | ndarray | None — never a pint Quantity
     sensitivity: Optional[float]  # shadow price from solution, or None
     units: str  # unit string
     label: str  # human label (from VarKey.label or "")
     source: str = ""  # lineagestr() for cross-model referenced vars; "" for local
+
+    def to_dict(self) -> dict:
+        """JSON-serializable dict."""
+        return {
+            "name": self.name,
+            "latex": self.latex,
+            "value": _serialize_value(self.value),
+            "sensitivity": self.sensitivity,
+            "units": self.units,
+            "label": self.label,
+            "source": self.source,
+        }
 
 
 @dataclass
@@ -79,12 +61,14 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
     title: str
     description: str
     assumptions: list  # list of str
-    variables: list  # list of VarEntry
+    free_variables: list  # list of VarEntry — optimized by the solver
+    fixed_variables: list  # list of VarEntry — prescribed constants
     constraint_groups: list  # list of CGroup
     lineage_path: str = ""  # dotted path e.g. "Aircraft.Wing"
     magic_prefix: str = (
         ""  # model.lineagestr() — stripped from variable names in renderers
     )
+    is_anonymous: bool = False  # True for bare Model(...) instances (no subclass name)
     children: list = field(default_factory=list)  # list of ReportSection
     lineage_map: dict = field(default_factory=dict)  # NOT in to_dict
 
@@ -94,20 +78,11 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
             "title": self.title,
             "lineage_path": self.lineage_path,
             "magic_prefix": self.magic_prefix,
+            "is_anonymous": self.is_anonymous,
             "description": self.description,
             "assumptions": list(self.assumptions),
-            "variables": [
-                {
-                    "name": v.name,
-                    "latex": v.latex,
-                    "value": _serialize_value(v.value),
-                    "sensitivity": v.sensitivity,
-                    "units": v.units,
-                    "label": v.label,
-                    "source": v.source,
-                }
-                for v in self.variables
-            ],
+            "free_variables": [v.to_dict() for v in self.free_variables],
+            "fixed_variables": [v.to_dict() for v in self.fixed_variables],
             "constraint_groups": [
                 {"label": cg.label, "constraints": [str(c) for c in cg.constraints]}
                 for cg in self.constraint_groups
@@ -120,32 +95,31 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
 
 
 def _serialize_value(val: Any) -> Any:
-    """Make a value JSON-serializable."""
+    """Make a value JSON-serializable.
+
+    val must be a plain float, numpy array, or None — not a pint Quantity.
+    """
     if val is None:
         return None
+    if isinstance(val, Quantity):
+        raise TypeError(
+            f"_serialize_value received a pint Quantity ({val!r}); "
+            "VarEntry.value must be a plain numeric"
+        )
     try:
         return float(val)
     except (TypeError, ValueError):
         return str(val)
 
 
-def _resolve_var_value(vk, solution=None, substitutions=None, model=None):
-    """Resolve a variable's display value following priority:
-    solution > substitutions override > model.substitutions > vk.value
+def _value_units(vk, varmap: VarMap) -> Tuple[Any, str]:
+    """Get (magnitude, unit_str) for vk from varmap.
+
+    Both values come from the same pint Quantity returned by varmap.quantity(),
+    guaranteeing they are consistent.  Raises KeyError if vk is not in varmap.
     """
-    if solution is not None:
-        try:
-            return solution[vk]
-        except (KeyError, TypeError):
-            pass
-    if substitutions is not None:
-        if vk in substitutions:
-            return substitutions[vk]
-    if model is not None:
-        subs = getattr(model, "substitutions", {})
-        if vk in subs:
-            return subs[vk]
-    return getattr(vk, "value", None)
+    qty = varmap.quantity(vk)
+    return qty.magnitude, unitstr(qty) or "-"
 
 
 def _resolve_sensitivity(vk, solution=None):
@@ -204,24 +178,64 @@ def _collect_constraint_varkeys(constraint_groups: List[CGroup]) -> set:
     return vkeys
 
 
-def _build_var_entries(
-    model, solution, substitutions, extra_vks=None
-) -> List[VarEntry]:
-    """Build VarEntry list from model.unique_varkeys, then cross-model extras.
+def _make_var_entry(
+    display_vk, excluded, get_val_units, solution, source=""
+) -> VarEntry:
+    "Build a VarEntry for display_vk using the provided value-lookup callable."
+    value, units_str = get_val_units(display_vk)
+    return VarEntry(
+        name=display_vk.str_without(excluded),
+        latex=display_vk.latex(excluded),
+        value=value,
+        sensitivity=_resolve_sensitivity(display_vk, solution=solution),
+        units=units_str,
+        label=display_vk.label or "",
+        source=source,
+    )
+
+
+def _is_free_vk(display_vk, solution, model) -> bool:
+    """Return True if display_vk is an optimized (free) variable.
+
+    With a solution: free iff the key appears in solution.primal.
+    Without a solution: free iff the key has no substitution in the model.
+    """
+    if solution is not None:
+        return display_vk in solution.primal
+    return display_vk not in model.substitutions
+
+
+def _build_split_var_entries(
+    model, solution, extra_vks=None
+) -> Tuple[List[VarEntry], List[VarEntry]]:
+    """Build (free_entries, fixed_entries) from model.unique_varkeys.
+
+    free_entries  — Optimized Variables: solved by the optimizer (no sens shown).
+    fixed_entries — Fixed Variables: prescribed constants with sensitivities.
 
     Local variables: names disambiguated within the section scope using
     _get_lineage_map(); model's own lineage stripped so only sub-model context
     is shown. Vector variables collapsed to a single VarEntry.
 
-    Cross-model variables (extra_vks): latex disambiguated against local names
-    by progressively adding lineage subscript components until unique. Full
-    dotted name stored in VarEntry.source for display in brackets.
+    Cross-model variables (extra_vks): full dotted name stored in
+    VarEntry.source for display in brackets.
     """
+    display_map: VarMap = (
+        solution.variables if solution is not None else model.substitutions
+    )
+
+    def _get_value_units(vk):
+        try:
+            return _value_units(vk, display_map)
+        except KeyError:
+            return None, unitstr(vk) or "-"
+
     lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
-    model_prefix = model.lineagestr()
-    excluded = {":MAGIC:" + model_prefix} if model_prefix else set()
-    entries = []
+    excluded = {":MAGIC:" + model.lineagestr()} if model.lineagestr() else set()
+    free_entries: List[VarEntry] = []
+    fixed_entries: List[VarEntry] = []
     seen_veckeys: set = set()
+
     with lineage_display_context(lineage_map):
         for vk in sorted(model.unique_varkeys, key=lambda v: v.name):
             if vk.veckey is not None:
@@ -231,21 +245,11 @@ def _build_var_entries(
                 display_vk = vk.veckey
             else:
                 display_vk = vk
-            entries.append(
-                VarEntry(
-                    name=display_vk.str_without(excluded),
-                    latex=display_vk.latex(excluded),
-                    value=_resolve_var_value(
-                        display_vk,
-                        solution=solution,
-                        substitutions=substitutions,
-                        model=model,
-                    ),
-                    sensitivity=_resolve_sensitivity(display_vk, solution=solution),
-                    units=display_vk.unitrepr or "-",
-                    label=display_vk.label or "",
-                )
-            )
+            entry = _make_var_entry(display_vk, excluded, _get_value_units, solution)
+            if _is_free_vk(display_vk, solution, model):
+                free_entries.append(entry)
+            else:
+                fixed_entries.append(entry)
 
     if extra_vks:
         owned_display = {(vk.veckey or vk) for vk in model.unique_varkeys}
@@ -256,24 +260,19 @@ def _build_var_entries(
                 if display_vk in owned_display or display_vk in cross_seen:
                     continue
                 cross_seen.add(display_vk)
-                entries.append(
-                    VarEntry(
-                        name=display_vk.str_without(excluded),
-                        latex=display_vk.latex(excluded),
-                        value=_resolve_var_value(
-                            display_vk,
-                            solution=solution,
-                            substitutions=substitutions,
-                            model=model,
-                        ),
-                        sensitivity=_resolve_sensitivity(display_vk, solution=solution),
-                        units=display_vk.unitrepr or "-",
-                        label=display_vk.label or "",
-                        source=display_vk.lineagestr(),
-                    )
+                entry = _make_var_entry(
+                    display_vk,
+                    excluded,
+                    _get_value_units,
+                    solution,
+                    source=display_vk.lineagestr(),
                 )
+                if _is_free_vk(display_vk, solution, model):
+                    free_entries.append(entry)
+                else:
+                    fixed_entries.append(entry)
 
-    return entries
+    return free_entries, fixed_entries
 
 
 def _build_constraint_groups(model) -> List[CGroup]:
@@ -293,9 +292,11 @@ def _build_constraint_groups(model) -> List[CGroup]:
 
     def _collect_own(container):
         for item in container:
-            if hasattr(item, "unique_varkeys"):
+            if isinstance(item, Tight):
+                yield from _collect_own(item)  # treat contents as bare constraints
+            elif hasattr(item, "unique_varkeys"):
                 continue  # skip child Models and ConstraintSets
-            if isinstance(item, (list, tuple)):
+            elif isinstance(item, (list, tuple)):
                 yield from _collect_own(item)
             else:
                 yield item
@@ -310,7 +311,6 @@ def _build_constraint_groups(model) -> List[CGroup]:
 def build_report_ir(
     model,
     solution=None,
-    substitutions: Optional[dict] = None,
     _parent_path: str = "",
 ) -> ReportSection:
     """Build a ReportSection tree from *model*.
@@ -321,34 +321,35 @@ def build_report_ir(
         Root model to report on.
     solution : Solution, optional
         If provided, variable entries include solved values and sensitivities.
-    substitutions : dict, optional
-        One-off value overrides without mutating model.substitutions.
     """
-    own_name = type(model).__name__
-    lineage_path = f"{_parent_path}.{own_name}" if _parent_path else own_name
+    from .model import Model as _Model  # pylint: disable=import-outside-toplevel
+
+    is_anon = type(model) is _Model  # pylint: disable=unidiomatic-typecheck
+    own_name = "" if is_anon else type(model).__name__
+    if own_name:
+        lineage_path = f"{_parent_path}.{own_name}" if _parent_path else own_name
+    else:
+        lineage_path = _parent_path  # transparent: inherit parent path
     lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
     cgroups = _build_constraint_groups(model)
+    free_vars, fixed_vars = _build_split_var_entries(
+        model,
+        solution,
+        extra_vks=_collect_constraint_varkeys(cgroups) - model.unique_varkeys,
+    )
     return ReportSection(
-        title=own_name,
+        title=own_name or "Model",
         description="[description]",
         assumptions=[],
         lineage_path=lineage_path,
         magic_prefix=model.lineagestr(),
-        variables=_build_var_entries(
-            model,
-            solution,
-            substitutions,
-            extra_vks=_collect_constraint_varkeys(cgroups) - model.unique_varkeys,
-        ),
+        is_anonymous=is_anon,
+        free_variables=free_vars,
+        fixed_variables=fixed_vars,
         constraint_groups=cgroups,
         lineage_map=lineage_map,
         children=[
-            build_report_ir(
-                child,
-                solution=solution,
-                substitutions=substitutions,
-                _parent_path=lineage_path,
-            )
+            build_report_ir(child, solution=solution, _parent_path=lineage_path)
             for child in model.submodels
         ],
     )
@@ -362,6 +363,10 @@ _INDENT = "  "
 def _fmt_value(val, precision: int = 4, vecn: int = 6, col_widths=()) -> str:
     """Format a variable value for display, handling scalars and arrays.
 
+    val must be a plain float, numpy array, or None — not a pint Quantity.
+    _build_var_entries() pre-extracts magnitudes; callers constructing VarEntry
+    directly must do the same.
+
     col_widths is a per-column list of minimum widths so that element position i
     across all vector rows in the same table renders at the same width.
     """
@@ -369,7 +374,12 @@ def _fmt_value(val, precision: int = 4, vecn: int = 6, col_widths=()) -> str:
 
     if val is None:
         return "-"
-    mag = getattr(val, "magnitude", val)
+    if isinstance(val, Quantity):
+        raise TypeError(
+            f"_fmt_value received a pint Quantity ({val!r}); "
+            "extract .magnitude before storing in VarEntry.value"
+        )
+    mag = val
     try:
         arr = np.asarray(mag)
         if arr.shape:
@@ -386,44 +396,43 @@ def _fmt_value(val, precision: int = 4, vecn: int = 6, col_widths=()) -> str:
         return str(mag)
 
 
+_SENS_NEARZERO_TOL = 1e-7
+
+
 def _fmt_sensitivity(sens, vecn: int = 6, col_widths=()) -> str:
     """Format a sensitivity value for display, handling scalars and arrays."""
     import numpy as np  # pylint: disable=import-outside-toplevel
 
     if sens is None:
         return "-"
-    mag = getattr(sens, "magnitude", sens)
     try:
-        arr = np.asarray(mag)
+        arr = np.asarray(sens)
         if arr.shape:
             flat = arr.ravel()
-            shown = [f"{x:+.2g}" for x in flat[:vecn]]
+            shown = [
+                "~0" if abs(x) < _SENS_NEARZERO_TOL else f"{x:+.2g}"
+                for x in flat[:vecn]
+            ]
             body = "  ".join(
                 s.ljust(col_widths[i]) if i < len(col_widths) else s
                 for i, s in enumerate(shown)
             )
             dots = " ..." if flat.size > vecn else ""
             return f"( {body}{dots} )"
-        return f"{float(arr):+.2g}"
+        scalar = float(arr)
+        return "~0" if abs(scalar) < _SENS_NEARZERO_TOL else f"{scalar:+.2g}"
     except (TypeError, ValueError):
-        return str(mag)
+        return str(sens)
 
 
-def _text_var_rows(variables: list, precision: int = 4, vecn: int = 6) -> list:
-    """Build column-aligned rows for variables section in text output.
-
-    Computes a uniform vec_width across all vector entries so that element
-    columns stay aligned when multiple vectors share the same table.
-    """
+def _compute_vec_col_widths(variables: list, precision: int, vecn: int) -> list:
+    """Pre-scan vector values to compute per-column widths for alignment."""
     import numpy as np  # pylint: disable=import-outside-toplevel
 
-    # Pre-scan: compute per-column max element widths across all vector values.
-    # col_widths[i] = max formatted width of element i across all vector rows.
     col_widths: list = []
     for ve in variables:
-        mag = getattr(ve.value, "magnitude", ve.value)
         try:
-            arr = np.asarray(mag)
+            arr = np.asarray(ve.value)
             if arr.shape:
                 elems = [f"{x:.{precision}g}" for x in arr.ravel()[:vecn]]
                 while len(col_widths) < len(elems):
@@ -432,21 +441,50 @@ def _text_var_rows(variables: list, precision: int = 4, vecn: int = 6) -> list:
                     col_widths[i] = max(col_widths[i], len(s))
         except (TypeError, ValueError):
             pass
+    return col_widths
 
+
+def _var_name_cell(ve: "VarEntry") -> str:
+    "Name with inline source annotation for cross-model variables."
+    if ve.source:
+        return f"{ve.name} [{ve.source}]"
+    return ve.name
+
+
+def _text_var_rows(
+    variables: list,
+    include_sensitivity: bool = False,
+    precision: int = 4,
+    vecn: int = 6,
+) -> list:
+    """Column-aligned rows for a variable table"""
+    col_widths = _compute_vec_col_widths(variables, precision, vecn)
     rows = []
     for ve in variables:
-        rows.append(
-            [
-                ve.name,
-                _fmt_value(
-                    ve.value, precision=precision, vecn=vecn, col_widths=col_widths
-                ),
-                _fmt_sensitivity(ve.sensitivity, vecn=vecn, col_widths=col_widths),
-                ve.units,
-                ve.label,
-            ]
-        )
-    return _format_aligned_columns(rows, "<<<<<", "  ")
+        row = [
+            _var_name_cell(ve),
+            _fmt_value(ve.value, precision=precision, vecn=vecn, col_widths=col_widths),
+            ve.units,
+        ]
+        if include_sensitivity:
+            row.append(_fmt_sensitivity(ve.sensitivity))
+        row.append(ve.label)
+        rows.append(row)
+    align = "<<<<<" if include_sensitivity else "<<<<"
+    return _format_aligned_columns(rows, align, "  ")
+
+
+def _text_cgroup_lines(constraint_groups: list, pad: str, lineage_map: dict) -> list:
+    "Build text lines for all constraint groups in a section."
+    lines = []
+    for cg in constraint_groups:
+        group_header = f"Constraints ({cg.label})" if cg.label else "Constraints"
+        lines.append(f"{pad}  {group_header}")
+        if cg.constraints:
+            for row_line in _text_constraint_rows(cg.constraints, lineage_map):
+                lines.append(f"{pad}    {row_line}")
+        lines.append("")
+    return lines
 
 
 def _text_constraint_rows(constraints: list, lineage_map: dict = None) -> list:
@@ -478,9 +516,13 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
     pad = _INDENT * indent
     lines: list = []
 
-    # Section header: use lineage path for nested models (shows where in tree)
-    header = ir.lineage_path if indent > 0 else ir.title
-    lines.append(f"{pad}{header}")
+    if ir.is_anonymous:
+        # Transparent wrapper: no header, children rendered at the same level
+        child_indent = indent
+    else:
+        # Section header: full lineage path when available, else title
+        lines.append(f"{pad}{ir.lineage_path or ir.title}")
+        child_indent = indent + 1
 
     # Description
     if ir.description:
@@ -494,25 +536,26 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
             lines.append(f"{pad}    - {assumption}")
         lines.append("")
 
-    # Variables table
-    if ir.variables:
-        lines.append(f"{pad}  Variables")
-        for row_line in _text_var_rows(ir.variables):
+    # Optimized Variables table (primal — no sensitivity column)
+    if ir.free_variables:
+        lines.append(f"{pad}  Optimized Variables")
+        for row_line in _text_var_rows(ir.free_variables):
+            lines.append(f"{pad}    {row_line}")
+        lines.append("")
+
+    # Fixed Variables table (constants — value | units | sensitivity | label)
+    if ir.fixed_variables:
+        lines.append(f"{pad}  Fixed Variables")
+        for row_line in _text_var_rows(ir.fixed_variables, include_sensitivity=True):
             lines.append(f"{pad}    {row_line}")
         lines.append("")
 
     # Constraint groups
-    for cg in ir.constraint_groups:
-        group_header = f"Constraints ({cg.label})" if cg.label else "Constraints"
-        lines.append(f"{pad}  {group_header}")
-        if cg.constraints:
-            for row_line in _text_constraint_rows(cg.constraints, ir.lineage_map):
-                lines.append(f"{pad}    {row_line}")
-        lines.append("")
+    lines.extend(_text_cgroup_lines(ir.constraint_groups, pad, ir.lineage_map))
 
     # Children (recursive)
     for child in ir.children:
-        lines.append(render_text(child, indent=indent + 1))
+        lines.append(render_text(child, indent=child_indent))
 
     return "\n".join(lines)
 
@@ -543,14 +586,26 @@ def _md_escape(text: str) -> str:
     return text
 
 
-def _md_var_row(ve: "VarEntry") -> str:
-    """Format one VarEntry as a markdown pipe-table row."""
-    name_cell = f"${ve.latex}$" if ve.latex else _md_escape(ve.name)
-    return (
-        f"| {name_cell} | {_md_escape(ve.source)} | {_fmt_value(ve.value)}"
-        f" | {_fmt_sensitivity(ve.sensitivity)} | {ve.units}"
-        f" | {_md_escape(ve.label)} |"
-    )
+def _md_var_table(variables: list, include_sensitivity: bool = False) -> list:
+    "Markdown pipe-table lines for a variable section."
+    has_source = any(ve.source for ve in variables)
+    cols = ["Variable"] + (["Source"] if has_source else []) + ["Value", "Units"]
+    if include_sensitivity:
+        cols.append("Sensitivity")
+    cols.append("Label")
+    sep = ["-" * max(len(c), 3) for c in cols]
+    lines = ["| " + " | ".join(cols) + " |", "| " + " | ".join(sep) + " |"]
+    for ve in variables:
+        name_cell = f"${ve.latex}$" if ve.latex else _md_escape(ve.name)
+        cells = [name_cell]
+        if has_source:
+            cells.append(_md_escape(ve.source))
+        cells += [_fmt_value(ve.value), ve.units]
+        if include_sensitivity:
+            cells.append(_fmt_sensitivity(ve.sensitivity))
+        cells.append(_md_escape(ve.label))
+        lines.append("| " + " | ".join(cells) + " |")
+    return lines
 
 
 def render_markdown(ir: "ReportSection", level: int = 1) -> str:
@@ -570,9 +625,14 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
     hdr = "#" * min(level, 6)
     lines: list = []
 
-    # Heading
-    lines.append(f"{hdr} {ir.title}")
-    lines.append("")
+    if ir.is_anonymous:
+        # Transparent wrapper: skip heading, children rendered at same level
+        child_level = level
+    else:
+        # Heading: use full lineage path when available, else title
+        lines.append(f"{hdr} {ir.lineage_path or ir.title}")
+        lines.append("")
+        child_level = level + 1
 
     # Description
     if ir.description:
@@ -585,12 +645,18 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
         lines.append(f"**Assumptions:** {assumption_str}")
         lines.append("")
 
-    # Variable pipe table
-    if ir.variables:
-        lines.append("| Variable | Source | Value | Sensitivity | Units | Label |")
-        lines.append("|----------|--------|-------|-------------|-------|-------|")
-        for ve in ir.variables:
-            lines.append(_md_var_row(ve))
+    # Optimized Variables pipe table (no sensitivity column)
+    if ir.free_variables:
+        lines.append("**Optimized Variables**")
+        lines.append("")
+        lines.extend(_md_var_table(ir.free_variables))
+        lines.append("")
+
+    # Fixed Variables pipe table (value | units | sensitivity | label)
+    if ir.fixed_variables:
+        lines.append("**Fixed Variables**")
+        lines.append("")
+        lines.extend(_md_var_table(ir.fixed_variables, include_sensitivity=True))
         lines.append("")
 
     # Constraint groups
@@ -612,7 +678,7 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
 
     # Children (recursive)
     for child in ir.children:
-        child_md = render_markdown(child, level=level + 1)
+        child_md = render_markdown(child, level=child_level)
         lines.append(child_md)
         lines.append("")
 

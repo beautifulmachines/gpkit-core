@@ -4,16 +4,27 @@ import json
 
 import pytest
 
+import gpkit
 from gpkit import Model, Variable
 from gpkit.report import (
     CGroup,
     ReportSection,
     VarEntry,
+    _fmt_value,
     _md_escape,
+    _serialize_value,
     build_report_ir,
     render_markdown,
     render_text,
 )
+from gpkit.util.repr_conventions import unitstr
+from gpkit.util.small_classes import Quantity
+
+
+def _all_vars(ir):
+    """All VarEntry objects in an IR section (free + fixed)."""
+    return ir.free_variables + ir.fixed_variables
+
 
 # ── Dataclass structure ───────────────────────────────────────────────────────
 
@@ -57,14 +68,16 @@ class TestReportDataclasses:
             title="Wing",
             description="Wing structural model",
             assumptions=["thin airfoil"],
-            variables=[ve],
+            free_variables=[ve],
+            fixed_variables=[],
             constraint_groups=[cg],
             children=[],
         )
         assert rs.title == "Wing"
         assert rs.description == "Wing structural model"
         assert rs.assumptions == ["thin airfoil"]
-        assert len(rs.variables) == 1
+        assert len(rs.free_variables) == 1
+        assert len(rs.fixed_variables) == 0
         assert len(rs.constraint_groups) == 1
         assert not rs.children
 
@@ -78,7 +91,8 @@ class TestReportDataclasses:
             title="Fuselage",
             description="fuselage drag model",
             assumptions=[],
-            variables=[ve],
+            free_variables=[ve],
+            fixed_variables=[],
             constraint_groups=[cg],
             children=[],
         )
@@ -89,7 +103,7 @@ class TestReportDataclasses:
         json_str = json.dumps(d)
         assert isinstance(json_str, str)
         restored = json.loads(json_str)
-        assert restored["variables"][0]["name"] == "x"
+        assert restored["free_variables"][0]["name"] == "x"
         assert restored["constraint_groups"][0]["label"] == "Aero"
 
 
@@ -113,7 +127,7 @@ class TestBuildReportIR:
         ir = build_report_ir(m)
         assert isinstance(ir, ReportSection)
         assert ir.title == "_RSSimple"
-        assert len(ir.variables) >= 1
+        assert len(_all_vars(ir)) >= 1
         assert not ir.children
 
     def test_build_report_ir_nested(self):
@@ -152,6 +166,21 @@ class TestBuildReportIR:
         assert "Drag" in group_labels
         assert "Lift" in group_labels
 
+    def test_var_entry_uses_pretty_unit_format(self):
+        """build_report_ir uses platform-appropriate pretty format in VarEntry.units."""
+
+        class _RSPrettyUnits(Model):
+            def setup(self):
+                area = Variable("S_pu", "m^2")
+                area_min = Variable("S_min_pu", 1, "m^2")
+                return [area >= area_min]
+
+        m = _RSPrettyUnits()
+        ir = build_report_ir(m)
+        ve = _all_vars(ir)[0]
+        area_vk = next(vk for vk in m.unique_varkeys if vk.name == "S_pu")
+        assert ve.units == unitstr(area_vk)
+
 
 # ── model.report() entry point ───────────────────────────────────────────────
 
@@ -175,23 +204,30 @@ class TestModelReport:
         json_str = json.dumps(result)
         assert isinstance(json_str, str)
         assert "title" in result
-        assert "variables" in result
+        assert "free_variables" in result
+        assert "fixed_variables" in result
         assert "children" in result
 
-    def test_report_substitutions(self):
-        """model.report(fmt='dict', substitutions=...) uses override without mutation"""
+    def test_anonymous_model_skips_model_header(self):
+        """Bare Model wrapper: no 'Model' header; children at top heading level."""
 
-        class _RSSubst(Model):
+        class _AnonChild(Model):
             def setup(self):
-                x = Variable("x_rssub")
-                return [x >= 1]
+                return [Variable("span_anon") >= 1]
 
-        m = _RSSubst()
-        original_subs = dict(m.substitutions)
-        x_vk = next(iter(m.unique_varkeys))
-        result = m.report(fmt="dict", substitutions={x_vk: 42.0})
-        assert isinstance(result, dict)
-        assert m.substitutions == original_subs
+        child = _AnonChild()
+        m = Model(child.cost, [child])
+        # text: no "Model" header line; child class at indent=0
+        txt = m.report(fmt="text")
+        assert "Model" not in txt
+        lines = txt.splitlines()
+        child_line = next(ln for ln in lines if "_AnonChild" in ln)
+        assert not child_line.startswith(" ")
+
+        # markdown: no "# Model" heading; child at # (level 1)
+        md = m.report(fmt="md")
+        assert "# Model" not in md
+        assert "# _AnonChild" in md
 
     def test_report_unknown_format_raises(self):
         """model.report(fmt='unknown') raises ValueError."""
@@ -204,6 +240,39 @@ class TestModelReport:
         m = _RSFmt()
         with pytest.raises(ValueError, match="not yet implemented"):
             m.report(fmt="unknown_format_xyz")
+
+
+# ── Value / unit contract ─────────────────────────────────────────────────────
+
+
+class TestValueUnitsContract:
+    """_fmt_value and _serialize_value must never emit units; VarEntry.value
+    must always be a plain numeric, not a pint Quantity."""
+
+    def test_fmt_value_raises_for_quantity(self):
+        """`_fmt_value` must raise TypeError if given a pint Quantity."""
+        qty = gpkit.ureg.Quantity(3.0, "day")
+        with pytest.raises(TypeError):
+            _fmt_value(qty)
+
+    def test_serialize_value_raises_for_quantity(self):
+        """`_serialize_value` raises if given a pint Quantity."""
+        qty = gpkit.ureg.Quantity(3.0, "day")
+        with pytest.raises(TypeError):
+            _serialize_value(qty)
+
+    def test_var_entry_value_is_plain_float_after_solve(self):
+        """build_report_ir stores plain floats in VarEntry.value, never Quantities."""
+        x = Variable("x_plain", "m")
+        c = Variable("c_plain", 2.0, "m")
+        m = Model(x, [x >= c])
+        sol = m.solve(verbosity=0)
+        ir = build_report_ir(m, solution=sol)
+        all_ves = _all_vars(ir) + [ve for ch in ir.children for ve in _all_vars(ch)]
+        for ve in all_ves:
+            assert not isinstance(
+                ve.value, Quantity
+            ), f"VarEntry.value for {ve.name!r} is a Quantity; expected plain float"
 
 
 # ── Text format renderer ─────────────────────────────────────────────────────
@@ -293,22 +362,6 @@ class TestRenderText:
         assert isinstance(result, str)
         assert "x_tsol" in result
 
-    def test_report_text_substitutions(self):
-        """model.report(fmt='text', substitutions=...) does not mutate model."""
-
-        class _TxtSubst(Model):
-            def setup(self):
-                x = Variable("x_rssub2")
-                return [x >= 1]
-
-        m = _TxtSubst()
-        original_subs = dict(m.substitutions)
-        x_vk = next(iter(m.unique_varkeys))
-        result = m.report(fmt="text", substitutions={x_vk: 5.0})
-        assert isinstance(result, str)
-        # Model should not be mutated
-        assert m.substitutions == original_subs
-
     def test_render_text_direct(self):
         """render_text(ir) returns hierarchical text from a ReportSection IR."""
         ve = VarEntry(
@@ -319,7 +372,8 @@ class TestRenderText:
             title="Wing",
             description="Wing model",
             assumptions=["thin airfoil"],
-            variables=[ve],
+            free_variables=[ve],
+            fixed_variables=[],
             constraint_groups=[cg],
             children=[],
         )
@@ -335,7 +389,8 @@ class TestRenderText:
             title="Aircraft",
             description="",
             assumptions=["steady level flight", "rigid structure"],
-            variables=[],
+            free_variables=[],
+            fixed_variables=[],
             constraint_groups=[],
             children=[],
         )
@@ -406,7 +461,7 @@ class TestRenderMarkdown:
         m = _MdParent()
         result = m.report(fmt="md")
         assert "# _MdParent" in result
-        assert "## _MdChild" in result
+        assert "## _MdParent._MdChild" in result
 
     def test_report_md_with_solution(self):
         """model.report(solution=sol, fmt='md') puts variable values in pipe table."""
@@ -433,7 +488,8 @@ class TestRenderMarkdown:
             title="Fuselage",
             description="Fuselage drag model",
             assumptions=[],
-            variables=[ve],
+            free_variables=[ve],
+            fixed_variables=[],
             constraint_groups=[cg],
             children=[],
         )
@@ -448,7 +504,8 @@ class TestRenderMarkdown:
             title="Propulsion",
             description="Turbofan engine sizing",
             assumptions=[],
-            variables=[],
+            free_variables=[],
+            fixed_variables=[],
             constraint_groups=[],
             children=[],
         )
@@ -461,7 +518,8 @@ class TestRenderMarkdown:
             title="Structural",
             description="",
             assumptions=["beam theory", "isotropic material"],
-            variables=[],
+            free_variables=[],
+            fixed_variables=[],
             constraint_groups=[],
             children=[],
         )

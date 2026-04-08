@@ -3,7 +3,7 @@
 import pytest
 
 from gpkit import Variable, units
-from gpkit.util.repr_conventions import unitstr
+from gpkit.util.repr_conventions import extract_subscript, latexify, unitstr
 from gpkit.util.small_classes import HashVector
 
 
@@ -69,6 +69,48 @@ class TestSmallScripts:
         assert unitstr(x.key) in footstrings
         assert unitstr(Variable("y"), dimless="---") == "---"
         assert unitstr(None, dimless="--") == "--"
+
+    def test_latexify_prefix_operators(self):
+        """dot accents and operator-prefix Greeks render as prefix, not subscript."""
+        assert latexify("dot_m") == r"\dot{m}"
+        assert latexify("dot_m_ref") == r"\dot{m_{\text{ref}}}"
+        assert latexify("ddot_x") == r"\ddot{x}"
+        assert latexify("Delta_V") == r"\Delta{V}"
+        assert latexify("Delta_T_ref") == r"\Delta{T_{\text{ref}}}"
+        assert latexify("Sigma_F") == r"\Sigma{F}"
+
+    def test_latexify_flat_multi_subscript(self):
+        """Multi-underscore names produce flat comma-separated subscripts"""
+        assert latexify("A_one_two") == r"A_{\text{one},\text{two}}"
+        assert latexify("C_L_max") == r"C_{L,\text{max}}"  # single-char sub not wrapped
+        assert latexify("rho_inf_ref") == r"\rho_{\infty,\text{ref}}"
+        # single-underscore behaviour unchanged
+        assert latexify("m_ref") == r"m_{\text{ref}}"
+        assert latexify("rho_inf") == r"\rho_{\infty}"
+        # multi-char base, no underscore
+        assert latexify("CD") == r"\text{CD}"
+        assert latexify("CL") == r"\text{CL}"
+        # single-char subscript: no \text{} wrapping
+        assert latexify("C_L") == r"C_{L}"
+        # prefix arg that is multi-char
+        assert latexify("dot_CD") == r"\dot{\text{CD}}"
+
+    def testextract_subscript(self):
+        """extract_subscript correctly parses trailing _{...} from a LaTeX string."""
+        assert extract_subscript(r"m_{\text{ref}}") == ("m", r"\text{ref}")
+        assert extract_subscript(r"\rho_{\infty}") == (r"\rho", r"\infty")
+        assert extract_subscript(r"A_{\text{one},\text{two}}") == (
+            "A",
+            r"\text{one},\text{two}",
+        )
+        assert extract_subscript("m") is None  # no subscript
+        assert extract_subscript(r"\vec{m}") is None  # brace but not _{...}
+
+    def test_latexify_lambda_workarounds(self):
+        """lamda and lambda_ both render as \\lambda (Python keyword workarounds)."""
+        assert latexify("lamda") == r"\lambda"
+        assert latexify("lambda_") == r"\lambda"
+        assert latexify("lambda_dry") == r"\lambda_{\text{dry}}"  # preserved
 
     def test_pint_366(self):
         # test for https://github.com/hgrecco/pint/issues/366

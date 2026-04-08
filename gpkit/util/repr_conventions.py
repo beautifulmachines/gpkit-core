@@ -65,6 +65,7 @@ _GREEK = {
     "eta": r"\eta",
     "theta": r"\theta",
     "lambda": r"\lambda",
+    "lamda": r"\lambda",  # Python keyword workaround
     "mu": r"\mu",
     "nu": r"\nu",
     "xi": r"\xi",
@@ -94,7 +95,8 @@ _GREEK = {
 }
 
 
-_LATEX_FUNCTIONS = {
+_LATEX_PREFIXES = {
+    # trig / math functions
     "sin",
     "cos",
     "tan",
@@ -110,7 +112,42 @@ _LATEX_FUNCTIONS = {
     "log",
     "ln",
     "exp",
+    # LaTeX accents
+    "dot",
+    "ddot",
+    # operator-prefix Greeks
+    "Delta",
+    "Sigma",
 }
+
+
+def _latexify_sub_token(token: str) -> str:
+    "Render a single subscript token as a LaTeX atom (Greek symbol or \\text{})."
+    result = _GREEK.get(token)
+    if result:
+        return result
+    return token if len(token) == 1 else r"\text{" + token + "}"
+
+
+def extract_subscript(name: str):
+    """If LaTeX string *name* ends with ``_{content}``, return ``(base, content)``.
+
+    Uses brace counting so nested groups (e.g. ``\\text{foo}``) are handled
+    correctly.  Returns ``None`` if no trailing ``_{...}`` subscript is found.
+    """
+    if not name.endswith("}"):
+        return None
+    depth = 0
+    for i in range(len(name) - 1, -1, -1):
+        if name[i] == "}":
+            depth += 1
+        elif name[i] == "{":
+            depth -= 1
+            if depth == 0:
+                if i >= 1 and name[i - 1] == "_":
+                    return name[: i - 1], name[i + 1 : -1]
+                return None
+    return None
 
 
 def latexify(name: str) -> str:
@@ -119,6 +156,7 @@ def latexify(name: str) -> str:
     - Pure Greek: 'rho' -> r'\\rho'
     - Underscore split: 'm_wet' -> r'm_{\\text{wet}}'
     - Greek + underscore: 'rho_inf' -> r'\\rho_{\\infty}'
+    - Multi-part subscript: 'A_one_two' -> r'A_{\\text{one},\\text{two}}'
     - Math function + arg: 'tan_alpha' -> r'\\tan{\\alpha}'
     - Already escaped (starts with '\\'): return as-is
     """
@@ -126,16 +164,19 @@ def latexify(name: str) -> str:
         return name  # already LaTeX — do not double-convert
     if "_" in name:
         parts = name.split("_", 1)
-        if parts[0] in _LATEX_FUNCTIONS:
+        if parts[0] in _LATEX_PREFIXES:
             arg = latexify(parts[1])
             return "\\" + parts[0] + "{" + arg + "}"
-        base = _GREEK.get(parts[0], parts[0])
-        if "_" in parts[1] or parts[1] in _GREEK:
-            sub = latexify(parts[1])  # nested/Greek → already math, no \text{}
-        else:
-            sub = r"\text{" + parts[1] + "}"
+        raw = parts[0]
+        base = _GREEK.get(raw, raw if len(raw) == 1 else r"\text{" + raw + "}")
+        if not parts[1]:  # trailing underscore (e.g. "lambda_") — strip it
+            return base
+        # Flatten all underscore-separated tokens into a single comma-separated
+        # subscript.  This avoids nested structures like A_{b_{\text{c}}}:
+        # each token is rendered independently as a Greek symbol or \text{}.
+        sub = ",".join(_latexify_sub_token(t) for t in parts[1].split("_"))
         return base + "_{" + sub + "}"
-    return _GREEK.get(name, name)
+    return _GREEK.get(name, name if len(name) == 1 else r"\text{" + name + "}")
 
 
 def strify(val, excluded):

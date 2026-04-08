@@ -9,6 +9,7 @@ from typing import List, Sequence
 from . import printing
 from .breakdowns import bdtable_gen
 from .budgets import build_budget
+from .units import Quantity
 from .varkey import VarKey
 from .varmap import VarMap
 
@@ -101,7 +102,7 @@ class Solution:
         vmap.update(self.constants)
         return vmap
 
-    def __getitem__(self, key: VarKey) -> float:
+    def __getitem__(self, key: VarKey) -> "Quantity":
         if key in self.primal:
             return self.primal.quantity(key)
         if key in self.constants:
@@ -110,7 +111,10 @@ class Solution:
             subbed = key.sub(self.variables, require_positive=False)
             # subbed should be a constant monomial
             assert getattr(subbed, "exp", {}) == {}
-            return getattr(subbed, "c", subbed)
+            c = getattr(subbed, "c", subbed)
+            if isinstance(c, Quantity):
+                return c
+            return Quantity(c, key.units or "dimensionless")
         raise KeyError(f"no variable '{key}' found in the solution")
 
     def almost_equal(self, other, tol=1e-6):

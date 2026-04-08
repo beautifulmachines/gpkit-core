@@ -343,7 +343,7 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
         ir_doc = json.loads(Path(path).read_text(encoding="utf-8"))
         return cls.from_ir(ir_doc)
 
-    def report(self, solution=None, fmt="text", substitutions=None):
+    def report(self, solution=None, fmt="text"):
         """Build a hierarchical report for this model.
 
         Parameters
@@ -352,13 +352,11 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
             If provided, variable tables include solved values and sensitivities.
         fmt : str
             Output format: "dict", "text", "md", or "latex".
-        substitutions : dict, optional
-            One-off value overrides without mutating model.substitutions.
         """
         # pylint: disable=import-outside-toplevel
         from .report import build_report_ir, render_report
 
-        ir = build_report_ir(self, solution=solution, substitutions=substitutions)
+        ir = build_report_ir(self, solution=solution)
         return render_report(ir, fmt=fmt)
 
     gp = progify(GeometricProgram)
