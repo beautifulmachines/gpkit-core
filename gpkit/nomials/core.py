@@ -85,6 +85,10 @@ class Nomial(NomialData):
         "Latex representation, parsing `excluded` just as .str_without does"
         if hasattr(self, "key"):
             return self.key.latex(excluded)
+        # Pure constants need their units shown for dimensional clarity,
+        # even when "units" is excluded (as variables suppress theirs in constraints)
+        if "units" in excluded and all(not exp for exp in self.hmap):
+            excluded = frozenset(excluded) - {"units"}
         if "ast" not in excluded and self.ast:
             excluded_inner = frozenset({"units"}.union(excluded))
             ast_latex = self.ast.latex(excluded_inner)

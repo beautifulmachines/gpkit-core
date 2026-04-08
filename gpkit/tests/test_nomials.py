@@ -111,6 +111,17 @@ class TestMonomial:  # pylint: disable=unnecessary-negation,comparison-with-itse
         latex = expr.latex(excluded=("units",))
         assert latex == "\\frac{4}{L}"
 
+    def test_latex_constant_with_units_in_constraint(self):
+        """Constants with units must show units in constraint LaTeX,
+        even when variables suppress theirs"""
+        x = Variable("x", "m")
+        c = x >= 4 * gpkit.units("m")
+        # report.py passes excluded=("units",) to suppress units on variables,
+        # but bare constants like 4 [m] are dimensionally meaningless without units
+        latex = c.latex(excluded=("units",))
+        assert r"\mathrm" in latex  # units rendered on the constant
+        assert "4" in latex
+
     def test_str_with_units(self):
         "Make sure __str__() works when units are involved"
         S = Variable("S", units="m^2")  # pylint: disable=invalid-name
