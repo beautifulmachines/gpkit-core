@@ -1,8 +1,6 @@
 """Modular aircraft concept"""
 
-import numpy as np
-
-from gpkit import Model, Var, Vectorize
+from gpkit import Model, Var, Vectorize, pi
 from gpkit.interactive.references import referencesplot
 
 
@@ -121,7 +119,7 @@ class WingAero(Model):
         return [
             self.D >= 0.5 * rho * V**2 * self.CD * S,
             self.Re == rho * V * c / mu,
-            self.CD >= 0.074 / self.Re**0.2 + self.CL**2 / np.pi / A / self.e,
+            self.CD >= 0.074 / self.Re**0.2 + self.CL**2 / pi / A / self.e,
         ]
 
 

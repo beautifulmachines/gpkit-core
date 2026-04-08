@@ -3,8 +3,6 @@
 import re
 import sys
 
-import numpy as np
-
 from .small_classes import Numbers, Quantity
 from .small_scripts import try_str_without
 
@@ -186,16 +184,7 @@ def strify(val, excluded):
         if isqty:
             units = val
             val = val.magnitude
-        if np.pi / 12 < val < 100 * np.pi and abs(12 * val / np.pi % 1) <= 1e-2:
-            # val is in bounds and a clean multiple of PI!
-            if val > 3.1:  # product of PI
-                val = f"{val/np.pi:.3g}{PI_STR}"
-                if val == f"1{PI_STR}":
-                    val = PI_STR
-            else:  # division of PI
-                val = f"({PI_STR}/{np.pi/val:.3g})"
-        else:
-            val = f"{val:.3g}"
+        val = f"{val:.3g}"
         if isqty:
             val += unitstr(units, " [%s]")
     else:

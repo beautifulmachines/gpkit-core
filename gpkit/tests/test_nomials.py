@@ -7,6 +7,7 @@ import pytest
 
 import gpkit
 from gpkit import (
+    Model,
     Monomial,
     NomialArray,
     Posynomial,
@@ -15,6 +16,7 @@ from gpkit import (
     Variable,
     VarKey,
     VectorVariable,
+    units,
 )
 from gpkit.exceptions import InvalidPosynomial
 from gpkit.nomials import NomialMap
@@ -293,6 +295,42 @@ class TestSignomial:
             assert Signomial(0) != 1
             assert Signomial(-3) == -3
             assert Signomial(-3) != 3
+
+
+class TestPi:
+    """Tests for gpkit.pi"""
+
+    def test_pi_is_not_variable(self):
+        assert not isinstance(gpkit.pi, gpkit.Variable)
+        assert not hasattr(gpkit.pi, "key")
+
+    def test_pi_str(self):
+        s = gpkit.pi.str_without()
+        assert s in ("π", "PI")  # platform-dependent
+
+    def test_pi_latex(self):
+        assert gpkit.pi.latex() == r"\pi"
+
+    def test_pi_value(self):
+        assert float(gpkit.pi.c) == pytest.approx(np.pi)
+
+    def test_pi_in_expression(self):
+        r = Variable("r")
+        expr = gpkit.pi * r**2
+        assert isinstance(expr, Monomial)
+        assert float(expr.c) == pytest.approx(np.pi)
+
+    def test_pi_expression_latex(self):
+        r = Variable("r")
+        latex = (gpkit.pi * r**2).latex(excluded=["units"])
+        assert r"\pi" in latex
+
+    def test_pi_model_solves_correctly(self):
+        r = Variable("r", "m")
+        A = Variable("A", "m^2")
+        m = Model(A, [A >= gpkit.pi * r**2, r >= 1 * units("m"), r <= 1 * units("m")])
+        sol = m.solve(verbosity=0)
+        assert sol[A] / A.units == pytest.approx(np.pi, rel=1e-4)
 
 
 class TestPosynomial:

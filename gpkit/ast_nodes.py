@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
+
+import numpy as np
 
 from .exceptions import IRSerializationError
 from .util.repr_conventions import (
+    PI_STR,
     _render_ast_node,
     _render_ast_node_latex,
     latex_unitstr,
@@ -67,6 +70,27 @@ class ConstNode(ASTNode):
 
     def to_ir(self):
         return {"node": "const", "value": self.value}
+
+
+@dataclass(frozen=True)
+class PiNode(ConstNode):
+    """A ConstNode for the mathematical constant π.
+
+    Inherits from ConstNode so isinstance(node, ConstNode) is True and
+    node.value gives np.pi for any code that needs the numeric value.
+    Renders as π (text) and \\pi (LaTeX).
+    """
+
+    value: float = field(default_factory=lambda: np.pi)
+
+    def str_without(self, excluded=()):
+        return PI_STR
+
+    def latex(self, _excluded=()):
+        return r"\pi"
+
+    def to_ir(self):
+        return {"node": "pi"}
 
 
 @dataclass(frozen=True)
@@ -158,6 +182,8 @@ def ast_from_ir(ir_dict, var_registry):
         return VarNode(var_registry[ir_dict["ref"]])
     if node == "const":
         return ConstNode(ir_dict["value"])
+    if node == "pi":
+        return PiNode()
     if node == "expr":
         children = []
         for c in ir_dict["children"]:
@@ -189,7 +215,9 @@ def to_ast(obj):
                 c_float = float(c)
                 if c_float == 1.0 and obj.hmap.units is not None:
                     return UnitsNode(obj.hmap.units)
-                return ConstNode(c_float)
+                if not (hasattr(obj, "ast") and obj.ast is not None):
+                    return ConstNode(c_float)
+                # else: explicit AST (e.g., gpkit.pi → PiNode) — fall through below
         except (ValueError, TypeError):
             pass
     if hasattr(obj, "ast") and obj.ast is not None:
