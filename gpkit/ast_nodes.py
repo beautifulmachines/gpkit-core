@@ -110,7 +110,10 @@ class UnitsNode(ASTNode):
 
     def latex(self, excluded=()):
         "Render this units node as a LaTeX string."
-        if "units" in excluded:
+        # Suppressed by "ast_units" (used when Nomial.latex appends unit suffix
+        # separately), but not by plain "units" (which only suppresses variable
+        # unit annotations — constants must always show their dimensional context).
+        if "ast_units" in excluded:
             return ""
         return latex_unitstr(self.units).lstrip("~")
 
@@ -215,13 +218,20 @@ def to_ast(obj):
                 c_float = float(c)
                 if c_float == 1.0 and obj.hmap.units is not None:
                     return UnitsNode(obj.hmap.units)
-                if not (hasattr(obj, "ast") and obj.ast is not None):
-                    return ConstNode(c_float)
-                # else: explicit AST (e.g., gpkit.pi → PiNode) — fall through below
+                # For valued constants, fall through to the obj.ast check below
+                # so the existing AST (which may carry UnitsNode children) is
+                # preferred over a bare ConstNode that would lose unit info.
         except (ValueError, TypeError):
             pass
     if hasattr(obj, "ast") and obj.ast is not None:
         return obj.ast
+    if hasattr(obj, "hmap"):
+        try:
+            ((exp, c),) = obj.hmap.items()
+            if not exp:
+                return ConstNode(float(c))
+        except (ValueError, TypeError):
+            pass
     if hasattr(obj, "key"):
         return VarNode(obj.key)
     return obj

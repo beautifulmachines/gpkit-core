@@ -38,7 +38,7 @@ class SingleEquationConstraint(ReprMixin):
             "right": self.right.to_ir(),
         }
 
-    def latex(self, excluded="units", aligned=False):
+    def latex(self, excluded=("units",), aligned=False):
         "Latex representation without attributes in excluded list"
         lhs = try_str_without(self.left, excluded, latex=True)
         op = self.latex_opers[self.oper]
