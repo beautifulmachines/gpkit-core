@@ -6,7 +6,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from .units import qty
-from .util.repr_conventions import ReprMixin, _extract_subscript, latexify
+from .util.repr_conventions import ReprMixin, extract_subscript, latexify
 from .util.small_classes import Count
 
 _lineage_ctx: ContextVar[dict] = ContextVar("lineage_ctx", default={})
@@ -45,7 +45,7 @@ def _strip_magic_prefix(namespace, excluded):
 
 def _merge_lineage_sub(name, lineage_sub):
     "Append lineage_sub into name's existing subscript, or add a new one."
-    extracted = _extract_subscript(name)
+    extracted = extract_subscript(name)
     if extracted is not None:
         base_name, existing_sub = extracted
         return "%s_{%s,%s}" % (base_name, existing_sub, lineage_sub)

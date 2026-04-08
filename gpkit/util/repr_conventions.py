@@ -129,7 +129,7 @@ def _latexify_sub_token(token: str) -> str:
     return token if len(token) == 1 else r"\text{" + token + "}"
 
 
-def _extract_subscript(name: str):
+def extract_subscript(name: str):
     """If LaTeX string *name* ends with ``_{content}``, return ``(base, content)``.
 
     Uses brace counting so nested groups (e.g. ``\\text{foo}``) are handled

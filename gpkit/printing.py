@@ -721,6 +721,8 @@ def _format_aligned_columns(
 
     Does NOT sort - expects pre-sorted input.
     """
+    if not rows:
+        return []
     (ncols,) = set(len(r) for r in rows) or (0,)
     if col_alignments is None:
         col_alignments = "<" * ncols

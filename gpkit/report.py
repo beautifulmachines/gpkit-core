@@ -9,45 +9,11 @@ from dataclasses import dataclass, field
 from typing import Any, List, Optional, Tuple
 
 from .constraints.tight import Tight
+from .printing import _format_aligned_columns
 from .util.repr_conventions import unitstr
 from .util.small_classes import Quantity
 from .varkey import lineage_display_context
 from .varmap import VarMap
-
-# ── Column alignment helper ───────────────────────────────────────────────────
-
-
-def _format_aligned_columns(
-    rows: list,  # each row is a list of column strings
-    col_alignments: str,  # '<' left, '>' right, one char per column
-    col_sep: str = " ",
-) -> list:
-    """Align arbitrary columns with dynamic widths.
-
-    Input: list of rows, where each row is a list of column strings.
-    Output: list of formatted/aligned lines.
-
-    Does NOT sort - expects pre-sorted input.
-    """
-    if not rows:
-        return []
-    ncols_set = set(len(r) for r in rows)
-    if len(ncols_set) != 1:
-        # Rows have different column counts — fall back to simple join
-        return [col_sep.join(str(c) for c in row).rstrip() for row in rows]
-    (ncols,) = ncols_set
-    if col_alignments is None:
-        col_alignments = "<" * ncols
-    assert len(col_alignments) == ncols
-    widths = [max(len(str(row[i])) for row in rows) for i in range(ncols)]
-    formatted = []
-    for row in rows:
-        parts = [
-            f"{str(cell):{align}{width}}"
-            for cell, width, align in zip(row, widths, col_alignments)
-        ]
-        formatted.append(col_sep.join(parts).rstrip())
-    return formatted
 
 
 @dataclass
@@ -635,65 +601,25 @@ def _md_escape(text: str) -> str:
     return text
 
 
-def _md_free_var_table(variables: list) -> list:
-    "Markdown pipe-table lines for Optimized Variables (no sensitivity column)."
+def _md_var_table(variables: list, include_sensitivity: bool = False) -> list:
+    "Markdown pipe-table lines for a variable section."
     has_source = any(ve.source for ve in variables)
-    lines = []
-    if has_source:
-        lines += [
-            "| Variable | Source | Value | Units | Label |",
-            "|----------|--------|-------|-------|-------|",
-        ]
-    else:
-        lines += [
-            "| Variable | Value | Units | Label |",
-            "|----------|-------|-------|-------|",
-        ]
+    cols = ["Variable"] + (["Source"] if has_source else []) + ["Value", "Units"]
+    if include_sensitivity:
+        cols.append("Sensitivity")
+    cols.append("Label")
+    sep = ["-" * max(len(c), 3) for c in cols]
+    lines = ["| " + " | ".join(cols) + " |", "| " + " | ".join(sep) + " |"]
     for ve in variables:
         name_cell = f"${ve.latex}$" if ve.latex else _md_escape(ve.name)
+        cells = [name_cell]
         if has_source:
-            lines.append(
-                f"| {name_cell} | {_md_escape(ve.source)}"
-                f" | {_fmt_value(ve.value)}"
-                f" | {ve.units} | {_md_escape(ve.label)} |"
-            )
-        else:
-            lines.append(
-                f"| {name_cell} | {_fmt_value(ve.value)}"
-                f" | {ve.units} | {_md_escape(ve.label)} |"
-            )
-    return lines
-
-
-def _md_fixed_var_table(variables: list) -> list:
-    "Markdown pipe-table lines for Fixed Variables (with sensitivity column)."
-    has_source = any(ve.source for ve in variables)
-    lines = []
-    if has_source:
-        lines += [
-            "| Variable | Source | Value | Units | Sensitivity | Label |",
-            "|----------|--------|-------|-------|-------------|-------|",
-        ]
-    else:
-        lines += [
-            "| Variable | Value | Units | Sensitivity | Label |",
-            "|----------|-------|-------|-------------|-------|",
-        ]
-    for ve in variables:
-        name_cell = f"${ve.latex}$" if ve.latex else _md_escape(ve.name)
-        if has_source:
-            lines.append(
-                f"| {name_cell} | {_md_escape(ve.source)}"
-                f" | {_fmt_value(ve.value)}"
-                f" | {ve.units} | {_fmt_sensitivity(ve.sensitivity)}"
-                f" | {_md_escape(ve.label)} |"
-            )
-        else:
-            lines.append(
-                f"| {name_cell} | {_fmt_value(ve.value)}"
-                f" | {ve.units} | {_fmt_sensitivity(ve.sensitivity)}"
-                f" | {_md_escape(ve.label)} |"
-            )
+            cells.append(_md_escape(ve.source))
+        cells += [_fmt_value(ve.value), ve.units]
+        if include_sensitivity:
+            cells.append(_fmt_sensitivity(ve.sensitivity))
+        cells.append(_md_escape(ve.label))
+        lines.append("| " + " | ".join(cells) + " |")
     return lines
 
 
@@ -738,14 +664,14 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
     if ir.free_variables:
         lines.append("**Optimized Variables**")
         lines.append("")
-        lines.extend(_md_free_var_table(ir.free_variables))
+        lines.extend(_md_var_table(ir.free_variables))
         lines.append("")
 
     # Fixed Variables pipe table (value | units | sensitivity | label)
     if ir.fixed_variables:
         lines.append("**Fixed Variables**")
         lines.append("")
-        lines.extend(_md_fixed_var_table(ir.fixed_variables))
+        lines.extend(_md_var_table(ir.fixed_variables, include_sensitivity=True))
         lines.append("")
 
     # Constraint groups

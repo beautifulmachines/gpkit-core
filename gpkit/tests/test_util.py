@@ -3,7 +3,7 @@
 import pytest
 
 from gpkit import Variable, units
-from gpkit.util.repr_conventions import _extract_subscript, latexify, unitstr
+from gpkit.util.repr_conventions import extract_subscript, latexify, unitstr
 from gpkit.util.small_classes import HashVector
 
 
@@ -95,16 +95,16 @@ class TestSmallScripts:
         # prefix arg that is multi-char
         assert latexify("dot_CD") == r"\dot{\text{CD}}"
 
-    def test_extract_subscript(self):
-        """_extract_subscript correctly parses trailing _{...} from a LaTeX string."""
-        assert _extract_subscript(r"m_{\text{ref}}") == ("m", r"\text{ref}")
-        assert _extract_subscript(r"\rho_{\infty}") == (r"\rho", r"\infty")
-        assert _extract_subscript(r"A_{\text{one},\text{two}}") == (
+    def testextract_subscript(self):
+        """extract_subscript correctly parses trailing _{...} from a LaTeX string."""
+        assert extract_subscript(r"m_{\text{ref}}") == ("m", r"\text{ref}")
+        assert extract_subscript(r"\rho_{\infty}") == (r"\rho", r"\infty")
+        assert extract_subscript(r"A_{\text{one},\text{two}}") == (
             "A",
             r"\text{one},\text{two}",
         )
-        assert _extract_subscript("m") is None  # no subscript
-        assert _extract_subscript(r"\vec{m}") is None  # brace but not _{...}
+        assert extract_subscript("m") is None  # no subscript
+        assert extract_subscript(r"\vec{m}") is None  # brace but not _{...}
 
     def test_latexify_lambda_workarounds(self):
         """lamda and lambda_ both render as \\lambda (Python keyword workarounds)."""
