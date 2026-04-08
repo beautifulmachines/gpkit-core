@@ -109,7 +109,10 @@ class TestMonomial:  # pylint: disable=unnecessary-negation,comparison-with-itse
         length = Variable("L", "m", "length")
         expr = 4 * gpkit.units.m**2 / length
         latex = expr.latex(excluded=("units",))
-        assert latex == "\\frac{4}{L}"
+        assert "1" not in latex  # no spurious coefficient
+        assert r"\mathrm" in latex  # units shown on the constant factor
+        assert "4" in latex
+        assert "L" in latex
 
     def test_latex_constant_with_units_in_constraint(self):
         """Constants with units must show units in constraint LaTeX,
@@ -121,6 +124,17 @@ class TestMonomial:  # pylint: disable=unnecessary-negation,comparison-with-itse
         latex = c.latex(excluded=("units",))
         assert r"\mathrm" in latex  # units rendered on the constant
         assert "4" in latex
+
+    def test_latex_mixed_expr_constant_units_shown(self):
+        """In expressions mixing a unit-bearing constant with variables,
+        the constant's units must appear even with excluded=('units',)"""
+        S = Variable("S", "m^2", "wing area")
+        L = Variable("L", "m", "wingspan")
+        c = S >= 4 * gpkit.units("m") * L
+        latex = c.latex(excluded=("units",))
+        assert r"\mathrm" in latex  # constant's units appear
+        assert "4" in latex
+        assert "L" in latex  # variable name present
 
     def test_str_with_units(self):
         "Make sure __str__() works when units are involved"

@@ -85,15 +85,16 @@ class Nomial(NomialData):
         "Latex representation, parsing `excluded` just as .str_without does"
         if hasattr(self, "key"):
             return self.key.latex(excluded)
-        # Pure constants need their units shown for dimensional clarity,
-        # even when "units" is excluded (as variables suppress theirs in constraints)
-        if "units" in excluded and all(not exp for exp in self.hmap):
-            excluded = frozenset(excluded) - {"units"}
         if "ast" not in excluded and self.ast:
-            excluded_inner = frozenset({"units"}.union(excluded))
-            ast_latex = self.ast.latex(excluded_inner)
             if "units" in excluded:
-                return ast_latex
+                # Pass excluded through so UnitsNode renders its dimensional context.
+                # UnitsNode represents a constant's physical units, not a variable
+                # annotation, so it is intentionally not suppressed here.
+                return self.ast.latex(excluded)
+            # Suppress UnitsNode via "ast_units" sentinel so it doesn't appear
+            # alongside the Monomial unitstr we append below (avoids double units).
+            excluded_inner = frozenset({"ast_units"}.union(excluded))
+            ast_latex = self.ast.latex(excluded_inner)
             units = self.unitstr(r"\mathrm{~\left[ %s \right]}", ":L~")
             units_tf = units.replace("frac", "tfrac").replace(r"\cdot", r"\cdot ")
             return ast_latex + units_tf
