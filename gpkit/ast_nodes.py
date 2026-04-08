@@ -218,15 +218,20 @@ def to_ast(obj):
                 c_float = float(c)
                 if c_float == 1.0 and obj.hmap.units is not None:
                     return UnitsNode(obj.hmap.units)
-                # For valued constants, prefer the existing AST (which may carry
-                # UnitsNode children) over a bare ConstNode that loses unit info
-                if hasattr(obj, "ast") and obj.ast is not None:
-                    return obj.ast
-                return ConstNode(c_float)
+                # For valued constants, fall through to the obj.ast check below
+                # so the existing AST (which may carry UnitsNode children) is
+                # preferred over a bare ConstNode that would lose unit info.
         except (ValueError, TypeError):
             pass
     if hasattr(obj, "ast") and obj.ast is not None:
         return obj.ast
+    if hasattr(obj, "hmap"):
+        try:
+            ((exp, c),) = obj.hmap.items()
+            if not exp:
+                return ConstNode(float(c))
+        except (ValueError, TypeError):
+            pass
     if hasattr(obj, "key"):
         return VarNode(obj.key)
     return obj

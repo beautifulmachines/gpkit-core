@@ -128,9 +128,9 @@ class TestMonomial:  # pylint: disable=unnecessary-negation,comparison-with-itse
     def test_latex_mixed_expr_constant_units_shown(self):
         """In expressions mixing a unit-bearing constant with variables,
         the constant's units must appear even with excluded=('units',)"""
-        S = Variable("S", "m^2", "wing area")
-        L = Variable("L", "m", "wingspan")
-        c = S >= 4 * gpkit.units("m") * L
+        wing_area = Variable("S", "m^2", "wing area")  # pylint: disable=invalid-name
+        wingspan = Variable("L", "m", "wingspan")  # pylint: disable=invalid-name
+        c = wing_area >= 4 * gpkit.units("m") * wingspan
         latex = c.latex(excluded=("units",))
         assert r"\mathrm" in latex  # constant's units appear
         assert "4" in latex
