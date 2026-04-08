@@ -2,12 +2,7 @@
 
 import pickle
 
-import numpy as np
-
-from gpkit import Model, Variable
-
-pi = np.pi
-
+from gpkit import Model, Variable, pi
 
 # Constants
 k = Variable("k", 1.2, "-", "form factor")

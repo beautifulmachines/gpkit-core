@@ -5,10 +5,20 @@
 import importlib
 import json
 
+import numpy as np
 import pytest
 
+import gpkit
 from gpkit import Model, SignomialsEnabled, Variable, VarKey, VectorVariable
-from gpkit.ast_nodes import ConstNode, ExprNode, UnitsNode, VarNode, ast_from_ir, to_ast
+from gpkit.ast_nodes import (
+    ConstNode,
+    ExprNode,
+    PiNode,
+    UnitsNode,
+    VarNode,
+    ast_from_ir,
+    to_ast,
+)
 from gpkit.constraints import ArrayConstraint
 from gpkit.constraints.set import build_model_tree
 from gpkit.exceptions import IRSerializationError
@@ -363,6 +373,31 @@ class TestASTNodeIR:
         node2 = ast_from_ir(ir, {})
         assert isinstance(node2, ConstNode)
         assert node2.value == 3.14
+
+    def test_pinode_is_constnode(self):
+        node = PiNode()
+        assert isinstance(node, ConstNode)
+        assert node.value == pytest.approx(np.pi)
+
+    def test_pinode_str(self):
+        node = PiNode()
+        s = node.str_without()
+        assert s in ("π", "PI")
+
+    def test_pinode_latex(self):
+        node = PiNode()
+        assert node.latex() == r"\pi"
+
+    def test_pinode_ir_roundtrip(self):
+        node = PiNode()
+        ir = node.to_ir()
+        assert ir == {"node": "pi"}
+        node2 = ast_from_ir(ir, None)
+        assert isinstance(node2, PiNode)
+
+    def test_to_ast_gpkit_pi(self):
+        result = to_ast(gpkit.pi)
+        assert isinstance(result, PiNode)
 
     def test_exprnode_add(self):
         x = Variable("x")

@@ -2,6 +2,9 @@
 
 __version__ = "0.3.1"
 
+import numpy as _np
+
+from .ast_nodes import PiNode as _PiNode
 from .constraints.set import ConstraintSet
 from .constraints.sigeq import SignomialEquality
 from .model import Model
@@ -21,6 +24,8 @@ from .util.build import build
 from .util.globals import NamedVariables, SignomialsEnabled, Vectorize, settings
 from .var import Var
 from .varkey import VarKey
+
+pi = Monomial(_np.pi, ast=_PiNode())
 
 if "just built!" in settings:  # pragma: no cover
     print(f"""

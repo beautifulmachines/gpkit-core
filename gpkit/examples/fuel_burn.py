@@ -15,9 +15,7 @@ Interactive widget code stripped; core model retained.
 
 import math
 
-import numpy as np
-
-from gpkit import Model, Var, Variable, Vectorize
+from gpkit import Model, Var, Variable, Vectorize, pi
 
 # ---- Breguet range approximation order ----
 _BREGUET_ORDER = 4
@@ -34,7 +32,6 @@ class FuelBurn(Model):
 
     # ---- Constants ----
     N_lift = Var("-", "wing loading multiplier", value=6.0)
-    pi = Var("-", "half of the circle constant", value=np.pi)
     sigma_max = Var("Pa", "allowable stress, 6061-T6", value=250e6)
     sigma_maxshear = Var("Pa", "allowable shear stress", value=167e6)
     g = Var("m/s^2", "gravitational constant", value=9.8)
@@ -94,7 +91,7 @@ class FuelBurn(Model):
         rho, mu = self.rho, self.mu
         rho_sl = self.rho_sl
         rho_alum, g = self.rho_alum, self.g
-        e, pi, A_prop = self.e, self.pi, self.A_prop
+        e, A_prop = self.e, self.A_prop
         eta_eng, eta_v, h_fuel = self.eta_eng, self.eta_v, self.h_fuel
         N_lift, sigma_max = self.N_lift, self.sigma_max
         sigma_maxshear = self.sigma_maxshear
