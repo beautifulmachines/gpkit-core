@@ -28,6 +28,18 @@ class VarEntry:
     label: str  # human label (from VarKey.label or "")
     source: str = ""  # lineagestr() for cross-model referenced vars; "" for local
 
+    def to_dict(self) -> dict:
+        """JSON-serializable dict."""
+        return {
+            "name": self.name,
+            "latex": self.latex,
+            "value": _serialize_value(self.value),
+            "sensitivity": self.sensitivity,
+            "units": self.units,
+            "label": self.label,
+            "source": self.source,
+        }
+
 
 @dataclass
 class CGroup:
@@ -35,18 +47,6 @@ class CGroup:
 
     label: str  # "" for unnamed groups
     constraints: list  # raw constraint objects; to_dict() serializes via str()
-
-
-def _var_entry_to_dict(v) -> dict:
-    return {
-        "name": v.name,
-        "latex": v.latex,
-        "value": _serialize_value(v.value),
-        "sensitivity": v.sensitivity,
-        "units": v.units,
-        "label": v.label,
-        "source": v.source,
-    }
 
 
 @dataclass
@@ -81,8 +81,8 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
             "is_anonymous": self.is_anonymous,
             "description": self.description,
             "assumptions": list(self.assumptions),
-            "free_variables": [_var_entry_to_dict(v) for v in self.free_variables],
-            "fixed_variables": [_var_entry_to_dict(v) for v in self.fixed_variables],
+            "free_variables": [v.to_dict() for v in self.free_variables],
+            "fixed_variables": [v.to_dict() for v in self.fixed_variables],
             "constraint_groups": [
                 {"label": cg.label, "constraints": [str(c) for c in cg.constraints]}
                 for cg in self.constraint_groups
@@ -451,42 +451,27 @@ def _var_name_cell(ve: "VarEntry") -> str:
     return ve.name
 
 
-def _text_free_var_rows(variables: list, precision: int = 4, vecn: int = 6) -> list:
-    """Column-aligned rows for Optimized Variables: name | value | units | label."""
+def _text_var_rows(
+    variables: list,
+    include_sensitivity: bool = False,
+    precision: int = 4,
+    vecn: int = 6,
+) -> list:
+    """Column-aligned rows for a variable table"""
     col_widths = _compute_vec_col_widths(variables, precision, vecn)
     rows = []
     for ve in variables:
-        rows.append(
-            [
-                _var_name_cell(ve),
-                _fmt_value(
-                    ve.value, precision=precision, vecn=vecn, col_widths=col_widths
-                ),
-                ve.units,
-                ve.label,
-            ]
-        )
-    return _format_aligned_columns(rows, "<<<<", "  ")
-
-
-def _text_fixed_var_rows(variables: list, precision: int = 4, vecn: int = 6) -> list:
-    """Column-aligned rows for Fixed Variables:
-    name | value | units | sensitivity | label."""
-    col_widths = _compute_vec_col_widths(variables, precision, vecn)
-    rows = []
-    for ve in variables:
-        rows.append(
-            [
-                _var_name_cell(ve),
-                _fmt_value(
-                    ve.value, precision=precision, vecn=vecn, col_widths=col_widths
-                ),
-                ve.units,
-                _fmt_sensitivity(ve.sensitivity),
-                ve.label,
-            ]
-        )
-    return _format_aligned_columns(rows, "<<<<<", "  ")
+        row = [
+            _var_name_cell(ve),
+            _fmt_value(ve.value, precision=precision, vecn=vecn, col_widths=col_widths),
+            ve.units,
+        ]
+        if include_sensitivity:
+            row.append(_fmt_sensitivity(ve.sensitivity))
+        row.append(ve.label)
+        rows.append(row)
+    align = "<<<<<" if include_sensitivity else "<<<<"
+    return _format_aligned_columns(rows, align, "  ")
 
 
 def _text_cgroup_lines(constraint_groups: list, pad: str, lineage_map: dict) -> list:
@@ -554,14 +539,14 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
     # Optimized Variables table (primal — no sensitivity column)
     if ir.free_variables:
         lines.append(f"{pad}  Optimized Variables")
-        for row_line in _text_free_var_rows(ir.free_variables):
+        for row_line in _text_var_rows(ir.free_variables):
             lines.append(f"{pad}    {row_line}")
         lines.append("")
 
     # Fixed Variables table (constants — value | units | sensitivity | label)
     if ir.fixed_variables:
         lines.append(f"{pad}  Fixed Variables")
-        for row_line in _text_fixed_var_rows(ir.fixed_variables):
+        for row_line in _text_var_rows(ir.fixed_variables, include_sensitivity=True):
             lines.append(f"{pad}    {row_line}")
         lines.append("")
 
