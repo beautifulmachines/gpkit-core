@@ -9,6 +9,7 @@ from dataclasses import dataclass, field
 from typing import Any, List, Optional, Tuple
 
 from .constraints.tight import Tight
+from .model import Model as _Model
 from .printing import _format_aligned_columns
 from .util.repr_conventions import unitstr
 from .util.small_classes import Quantity
@@ -71,6 +72,17 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
     is_anonymous: bool = False  # True for bare Model(...) instances (no subclass name)
     children: list = field(default_factory=list)  # list of ReportSection
     lineage_map: dict = field(default_factory=dict)  # NOT in to_dict
+    references: list = field(default_factory=list)  # list of str
+    front_matter: str = ""  # raw text/MD prepended at root only
+    toc: bool = (
+        False  # insert TOC marker (supported by renderers that have a native facility)
+    )
+    objective_str: str = ""  # text representation of cost expression; "" if constant
+    objective_latex: str = ""  # LaTeX representation of cost expression
+    objective_value: Optional[float] = (
+        None  # magnitude of attained cost; None if unsolved
+    )
+    objective_units: str = ""  # unit string for the cost expression
 
     def to_dict(self) -> dict:
         """JSON-serializable dict (for format='dict' and future API)."""
@@ -81,6 +93,13 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
             "is_anonymous": self.is_anonymous,
             "description": self.description,
             "assumptions": list(self.assumptions),
+            "references": list(self.references),
+            "front_matter": self.front_matter,
+            "toc": self.toc,
+            "objective_str": self.objective_str,
+            "objective_latex": self.objective_latex,
+            "objective_value": self.objective_value,
+            "objective_units": self.objective_units,
             "free_variables": [v.to_dict() for v in self.free_variables],
             "fixed_variables": [v.to_dict() for v in self.fixed_variables],
             "constraint_groups": [
@@ -305,6 +324,27 @@ def _build_constraint_groups(model) -> List[CGroup]:
     return [CGroup(label="", constraints=own)] if own else []
 
 
+def _build_objective(model, solution) -> dict:
+    """Return objective keyword args for ReportSection for the model's cost.
+
+    All fields are empty/None when the cost has no variables (i.e. it is a
+    trivial constant placeholder rather than a real optimization objective).
+    """
+    if not model.cost.vks:
+        return {
+            "objective_str": "",
+            "objective_latex": "",
+            "objective_value": None,
+            "objective_units": "",
+        }
+    return {
+        "objective_str": model.cost.str_without({"units"}),
+        "objective_latex": model.cost.latex({"units"}),
+        "objective_value": float(solution.cost) if solution is not None else None,
+        "objective_units": unitstr(model.cost),
+    }
+
+
 # ── Core builder ─────────────────────────────────────────────────────────────
 
 
@@ -312,6 +352,8 @@ def build_report_ir(
     model,
     solution=None,
     _parent_path: str = "",
+    front_matter: str = "",
+    toc: bool = False,
 ) -> ReportSection:
     """Build a ReportSection tree from *model*.
 
@@ -321,9 +363,14 @@ def build_report_ir(
         Root model to report on.
     solution : Solution, optional
         If provided, variable entries include solved values and sensitivities.
+    front_matter : str, optional
+        Raw text/markdown prepended before the report.  Set only on the root
+        ReportSection; not propagated to children.
+    toc : bool, optional
+        If True, a table-of-contents marker is inserted by renderers that have
+        a native TOC facility (e.g. ``[TOC]`` in Markdown).  Set only on the
+        root ReportSection; not propagated to children.
     """
-    from .model import Model as _Model  # pylint: disable=import-outside-toplevel
-
     is_anon = type(model) is _Model  # pylint: disable=unidiomatic-typecheck
     own_name = "" if is_anon else type(model).__name__
     if own_name:
@@ -337,10 +384,15 @@ def build_report_ir(
         solution,
         extra_vks=_collect_constraint_varkeys(cgroups) - model.unique_varkeys,
     )
+    if is_anon:
+        desc = {"summary": "", "assumptions": [], "references": []}
+    else:
+        desc = type(model).description()
     return ReportSection(
         title=own_name or "Model",
-        description="[description]",
-        assumptions=[],
+        description=desc["summary"],
+        assumptions=desc["assumptions"],
+        references=desc["references"],
         lineage_path=lineage_path,
         magic_prefix=model.lineagestr(),
         is_anonymous=is_anon,
@@ -348,6 +400,9 @@ def build_report_ir(
         fixed_variables=fixed_vars,
         constraint_groups=cgroups,
         lineage_map=lineage_map,
+        front_matter=front_matter,
+        toc=toc,
+        **_build_objective(model, solution),
         children=[
             build_report_ir(child, solution=solution, _parent_path=lineage_path)
             for child in model.submodels
@@ -499,6 +554,32 @@ def _text_constraint_rows(constraints: list, lineage_map: dict = None) -> list:
     return _format_aligned_columns(c_rows, "<<", "  ")
 
 
+def _text_prose_lines(ir: "ReportSection", pad: str) -> list:
+    """Return prose lines: description, assumptions, references, objective."""
+    lines = []
+    if ir.description:
+        lines.append(f"{pad}  {ir.description}")
+        lines.append("")
+    if ir.assumptions:
+        lines.append(f"{pad}  Assumptions:")
+        for item in ir.assumptions:
+            lines.append(f"{pad}    - {item}")
+        lines.append("")
+    if ir.references:
+        lines.append(f"{pad}  References:")
+        for item in ir.references:
+            lines.append(f"{pad}    - {item}")
+        lines.append("")
+    if ir.objective_str:
+        lines.append(f"{pad}  Objective")
+        lines.append(f"{pad}    minimize: {ir.objective_str}")
+        if ir.objective_value is not None:
+            val_str = _fmt_value(ir.objective_value)
+            lines.append(f"{pad}    attained: {val_str} {ir.objective_units}".rstrip())
+        lines.append("")
+    return lines
+
+
 def render_text(ir: "ReportSection", indent: int = 0) -> str:
     """Render a ReportSection tree as hierarchical plain text.
 
@@ -516,6 +597,11 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
     pad = _INDENT * indent
     lines: list = []
 
+    # Front matter (root only)
+    if ir.front_matter:
+        lines.append(ir.front_matter)
+        lines.append("")
+
     if ir.is_anonymous:
         # Transparent wrapper: no header, children rendered at the same level
         child_indent = indent
@@ -524,17 +610,7 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
         lines.append(f"{pad}{ir.lineage_path or ir.title}")
         child_indent = indent + 1
 
-    # Description
-    if ir.description:
-        lines.append(f"{pad}  {ir.description}")
-        lines.append("")
-
-    # Assumptions
-    if ir.assumptions:
-        lines.append(f"{pad}  Assumptions:")
-        for assumption in ir.assumptions:
-            lines.append(f"{pad}    - {assumption}")
-        lines.append("")
+    lines.extend(_text_prose_lines(ir, pad))
 
     # Optimized Variables table (primal — no sensitivity column)
     if ir.free_variables:
@@ -608,6 +684,28 @@ def _md_var_table(variables: list, include_sensitivity: bool = False) -> list:
     return lines
 
 
+def _md_prose_lines(ir: "ReportSection") -> list:
+    """Return markdown lines for description, assumptions, references, and objective."""
+    lines = []
+    if ir.description:
+        lines.append(ir.description)
+        lines.append("")
+    if ir.assumptions:
+        lines.append(f"**Assumptions:** {'; '.join(ir.assumptions)}")
+        lines.append("")
+    if ir.references:
+        lines.append(f"**References:** {'; '.join(ir.references)}")
+        lines.append("")
+    if ir.objective_str:
+        lines.append(f"**Objective:** minimize $${ir.objective_latex}$$")
+        if ir.objective_value is not None:
+            val_str = _fmt_value(ir.objective_value)
+            attained = f"{val_str} {ir.objective_units}".rstrip()
+            lines.append(f"**Attained:** {attained}")
+        lines.append("")
+    return lines
+
+
 def render_markdown(ir: "ReportSection", level: int = 1) -> str:
     """Render a ReportSection tree as Markdown.
 
@@ -625,6 +723,14 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
     hdr = "#" * min(level, 6)
     lines: list = []
 
+    # Front matter and TOC marker (root only, before first heading)
+    if ir.front_matter:
+        lines.append(ir.front_matter)
+        lines.append("")
+    if ir.toc:
+        lines.append("[TOC]")
+        lines.append("")
+
     if ir.is_anonymous:
         # Transparent wrapper: skip heading, children rendered at same level
         child_level = level
@@ -634,16 +740,7 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
         lines.append("")
         child_level = level + 1
 
-    # Description
-    if ir.description:
-        lines.append(ir.description)
-        lines.append("")
-
-    # Assumptions
-    if ir.assumptions:
-        assumption_str = "; ".join(ir.assumptions)
-        lines.append(f"**Assumptions:** {assumption_str}")
-        lines.append("")
+    lines.extend(_md_prose_lines(ir))
 
     # Optimized Variables pipe table (no sensitivity column)
     if ir.free_variables:

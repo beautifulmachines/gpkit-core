@@ -645,3 +645,21 @@ class TestModelDescription:
         assert "references" in d
         assert isinstance(d["assumptions"], list)
         assert isinstance(d["references"], list)
+
+    def test_model_description_class_attrs(self):
+        """Class-attr assumptions/references are included via description()."""
+
+        class _DescAttrs(Model):
+            """Aerodynamics model."""
+
+            assumptions = ["incompressible flow", "steady state"]
+            references = ["Anderson 2001"]
+
+            def setup(self):
+                x = Variable("x_desc_attrs")
+                return [x >= 1]
+
+        d = _DescAttrs.description()
+        assert d["summary"] == "Aerodynamics model."
+        assert d["assumptions"] == ["incompressible flow", "steady state"]
+        assert d["references"] == ["Anderson 2001"]
