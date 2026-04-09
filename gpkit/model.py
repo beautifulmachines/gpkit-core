@@ -180,8 +180,8 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
         """
         return {
             "summary": (cls.__doc__ or "").strip(),
-            "assumptions": [],  # discrete modeling choices, separate from prose summary
-            "references": [],
+            "assumptions": list(getattr(cls, "assumptions", [])),
+            "references": list(getattr(cls, "references", [])),
         }
 
     def get_var(self, path: str):
