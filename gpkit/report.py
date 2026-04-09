@@ -10,6 +10,7 @@ from typing import Any, List, Optional, Tuple
 
 from .constraints.tight import Tight
 from .model import Model as _Model
+from .nomials import Variable
 from .printing import _format_aligned_columns
 from .util.repr_conventions import unitstr
 from .util.small_classes import Quantity
@@ -340,7 +341,14 @@ def _reciprocal_if_1_over_x(cost):
     coeff = hmap[exp]
     exp_dict = dict(exp)
     if abs(coeff - 1.0) < 1e-10 and exp_dict and all(v < 0 for v in exp_dict.values()):
-        return True, 1 / cost
+        # Build the inner expression from VarKeys rather than computing 1/cost.
+        # 1/cost encodes div(1, cost.ast) in its AST, causing str/latex to
+        # render as 1/(1/x) instead of x.
+        inner = None
+        for vk, e in exp_dict.items():
+            term = Variable(vk) if e == -1 else Variable(vk) ** (-e)
+            inner = term if inner is None else inner * term
+        return True, inner
     return False, cost
 
 
@@ -422,39 +430,41 @@ def feasibility_block(model) -> str:
                                     + sensitivities_block()))
     """
     ctx = _model_stats(model)
-    obj_clause = (
-        f" It is currently set to {ctx['objective_direction']}"
-        f" ${ctx['objective_latex']}$."
-        if ctx["objective_latex"]
-        else ""
-    )
+    if ctx["objective_latex"]:
+        direction = ctx["objective_direction"]
+        obj_clause = (
+            f" The objective is currently set to {direction}"
+            f" ${ctx['objective_latex']}$."
+        )
+    else:
+        obj_clause = ""
     return (
         f"## Feasibility and Optimality\n\n"
         f"This model has {ctx['n_free']} free variables and "
-        f"{ctx['n_constraints']} constraints involving these variables. "
-        f"The subset of the design space that satisfies all constraints "
-        f"simultaneously is the *feasible set*. If the problem is feasible, "
-        f"an objective function is minimized to choose among designs."
-        f"{obj_clause} A globally optimal *solution* is a set of "
-        f"{ctx['n_free']} free variable values that simultaneously satisfies "
-        f"all {ctx['n_constraints']} constraints and minimizes the objective. "
-        f"No other feasible solution can achieve a lower objective value."
+        f"{ctx['n_constraints']} constraints. A design satisfying all "
+        f"constraints is *feasible*; the set of all feasible designs is the "
+        f"*feasible set*."
+        f"{obj_clause} "
+        f"The solver finds a globally optimal solution — the unique feasible "
+        f"design that cannot be improved further — with a reliable, efficient "
+        f"algorithm. This guarantee comes from the convex structure of the "
+        f"problem, not from luck or tuning."
     )
 
 
 SENSITIVITIES_BLOCK = (
     "## Sensitivities\n\n"
-    "When the convex optimization problem is solved, we obtain optimal values "
-    "of the free variables (the *primal solution*) as well as a *dual solution* "
-    "that can be translated to sensitivity information. Assume the sensitivity "
-    "to a constant $c$ is $s$. If the value of $c$ is increased by a factor "
-    "$\\epsilon$ and the problem re-solved, the optimal cost increases by a "
-    "factor $s \\cdot \\epsilon$. For example, a sensitivity of 1.5 means a "
-    "1% increase in $c$ causes the cost to increase by approximately 1.5%. "
-    "These point sensitivities come for free with the solve and give intuition "
-    "about how the solution would change if a parameter were varied. A positive "
-    "sensitivity means increasing that constant is detrimental; a negative "
-    "sensitivity means it is beneficial."
+    "Each fixed parameter in the model has a *sensitivity* — a number that "
+    "tells you how much the objective would change if that parameter changed. "
+    "Specifically, if a constant $c$ has sensitivity $s$, then increasing $c$ "
+    "by 1% would change the objective by approximately $s$% (holding all other "
+    "constants fixed and re-solving). A sensitivity of 1.5 means a 1% increase "
+    "in that parameter drives the objective up by 1.5%; a sensitivity of −0.8 "
+    "means a 1% increase drives it down by 0.8%. "
+    "Sensitivities with large magnitude flag the parameters that matter most; "
+    "near-zero sensitivities indicate parameters the design is robust to. "
+    "These numbers come for free alongside every solve — no extra computation "
+    "required."
 )
 
 
