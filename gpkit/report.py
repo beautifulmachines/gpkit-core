@@ -345,6 +345,93 @@ def _build_objective(model, solution) -> dict:
     }
 
 
+# ── Standard text blocks ──────────────────────────────────────────────────────
+
+
+def _model_stats(model) -> dict:
+    """Compute model-wide counts for use in report text blocks.
+
+    Returns a dict with keys: n_free, n_constraints, objective_str,
+    objective_latex.  All values are derived from the model without requiring
+    a solved solution.
+    """
+    n_free = len(model.vks) - len(model.substitutions)
+    # flat() returns a generator (flatiter), so use sum() rather than len().
+    n_constraints = sum(1 for _ in model.flat())
+    obj_str = model.cost.str_without({"units"}) if model.cost.vks else None
+    obj_latex = model.cost.latex({"units"}) if model.cost.vks else None
+    return {
+        "n_free": n_free,
+        "n_constraints": n_constraints,
+        "objective_str": obj_str,
+        "objective_latex": obj_latex,
+    }
+
+
+def feasibility_block(model) -> str:
+    """Return a markdown explanation of feasibility and optimality for *model*.
+
+    Fills in the number of free variables, constraints, and current objective
+    expression.  Suitable for use as ``front_matter`` or a ``report_preamble``
+    in a custom report.
+
+    Example usage::
+
+        from gpkit.report import feasibility_block, sensitivities_block
+
+        class Aircraft(Model):
+            ...
+
+        m = Aircraft()
+        sol = m.solve()
+        print(m.report(sol, fmt="md",
+                       front_matter=feasibility_block(m) + "\\n\\n"
+                                    + sensitivities_block()))
+    """
+    ctx = _model_stats(model)
+    obj_clause = (
+        f" It is currently set to minimize ${ctx['objective_latex']}$."
+        if ctx["objective_latex"]
+        else ""
+    )
+    return (
+        f"## Feasibility and Optimality\n\n"
+        f"This model has {ctx['n_free']} free variables and "
+        f"{ctx['n_constraints']} constraints involving these variables. "
+        f"The subset of the design space that satisfies all constraints "
+        f"simultaneously is the *feasible set*. If the problem is feasible, "
+        f"an objective function is minimized to choose among designs."
+        f"{obj_clause} A globally optimal *solution* is a set of "
+        f"{ctx['n_free']} free variable values that simultaneously satisfies "
+        f"all {ctx['n_constraints']} constraints and minimizes the objective. "
+        f"No other feasible solution can achieve a lower objective value."
+    )
+
+
+SENSITIVITIES_BLOCK = (
+    "## Sensitivities\n\n"
+    "When the convex optimization problem is solved, we obtain optimal values "
+    "of the free variables (the *primal solution*) as well as a *dual solution* "
+    "that can be translated to sensitivity information. Assume the sensitivity "
+    "to a constant $c$ is $s$. If the value of $c$ is increased by a factor "
+    "$\\epsilon$ and the problem re-solved, the optimal cost increases by a "
+    "factor $s \\cdot \\epsilon$. For example, a sensitivity of 1.5 means a "
+    "1% increase in $c$ causes the cost to increase by approximately 1.5%. "
+    "These point sensitivities come for free with the solve and give intuition "
+    "about how the solution would change if a parameter were varied. A positive "
+    "sensitivity means increasing that constant is detrimental; a negative "
+    "sensitivity means it is beneficial."
+)
+
+
+def sensitivities_block() -> str:
+    """Return a markdown explanation of GP dual solution / sensitivity information.
+
+    This text is model-independent and can be included in any GP report.
+    """
+    return SENSITIVITIES_BLOCK
+
+
 # ── Core builder ─────────────────────────────────────────────────────────────
 
 
@@ -364,8 +451,10 @@ def build_report_ir(
     solution : Solution, optional
         If provided, variable entries include solved values and sensitivities.
     front_matter : str, optional
-        Raw text/markdown prepended before the report.  Set only on the root
-        ReportSection; not propagated to children.
+        Raw text/markdown prepended before the root section.  For the root
+        model, caller-supplied *front_matter* is combined with the model's
+        ``report_preamble()`` (if any).  For child models, only
+        ``report_preamble()`` is used.
     toc : bool, optional
         If True, a table-of-contents marker is inserted by renderers that have
         a native TOC facility (e.g. ``[TOC]`` in Markdown).  Set only on the
@@ -386,8 +475,16 @@ def build_report_ir(
     )
     if is_anon:
         desc = {"summary": "", "assumptions": [], "references": []}
+        section_fm = front_matter
     else:
         desc = type(model).description()
+        preamble = type(model).report_preamble()
+        if preamble and front_matter:
+            section_fm = front_matter + "\n\n" + preamble
+        elif preamble:
+            section_fm = preamble
+        else:
+            section_fm = front_matter
     return ReportSection(
         title=own_name or "Model",
         description=desc["summary"],
@@ -400,11 +497,21 @@ def build_report_ir(
         fixed_variables=fixed_vars,
         constraint_groups=cgroups,
         lineage_map=lineage_map,
-        front_matter=front_matter,
+        front_matter=section_fm,
         toc=toc,
         **_build_objective(model, solution),
         children=[
-            build_report_ir(child, solution=solution, _parent_path=lineage_path)
+            build_report_ir(
+                child,
+                solution=solution,
+                _parent_path=lineage_path,
+                front_matter=(
+                    type(child).report_preamble()
+                    if type(child)
+                    is not _Model  # pylint: disable=unidiomatic-typecheck
+                    else ""
+                ),
+            )
             for child in model.submodels
         ],
     )
@@ -597,7 +704,6 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
     pad = _INDENT * indent
     lines: list = []
 
-    # Front matter (root only)
     if ir.front_matter:
         lines.append(ir.front_matter)
         lines.append("")
@@ -723,7 +829,7 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
     hdr = "#" * min(level, 6)
     lines: list = []
 
-    # Front matter and TOC marker (root only, before first heading)
+    # Front matter and TOC marker (before first heading)
     if ir.front_matter:
         lines.append(ir.front_matter)
         lines.append("")

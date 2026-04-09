@@ -343,7 +343,30 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
         ir_doc = json.loads(Path(path).read_text(encoding="utf-8"))
         return cls.from_ir(ir_doc)
 
-    def report(self, solution=None, fmt="text"):
+    @classmethod
+    def report_preamble(cls) -> str:
+        """Return optional markdown prose prepended before this model's report section.
+
+        Override in Model subclasses to attach section-specific context to a
+        specific part of a hierarchical report.  The returned string is placed
+        before the section heading (and before the model's description/variables
+        tables).
+
+        Example::
+
+            class Wing(Model):
+                @classmethod
+                def report_preamble(cls):
+                    return "This section covers aerodynamic and structural wing sizing."
+
+        For preambles that depend on model-specific counts (free variables,
+        constraints, objective), use :func:`gpkit.report.feasibility_block`
+        and :func:`gpkit.report.sensitivities_block` instead, and pass the
+        result via the *front_matter* argument of :meth:`report`.
+        """
+        return ""
+
+    def report(self, solution=None, fmt="text", front_matter="", toc=False):
         """Build a hierarchical report for this model.
 
         Parameters
@@ -352,11 +375,26 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
             If provided, variable tables include solved values and sensitivities.
         fmt : str
             Output format: "dict", "text", "md", or "latex".
+        front_matter : str, optional
+            Raw text/markdown prepended before the entire report (before the
+            root model's heading).  Combine with
+            :func:`gpkit.report.feasibility_block` and
+            :func:`gpkit.report.sensitivities_block` to add standard GP
+            explanatory text::
+
+                from gpkit.report import feasibility_block, sensitivities_block
+                m.report(sol, fmt="md",
+                         front_matter=feasibility_block(m) + "\\n\\n"
+                                      + sensitivities_block())
+        toc : bool, optional
+            If True, a table-of-contents marker is inserted (Markdown only).
         """
         # pylint: disable=import-outside-toplevel
         from .report import build_report_ir, render_report
 
-        ir = build_report_ir(self, solution=solution)
+        ir = build_report_ir(
+            self, solution=solution, front_matter=front_matter, toc=toc
+        )
         return render_report(ir, fmt=fmt)
 
     gp = progify(GeometricProgram)
