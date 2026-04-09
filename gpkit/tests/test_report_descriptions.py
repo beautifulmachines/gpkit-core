@@ -328,9 +328,8 @@ class TestObjective:
     """Tests for objective expression and value in ReportSection and renderers."""
 
     def _solved_box(self):
-        from gpkit.examples.simple_box import (
-            Box,  # pylint: disable=import-outside-toplevel
-        )
+        # pylint: disable=import-outside-toplevel
+        from gpkit.examples.simple_box import Box
 
         m = Box()
         sol = m.solve(verbosity=0)
