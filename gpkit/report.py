@@ -454,7 +454,7 @@ def feasibility_block(model) -> str:
         obj_clause = ""
     return (
         f"## Feasibility and Optimality\n\n"
-        f"This model has {ctx['n_free']} free variables and "
+        f"The model currently has {ctx['n_free']} free variables and "
         f"{ctx['n_constraints']} constraints. A design satisfying all "
         f"constraints is *feasible*; the set of all feasible designs is the "
         f"*feasible set*."
@@ -468,15 +468,15 @@ def feasibility_block(model) -> str:
 
 SENSITIVITIES_BLOCK = (
     "## Sensitivities\n\n"
-    "Each fixed parameter in the model has a *sensitivity* — a number that "
+    "Each fixed constant in the model has a *sensitivity* — a number that "
     "tells you how much the objective would change if that parameter changed. "
     "Specifically, if a constant $c$ has sensitivity $s$, then increasing $c$ "
-    "by 1% would change the objective by approximately $s$% (holding all other "
+    "by 1% would worsen the objective by approximately $s$% (holding all other "
     "constants fixed and re-solving). A sensitivity of 1.5 means a 1% increase "
-    "in that parameter drives the objective up by 1.5%; a sensitivity of −0.8 "
-    "means a 1% increase drives it down by 0.8%. "
+    "in that constant would worsen the objective by 1.5%; a sensitivity of −0.8 "
+    "means a 1% increase would improve the objective by 0.8%. "
     "Sensitivities with large magnitude flag the parameters that matter most; "
-    "near-zero sensitivities indicate parameters the design is robust to. "
+    "near-zero sensitivities indicate parameters the design is insensitive to. "
     "These numbers come for free alongside every solve — no extra computation "
     "required."
 )
