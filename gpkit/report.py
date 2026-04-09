@@ -80,6 +80,7 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
     )
     objective_str: str = ""  # text representation of cost expression; "" if constant
     objective_latex: str = ""  # LaTeX representation of cost expression
+    objective_label: str = ""  # variable label when expr is a single variable; else ""
     objective_value: Optional[float] = (
         None  # magnitude of attained cost; None if unsolved
     )
@@ -93,6 +94,7 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
             "lineage_path": self.lineage_path,
             "magic_prefix": self.magic_prefix,
             "objective_direction": self.objective_direction,
+            "objective_label": self.objective_label,
             "is_anonymous": self.is_anonymous,
             "description": self.description,
             "assumptions": list(self.assumptions),
@@ -363,18 +365,24 @@ def _build_objective(model, solution) -> dict:
         return {
             "objective_str": "",
             "objective_latex": "",
+            "objective_label": "",
             "objective_value": None,
             "objective_units": "",
             "objective_direction": "minimize",
         }
     is_recip, expr = _reciprocal_if_1_over_x(model.cost)
-    if is_recip:
-        cost_value = 1.0 / float(solution.cost) if solution is not None else None
-    else:
-        cost_value = float(solution.cost) if solution is not None else None
+    cost_value = (
+        (1.0 / float(solution.cost) if is_recip else float(solution.cost))
+        if solution is not None
+        else None
+    )
+    excluded = {"units", "lineage"}
+    vks = list(expr.vks)
+    label = vks[0].label if len(vks) == 1 else ""
     return {
-        "objective_str": expr.str_without({"units"}),
-        "objective_latex": expr.latex({"units"}),
+        "objective_str": expr.str_without(excluded),
+        "objective_latex": expr.latex(excluded),
+        "objective_label": label or "",
         "objective_value": cost_value,
         "objective_units": unitstr(expr),
         "objective_direction": "maximize" if is_recip else "minimize",
@@ -396,15 +404,20 @@ def _model_stats(model) -> dict:
     n_constraints = sum(1 for _ in model.flat())
     if model.cost.vks:
         is_recip, expr = _reciprocal_if_1_over_x(model.cost)
-        obj_latex = expr.latex({"units"})
+        excluded = {"units", "lineage"}
+        vks = list(expr.vks)
+        obj_latex = expr.latex(excluded)
+        obj_label = vks[0].label if len(vks) == 1 else ""
         obj_direction = "maximize" if is_recip else "minimize"
     else:
         obj_latex = None
+        obj_label = ""
         obj_direction = "minimize"
     return {
         "n_free": n_free,
         "n_constraints": n_constraints,
         "objective_latex": obj_latex,
+        "objective_label": obj_label or "",
         "objective_direction": obj_direction,
     }
 
@@ -432,9 +445,10 @@ def feasibility_block(model) -> str:
     ctx = _model_stats(model)
     if ctx["objective_latex"]:
         direction = ctx["objective_direction"]
+        label_clause = f", {ctx['objective_label']}" if ctx["objective_label"] else ""
         obj_clause = (
             f" The objective is currently set to {direction}"
-            f" ${ctx['objective_latex']}$."
+            f" ${ctx['objective_latex']}${label_clause}."
         )
     else:
         obj_clause = ""
@@ -712,8 +726,11 @@ def _text_prose_lines(ir: "ReportSection", pad: str) -> list:
             lines.append(f"{pad}    - {item}")
         lines.append("")
     if ir.objective_str:
+        label_clause = f", {ir.objective_label}" if ir.objective_label else ""
         lines.append(f"{pad}  Objective")
-        lines.append(f"{pad}    {ir.objective_direction}: {ir.objective_str}")
+        lines.append(
+            f"{pad}    {ir.objective_direction}: {ir.objective_str}{label_clause}"
+        )
         if ir.objective_value is not None:
             val_str = _fmt_value(ir.objective_value)
             lines.append(f"{pad}    attained: {val_str} {ir.objective_units}".rstrip())
@@ -837,8 +854,10 @@ def _md_prose_lines(ir: "ReportSection") -> list:
         lines.append(f"**References:** {'; '.join(ir.references)}")
         lines.append("")
     if ir.objective_str:
+        label_clause = f", {ir.objective_label}" if ir.objective_label else ""
         lines.append(
-            f"**Objective:** {ir.objective_direction} $${ir.objective_latex}$$"
+            f"**Objective:** {ir.objective_direction}"
+            f" $${ir.objective_latex}$${label_clause}"
         )
         if ir.objective_value is not None:
             val_str = _fmt_value(ir.objective_value)
