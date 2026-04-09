@@ -388,11 +388,16 @@ class TestObjective:
         assert ir.objective_units != ""
 
     def test_build_ir_populates_objective_solved(self):
-        """build_report_ir populates objective_value from solution."""
+        """build_report_ir populates objective_value from solution.
+
+        Box uses cost=1/(h*w*d), so the direction flips to "maximize" and
+        objective_value is the maximized volume (1/sol.cost), not sol.cost.
+        """
         m, sol = self._solved_box()
         ir = build_report_ir(m, solution=sol)
         assert ir.objective_value is not None
-        assert ir.objective_value == pytest.approx(sol.cost)
+        assert ir.objective_direction == "maximize"
+        assert ir.objective_value == pytest.approx(1.0 / sol.cost)
 
     def test_build_ir_objective_empty_for_constant_cost(self):
         """build_report_ir leaves objective fields empty when cost has no variables."""
@@ -431,18 +436,24 @@ class TestObjective:
         assert ir.children[0].objective_str == ""  # child does not
 
     def test_render_text_objective(self):
-        """render_text includes objective expression and value when present."""
+        """render_text includes objective expression and value when present.
+
+        Box uses cost=1/(h*w*d), so the direction is "maximize".
+        """
         m, sol = self._solved_box()
         out = m.report(solution=sol, fmt="text")
         assert "Objective" in out
-        assert "minimize" in out.lower()
+        assert "maximize" in out.lower()
 
     def test_render_markdown_objective(self):
-        """render_markdown includes objective heading and value when present."""
+        """render_markdown includes objective heading and value when present.
+
+        Box uses cost=1/(h*w*d), so the direction is "maximize".
+        """
         m, sol = self._solved_box()
         out = m.report(solution=sol, fmt="md")
         assert "Objective" in out
-        assert "minimize" in out.lower()
+        assert "maximize" in out.lower()
 
     def test_render_text_no_objective_when_empty(self):
         """render_text omits objective section when cost has no variables."""

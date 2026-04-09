@@ -83,6 +83,7 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
         None  # magnitude of attained cost; None if unsolved
     )
     objective_units: str = ""  # unit string for the cost expression
+    objective_direction: str = "minimize"  # "minimize" or "maximize"
 
     def to_dict(self) -> dict:
         """JSON-serializable dict (for format='dict' and future API)."""
@@ -90,6 +91,7 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
             "title": self.title,
             "lineage_path": self.lineage_path,
             "magic_prefix": self.magic_prefix,
+            "objective_direction": self.objective_direction,
             "is_anonymous": self.is_anonymous,
             "description": self.description,
             "assumptions": list(self.assumptions),
@@ -324,11 +326,30 @@ def _build_constraint_groups(model) -> List[CGroup]:
     return [CGroup(label="", constraints=own)] if own else []
 
 
+def _reciprocal_if_1_over_x(cost):
+    """Return (True, 1/cost) if cost is a single monomial 1/expr, else (False, cost).
+
+    Detects the pattern coeff=1, all-negative exponents — the 1/x form that
+    GPs use to express maximization.  Mirrors the TOML printer's _is_reciprocal
+    check but operates on the live cost object rather than the IR AST dict.
+    """
+    hmap = cost.hmap
+    if len(hmap) != 1:
+        return False, cost
+    (exp,) = hmap.keys()
+    coeff = hmap[exp]
+    exp_dict = dict(exp)
+    if abs(coeff - 1.0) < 1e-10 and exp_dict and all(v < 0 for v in exp_dict.values()):
+        return True, 1 / cost
+    return False, cost
+
+
 def _build_objective(model, solution) -> dict:
     """Return objective keyword args for ReportSection for the model's cost.
 
     All fields are empty/None when the cost has no variables (i.e. it is a
     trivial constant placeholder rather than a real optimization objective).
+    Detects the 1/expr pattern and flips direction to "maximize".
     """
     if not model.cost.vks:
         return {
@@ -336,12 +357,19 @@ def _build_objective(model, solution) -> dict:
             "objective_latex": "",
             "objective_value": None,
             "objective_units": "",
+            "objective_direction": "minimize",
         }
+    is_recip, expr = _reciprocal_if_1_over_x(model.cost)
+    if is_recip:
+        cost_value = 1.0 / float(solution.cost) if solution is not None else None
+    else:
+        cost_value = float(solution.cost) if solution is not None else None
     return {
-        "objective_str": model.cost.str_without({"units"}),
-        "objective_latex": model.cost.latex({"units"}),
-        "objective_value": float(solution.cost) if solution is not None else None,
-        "objective_units": unitstr(model.cost),
+        "objective_str": expr.str_without({"units"}),
+        "objective_latex": expr.latex({"units"}),
+        "objective_value": cost_value,
+        "objective_units": unitstr(expr),
+        "objective_direction": "maximize" if is_recip else "minimize",
     }
 
 
@@ -358,13 +386,18 @@ def _model_stats(model) -> dict:
     n_free = len(model.vks) - len(model.substitutions)
     # flat() returns a generator (flatiter), so use sum() rather than len().
     n_constraints = sum(1 for _ in model.flat())
-    obj_str = model.cost.str_without({"units"}) if model.cost.vks else None
-    obj_latex = model.cost.latex({"units"}) if model.cost.vks else None
+    if model.cost.vks:
+        is_recip, expr = _reciprocal_if_1_over_x(model.cost)
+        obj_latex = expr.latex({"units"})
+        obj_direction = "maximize" if is_recip else "minimize"
+    else:
+        obj_latex = None
+        obj_direction = "minimize"
     return {
         "n_free": n_free,
         "n_constraints": n_constraints,
-        "objective_str": obj_str,
         "objective_latex": obj_latex,
+        "objective_direction": obj_direction,
     }
 
 
@@ -390,7 +423,8 @@ def feasibility_block(model) -> str:
     """
     ctx = _model_stats(model)
     obj_clause = (
-        f" It is currently set to minimize ${ctx['objective_latex']}$."
+        f" It is currently set to {ctx['objective_direction']}"
+        f" ${ctx['objective_latex']}$."
         if ctx["objective_latex"]
         else ""
     )
@@ -501,17 +535,7 @@ def build_report_ir(
         toc=toc,
         **_build_objective(model, solution),
         children=[
-            build_report_ir(
-                child,
-                solution=solution,
-                _parent_path=lineage_path,
-                front_matter=(
-                    type(child).report_preamble()
-                    if type(child)
-                    is not _Model  # pylint: disable=unidiomatic-typecheck
-                    else ""
-                ),
-            )
+            build_report_ir(child, solution=solution, _parent_path=lineage_path)
             for child in model.submodels
         ],
     )
@@ -679,7 +703,7 @@ def _text_prose_lines(ir: "ReportSection", pad: str) -> list:
         lines.append("")
     if ir.objective_str:
         lines.append(f"{pad}  Objective")
-        lines.append(f"{pad}    minimize: {ir.objective_str}")
+        lines.append(f"{pad}    {ir.objective_direction}: {ir.objective_str}")
         if ir.objective_value is not None:
             val_str = _fmt_value(ir.objective_value)
             lines.append(f"{pad}    attained: {val_str} {ir.objective_units}".rstrip())
@@ -803,7 +827,9 @@ def _md_prose_lines(ir: "ReportSection") -> list:
         lines.append(f"**References:** {'; '.join(ir.references)}")
         lines.append("")
     if ir.objective_str:
-        lines.append(f"**Objective:** minimize $${ir.objective_latex}$$")
+        lines.append(
+            f"**Objective:** {ir.objective_direction} $${ir.objective_latex}$$"
+        )
         if ir.objective_value is not None:
             val_str = _fmt_value(ir.objective_value)
             attained = f"{val_str} {ir.objective_units}".rstrip()
