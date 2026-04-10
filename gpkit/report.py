@@ -490,6 +490,39 @@ def sensitivities_block() -> str:
     return SENSITIVITIES_BLOCK
 
 
+def objective_block(model, solution=None) -> str:
+    """Return a markdown summary of the model's objective for use in a report.
+
+    Shows the objective direction (minimize/maximize), the expression without
+    lineage, the variable label when the expression is a single variable, and
+    the attained value when *solution* is provided.
+
+    Like :func:`feasibility_block` and :func:`sensitivities_block`, this
+    returns a plain markdown string so it can be placed wherever the author
+    wants — front matter, a subsection preamble, or anywhere else.
+
+    Example::
+
+        from gpkit.report import objective_block
+        m.report(sol, fmt="md", front_matter=objective_block(m, sol))
+    """
+    if not model.cost.vks:
+        return ""
+    is_recip, expr = _reciprocal_if_1_over_x(model.cost)
+    excluded = {"units", "lineage"}
+    direction = "maximize" if is_recip else "minimize"
+    latex = expr.latex(excluded)
+    vks = list(expr.vks)
+    label_clause = f", {vks[0].label}" if len(vks) == 1 and vks[0].label else ""
+    lines = [f"**Objective:** {direction} ${latex}${label_clause}"]
+    if solution is not None:
+        cost_value = 1.0 / float(solution.cost) if is_recip else float(solution.cost)
+        val_str = _fmt_value(cost_value)
+        attained = f"{val_str} {unitstr(expr)}".rstrip()
+        lines.append(f"**Attained:** {attained}")
+    return "\n".join(lines)
+
+
 # ── Core builder ─────────────────────────────────────────────────────────────
 
 
@@ -855,9 +888,11 @@ def _md_prose_lines(ir: "ReportSection") -> list:
         lines.append("")
     if ir.objective_str:
         label_clause = f", {ir.objective_label}" if ir.objective_label else ""
+        # Inline math ($) keeps the label on the same line; display math ($$)
+        # creates a block that breaks the label and attained row onto new lines.
         lines.append(
             f"**Objective:** {ir.objective_direction}"
-            f" $${ir.objective_latex}$${label_clause}"
+            f" ${ir.objective_latex}${label_clause}"
         )
         if ir.objective_value is not None:
             val_str = _fmt_value(ir.objective_value)
