@@ -10,6 +10,7 @@ from typing import Any, List, Optional, Tuple
 
 from .constraints.tight import Tight
 from .model import Model as _Model
+from .nomials import Variable
 from .printing import _format_aligned_columns
 from .util.repr_conventions import unitstr
 from .util.small_classes import Quantity
@@ -79,10 +80,12 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
     )
     objective_str: str = ""  # text representation of cost expression; "" if constant
     objective_latex: str = ""  # LaTeX representation of cost expression
+    objective_label: str = ""  # variable label when expr is a single variable; else ""
     objective_value: Optional[float] = (
         None  # magnitude of attained cost; None if unsolved
     )
     objective_units: str = ""  # unit string for the cost expression
+    objective_direction: str = "minimize"  # "minimize" or "maximize"
 
     def to_dict(self) -> dict:
         """JSON-serializable dict (for format='dict' and future API)."""
@@ -90,6 +93,8 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
             "title": self.title,
             "lineage_path": self.lineage_path,
             "magic_prefix": self.magic_prefix,
+            "objective_direction": self.objective_direction,
+            "objective_label": self.objective_label,
             "is_anonymous": self.is_anonymous,
             "description": self.description,
             "assumptions": list(self.assumptions),
@@ -324,25 +329,199 @@ def _build_constraint_groups(model) -> List[CGroup]:
     return [CGroup(label="", constraints=own)] if own else []
 
 
+def _reciprocal_if_1_over_x(cost):
+    """Return (True, 1/cost) if cost is a single monomial 1/expr, else (False, cost).
+
+    Detects the pattern coeff=1, all-negative exponents — the 1/x form that
+    GPs use to express maximization.  Mirrors the TOML printer's _is_reciprocal
+    check but operates on the live cost object rather than the IR AST dict.
+    """
+    hmap = cost.hmap
+    if len(hmap) != 1:
+        return False, cost
+    (exp,) = hmap.keys()
+    coeff = hmap[exp]
+    exp_dict = dict(exp)
+    if abs(coeff - 1.0) < 1e-10 and exp_dict and all(v < 0 for v in exp_dict.values()):
+        # Build the inner expression from VarKeys rather than computing 1/cost.
+        # 1/cost encodes div(1, cost.ast) in its AST, causing str/latex to
+        # render as 1/(1/x) instead of x.
+        inner = None
+        for vk, e in exp_dict.items():
+            term = Variable(vk) if e == -1 else Variable(vk) ** (-e)
+            inner = term if inner is None else inner * term
+        return True, inner
+    return False, cost
+
+
 def _build_objective(model, solution) -> dict:
     """Return objective keyword args for ReportSection for the model's cost.
 
     All fields are empty/None when the cost has no variables (i.e. it is a
     trivial constant placeholder rather than a real optimization objective).
+    Detects the 1/expr pattern and flips direction to "maximize".
     """
     if not model.cost.vks:
         return {
             "objective_str": "",
             "objective_latex": "",
+            "objective_label": "",
             "objective_value": None,
             "objective_units": "",
+            "objective_direction": "minimize",
         }
+    is_recip, expr = _reciprocal_if_1_over_x(model.cost)
+    cost_value = (
+        (1.0 / float(solution.cost) if is_recip else float(solution.cost))
+        if solution is not None
+        else None
+    )
+    excluded = {"units", "lineage"}
+    vks = list(expr.vks)
+    label = vks[0].label if len(vks) == 1 else ""
     return {
-        "objective_str": model.cost.str_without({"units"}),
-        "objective_latex": model.cost.latex({"units"}),
-        "objective_value": float(solution.cost) if solution is not None else None,
-        "objective_units": unitstr(model.cost),
+        "objective_str": expr.str_without(excluded),
+        "objective_latex": expr.latex(excluded),
+        "objective_label": label or "",
+        "objective_value": cost_value,
+        "objective_units": unitstr(expr),
+        "objective_direction": "maximize" if is_recip else "minimize",
     }
+
+
+# ── Standard text blocks ──────────────────────────────────────────────────────
+
+
+def _model_stats(model) -> dict:
+    """Compute model-wide counts for use in report text blocks.
+
+    Returns a dict with keys: n_free, n_constraints, objective_str,
+    objective_latex.  All values are derived from the model without requiring
+    a solved solution.
+    """
+    n_free = len(model.vks) - len(model.substitutions)
+    # flat() returns a generator (flatiter), so use sum() rather than len().
+    n_constraints = sum(1 for _ in model.flat())
+    if model.cost.vks:
+        is_recip, expr = _reciprocal_if_1_over_x(model.cost)
+        excluded = {"units", "lineage"}
+        vks = list(expr.vks)
+        obj_latex = expr.latex(excluded)
+        obj_label = vks[0].label if len(vks) == 1 else ""
+        obj_direction = "maximize" if is_recip else "minimize"
+    else:
+        obj_latex = None
+        obj_label = ""
+        obj_direction = "minimize"
+    return {
+        "n_free": n_free,
+        "n_constraints": n_constraints,
+        "objective_latex": obj_latex,
+        "objective_label": obj_label or "",
+        "objective_direction": obj_direction,
+    }
+
+
+def feasibility_block(model) -> str:
+    """Return a markdown explanation of feasibility and optimality for *model*.
+
+    Fills in the number of free variables, constraints, and current objective
+    expression.  Suitable for use as ``front_matter`` or a ``report_preamble``
+    in a custom report.
+
+    Example usage::
+
+        from gpkit.report import feasibility_block, sensitivities_block
+
+        class Aircraft(Model):
+            ...
+
+        m = Aircraft()
+        sol = m.solve()
+        print(m.report(sol, fmt="md",
+                       front_matter=feasibility_block(m) + "\\n\\n"
+                                    + sensitivities_block()))
+    """
+    ctx = _model_stats(model)
+    if ctx["objective_latex"]:
+        direction = ctx["objective_direction"]
+        label_clause = f", {ctx['objective_label']}" if ctx["objective_label"] else ""
+        obj_clause = (
+            f" The objective is currently set to {direction}"
+            f" ${ctx['objective_latex']}${label_clause}."
+        )
+    else:
+        obj_clause = ""
+    return (
+        f"## Feasibility and Optimality\n\n"
+        f"The model currently has {ctx['n_free']} free variables and "
+        f"{ctx['n_constraints']} constraints. A design satisfying all "
+        f"constraints is *feasible*; the set of all feasible designs is the "
+        f"*feasible set*."
+        f"{obj_clause} "
+        f"The solver finds a globally optimal solution — the unique feasible "
+        f"design that cannot be improved further — with a reliable, efficient "
+        f"algorithm. This guarantee comes from the convex structure of the "
+        f"problem, not from luck or tuning."
+    )
+
+
+SENSITIVITIES_BLOCK = (
+    "## Sensitivities\n\n"
+    "Each fixed constant in the model has a *sensitivity* — a number that "
+    "tells you how much the objective would change if that parameter changed. "
+    "Specifically, if a constant $c$ has sensitivity $s$, then increasing $c$ "
+    "by 1% would worsen the objective by approximately $s$% (holding all other "
+    "constants fixed and re-solving). A sensitivity of 1.5 means a 1% increase "
+    "in that constant would worsen the objective by 1.5%; a sensitivity of −0.8 "
+    "means a 1% increase would improve the objective by 0.8%. "
+    "Sensitivities with large magnitude flag the parameters that matter most; "
+    "near-zero sensitivities indicate parameters the design is insensitive to. "
+    "These numbers come for free alongside every solve — no extra computation "
+    "required."
+)
+
+
+def sensitivities_block() -> str:
+    """Return a markdown explanation of GP dual solution / sensitivity information.
+
+    This text is model-independent and can be included in any GP report.
+    """
+    return SENSITIVITIES_BLOCK
+
+
+def objective_block(model, solution=None) -> str:
+    """Return a markdown summary of the model's objective for use in a report.
+
+    Shows the objective direction (minimize/maximize), the expression without
+    lineage, the variable label when the expression is a single variable, and
+    the attained value when *solution* is provided.
+
+    Like :func:`feasibility_block` and :func:`sensitivities_block`, this
+    returns a plain markdown string so it can be placed wherever the author
+    wants — front matter, a subsection preamble, or anywhere else.
+
+    Example::
+
+        from gpkit.report import objective_block
+        m.report(sol, fmt="md", front_matter=objective_block(m, sol))
+    """
+    if not model.cost.vks:
+        return ""
+    is_recip, expr = _reciprocal_if_1_over_x(model.cost)
+    excluded = {"units", "lineage"}
+    direction = "maximize" if is_recip else "minimize"
+    latex = expr.latex(excluded)
+    vks = list(expr.vks)
+    label_clause = f", {vks[0].label}" if len(vks) == 1 and vks[0].label else ""
+    lines = [f"**Objective:** {direction} ${latex}${label_clause}"]
+    if solution is not None:
+        cost_value = 1.0 / float(solution.cost) if is_recip else float(solution.cost)
+        val_str = _fmt_value(cost_value)
+        attained = f"{val_str} {unitstr(expr)}".rstrip()
+        lines.append("")
+        lines.append(f"**Attained:** {attained}")
+    return "\n".join(lines)
 
 
 # ── Core builder ─────────────────────────────────────────────────────────────
@@ -364,8 +543,10 @@ def build_report_ir(
     solution : Solution, optional
         If provided, variable entries include solved values and sensitivities.
     front_matter : str, optional
-        Raw text/markdown prepended before the report.  Set only on the root
-        ReportSection; not propagated to children.
+        Raw text/markdown prepended before the root section.  For the root
+        model, caller-supplied *front_matter* is combined with the model's
+        ``report_preamble()`` (if any).  For child models, only
+        ``report_preamble()`` is used.
     toc : bool, optional
         If True, a table-of-contents marker is inserted by renderers that have
         a native TOC facility (e.g. ``[TOC]`` in Markdown).  Set only on the
@@ -386,8 +567,16 @@ def build_report_ir(
     )
     if is_anon:
         desc = {"summary": "", "assumptions": [], "references": []}
+        section_fm = front_matter
     else:
         desc = type(model).description()
+        preamble = type(model).report_preamble()
+        if preamble and front_matter:
+            section_fm = front_matter + "\n\n" + preamble
+        elif preamble:
+            section_fm = preamble
+        else:
+            section_fm = front_matter
     return ReportSection(
         title=own_name or "Model",
         description=desc["summary"],
@@ -400,7 +589,7 @@ def build_report_ir(
         fixed_variables=fixed_vars,
         constraint_groups=cgroups,
         lineage_map=lineage_map,
-        front_matter=front_matter,
+        front_matter=section_fm,
         toc=toc,
         **_build_objective(model, solution),
         children=[
@@ -570,13 +759,6 @@ def _text_prose_lines(ir: "ReportSection", pad: str) -> list:
         for item in ir.references:
             lines.append(f"{pad}    - {item}")
         lines.append("")
-    if ir.objective_str:
-        lines.append(f"{pad}  Objective")
-        lines.append(f"{pad}    minimize: {ir.objective_str}")
-        if ir.objective_value is not None:
-            val_str = _fmt_value(ir.objective_value)
-            lines.append(f"{pad}    attained: {val_str} {ir.objective_units}".rstrip())
-        lines.append("")
     return lines
 
 
@@ -597,7 +779,6 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
     pad = _INDENT * indent
     lines: list = []
 
-    # Front matter (root only)
     if ir.front_matter:
         lines.append(ir.front_matter)
         lines.append("")
@@ -696,13 +877,6 @@ def _md_prose_lines(ir: "ReportSection") -> list:
     if ir.references:
         lines.append(f"**References:** {'; '.join(ir.references)}")
         lines.append("")
-    if ir.objective_str:
-        lines.append(f"**Objective:** minimize $${ir.objective_latex}$$")
-        if ir.objective_value is not None:
-            val_str = _fmt_value(ir.objective_value)
-            attained = f"{val_str} {ir.objective_units}".rstrip()
-            lines.append(f"**Attained:** {attained}")
-        lines.append("")
     return lines
 
 
@@ -723,7 +897,7 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
     hdr = "#" * min(level, 6)
     lines: list = []
 
-    # Front matter and TOC marker (root only, before first heading)
+    # Front matter and TOC marker (before first heading)
     if ir.front_matter:
         lines.append(ir.front_matter)
         lines.append("")

@@ -26,7 +26,12 @@ def nomial_latex_helper(c, pos_vars, neg_vars):
             cstr = f"{cstr[:idx]} \\times 10^{{int(cstr[idx + 1:])}}"
 
     if pos_vars and neg_vars:
-        return f"{cstr}\\frac{{{pvarstr}}}{{{nvarstr}}}"
+        if cstr in (
+            "",
+            "-",
+        ):  # coefficient is ±1; sign (or nothing) before the fraction
+            return f"{cstr}\\frac{{{pvarstr}}}{{{nvarstr}}}"
+        return f"\\frac{{{cstr} {pvarstr}}}{{{nvarstr}}}"  # numeric coeff in numerator
     if neg_vars and not pos_vars:
         return f"\\frac{{{cstr}}}{{{nvarstr}}}"
     if pos_vars:
