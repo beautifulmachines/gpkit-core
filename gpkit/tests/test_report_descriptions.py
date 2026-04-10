@@ -12,6 +12,7 @@ from gpkit import Model, Variable
 from gpkit.report import (
     ReportSection,
     build_report_ir,
+    objective_block,
     render_markdown,
     render_text,
 )
@@ -437,8 +438,6 @@ class TestObjective:
 
     def test_render_text_objective(self):
         """Objective is no longer auto-rendered; use objective_block() instead."""
-        from gpkit.report import objective_block
-
         m, sol = self._solved_box()
         out = m.report(solution=sol, fmt="text")
         assert "Objective" not in out  # removed from auto-render
@@ -448,8 +447,6 @@ class TestObjective:
 
     def test_render_markdown_objective(self):
         """Objective is no longer auto-rendered; use objective_block() instead."""
-        from gpkit.report import objective_block
-
         m, sol = self._solved_box()
         out = m.report(solution=sol, fmt="md")
         assert "Objective" not in out  # removed from auto-render
