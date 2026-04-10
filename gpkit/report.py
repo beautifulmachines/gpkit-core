@@ -519,6 +519,7 @@ def objective_block(model, solution=None) -> str:
         cost_value = 1.0 / float(solution.cost) if is_recip else float(solution.cost)
         val_str = _fmt_value(cost_value)
         attained = f"{val_str} {unitstr(expr)}".rstrip()
+        lines.append("")
         lines.append(f"**Attained:** {attained}")
     return "\n".join(lines)
 
@@ -758,16 +759,6 @@ def _text_prose_lines(ir: "ReportSection", pad: str) -> list:
         for item in ir.references:
             lines.append(f"{pad}    - {item}")
         lines.append("")
-    if ir.objective_str:
-        label_clause = f", {ir.objective_label}" if ir.objective_label else ""
-        lines.append(f"{pad}  Objective")
-        lines.append(
-            f"{pad}    {ir.objective_direction}: {ir.objective_str}{label_clause}"
-        )
-        if ir.objective_value is not None:
-            val_str = _fmt_value(ir.objective_value)
-            lines.append(f"{pad}    attained: {val_str} {ir.objective_units}".rstrip())
-        lines.append("")
     return lines
 
 
@@ -885,19 +876,6 @@ def _md_prose_lines(ir: "ReportSection") -> list:
         lines.append("")
     if ir.references:
         lines.append(f"**References:** {'; '.join(ir.references)}")
-        lines.append("")
-    if ir.objective_str:
-        label_clause = f", {ir.objective_label}" if ir.objective_label else ""
-        # Inline math ($) keeps the label on the same line; display math ($$)
-        # creates a block that breaks the label and attained row onto new lines.
-        lines.append(
-            f"**Objective:** {ir.objective_direction}"
-            f" ${ir.objective_latex}${label_clause}"
-        )
-        if ir.objective_value is not None:
-            val_str = _fmt_value(ir.objective_value)
-            attained = f"{val_str} {ir.objective_units}".rstrip()
-            lines.append(f"**Attained:** {attained}")
         lines.append("")
     return lines
 

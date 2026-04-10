@@ -436,24 +436,26 @@ class TestObjective:
         assert ir.children[0].objective_str == ""  # child does not
 
     def test_render_text_objective(self):
-        """render_text includes objective expression and value when present.
+        """Objective is no longer auto-rendered; use objective_block() instead."""
+        from gpkit.report import objective_block
 
-        Box uses cost=1/(h*w*d), so the direction is "maximize".
-        """
         m, sol = self._solved_box()
         out = m.report(solution=sol, fmt="text")
-        assert "Objective" in out
-        assert "maximize" in out.lower()
+        assert "Objective" not in out  # removed from auto-render
+        block = objective_block(m, sol)
+        assert "maximize" in block.lower()
+        assert "Attained" in block
 
     def test_render_markdown_objective(self):
-        """render_markdown includes objective heading and value when present.
+        """Objective is no longer auto-rendered; use objective_block() instead."""
+        from gpkit.report import objective_block
 
-        Box uses cost=1/(h*w*d), so the direction is "maximize".
-        """
         m, sol = self._solved_box()
         out = m.report(solution=sol, fmt="md")
-        assert "Objective" in out
-        assert "maximize" in out.lower()
+        assert "Objective" not in out  # removed from auto-render
+        block = objective_block(m, sol)
+        assert "maximize" in block.lower()
+        assert "Attained" in block
 
     def test_render_text_no_objective_when_empty(self):
         """render_text omits objective section when cost has no variables."""
