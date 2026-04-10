@@ -347,6 +347,36 @@ class TestRenderText:
         # Should contain variable names from constraints
         assert "x_ca" in result
 
+    def test_report_section_order_text(self):
+        """Constraints appear before Optimized/Fixed Variables in text output."""
+
+        class _OrderM(Model):
+            def setup(self):
+                x = Variable("x_ord_t")
+                x_max = Variable("x_ord_max", 10)
+                return [x >= 2, x <= x_max]
+
+        m = _OrderM()
+        sol = m.solve(verbosity=0)
+        result = m.report(solution=sol, fmt="text")
+        assert result.index("Constraints") < result.index("Optimized Variables")
+        assert result.index("Optimized Variables") < result.index("Fixed Variables")
+
+    def test_report_section_order_markdown(self):
+        """Constraints appear before Optimized/Fixed Variables in markdown output."""
+
+        class _OrderMd(Model):
+            def setup(self):
+                x = Variable("x_ord_md")
+                x_max = Variable("x_ord_md_max", 10)
+                return [x >= 2, x <= x_max]
+
+        m = _OrderMd()
+        sol = m.solve(verbosity=0)
+        result = m.report(solution=sol, fmt="md")
+        assert result.index("Constraints") < result.index("Optimized Variables")
+        assert result.index("Optimized Variables") < result.index("Fixed Variables")
+
     def test_report_text_with_solution(self):
         """model.report(solution=sol, fmt='text') includes variable values."""
 
