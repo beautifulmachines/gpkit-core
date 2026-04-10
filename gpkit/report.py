@@ -793,6 +793,9 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
 
     lines.extend(_text_prose_lines(ir, pad))
 
+    # Constraint groups
+    lines.extend(_text_cgroup_lines(ir.constraint_groups, pad, ir.lineage_map))
+
     # Optimized Variables table (primal — no sensitivity column)
     if ir.free_variables:
         lines.append(f"{pad}  Optimized Variables")
@@ -806,9 +809,6 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
         for row_line in _text_var_rows(ir.fixed_variables, include_sensitivity=True):
             lines.append(f"{pad}    {row_line}")
         lines.append("")
-
-    # Constraint groups
-    lines.extend(_text_cgroup_lines(ir.constraint_groups, pad, ir.lineage_map))
 
     # Children (recursive)
     for child in ir.children:
@@ -916,20 +916,6 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
 
     lines.extend(_md_prose_lines(ir))
 
-    # Optimized Variables pipe table (no sensitivity column)
-    if ir.free_variables:
-        lines.append("**Optimized Variables**")
-        lines.append("")
-        lines.extend(_md_var_table(ir.free_variables))
-        lines.append("")
-
-    # Fixed Variables pipe table (value | units | sensitivity | label)
-    if ir.fixed_variables:
-        lines.append("**Fixed Variables**")
-        lines.append("")
-        lines.extend(_md_var_table(ir.fixed_variables, include_sensitivity=True))
-        lines.append("")
-
     # Constraint groups
     excluded = ("units", ":MAGIC:" + ir.magic_prefix) if ir.magic_prefix else ("units",)
     for cg in ir.constraint_groups:
@@ -946,6 +932,20 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
                 lines.append(f"{c_latex} \\\\")
             lines.append("\\end{aligned}$$")
             lines.append("")
+
+    # Optimized Variables pipe table (no sensitivity column)
+    if ir.free_variables:
+        lines.append("**Optimized Variables**")
+        lines.append("")
+        lines.extend(_md_var_table(ir.free_variables))
+        lines.append("")
+
+    # Fixed Variables pipe table (value | units | sensitivity | label)
+    if ir.fixed_variables:
+        lines.append("**Fixed Variables**")
+        lines.append("")
+        lines.extend(_md_var_table(ir.fixed_variables, include_sensitivity=True))
+        lines.append("")
 
     # Children (recursive)
     for child in ir.children:
