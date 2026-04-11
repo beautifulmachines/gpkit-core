@@ -6,6 +6,7 @@ import pytest
 
 import gpkit
 from gpkit import Model, Variable
+from gpkit.constraints.tight import Tight
 from gpkit.report import (
     CGroup,
     ReportSection,
@@ -165,6 +166,40 @@ class TestBuildReportIR:
         group_labels = [cg.label for cg in ir.constraint_groups]
         assert "Drag" in group_labels
         assert "Lift" in group_labels
+
+    def test_build_report_ir_dict_cgroups_with_tight(self):
+        """dict cgroups with Tight-wrapped list produce leaf CGroup constraints."""
+
+        class _RSDictTight(Model):
+            def setup(self):
+                x = Variable("x_rsdt")
+                y = Variable("y_rsdt")
+                return {"Structural": [Tight([x >= 1, y >= x])]}
+
+        m = _RSDictTight()
+        ir = build_report_ir(m)
+        assert ir.constraint_groups[0].label == "Structural"
+        # Tight should be unwrapped: two leaf constraints, not a Tight object
+        for c in ir.constraint_groups[0].constraints:
+            assert not isinstance(
+                c, Tight
+            ), "Tight should be unwrapped into leaf constraints"
+
+    def test_report_md_dict_cgroups_with_tight(self):
+        """model.report(fmt='md') with Tight in dict cgroups must not raise."""
+
+        class _MDDictTight(Model):
+            def setup(self):
+                x = Variable("x_mddt")
+                y = Variable("y_mddt")
+                return {"Structural": [Tight([x >= 1, y >= x])]}
+
+        m = _MDDictTight()
+        # previously raised TypeError: unexpected keyword argument 'aligned'
+        result = m.report(fmt="md")
+        assert "Structural" in result
+        # variable names appear in LaTeX form, e.g. x_{\text{mddt}}
+        assert "mddt" in result
 
     def test_var_entry_uses_pretty_unit_format(self):
         """build_report_ir uses platform-appropriate pretty format in VarEntry.units."""
