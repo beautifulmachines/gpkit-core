@@ -299,33 +299,48 @@ def _build_split_var_entries(
     return free_entries, fixed_entries
 
 
+def _collect_leaf_constraints(container) -> list:
+    """Recursively collect single-equation leaf constraints from a container.
+
+    Unwraps Tight; skips other ConstraintSet subclasses and Models (identified
+    by unique_varkeys); flattens lists and tuples.
+
+    Known limitation: only Tight is unwrapped. Other transparent wrappers
+    (Loose, Bounded, SignomialEquality, ConstraintsRelaxed*) are silently
+    dropped — the isinstance(Tight) check is not a principled protocol.
+    """
+    result = []
+    for item in container:
+        if isinstance(item, Tight):
+            result.extend(_collect_leaf_constraints(item))
+        elif hasattr(item, "unique_varkeys"):
+            pass  # skip child Models and other ConstraintSet subclasses
+        elif isinstance(item, (list, tuple)):
+            result.extend(_collect_leaf_constraints(item))
+        else:
+            result.append(item)
+    return result
+
+
 def _build_constraint_groups(model) -> List[CGroup]:
     """Build CGroup list from model.cgroups or a single unnamed group.
 
-    Raw constraint objects are stored; renderers call str() or .latex() as
-    appropriate. to_dict() serializes via str().
+    CGroup.constraints holds only leaf (single-equation) constraints;
+    Tight wrappers are unwrapped so every item accepts .latex(excluded,
+    aligned=True). Raw objects are stored; renderers call str() or .latex().
     """
     if model.cgroups is not None:
         return [
             CGroup(
                 label=label,
-                constraints=list(items if isinstance(items, list) else [items]),
+                constraints=_collect_leaf_constraints(
+                    items if isinstance(items, list) else [items]
+                ),
             )
             for label, items in model.cgroups.items()
         ]
 
-    def _collect_own(container):
-        for item in container:
-            if isinstance(item, Tight):
-                yield from _collect_own(item)  # treat contents as bare constraints
-            elif hasattr(item, "unique_varkeys"):
-                continue  # skip child Models and ConstraintSets
-            elif isinstance(item, (list, tuple)):
-                yield from _collect_own(item)
-            else:
-                yield item
-
-    own = list(_collect_own(model))
+    own = _collect_leaf_constraints(model)
     return [CGroup(label="", constraints=own)] if own else []
 
 
