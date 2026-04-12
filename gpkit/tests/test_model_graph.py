@@ -88,6 +88,28 @@ class TestModelGraph:
         m = _MGOuter()
         assert m.submodels == [m.inner]
 
+    def test_two_identical_empty_children_both_registered(self):
+        """Two distinct instances of an empty model must both appear in _children.
+
+        Regression: _scan_for_children used list `in` (which calls __eq__) rather
+        than identity checks, so two empty models ([] == []) collapsed to one.
+        """
+
+        class _EmptyChild(Model):
+            def setup(self):
+                return []
+
+        class _Parent(Model):
+            def setup(self):
+                c1 = _EmptyChild()
+                c2 = _EmptyChild()
+                self.cost = Variable("W")
+                return [self.cost >= 1, c1, c2]
+
+        p = _Parent()
+        assert len(p.submodels) == 2
+        assert p.submodels[0] is not p.submodels[1]
+
     def test_children_of_same_class_are_distinguishable(self):
         """Two children of the same class are distinguished by attr name."""
 
