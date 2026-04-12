@@ -91,7 +91,7 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
         # instances — only direct Model instances count.
         def _scan_for_children(items):
             if isinstance(items, Model):
-                if items not in self._children:
+                if not any(items is child for child in self._children):
                     self._children.append(items)
             elif isinstance(items, dict):
                 for item in items.values():
@@ -124,7 +124,9 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
             _scan_for_children(constraints)
             # Map attribute names to child models (for get_var() path resolution)
             for attr_name, val in list(self.__dict__.items()):
-                if isinstance(val, Model) and val in self._children:
+                if isinstance(val, Model) and any(
+                    val is child for child in self._children
+                ):
                     self._child_attrs[attr_name] = val
         else:
             if args and not substitutions:
