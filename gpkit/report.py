@@ -10,7 +10,6 @@ from typing import Any, List, Optional, Tuple
 
 from .constraints.tight import Tight
 from .model import Model as _Model
-from .nomials import Variable
 from .printing import _format_aligned_columns
 from .util.repr_conventions import unitstr
 from .util.small_classes import Quantity
@@ -344,31 +343,6 @@ def _build_constraint_groups(model) -> List[CGroup]:
     return [CGroup(label="", constraints=own)] if own else []
 
 
-def _reciprocal_if_1_over_x(cost):
-    """Return (True, 1/cost) if cost is a single monomial 1/expr, else (False, cost).
-
-    Detects the pattern coeff=1, all-negative exponents — the 1/x form that
-    GPs use to express maximization.  Mirrors the TOML printer's _is_reciprocal
-    check but operates on the live cost object rather than the IR AST dict.
-    """
-    hmap = cost.hmap
-    if len(hmap) != 1:
-        return False, cost
-    (exp,) = hmap.keys()
-    coeff = hmap[exp]
-    exp_dict = dict(exp)
-    if abs(coeff - 1.0) < 1e-10 and exp_dict and all(v < 0 for v in exp_dict.values()):
-        # Build the inner expression from VarKeys rather than computing 1/cost.
-        # 1/cost encodes div(1, cost.ast) in its AST, causing str/latex to
-        # render as 1/(1/x) instead of x.
-        inner = None
-        for vk, e in exp_dict.items():
-            term = Variable(vk) if e == -1 else Variable(vk) ** (-e)
-            inner = term if inner is None else inner * term
-        return True, inner
-    return False, cost
-
-
 def _build_objective(model, solution) -> dict:
     """Return objective keyword args for ReportSection for the model's cost.
 
@@ -385,22 +359,15 @@ def _build_objective(model, solution) -> dict:
             "objective_units": "",
             "objective_direction": "minimize",
         }
-    is_recip, expr = _reciprocal_if_1_over_x(model.cost)
-    cost_value = (
-        (1.0 / float(solution.cost) if is_recip else float(solution.cost))
-        if solution is not None
-        else None
-    )
+    obj = model.objective_info(solution=solution)
     excluded = {"units", "lineage"}
-    vks = list(expr.vks)
-    label = vks[0].label if len(vks) == 1 else ""
     return {
-        "objective_str": expr.str_without(excluded),
-        "objective_latex": expr.latex(excluded),
-        "objective_label": label or "",
-        "objective_value": cost_value,
-        "objective_units": unitstr(expr),
-        "objective_direction": "maximize" if is_recip else "minimize",
+        "objective_str": obj.expr.str_without(excluded),
+        "objective_latex": obj.expr.latex(excluded),
+        "objective_label": (obj.variable.label or "") if obj.variable else "",
+        "objective_value": obj.value,
+        "objective_units": obj.units,
+        "objective_direction": obj.sense,
     }
 
 
@@ -418,12 +385,11 @@ def _model_stats(model) -> dict:
     # flat() returns a generator (flatiter), so use sum() rather than len().
     n_constraints = sum(1 for _ in model.flat())
     if model.cost.vks:
-        is_recip, expr = _reciprocal_if_1_over_x(model.cost)
+        obj = model.objective_info()
         excluded = {"units", "lineage"}
-        vks = list(expr.vks)
-        obj_latex = expr.latex(excluded)
-        obj_label = vks[0].label if len(vks) == 1 else ""
-        obj_direction = "maximize" if is_recip else "minimize"
+        obj_latex = obj.expr.latex(excluded)
+        obj_label = (obj.variable.label or "") if obj.variable else ""
+        obj_direction = obj.sense
     else:
         obj_latex = None
         obj_label = ""
@@ -523,17 +489,16 @@ def objective_block(model, solution=None) -> str:
     """
     if not model.cost.vks:
         return ""
-    is_recip, expr = _reciprocal_if_1_over_x(model.cost)
+    obj = model.objective_info(solution=solution)
     excluded = {"units", "lineage"}
-    direction = "maximize" if is_recip else "minimize"
-    latex = expr.latex(excluded)
-    vks = list(expr.vks)
-    label_clause = f", {vks[0].label}" if len(vks) == 1 and vks[0].label else ""
-    lines = [f"**Objective:** {direction} ${latex}${label_clause}"]
+    latex = obj.expr.latex(excluded)
+    label_clause = (
+        f", {obj.variable.label}" if obj.variable and obj.variable.label else ""
+    )
+    lines = [f"**Objective:** {obj.sense} ${latex}${label_clause}"]
     if solution is not None:
-        cost_value = 1.0 / float(solution.cost) if is_recip else float(solution.cost)
-        val_str = _fmt_value(cost_value)
-        attained = f"{val_str} {unitstr(expr)}".rstrip()
+        val_str = _fmt_value(obj.value)
+        attained = f"{val_str} {obj.units}".rstrip()
         lines.append("")
         lines.append(f"**Attained:** {attained}")
     return "\n".join(lines)
