@@ -1010,4 +1010,31 @@ def test_vectorized_block_marker():
     assert child.vectorized_block
 
 
+def test_n_free_and_n_constraints():
+    """n_free and n_constraints return correct counts."""
+
+    class _M(Model):
+        def setup(self):
+            x = Variable("x")
+            y = Variable("y")
+            return [x >= 1, y >= x, x * y <= 10]
+
+    m = _M()
+    assert m.n_free == 2
+    assert m.n_constraints == 3
+
+    m.substitutions.update({"x": 2})
+    assert m.n_free == 1  # x is now fixed
+
+    class _Nested(Model):
+        def setup(self):
+            a = Variable("a")
+            child = _M()
+            return [a >= 1, child]
+
+    mn = _Nested()
+    assert mn.n_free == 3  # a + x + y
+    assert mn.n_constraints == 4  # a>=1 plus 3 from child
+
+
 # ── Task 1: _cgroups from dict setup() ──────────────────────────────────────

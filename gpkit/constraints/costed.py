@@ -121,3 +121,13 @@ class CostedConstraintSet(ConstraintSet):
         return Objective(
             sense=sense, expr=expr, variable=variable, units=units, value=value
         )
+
+    @property
+    def n_free(self):
+        """Number of variables not fixed by substitutions."""
+        return len(self.vks) - len(self.substitutions)
+
+    @property
+    def n_constraints(self):
+        """Total number of constraints in this model and its children."""
+        return sum(1 for _ in self.flat())
