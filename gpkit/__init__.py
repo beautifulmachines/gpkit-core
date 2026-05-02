@@ -5,6 +5,7 @@ __version__ = "0.3.6"
 import numpy as _np
 
 from .ast_nodes import PiNode as _PiNode
+from .constraints import growth as _growth  # noqa: F401  (attaches methods to Variable)
 from .constraints.costed import Objective
 from .constraints.set import ConstraintSet
 from .constraints.sigeq import SignomialEquality
