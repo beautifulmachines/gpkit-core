@@ -479,6 +479,12 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
             if fixed:
                 msg += f" after substituting {fixed}."
             raise PrimalInfeasible(msg)
+        if not coeff:
+            raise InvalidGPConstraint(
+                "Degenerate constraint: all monomials evaluated to zero"
+                " coefficient. Check that no substituted value forces a"
+                f" constraint coefficient to zero. Constraint: {self}"
+            )
         scaled = hmap / coeff
         scaled.units = hmap.units
         del scaled[EMPTY_HV]
