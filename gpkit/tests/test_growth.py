@@ -4,7 +4,7 @@ import pickle
 
 import pytest
 
-from gpkit import Model, Variable, VarKey
+from gpkit import Model, Var, Variable, VarKey, units
 from gpkit.nomials.growth import theta
 
 
@@ -97,6 +97,39 @@ class TestThetaSingleton:
         sol = model.solve(verbosity=0)
         assert sol[m.growth].to("kg").magnitude == pytest.approx(50.0)
         assert sol[m].to("kg").magnitude == pytest.approx(150.0)
+
+
+class TestVarDescriptorGrowth:
+    """The Var class-level descriptor accepts and propagates growth=..."""
+
+    def test_var_descriptor_accepts_growth(self):
+        class Wing(Model):
+            "Test fixture: wing mass with a 25% growth allowance."
+
+            m = Var("kg", "wing mass", growth=0.25)
+
+            def setup(self):
+                e = Variable("e", 100, "kg")
+                self.cost = self.m
+                return self.m.grown_from(e)
+
+        wing = Wing()
+        assert wing.m.key.growth == 0.25
+        sol = wing.solve(verbosity=0)
+        assert sol[wing.m].to("kg").magnitude == pytest.approx(125.0, rel=1e-4)
+
+    def test_var_descriptor_default_growth_is_none(self):
+        class Plain(Model):
+            "Test fixture: variable with no growth declared."
+
+            m = Var("kg", "plain mass")
+
+            def setup(self):
+                self.cost = self.m
+                return [self.m >= 1 * units("kg")]
+
+        plain = Plain()
+        assert plain.m.key.growth is None
 
 
 class TestGrownFromHelper:
