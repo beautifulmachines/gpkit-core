@@ -82,6 +82,7 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
     veckey: "VarKey" = None
     value: Any = None
     choices: tuple = None
+    growth: float = None
 
     # Derived fields (computed in __post_init__)
     key: "VarKey" = field(default=None, init=False, repr=False)
@@ -150,6 +151,7 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
             "shape": self.shape or None,
             "value": value,
             "choices": self.choices,
+            "growth": self.growth,
         }
         return (VarKey, (), {k: v for k, v in state.items() if v is not None})
 
