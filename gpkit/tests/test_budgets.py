@@ -326,6 +326,171 @@ class TestBudgetErrors:
 
 
 # ---------------------------------------------------------------------------
+# Tests: growth allowance integration
+# ---------------------------------------------------------------------------
+
+
+class GrowthSpar(Model):
+    """Leaf component with a 20% growth allowance."""
+
+    m: Variable
+
+    def setup(self):
+        e = Variable("e", 50, "kg", "spar nominal estimate")
+        self.m = Variable("m", "kg", "spar mass", growth=0.20)
+        self.cost = self.m
+        return self.m.grown_from(e)
+
+
+class GrowthSkin(Model):
+    """Leaf component without a growth allowance."""
+
+    m: Variable
+
+    def setup(self):
+        e = Variable("e", 30, "kg", "skin nominal estimate")
+        self.m = Variable("m", "kg", "skin mass")
+        self.cost = self.m
+        return [self.m >= e]
+
+
+class GrowthWing(Model):
+    """Wing with 10% subsystem growth budgeted across two spars."""
+
+    spar1: GrowthSpar
+    spar2: GrowthSpar
+    m: Variable
+
+    def setup(self):
+        self.spar1 = GrowthSpar()
+        self.spar2 = GrowthSpar()
+        self.m = Variable("m", "kg", "wing mass", growth=0.10)
+        self.cost = self.m
+        return [
+            self.m.grown_from(self.spar1.m + self.spar2.m),
+            self.spar1,
+            self.spar2,
+        ]
+
+
+class GrowthMixedWing(Model):
+    """Wing with 10% growth, mixing a growth-enabled spar and a plain skin."""
+
+    spar: GrowthSpar
+    skin: GrowthSkin
+    m: Variable
+
+    def setup(self):
+        self.spar = GrowthSpar()
+        self.skin = GrowthSkin()
+        self.m = Variable("m", "kg", "wing mass", growth=0.10)
+        self.cost = self.m
+        return [
+            self.m.grown_from(self.spar.m + self.skin.m),
+            self.spar,
+            self.skin,
+        ]
+
+
+class TestBudgetWithGrowth:
+    """Budget walker peels off allowance terms and computes CBE/GA columns."""
+
+    def test_allowance_term_not_rendered_as_child(self):
+        model = GrowthSpar()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        labels = [n.label for n in b.children]
+        assert not any("growth" in (lbl or "") for lbl in labels)
+
+    def test_leaf_cbe_plus_ga_equals_total(self):
+        model = GrowthSpar()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        # m = 1.20 * 50 = 60; cbe = 50 (from leaf expr); ga = 10
+        assert b.total == pytest.approx(60.0, rel=1e-4)
+        assert b.cbe_total == pytest.approx(50.0, rel=1e-4)
+        assert b.ga_total == pytest.approx(10.0, rel=1e-4)
+        assert b.cbe_total + b.ga_total == pytest.approx(b.total, rel=1e-4)
+
+    def test_two_level_recursive_ga_accumulation(self):
+        model = GrowthWing()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        # spar_total = 60 each; wing_cbe constraint = 120; wing.m = 132
+        # leaf cbe sum (recursive) = 50 + 50 = 100
+        # ga (recursive) = 132 - 100 = 32 (Wing.m_growth=12 + 2*Spar.m_growth=20)
+        assert b.total == pytest.approx(132.0, rel=1e-4)
+        assert b.cbe_total == pytest.approx(100.0, rel=1e-4)
+        assert b.ga_total == pytest.approx(32.0, rel=1e-4)
+
+    def test_invariant_at_every_node(self):
+        model = GrowthWing()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        for node in _walk_all_nodes(b.children):
+            assert node.cbe_value + node.ga_value == pytest.approx(node.value, rel=1e-4)
+
+    def test_mixed_growth_and_plain_children(self):
+        model = GrowthMixedWing()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        # Spar: cbe=50, ga=10, total=60
+        # Skin: cbe=30, ga=0, total=30 (no growth declared)
+        # Wing.m_cbe = spar.m + skin.m = 90; Wing.m_growth = 9; Wing.m = 99
+        # Recursive cbe at wing = 50 + 30 = 80; ga = 99 - 80 = 19
+        assert b.total == pytest.approx(99.0, rel=1e-4)
+        assert b.cbe_total == pytest.approx(80.0, rel=1e-4)
+        assert b.ga_total == pytest.approx(19.0, rel=1e-4)
+        # Skin's row should have ga=0
+        skin_node = next(
+            n
+            for n in b.children
+            if n.vk and n.vk.name == "m" and "skin" in n.vk.lineagestr().lower()
+        )
+        assert skin_node.ga_value == pytest.approx(0.0, abs=1e-4)
+
+
+class TestBudgetRenderingWithGrowth:
+    """Text/markdown render adds CBE and GA columns when growth is present."""
+
+    def test_text_includes_cbe_and_ga_columns(self):
+        model = GrowthWing()
+        sol, _ = solve(model)
+        out = build_budget(sol, model, model.m).text()
+        assert "CBE" in out
+        assert "GA" in out
+
+    def test_markdown_includes_cbe_and_ga_columns(self):
+        model = GrowthWing()
+        sol, _ = solve(model)
+        out = build_budget(sol, model, model.m).markdown()
+        assert "CBE" in out
+        assert "GA" in out
+
+    def test_text_unchanged_for_no_growth_budget(self):
+        model = Aircraft()
+        sol, _ = solve(model)
+        out = build_budget(sol, model, model.m).text()
+        assert "CBE" not in out
+        assert " GA " not in out  # spaces guard against partial-word matches
+
+    def test_to_dict_always_has_cbe_ga(self):
+        model = GrowthSpar()
+        sol, _ = solve(model)
+        d = build_budget(sol, model, model.m).to_dict()
+        assert "cbe_total" in d
+        assert "ga_total" in d
+        assert d["cbe_total"] + d["ga_total"] == pytest.approx(d["total"], rel=1e-4)
+
+
+def _walk_all_nodes(nodes):
+    "Yield every BudgetNode in a tree (depth-first)."
+    for n in nodes:
+        yield n
+        yield from _walk_all_nodes(n.children)
+
+
+# ---------------------------------------------------------------------------
 # Tests: unit-mismatch coefficient bug
 # ---------------------------------------------------------------------------
 
