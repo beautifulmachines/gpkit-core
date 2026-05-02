@@ -13,6 +13,7 @@ from gpkit.report import (
     VarEntry,
     _fmt_value,
     _md_escape,
+    _md_var_table,
     _serialize_value,
     build_report_ir,
     render_markdown,
@@ -600,6 +601,26 @@ class TestRenderMarkdown:
         assert _md_escape("no specials") == "no specials"
         assert _md_escape("a_b*c|d") == r"a\_b\*c\|d"
         assert _md_escape("~95% TD") == r"\~95\% TD"
+
+    def test_md_var_table_unit_caret_escaped(self):
+        """Units with ASCII ^ are escaped so pandoc does not treat them as superscript.
+
+        pandoc's superscript extension turns ^text^ into <sup>text</sup>, so a
+        unit string like 'km^2/s^2' in a pipe-table cell renders as
+        km<sup>2/s</sup>2 in HTML.  The fix escapes ^ to \\^ so it is literal.
+        """
+        ve = VarEntry(
+            name="v",
+            latex="v",
+            value=1.0,
+            sensitivity=None,
+            units="km^2/s^2",
+            label="specific energy",
+        )
+        lines = _md_var_table([ve])
+        table_str = "\n".join(lines)
+        assert r"km\^2/s\^2" in table_str  # caret must be escaped
+        assert "km^2/s^2" not in table_str  # raw unescaped caret must not appear
 
 
 # ── Tests moved from test_model.py (cgroups + description) ──────────────────
