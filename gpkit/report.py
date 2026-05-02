@@ -853,7 +853,7 @@ def _split_constraint_str(c_str: str):
 
 def _md_escape(text: str) -> str:
     r"""Escape characters that have special meaning in markdown pipe tables."""
-    for ch in ("\\", "|", "*", "_", "`", "~", "[", "]", "<", ">", "%"):
+    for ch in ("\\", "|", "*", "_", "`", "~", "[", "]", "<", ">", "%", "^"):
         text = text.replace(ch, "\\" + ch)
     return text
 
@@ -872,7 +872,7 @@ def _md_var_table(variables: list, include_sensitivity: bool = False) -> list:
         cells = [name_cell]
         if has_source:
             cells.append(_md_escape(ve.source))
-        cells += [_fmt_value(ve.value), ve.units]
+        cells += [_fmt_value(ve.value), _md_escape(ve.units)]
         if include_sensitivity:
             cells.append(_fmt_sensitivity(ve.sensitivity))
         cells.append(_md_escape(ve.label))
