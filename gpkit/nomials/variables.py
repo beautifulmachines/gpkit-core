@@ -101,6 +101,34 @@ class Variable(Monomial):
                 args = [{self: arg}]
         return Monomial.sub(self, *args, **kwargs)
 
+    # Growth-allowance interface. Helpers live in .growth (same package);
+    # imports are deferred to break the variables.py ↔ growth.py module-load
+    # cycle. Returns a plain list so this method stays inside the nomials
+    # layer (no constraints/ dependency); wrap with
+    # GrowthAllowance.make_constraints for slack-warning diagnostics.
+    def grown_from(self, expr):
+        "Return the two bookkeeping constraints for self's growth allowance."
+        # pylint: disable=import-outside-toplevel
+        from .growth import make_growth_constraints
+
+        return make_growth_constraints(self, expr)
+
+    @property
+    def growth(self):
+        "The auto-generated allowance Variable sibling."
+        # pylint: disable=import-outside-toplevel
+        from .growth import sibling_growth
+
+        return sibling_growth(self.key)
+
+    @property
+    def f_growth(self):
+        "The auto-generated fraction Variable sibling."
+        # pylint: disable=import-outside-toplevel
+        from .growth import sibling_fraction
+
+        return sibling_fraction(self.key)
+
 
 class ArrayVariable(NomialArray):  # pylint: disable=too-many-locals
     """A described vector of singlet Monomials.

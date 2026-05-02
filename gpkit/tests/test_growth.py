@@ -5,8 +5,7 @@ import pickle
 import pytest
 
 from gpkit import Model, Variable, VarKey
-from gpkit.constraints.growth import GrowthAllowance, GrowthAllowanceConstraints
-from gpkit.constraints.tight import Tight
+from gpkit.nomials.growth import theta
 
 
 class TestGrowthVarKeyField:
@@ -76,28 +75,25 @@ class TestThetaSingleton:
     """A single shared theta variable scales every growth allowance."""
 
     def test_theta_is_singleton(self):
-        a = GrowthAllowance.theta()
-        b = GrowthAllowance.theta()
+        a = theta()
+        b = theta()
         assert a.key == b.key
 
     def test_theta_default_value_is_one(self):
-        theta = GrowthAllowance.theta()
-        assert theta.key.value == 1.0
+        assert theta().key.value == 1.0
 
     def test_theta_lineage(self):
-        theta = GrowthAllowance.theta()
-        assert theta.key.lineage == (("growth", 0),)
-        assert theta.key.name == "theta"
+        assert theta().key.lineage == (("growth", 0),)
+        assert theta().key.name == "theta"
 
     def test_theta_is_dimensionless(self):
-        theta = GrowthAllowance.theta()
-        assert theta.key.units is None
+        assert theta().key.units is None
 
     def test_doubling_theta_doubles_allowance(self):
         m = Variable("m", "kg", growth=0.25)
         e = Variable("e", 100, "kg")
         model = Model(m, m.grown_from(e))
-        model.substitutions[GrowthAllowance.theta().key] = 2.0
+        model.substitutions[theta().key] = 2.0
         sol = model.solve(verbosity=0)
         assert sol[m.growth].to("kg").magnitude == pytest.approx(50.0)
         assert sol[m].to("kg").magnitude == pytest.approx(150.0)
@@ -106,12 +102,12 @@ class TestThetaSingleton:
 class TestGrownFromHelper:
     """m.grown_from(expr) emits the right constraint set."""
 
-    def test_returns_growth_allowance_constraints(self):
+    def test_returns_plain_two_constraint_list(self):
         m = Variable("m", "kg", growth=0.25)
         e = Variable("e", 100, "kg")
         cs = m.grown_from(e)
-        assert isinstance(cs, GrowthAllowanceConstraints)
-        assert isinstance(cs, Tight)
+        assert isinstance(cs, list)
+        assert len(cs) == 2
 
     def test_grown_from_without_growth_kwarg_raises(self):
         m = Variable("m", "kg")
@@ -144,7 +140,7 @@ class TestSingleLevelSolve:
         assert sol[m].to("kg").magnitude == pytest.approx(125.0, rel=1e-4)
         assert sol[m.growth].to("kg").magnitude == pytest.approx(25.0, rel=1e-4)
         assert sol[m.f_growth].magnitude == pytest.approx(0.25)
-        assert sol[GrowthAllowance.theta()].magnitude == pytest.approx(1.0)
+        assert sol[theta()].magnitude == pytest.approx(1.0)
 
     def test_matches_hand_rolled_equivalent(self):
         m_auto = Variable("m", "kg", growth=0.25)
