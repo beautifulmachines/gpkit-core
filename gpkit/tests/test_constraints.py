@@ -22,6 +22,7 @@ from gpkit.constraints.relax import (
 from gpkit.constraints.tight import Tight
 from gpkit.exceptions import InvalidGPConstraint, PrimalInfeasible
 from gpkit.nomials import MonomialEquality, PosynomialInequality, SignomialInequality
+from gpkit.nomials.substitution import parse_subs
 from gpkit.units import DimensionalityError
 from gpkit.util.globals import NamedVariables
 
@@ -182,6 +183,21 @@ class TestConstraint:
             m.solve(verbosity=0)
         PosynomialInequality.feastol = 1e-3
         assert m.substitutions["x"] == m.solve(verbosity=0)[x]
+
+    def test_degenerate_constraint_at_construction(self):
+        "Constant term exactly equal to RHS at construction raises descriptive error"
+        x = Variable("x")
+        with pytest.raises(InvalidGPConstraint, match="Degenerate constraint"):
+            _ = x + 1 <= 1
+
+    def test_degenerate_constraint_via_substitution(self):
+        "Substitution making constant term equal to RHS raises descriptive error"
+        x = Variable("x")
+        y = Variable("y")
+        c = x + y <= 1
+        subs = parse_subs(c.vks, {y: 1})
+        with pytest.raises(InvalidGPConstraint, match="Degenerate constraint"):
+            c.as_hmapslt1(subs)
 
 
 class TestCostedConstraint:
