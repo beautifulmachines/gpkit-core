@@ -258,7 +258,7 @@ class Budget:
         """Return an aligned-column plain-text budget table.
 
         When the budget contains any growth allowance, two extra columns
-        (CBE and GA) appear before the totals column.
+        (Nominal and Growth) appear before the totals column.
         """
         top_label = _vk_display(self.top_vk, lineage=True)
         header = f"Budget  —  {top_label}"
@@ -271,7 +271,7 @@ class Budget:
         top_label = _vk_display(self.top_vk, lineage=True)
         if self._show_growth_columns():
             lines = [
-                "| Component | CBE | GA | Total | Units | Fraction |",
+                "| Component | Nominal | Growth | Total | Units | Fraction |",
                 "| --- | ---: | ---: | ---: | :--- | ---: |",
                 f"| **{top_label}** | **{self.cbe_total:.4g}** "
                 f"| **{self.ga_total:.4g}** | **{self.total:.4g}** "
@@ -357,8 +357,8 @@ def _render_growth_text(budget, top_label, header):
     _collect_text_rows(budget.children, rows, depth=1, show_growth=True)
     w = {
         "lbl": max(r[0] * 2 + len(r[1]) for r in rows),
-        "cbe": max(max(len(r[2]) for r in rows), len("CBE")),
-        "ga": max(max(len(r[3]) for r in rows), len("GA")),
+        "cbe": max(max(len(r[2]) for r in rows), len("Nominal")),
+        "ga": max(max(len(r[3]) for r in rows), len("Growth")),
         "tot": max(max(len(r[4]) for r in rows), len("Total")),
         "unt": max(len(r[5]) for r in rows),
         "pct": max(len(r[6]) for r in rows),
@@ -366,7 +366,7 @@ def _render_growth_text(budget, top_label, header):
     lines = [
         header,
         "-" * len(header),
-        f"  {' ' * w['lbl']}  {'CBE':>{w['cbe']}}  {'GA':>{w['ga']}}  "
+        f"  {' ' * w['lbl']}  {'Nominal':>{w['cbe']}}  {'Growth':>{w['ga']}}  "
         f"{'Total':>{w['tot']}}  {'':>{w['unt']}}  {'':>{w['pct']}}",
     ]
     for row in rows:

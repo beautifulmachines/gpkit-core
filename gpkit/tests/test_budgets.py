@@ -393,7 +393,7 @@ class GrowthMixedWing(Model):
 
 
 class TestBudgetWithGrowth:
-    """Budget walker peels off allowance terms and computes CBE/GA columns."""
+    """Budget walker peels off allowance terms and computes Nominal/Growth columns."""
 
     def test_allowance_term_not_rendered_as_child(self):
         model = GrowthSpar()
@@ -451,28 +451,28 @@ class TestBudgetWithGrowth:
 
 
 class TestBudgetRenderingWithGrowth:
-    """Text/markdown render adds CBE and GA columns when growth is present."""
+    """Text/markdown render adds Nominal and Growth columns when growth is present."""
 
-    def test_text_includes_cbe_and_ga_columns(self):
+    def test_text_includes_nominal_and_growth_columns(self):
         model = GrowthWing()
         sol, _ = solve(model)
         out = build_budget(sol, model, model.m).text()
-        assert "CBE" in out
-        assert "GA" in out
+        assert "Nominal" in out
+        assert "Growth" in out
 
-    def test_markdown_includes_cbe_and_ga_columns(self):
+    def test_markdown_includes_nominal_and_growth_columns(self):
         model = GrowthWing()
         sol, _ = solve(model)
         out = build_budget(sol, model, model.m).markdown()
-        assert "CBE" in out
-        assert "GA" in out
+        assert "Nominal" in out
+        assert "Growth" in out
 
     def test_text_unchanged_for_no_growth_budget(self):
         model = Aircraft()
         sol, _ = solve(model)
         out = build_budget(sol, model, model.m).text()
-        assert "CBE" not in out
-        assert " GA " not in out  # spaces guard against partial-word matches
+        assert "Nominal" not in out
+        assert "Growth" not in out
 
     def test_to_dict_always_has_cbe_ga(self):
         model = GrowthSpar()
