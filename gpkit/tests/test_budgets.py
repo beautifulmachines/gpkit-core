@@ -68,21 +68,6 @@ class Aircraft(Model):
         return [self.m >= self.wing.m, self.wing]
 
 
-class AircraftWithMargin(Model):
-    """Budget constraint includes a self-referential margin term."""
-
-    wing: Wing
-    m: Variable
-
-    def setup(self):
-        self.wing = Wing()
-        f_margin = Variable("f_margin", 0.1, label="mass margin fraction")
-        self.m = Variable("m", "kg", "total mass")
-        self.cost = self.m
-        # m >= wing.m + f_margin * m  →  m*(1-0.1) >= wing.m  at optimum
-        return [self.m >= self.wing.m + f_margin * self.m, self.wing]
-
-
 class SlackModel(Model):
     """Budget constraint that is NOT tight at the optimum.
 
@@ -225,38 +210,6 @@ class TestBuildBudgetBasic:
         assert wing_node.label == "Wing.m"
         spar_node = next(n for n in wing_node.children if abs(n.value - 10) < 1e-3)
         assert spar_node.label == "Spar.m"
-
-
-# ---------------------------------------------------------------------------
-# Tests: build_budget — margin / self-referential term
-# ---------------------------------------------------------------------------
-
-
-class TestBuildBudgetMargin:
-    """Tests for build_budget() with self-referential margin terms."""
-
-    def test_margin_term_present(self):
-        model = AircraftWithMargin()
-        sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
-        labels = [n.label for n in b.children]
-        assert any("[margin]" in lbl for lbl in labels)
-
-    def test_margin_term_value(self):
-        model = AircraftWithMargin()
-        sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
-        margin_nodes = [n for n in b.children if "[margin]" in n.label]
-        assert len(margin_nodes) == 1
-        # f_margin = 0.1, wing.m = 15 kg → m_total ≈ 16.67 kg, margin ≈ 1.67 kg
-        assert margin_nodes[0].value > 0
-
-    def test_children_sum_with_margin(self):
-        model = AircraftWithMargin()
-        sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
-        child_sum = sum(n.value for n in b.children)
-        assert abs(child_sum - b.total) / b.total < 1e-4
 
 
 # ---------------------------------------------------------------------------

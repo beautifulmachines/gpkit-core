@@ -443,14 +443,9 @@ def _attach_sub_budget(node, child_vk, ctx, remaining_depth=float("inf")):
 
 def _process_term(top_vk, term, ctx, remaining_depth=float("inf")):
     """Build a single BudgetNode for one term in a budget constraint's RHS."""
-    is_self_ref = top_vk in term.exp
     free_in_term = {vk for vk in term.exp if vk not in ctx.solution.constants}
     parent_prefix = top_vk.lineagestr() if top_vk.lineage else None
-    is_simple = (
-        not is_self_ref
-        and len(free_in_term) == 1
-        and term.exp.get(next(iter(free_in_term))) == 1
-    )
+    is_simple = len(free_in_term) == 1 and term.exp.get(next(iter(free_in_term))) == 1
     if is_simple:
         child_vk = next(iter(free_in_term))
         if term.ast_label is not None:
@@ -499,8 +494,6 @@ def _process_term(top_vk, term, ctx, remaining_depth=float("inf")):
         if term.ast_label is not None
         else _format_term_label(term.exp, term.phys_coeff, strip_prefix=parent_prefix)
     )
-    if is_self_ref:
-        label += " [margin]"
     return BudgetNode(
         label=label,
         vk=None,
