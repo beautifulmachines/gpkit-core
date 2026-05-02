@@ -182,7 +182,7 @@ def find_budget_constraints(model, vk, solution):
 
 
 @dataclass
-class BudgetNode:
+class BudgetNode:  # pylint: disable=too-many-instance-attributes
     """A single line in a hierarchical budget breakdown.
 
     Attributes
@@ -262,56 +262,9 @@ class Budget:
         """
         top_label = _vk_display(self.top_vk, lineage=True)
         header = f"Budget  —  {top_label}"
-        show_growth = self._show_growth_columns()
-
-        if show_growth:
-            rows = [
-                (
-                    0,
-                    top_label,
-                    f"{self.cbe_total:.4g}",
-                    f"{self.ga_total:.4g}",
-                    f"{self.total:.4g}",
-                    f"[{self.units}]",
-                    "100.0%",
-                )
-            ]
-            _collect_text_rows(self.children, rows, depth=1, show_growth=True)
-            lbl_w = max(r[0] * 2 + len(r[1]) for r in rows)
-            cbe_w = max(len(r[2]) for r in rows + [(0, "", "CBE", "", "", "", "")])
-            ga_w = max(len(r[3]) for r in rows + [(0, "", "", "GA", "", "", "")])
-            tot_w = max(len(r[4]) for r in rows + [(0, "", "", "", "Total", "", "")])
-            unt_w = max(len(r[5]) for r in rows)
-            pct_w = max(len(r[6]) for r in rows)
-            lines = [
-                header,
-                "-" * len(header),
-                f"  {' ' * lbl_w}  {'CBE':>{cbe_w}}  {'GA':>{ga_w}}  "
-                f"{'Total':>{tot_w}}  {'':>{unt_w}}  {'':>{pct_w}}",
-            ]
-            for depth, label, cbe_s, ga_s, tot_s, unt_s, pct_s in rows:
-                lines.append(
-                    f"  {'  ' * depth}{label}"
-                    f"{' ' * (lbl_w - depth * 2 - len(label))}  "
-                    f"{cbe_s:>{cbe_w}}  {ga_s:>{ga_w}}  {tot_s:>{tot_w}}  "
-                    f"{unt_s:>{unt_w}}  {pct_s:>{pct_w}}"
-                )
-            return "\n".join(lines)
-
-        rows = [(0, top_label, f"{self.total:.4g}", f"[{self.units}]", "100.0%")]
-        _collect_text_rows(self.children, rows, depth=1)
-        lbl_w = max(r[0] * 2 + len(r[1]) for r in rows)
-        val_w = max(len(r[2]) for r in rows)
-        unt_w = max(len(r[3]) for r in rows)
-        pct_w = max(len(r[4]) for r in rows)
-        lines = [header, "-" * len(header)]
-        for depth, label, val_str, units_str, pct_str in rows:
-            lines.append(
-                f"  {'  ' * depth}{label}"
-                f"{' ' * (lbl_w - depth * 2 - len(label))}  "
-                f"{val_str:>{val_w}}  {units_str:>{unt_w}}  {pct_str:>{pct_w}}"
-            )
-        return "\n".join(lines)
+        if self._show_growth_columns():
+            return _render_growth_text(self, top_label, header)
+        return _render_plain_text(self, top_label, header)
 
     def markdown(self) -> str:
         """Return a GitHub-flavored markdown budget table."""
@@ -370,6 +323,65 @@ def _vk_display(vk, lineage=False, strip_prefix=None):
             return vk.str_without(["units", f":MAGIC:{strip_prefix}"])
         return vk.str_without(["units"])
     return vk.str_without(["units", "lineage"])
+
+
+def _render_plain_text(budget, top_label, header):
+    rows = [(0, top_label, f"{budget.total:.4g}", f"[{budget.units}]", "100.0%")]
+    _collect_text_rows(budget.children, rows, depth=1)
+    lbl_w = max(r[0] * 2 + len(r[1]) for r in rows)
+    val_w = max(len(r[2]) for r in rows)
+    unt_w = max(len(r[3]) for r in rows)
+    pct_w = max(len(r[4]) for r in rows)
+    lines = [header, "-" * len(header)]
+    for depth, label, val_str, units_str, pct_str in rows:
+        lines.append(
+            f"  {'  ' * depth}{label}"
+            f"{' ' * (lbl_w - depth * 2 - len(label))}  "
+            f"{val_str:>{val_w}}  {units_str:>{unt_w}}  {pct_str:>{pct_w}}"
+        )
+    return "\n".join(lines)
+
+
+def _render_growth_text(budget, top_label, header):
+    rows = [
+        (
+            0,
+            top_label,
+            f"{budget.cbe_total:.4g}",
+            f"{budget.ga_total:.4g}",
+            f"{budget.total:.4g}",
+            f"[{budget.units}]",
+            "100.0%",
+        )
+    ]
+    _collect_text_rows(budget.children, rows, depth=1, show_growth=True)
+    w = {
+        "lbl": max(r[0] * 2 + len(r[1]) for r in rows),
+        "cbe": max(max(len(r[2]) for r in rows), len("CBE")),
+        "ga": max(max(len(r[3]) for r in rows), len("GA")),
+        "tot": max(max(len(r[4]) for r in rows), len("Total")),
+        "unt": max(len(r[5]) for r in rows),
+        "pct": max(len(r[6]) for r in rows),
+    }
+    lines = [
+        header,
+        "-" * len(header),
+        f"  {' ' * w['lbl']}  {'CBE':>{w['cbe']}}  {'GA':>{w['ga']}}  "
+        f"{'Total':>{w['tot']}}  {'':>{w['unt']}}  {'':>{w['pct']}}",
+    ]
+    for row in rows:
+        lines.append(_format_growth_row(row, w))
+    return "\n".join(lines)
+
+
+def _format_growth_row(row, w):
+    depth, label, cbe_s, ga_s, tot_s, unt_s, pct_s = row
+    return (
+        f"  {'  ' * depth}{label}"
+        f"{' ' * (w['lbl'] - depth * 2 - len(label))}  "
+        f"{cbe_s:>{w['cbe']}}  {ga_s:>{w['ga']}}  {tot_s:>{w['tot']}}  "
+        f"{unt_s:>{w['unt']}}  {pct_s:>{w['pct']}}"
+    )
 
 
 def _collect_text_rows(nodes, rows, depth, show_growth=False):

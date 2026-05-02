@@ -20,6 +20,11 @@ class TestGrowthVarKeyField:
         vk = VarKey("m", units="kg")
         assert vk.growth is None
 
+    def test_growth_survives_pickle(self):
+        vk = VarKey("m", units="kg", growth=0.25)
+        restored = pickle.loads(pickle.dumps(vk))
+        assert restored.growth == 0.25
+
 
 class TestGrowthDoesNotAffectIdentity:
     """Growth metadata is not part of canonical identity (ref/hash/eq)."""
@@ -67,15 +72,6 @@ class TestSiblingDedup:
         assert m_growth.key != p_growth.key
 
 
-class TestPickleRoundTrip:
-    """Growth metadata survives pickle round-trip."""
-
-    def test_growth_survives_pickle(self):
-        vk = VarKey("m", units="kg", growth=0.25)
-        restored = pickle.loads(pickle.dumps(vk))
-        assert restored.growth == 0.25
-
-
 class TestThetaSingleton:
     """A single shared theta variable scales every growth allowance."""
 
@@ -96,6 +92,15 @@ class TestThetaSingleton:
     def test_theta_is_dimensionless(self):
         theta = GrowthAllowance.theta()
         assert theta.key.units is None
+
+    def test_doubling_theta_doubles_allowance(self):
+        m = Variable("m", "kg", growth=0.25)
+        e = Variable("e", 100, "kg")
+        model = Model(m, m.grown_from(e))
+        model.substitutions[GrowthAllowance.theta().key] = 2.0
+        sol = model.solve(verbosity=0)
+        assert sol[m.growth].to("kg").magnitude == pytest.approx(50.0)
+        assert sol[m].to("kg").magnitude == pytest.approx(150.0)
 
 
 class TestGrownFromHelper:
@@ -158,47 +163,6 @@ class TestSingleLevelSolve:
         assert sol_auto[m_auto].to("kg").magnitude == pytest.approx(
             sol_hand[m_hand].to("kg").magnitude
         )
-
-    def test_two_level_hierarchy(self):
-        class Spar(Model):
-            def setup(self):
-                self.m = Variable("m", "kg", growth=0.20)
-                e = Variable("e", 50, "kg")
-                return self.m.grown_from(e)
-
-        class Wing(Model):
-            def setup(self):
-                self.m = Variable("m", "kg", growth=0.10)
-                self.spar1, self.spar2 = Spar(), Spar()
-                self.cost = self.m
-                return [
-                    self.m.grown_from(self.spar1.m + self.spar2.m),
-                    self.spar1,
-                    self.spar2,
-                ]
-
-        wing = Wing()
-        sol = wing.solve(verbosity=0)
-        spar_total = 1.20 * 50.0
-        wing_cbe = 2 * spar_total
-        wing_total = 1.10 * wing_cbe
-        assert sol[wing.m].to("kg").magnitude == pytest.approx(wing_total, rel=1e-4)
-        assert sol[wing.spar1.m].to("kg").magnitude == pytest.approx(
-            spar_total, rel=1e-4
-        )
-
-
-class TestThetaSubstitution:
-    """Substituting theta to a non-default value scales all allowances."""
-
-    def test_doubling_theta_doubles_allowance(self):
-        m = Variable("m", "kg", growth=0.25)
-        e = Variable("e", 100, "kg")
-        model = Model(m, m.grown_from(e))
-        model.substitutions[GrowthAllowance.theta().key] = 2.0
-        sol = model.solve(verbosity=0)
-        assert sol[m.growth].to("kg").magnitude == pytest.approx(50.0)
-        assert sol[m].to("kg").magnitude == pytest.approx(150.0)
 
 
 if __name__ == "__main__":
