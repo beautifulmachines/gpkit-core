@@ -517,7 +517,7 @@ def _make_term(mon, hmap_units, ast_labels, ast_is_var, ctx):
     )
 
 
-def _attach_sub_budget(node, child_vk, ctx, remaining_depth=float("inf")):
+def _attach_sub_budget(node, child_vk, ctx):
     "Recursively attach sub-budget children to *node* if a budget constraint exists."
     sub_matches = find_budget_constraints(ctx.model, child_vk, ctx.solution)
     if len(sub_matches) > 1:
@@ -535,11 +535,11 @@ def _attach_sub_budget(node, child_vk, ctx, remaining_depth=float("inf")):
         visited=ctx.visited | {child_vk},
     )
     node.children, node.peeled_frac, node.slack = _build_children(
-        child_vk, sub_lt, sub_c, sub_ctx, remaining_depth=remaining_depth
+        child_vk, sub_lt, sub_c, sub_ctx
     )
 
 
-def _process_term(top_vk, term, ctx, remaining_depth=float("inf")):
+def _process_term(top_vk, term, ctx):
     """Build a single BudgetNode for one term in a budget constraint's RHS.
 
     Bare-variable terms (``m``, ``m_min``) become recursable nodes — we try
@@ -591,9 +591,8 @@ def _process_term(top_vk, term, ctx, remaining_depth=float("inf")):
         child_vk not in ctx.visited
         and child_vk.units is not None
         and child_vk.units.is_compatible_with(ctx.level_units)
-        and remaining_depth > 0
     ):
-        _attach_sub_budget(node, child_vk, ctx, remaining_depth=remaining_depth - 1)
+        _attach_sub_budget(node, child_vk, ctx)
     return node
 
 
@@ -623,7 +622,7 @@ def _is_redundant_compound_leaf(nodes):
     return len(nodes) == 1 and nodes[0].vk is None
 
 
-def _build_children(top_vk, lt, constraint, ctx, remaining_depth=float("inf")):
+def _build_children(top_vk, lt, constraint, ctx):
     """Recursively build BudgetNode children from the lt side of a budget constraint.
 
     When *top_vk* declares a growth allowance, the auto-generated allowance
@@ -646,7 +645,7 @@ def _build_children(top_vk, lt, constraint, ctx, remaining_depth=float("inf")):
         if _is_allowance_term(term, top_vk):
             peeled_frac += term.term_val / total_val if total_val else 0.0
             continue
-        node = _process_term(top_vk, term, ctx, remaining_depth=remaining_depth)
+        node = _process_term(top_vk, term, ctx)
         node.fraction = term.term_val / total_val if total_val else 0.0
         nodes.append(node)
     slack_frac = 0.0
@@ -706,6 +705,16 @@ def _resolve_vk(var):
     )
 
 
+def _trim_to_depth(nodes, remaining_depth):
+    "Remove children beyond *remaining_depth* levels; cbe/ga values are unchanged."
+    if remaining_depth <= 0:
+        for node in nodes:
+            node.children = []
+        return
+    for node in nodes:
+        _trim_to_depth(node.children, remaining_depth - 1)
+
+
 def build_budget(  # pylint: disable=too-many-locals
     solution, model, var, display_units=None, depth=float("inf")
 ):
@@ -722,9 +731,10 @@ def build_budget(  # pylint: disable=too-many-locals
     display_units : str, optional
         Units for all displayed values.  Defaults to the variable's own units.
     depth : int or float, optional
-        Maximum expansion depth. ``depth=0`` returns only the top variable with
-        no children. ``depth=1`` expands one level. Defaults to ``float('inf')``
-        (fully recursive, current behaviour).
+        Maximum display depth. ``depth=0`` returns only the top variable with
+        no children. ``depth=1`` shows one level of children. Defaults to
+        ``float('inf')`` (fully recursive). Growth allowances and cbe/ga totals
+        are always computed from the full tree regardless of *depth*.
 
     Returns
     -------
@@ -781,13 +791,12 @@ def build_budget(  # pylint: disable=too-many-locals
         level_units=display_units,
         visited=frozenset({top_vk}),
     )
-    children, peeled_frac, _ = _build_children(
-        top_vk, lt, constraint, ctx, remaining_depth=depth - 1
-    )
+    children, peeled_frac, _ = _build_children(top_vk, lt, constraint, ctx)
     for child in children:
         _compute_cbe_ga(child)
     cbe_total = _cbe_value(total_val, children, peeled_frac)
     has_growth = peeled_frac > 0 or any(c.has_growth for c in children)
+    _trim_to_depth(children, depth - 1)
     return Budget(
         top_vk=top_vk,
         total=total_val,

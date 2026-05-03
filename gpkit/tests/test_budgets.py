@@ -421,6 +421,43 @@ class GrowthMixedWing(Model):
         ]
 
 
+class BareParentGrowthChild(Model):
+    """Bare (no-growth) parent with one growth child and one plain child."""
+
+    spar: GrowthSpar
+    skin: GrowthSkin
+    m: Variable
+
+    def setup(self):
+        self.spar = GrowthSpar()  # m with growth=0.20, e=50 → m=60
+        self.skin = GrowthSkin()  # m with no growth, e=30 → m=30
+        self.m = Variable("m", "kg", "total mass")  # NO growth declared
+        self.cost = self.m
+        return [
+            self.m >= self.spar.m + self.skin.m,  # bare constraint, no grown_from
+            self.spar,
+            self.skin,
+        ]
+
+
+class BareGrandparentGrowthGrandchild(Model):
+    """Two levels of bare (no-growth) parents; growth only in the grandchild."""
+
+    wing: BareParentGrowthChild
+    m: Variable
+
+    def setup(self):
+        self.wing = BareParentGrowthChild()  # bare parent with growth grandchild
+        skin2 = GrowthSkin()  # no growth, e=30
+        self.m = Variable("m", "kg", "aircraft mass")  # NO growth
+        self.cost = self.m
+        return [
+            self.m >= self.wing.m + skin2.m,  # bare, no growth
+            self.wing,
+            skin2,
+        ]
+
+
 class TestBudgetWithGrowth:
     """Budget walker peels off allowance terms and computes Nominal/Growth columns."""
 
@@ -613,6 +650,81 @@ def _walk_all_nodes(nodes):
     for n in nodes:
         yield n
         yield from _walk_all_nodes(n.children)
+
+
+# ---------------------------------------------------------------------------
+# Tests: bare parent (no growth) with growth child
+# ---------------------------------------------------------------------------
+
+
+class TestBareParentWithGrowthChild:
+    """Budget correctly propagates growth through bare (no grown_from) parents."""
+
+    def test_budget_has_growth_true(self):
+        # Budget.has_growth must be True even though the top var declares no growth
+        model = BareParentGrowthChild()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        assert b.has_growth is True
+
+    def test_cbe_and_ga_totals(self):
+        # ga_total should equal the leaf's 10 kg growth; cbe = 80; total = 90
+        model = BareParentGrowthChild()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        assert b.total == pytest.approx(90.0, rel=1e-4)
+        assert b.cbe_total == pytest.approx(80.0, rel=1e-4)
+        assert b.ga_total == pytest.approx(10.0, rel=1e-4)
+
+    def test_growth_child_node_has_growth_true(self):
+        model = BareParentGrowthChild()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        spar_node = next(n for n in b.children if n.vk and "Spar" in n.vk.lineagestr())
+        assert spar_node.has_growth is True
+        assert spar_node.ga_value == pytest.approx(10.0, rel=1e-4)
+
+    def test_plain_child_node_has_growth_false(self):
+        model = BareParentGrowthChild()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        skin_node = next(n for n in b.children if n.vk and "Skin" in n.vk.lineagestr())
+        assert skin_node.has_growth is False
+
+    def test_growth_columns_rendered_in_text(self):
+        model = BareParentGrowthChild()
+        sol, _ = solve(model)
+        out = build_budget(sol, model, model.m).text()
+        assert "Nominal" in out
+        assert "Growth" in out
+
+    def test_invariant_at_every_node(self):
+        model = BareParentGrowthChild()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        for node in _walk_all_nodes(b.children):
+            assert node.cbe_value + node.ga_value == pytest.approx(node.value, rel=1e-4)
+
+    def test_three_level_bare_grandparent_growth_propagates(self):
+        # Two levels of bare parents above leaf; growth must bubble all the way up.
+        # aircraft.m (no growth) >= wing.m (no growth) + skin2.m (no growth)
+        # wing.m (no growth) >= spar.m (growth=0.20) + skin.m (no growth)
+        # spar: e=50 → m=60 (10 growth); skin: 30; wing.m=90; skin2=30; aircraft.m=120
+        # cbe: spar_cbe=50, skin_cbe=30, wing_cbe=80, skin2_cbe=30, total_cbe=110; ga=10
+        model = BareGrandparentGrowthGrandchild()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        assert b.has_growth is True
+        assert b.total == pytest.approx(120.0, rel=1e-4)
+        assert b.cbe_total == pytest.approx(110.0, rel=1e-4)
+        assert b.ga_total == pytest.approx(10.0, rel=1e-4)
+
+    def test_three_level_all_nodes_invariant(self):
+        model = BareGrandparentGrowthGrandchild()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        for node in _walk_all_nodes(b.children):
+            assert node.cbe_value + node.ga_value == pytest.approx(node.value, rel=1e-4)
 
 
 # ---------------------------------------------------------------------------
@@ -981,6 +1093,20 @@ class TestBudgetDepth:
         b = sol.budget(model.m, depth=1)
         assert len(b.children) == 1
         assert not b.children[0].children
+
+    def test_depth_does_not_hide_growth_totals(self):
+        # Growth lives at the leaf level (GrowthSpar.e); the top budget variable
+        # has no growth itself.  Requesting depth=1 stops expansion at the spar
+        # row, but the cbe/ga totals and has_growth must still reflect the full tree.
+        model = BareParentGrowthChild()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m, depth=1)
+        assert b.has_growth is True
+        assert b.ga_total == pytest.approx(10.0, rel=1e-4)
+        spar_node = next(n for n in b.children if n.vk and "Spar" in n.vk.lineagestr())
+        assert spar_node.has_growth is True
+        assert spar_node.ga_value == pytest.approx(10.0, rel=1e-4)
+        assert not spar_node.children  # depth=1: display is trimmed
 
 
 # ---------------------------------------------------------------------------
