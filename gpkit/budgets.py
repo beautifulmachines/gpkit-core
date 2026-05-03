@@ -225,6 +225,9 @@ class BudgetNode:  # pylint: disable=too-many-instance-attributes
     cbe_value: float = 0.0
     ga_value: float = 0.0
     has_growth: bool = False
+    # Fraction of *value* peeled off as a growth allowance at this level
+    # (excludes growth from descendants).  Drives the leaf cbe/ga split.
+    peeled_frac: float = 0.0
 
 
 @dataclass
@@ -531,16 +534,9 @@ def _attach_sub_budget(node, child_vk, ctx, remaining_depth=float("inf")):
         level_units=child_units,
         visited=ctx.visited | {child_vk},
     )
-    node.children, peeled_frac, slack_frac = _build_children(
+    node.children, node.peeled_frac, node.slack = _build_children(
         child_vk, sub_lt, sub_c, sub_ctx, remaining_depth=remaining_depth
     )
-    node.has_growth = peeled_frac > 0
-    node.slack = slack_frac
-    if not node.children and peeled_frac > 0:
-        # Suppression dropped the lone non-growth (compound) term; record
-        # this level's peeled growth so _compute_cbe_ga's leaf branch can
-        # derive cbe = value − ga correctly.
-        node.ga_value = node.value * peeled_frac
 
 
 def _process_term(top_vk, term, ctx, remaining_depth=float("inf")):
@@ -676,25 +672,26 @@ def _build_children(top_vk, lt, constraint, ctx, remaining_depth=float("inf")):
     return nodes, peeled_frac, slack_frac
 
 
+def _cbe_value(value, children, peeled_frac):
+    "Sum children's cbe when present; otherwise scale value by non-growth fraction."
+    if children:
+        return sum(c.cbe_value for c in children)
+    return value * (1.0 - peeled_frac)
+
+
 def _compute_cbe_ga(node):
     """Post-order cbe/ga split.
 
-    Non-leaves: ``cbe`` is the sum of children's cbe; ``ga`` is the
-    remainder.  Leaves: ``ga_value`` is pre-set in ``_attach_sub_budget``
-    when growth was peeled but the lone non-growth term was suppressed
-    (zero otherwise); ``cbe`` is derived from it.
-
-    Also propagates ``has_growth`` up: a node has growth if it owns a peeled
-    allowance (set in _attach_sub_budget) or any descendant does.
+    For every node, ``ga = value − cbe``.  Non-leaves take ``cbe`` from the
+    sum of children's cbe; leaves derive it from their own ``peeled_frac``.
+    ``has_growth`` propagates up from peeled allowances at this level or in
+    any descendant.
     """
-    if node.children:
-        for child in node.children:
-            _compute_cbe_ga(child)
-        node.cbe_value = sum(c.cbe_value for c in node.children)
-        node.has_growth = node.has_growth or any(c.has_growth for c in node.children)
-        node.ga_value = node.value - node.cbe_value
-    else:
-        node.cbe_value = node.value - node.ga_value
+    for child in node.children:
+        _compute_cbe_ga(child)
+    node.cbe_value = _cbe_value(node.value, node.children, node.peeled_frac)
+    node.ga_value = node.value - node.cbe_value
+    node.has_growth = node.peeled_frac > 0 or any(c.has_growth for c in node.children)
 
 
 def _resolve_vk(var):
@@ -789,11 +786,7 @@ def build_budget(  # pylint: disable=too-many-locals
     )
     for child in children:
         _compute_cbe_ga(child)
-    cbe_total = (
-        sum(c.cbe_value for c in children)
-        if children
-        else total_val * (1.0 - peeled_frac)
-    )
+    cbe_total = _cbe_value(total_val, children, peeled_frac)
     has_growth = peeled_frac > 0 or any(c.has_growth for c in children)
     return Budget(
         top_vk=top_vk,
