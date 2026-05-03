@@ -110,6 +110,8 @@ class TestSiblingsInUniqueVarkeys:
         class Wing(Model):
             "Test fixture: wing mass with declared growth."
 
+            m: Variable
+
             def setup(self):
                 self.m = Variable("m", "kg", "wing mass", growth=0.25)
                 e = Variable("e", 100, "kg")
