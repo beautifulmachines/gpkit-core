@@ -225,9 +225,6 @@ class BudgetNode:  # pylint: disable=too-many-instance-attributes
     cbe_value: float = 0.0
     ga_value: float = 0.0
     has_growth: bool = False
-    # True when the term is a bare variable (e.g. ``m``); false for compound
-    # expressions (``rho*A``, ``1/m``, ``2*m``) that get suppressed when alone.
-    is_var: bool = False
 
 
 @dataclass
@@ -546,24 +543,13 @@ def _attach_sub_budget(node, child_vk, ctx, remaining_depth=float("inf")):
         node.ga_value = node.value * peeled_frac
 
 
-def _term_is_var(term):
-    "True when *term* is a bare variable reference."
-    if term.ast_label is not None:
-        # AST tracked the term — trust its var/expression classification.
-        return term.is_var_node is True
-    if len(term.exp) != 1:
-        return False
-    (exp_value,) = term.exp.values()
-    return exp_value == 1 and abs(term.phys_coeff - 1.0) <= 1e-10
-
-
 def _process_term(top_vk, term, ctx, remaining_depth=float("inf")):
     """Build a single BudgetNode for one term in a budget constraint's RHS.
 
     Bare-variable terms (``m``, ``m_min``) become recursable nodes — we try
     to expand a sub-budget below them.  Compound terms (``rho*A``, ``1/m``,
-    ``2*m``) become non-recursing leaves; ``_is_redundant_leaf`` drops them
-    when they're the only child of their parent.
+    ``2*m``) become non-recursing leaves; ``_is_redundant_compound_leaf``
+    drops them when they're the only child of their parent.
     """
     parent_prefix = top_vk.lineagestr() if top_vk.lineage else None
     is_var = _term_is_var(term)
@@ -582,7 +568,6 @@ def _process_term(top_vk, term, ctx, remaining_depth=float("inf")):
             fraction=0.0,
             slack=0.0,
             units=ctx.level_units,
-            is_var=False,
         )
     (child_vk,) = term.exp.keys()
     label = (
@@ -605,7 +590,6 @@ def _process_term(top_vk, term, ctx, remaining_depth=float("inf")):
         fraction=0.0,
         slack=0.0,
         units=units,
-        is_var=True,
     )
     if (
         child_vk not in ctx.visited
@@ -615,6 +599,17 @@ def _process_term(top_vk, term, ctx, remaining_depth=float("inf")):
     ):
         _attach_sub_budget(node, child_vk, ctx, remaining_depth=remaining_depth - 1)
     return node
+
+
+def _term_is_var(term):
+    "True when *term* is a bare variable reference."
+    if term.ast_label is not None:
+        # AST tracked the term — trust its var/expression classification.
+        return term.is_var_node is True
+    if len(term.exp) != 1:
+        return False
+    (exp_value,) = term.exp.values()
+    return exp_value == 1 and abs(term.phys_coeff - 1.0) <= 1e-10
 
 
 def _is_allowance_term(term, parent_vk):
@@ -627,9 +622,9 @@ def _is_allowance_term(term, parent_vk):
     return vk.name == f"{parent_vk.name}_growth" and vk.lineage == parent_vk.lineage
 
 
-def _is_monomial_leaf(nodes):
+def _is_redundant_compound_leaf(nodes):
     "True when *nodes* is a single compound (non-bare-var) row — drop it."
-    return len(nodes) == 1 and not nodes[0].is_var
+    return len(nodes) == 1 and nodes[0].vk is None
 
 
 def _build_children(top_vk, lt, constraint, ctx, remaining_depth=float("inf")):
@@ -674,7 +669,7 @@ def _build_children(top_vk, lt, constraint, ctx, remaining_depth=float("inf")):
             )
         else:
             slack_frac = 0.0
-    if _is_monomial_leaf(nodes):
+    if _is_redundant_compound_leaf(nodes):
         # Compound monomial expression as a lone child — visually redundant
         # with the parent's value; drop it regardless of depth.
         return [], peeled_frac, slack_frac
