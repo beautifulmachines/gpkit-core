@@ -448,6 +448,30 @@ class TestBudgetWithGrowth:
         for node in _walk_all_nodes(b.children):
             assert node.cbe_value + node.ga_value == pytest.approx(node.value, rel=1e-4)
 
+    def test_growth_leaf_suppresses_lone_term_at_top_level(self):
+        # GrowthSpar has m >= e + m_growth; once growth is peeled the lone
+        # non-growth term is redundant and gets suppressed.
+        model = GrowthSpar()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        assert b.children == []
+        assert b.cbe_total == pytest.approx(50.0, rel=1e-4)
+        assert b.ga_total == pytest.approx(10.0, rel=1e-4)
+        assert b.total == pytest.approx(60.0, rel=1e-4)
+
+    def test_growth_leaf_suppresses_lone_term_under_parent(self):
+        # GrowthWing has spar1, spar2 each with their own growth + 'e' leaf.
+        # The 'e' grandchildren are suppressed; cbe/ga still split correctly.
+        model = GrowthWing()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        # Wing has two children (spar1, spar2), no grandchildren.
+        assert len(b.children) == 2
+        for spar_node in b.children:
+            assert spar_node.children == []
+            assert spar_node.cbe_value == pytest.approx(50.0, rel=1e-4)
+            assert spar_node.ga_value == pytest.approx(10.0, rel=1e-4)
+
     def test_mixed_growth_and_plain_children(self):
         model = GrowthMixedWing()
         sol, _ = solve(model)
@@ -504,20 +528,13 @@ class TestBudgetRenderingWithGrowth:
 class TestBudgetGrowthCellBlanking:
     """GA cell renders blank for rows with no growth in their subtree."""
 
-    def test_leaf_row_in_growth_subtree_has_blank_ga(self):
+    def test_growth_leaf_has_no_redundant_e_row(self):
+        # The lone non-growth term ('e') is redundant with the parent's CBE
+        # column and gets suppressed.
         model = GrowthSpar()
         sol, _ = solve(model)
         out = build_budget(sol, model, model.m).text()
-        # Row for the leaf 'e' should NOT contain a numeric Growth value
-        # ("0", "0.0", "1e-08", etc). Find the e-row and check its GA col.
-        e_line = next(
-            line for line in out.splitlines() if line.lstrip().startswith("e ")
-        )
-        # Three numeric columns: Nominal, Growth, Total. Growth should be blank.
-        # Split-from-the-right since the Total/Units/Frac suffix is fixed.
-        tokens = e_line.split()
-        # Tokens: ['e', nominal, total, '[kg]', pct]  (no growth token)
-        assert tokens == ["e", "50", "50", "[kg]", "83.3%"]
+        assert not any(line.lstrip().startswith("e ") for line in out.splitlines())
 
     def test_non_growth_submodel_has_blank_ga_despite_noise(self):
         model = GrowthMixedWing()
@@ -553,13 +570,13 @@ class TestBudgetGrowthCellBlanking:
         assert "10" in tokens
 
     def test_has_growth_propagates_in_to_dict(self):
+        # Growth-bearing top with a single non-growth term: child row is
+        # suppressed but has_growth is still surfaced at the top.
         model = GrowthSpar()
         sol, _ = solve(model)
         d = build_budget(sol, model, model.m).to_dict()
         assert d["has_growth"] is True
-        # Find the leaf 'e' child — it should have has_growth False
-        e_child = next(c for c in d["children"] if c["label"] == "e")
-        assert e_child["has_growth"] is False
+        assert d["children"] == []
 
 
 def _walk_all_nodes(nodes):
