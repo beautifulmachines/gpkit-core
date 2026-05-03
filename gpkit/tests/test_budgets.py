@@ -1,8 +1,9 @@
 """Tests for gpkit.budgets — variable budget computation and display."""
 
-# pylint: disable=attribute-defined-outside-init
+# pylint: disable=attribute-defined-outside-init,too-many-lines
 
 import math
+import warnings
 
 import pytest
 
@@ -317,12 +318,29 @@ class TestBudgetErrors:
             build_budget(sol, model, "m")
 
     def test_spar_budget_leaf(self):
+        # Spar.m >= m_min is a single-monomial RHS — no decomposition row
         model = Aircraft()
         sol, _ = solve(model)
-        # Spar.m's budget terminates at a constant — no named-variable children
         b = build_budget(sol, model, model.wing.spar.m)
-        named_children = [n for n in b.children if n.vk is not None]
-        assert len(named_children) == 0
+        assert not b.children
+
+    def test_single_monomial_leaf_suppressed_under_aircraft(self):
+        # Aircraft.m -> Wing.m -> {Spar.m, Skin.m}; each leaf has m >= m_min
+        # (single monomial). Those leaves should render with no further children.
+        model = Aircraft()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        wing_node = b.children[0]
+        for leaf in wing_node.children:
+            assert leaf.children == []
+
+    def test_multi_term_posynomial_keeps_children(self):
+        # Wing.m >= Spar.m + Skin.m has two terms — both rows must stay.
+        model = Aircraft()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        wing_node = b.children[0]
+        assert len(wing_node.children) == 2
 
 
 # ---------------------------------------------------------------------------
@@ -653,20 +671,13 @@ class TestBuildBudgetMixedUnits:
         b = sol.budget(model.m)
         assert isinstance(b, Budget)
 
-    def test_label_includes_constants(self):
-        # m >= rho*V: child label should show "rho·V", not just "V"
-        model = Cylinder()
-        sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
-        assert any("rho" in c.label for c in b.children)
-
     def test_no_cross_unit_recursion(self):
-        # rho·V contributes to m, but V (m^3) != m (kg): should not recurse into V
+        # m >= rho*V is a single-monomial RHS; V also has different units
+        # so no recursion is possible. Result: budget renders with no children.
         model = Cylinder()
         sol, _ = solve(model)
         b = build_budget(sol, model, model.m)
-        rho_v_node = b.children[0]
-        assert rho_v_node.children == []
+        assert not b.children
 
 
 # ---------------------------------------------------------------------------
@@ -953,20 +964,140 @@ class ScaledTermModel(Model):
 
 
 class TestScaledTermNoRecursion:
-    """Scaled terms (f * m_sub) must be leaf nodes, not recursed into."""
+    """Scaled-term leaves (f * m_sub) collapse — single-monomial RHS suppressed"""
 
-    def test_scaled_node_has_no_children(self):
+    def test_scaled_term_leaf_has_no_children(self):
+        # m >= 0.5 * m_sub is a single monomial with a scaled simple term;
+        # the row is redundant with the parent total, so no child is rendered.
         model = ScaledTermModel()
         sol, _ = solve(model)
         b = build_budget(sol, model, model.m)
+        assert not b.children
+
+    def test_scaled_term_total_correct(self):
+        """Top total reflects 0.5 * 10 = 5 kg, even with no child row."""
+        model = ScaledTermModel()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        assert b.total == pytest.approx(5.0, rel=1e-4)
+
+
+# ---------------------------------------------------------------------------
+# Tests: multiple budget constraints (issue #185)
+# ---------------------------------------------------------------------------
+
+
+class TightAndSlackBoundsOnSub(Model):
+    """Sub-variable has one tight bound (rollup) and one slack bound (floor).
+
+    The slack bound has near-zero sensitivity at the optimum and should be
+    filtered out — leaving the rollup as the unique budget constraint.
+    """
+
+    spar: Spar
+    skin: Skin
+    m: Variable
+
+    def setup(self):
+        self.spar = Spar()
+        self.skin = Skin()
+        self.m = Variable("m", "kg", "wing mass")
+        self.cost = self.m
+        slack_floor = Variable("m_floor", 1, "kg", "non-binding floor")
+        return [
+            self.m >= self.spar.m + self.skin.m,  # tight rollup, m = 15
+            self.m >= slack_floor,  # slack at optimum, sens ≈ 0
+            self.spar,
+            self.skin,
+        ]
+
+
+class TwoTightBoundsOnSub(Model):
+    """Sub-variable with two distinct lower bounds, both equal at the optimum.
+
+    Real-world cases (e.g. propellant mass with a physics rollup AND a tank
+    minimum-fill bound) can produce non-trivial dual splits across both
+    constraints. Conic solvers usually collapse the dual onto one when the
+    constraints are exact duplicates, so the tests below patch the sens
+    dict to simulate the genuinely-ambiguous case.
+    """
+
+    m: Variable
+
+    def setup(self):
+        a = Variable("a", 5, "kg")
+        b = Variable("b", 5, "kg")
+        c = Variable("c", 10, "kg")
+        self.m = Variable("m", "kg", "ambiguous mass")
+        self.cost = self.m
+        return [
+            self.m >= a + b,
+            self.m >= c,
+        ]
+
+
+def _force_both_tight(sol, model, m_var):
+    """Patch the solution so both budget constraints on m have sens > threshold."""
+    matches = find_budget_constraints(model, m_var.key, sol)
+    assert len(matches) == 2, "fixture must have exactly two matches"
+    for c, _, _ in matches:
+        sol.sens.constraints[c] = 0.5
+
+
+class TestMultipleBudgetConstraints:
+    """Tests for ambiguity handling and near-zero sensitivity filtering."""
+
+    def test_no_warning_for_tight_plus_slack_at_top_level(self):
+        # Slack-bound noise must not raise a warning at the top level.
+        model = TightAndSlackBoundsOnSub()
+        sol, _ = solve(model)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            build_budget(sol, model, model.m)
+
+    def test_no_warning_for_tight_plus_slack_at_sub_budget(self):
+        # Same model exercised through a parent so it lands in _attach_sub_budget.
+        class Outer(Model):  # pylint: disable=missing-class-docstring
+            inner: TightAndSlackBoundsOnSub
+            m: Variable
+
+            def setup(self):  # pylint: disable=attribute-defined-outside-init
+                self.inner = TightAndSlackBoundsOnSub()
+                self.m = Variable("m", "kg")
+                self.cost = self.m
+                return [self.m >= self.inner.m, self.inner]
+
+        model = Outer()
+        sol, _ = solve(model)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            build_budget(sol, model, model.m)
+
+    def test_sub_budget_ambiguity_silent_leaf(self):
+        # Sub-variable with two genuinely tight bounds: leaf with no children.
+        class Outer(Model):  # pylint: disable=missing-class-docstring
+            sub: TwoTightBoundsOnSub
+            m: Variable
+
+            def setup(self):  # pylint: disable=attribute-defined-outside-init
+                self.sub = TwoTightBoundsOnSub()
+                self.m = Variable("m", "kg")
+                self.cost = self.m
+                return [self.m >= self.sub.m, self.sub]
+
+        model = Outer()
+        sol, _ = solve(model)
+        _force_both_tight(sol, model, model.sub.m)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            b = build_budget(sol, model, model.m)
         assert len(b.children) == 1
-        scaled_node = b.children[0]
-        assert scaled_node.children == []
+        assert not b.children[0].children
 
-    def test_scaled_node_value_correct(self):
-        """Node value is 0.5 * 10 = 5 kg, not 10 kg."""
-        model = ScaledTermModel()
+    def test_top_level_ambiguity_raises(self):
+        # User explicitly asked for a budget on the ambiguous variable.
+        model = TwoTightBoundsOnSub()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
-        scaled_node = b.children[0]
-        assert scaled_node.value == pytest.approx(5.0, rel=1e-4)
+        _force_both_tight(sol, model, model.m)
+        with pytest.raises(ValueError, match="multiple"):
+            build_budget(sol, model, model.m)

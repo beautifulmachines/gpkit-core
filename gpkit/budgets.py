@@ -15,7 +15,6 @@ Usage example::
 
 from __future__ import annotations
 
-import warnings
 from dataclasses import dataclass, field
 from typing import Optional
 
@@ -176,6 +175,12 @@ def find_budget_constraints(model, vk, solution):
     return sorted(matches, key=lambda x: -x[2])
 
 
+def _drop_nonbinding(matches, threshold=1e-5):
+    "Drop near-zero-sensitivity matches when at least one binding match remains."
+    binding = [m for m in matches if m[2] > threshold]
+    return binding if binding else matches
+
+
 # ---------------------------------------------------------------------------
 # Data structures
 # ---------------------------------------------------------------------------
@@ -220,6 +225,9 @@ class BudgetNode:  # pylint: disable=too-many-instance-attributes
     cbe_value: float = 0.0
     ga_value: float = 0.0
     has_growth: bool = False
+    # True when a sub-budget exists but expansion was deliberately stopped
+    # (e.g. multiple tight bounds on the same variable — ambiguous).
+    terminate: bool = False
 
 
 @dataclass
@@ -512,14 +520,15 @@ def _make_term(mon, hmap_units, ast_labels, ast_is_var, ctx):
 def _attach_sub_budget(node, child_vk, ctx, remaining_depth=float("inf")):
     "Recursively attach sub-budget children to *node* if a budget constraint exists."
     sub_matches = find_budget_constraints(ctx.model, child_vk, ctx.solution)
+    if len(sub_matches) > 1:
+        sub_matches = _drop_nonbinding(sub_matches)
     if not sub_matches:
         return
     if len(sub_matches) > 1:
-        warnings.warn(
-            f"Multiple budget constraints for {child_vk}; "
-            "using highest-sensitivity one.",
-            stacklevel=5,
-        )
+        # Multiple genuinely tight bounds — stop expansion. Mark the node so
+        # the caller doesn't treat its empty children as a redundant leaf.
+        node.terminate = True
+        return
     sub_c, sub_lt = sub_matches[0][0], sub_matches[0][1]
     child_units = child_vk.unitrepr if child_vk.unitrepr != "-" else "dimensionless"
     sub_ctx = _BudgetCtx(
@@ -529,12 +538,11 @@ def _attach_sub_budget(node, child_vk, ctx, remaining_depth=float("inf")):
         level_units=child_units,
         visited=ctx.visited | {child_vk},
     )
-    node.children, peeled_frac = _build_children(
+    node.children, peeled_frac, slack_frac = _build_children(
         child_vk, sub_lt, sub_c, sub_ctx, remaining_depth=remaining_depth
     )
     node.has_growth = peeled_frac > 0
-    non_slack_frac = sum(c.fraction for c in node.children if c.label != "[slack]")
-    node.slack = max(0.0, 1.0 - non_slack_frac - peeled_frac)
+    node.slack = slack_frac
 
 
 def _process_term(top_vk, term, ctx, remaining_depth=float("inf")):
@@ -610,12 +618,24 @@ def _is_allowance_term(term, parent_vk):
     return vk.name == f"{parent_vk.name}_growth" and vk.lineage == parent_vk.lineage
 
 
+def _is_redundant_leaf(nodes, peeled_frac):
+    "True when *nodes* is a single child that visually duplicates its parent."
+    if peeled_frac != 0.0 or len(nodes) != 1:
+        return False
+    only = nodes[0]
+    return not only.children and not only.terminate and only.label != "[slack]"
+
+
 def _build_children(top_vk, lt, constraint, ctx, remaining_depth=float("inf")):
     """Recursively build BudgetNode children from the lt side of a budget constraint.
 
     When *top_vk* declares a growth allowance, the auto-generated allowance
     term in its budget constraint is peeled off rather than rendered as a
     child row — its value flows into the parent's ``ga_value`` instead.
+
+    Returns ``(nodes, peeled_frac, slack_frac)``.  ``slack_frac`` is the
+    constraint's relative slack (0 when tight) so callers don't have to
+    reverse-engineer it from child fractions.
     """
     total_val = float(ctx.solution[top_vk].to(ctx.level_units).magnitude)
     is_tight = abs(ctx.solution.sens.constraints.get(constraint, 0.0)) > 1e-5
@@ -632,9 +652,10 @@ def _build_children(top_vk, lt, constraint, ctx, remaining_depth=float("inf")):
         node = _process_term(top_vk, term, ctx, remaining_depth=remaining_depth)
         node.fraction = term.term_val / total_val if total_val else 0.0
         nodes.append(node)
+    slack_frac = 0.0
     if not is_tight and total_val:
-        slack_frac = 1.0 - sum(n.fraction for n in nodes) - peeled_frac
-        if abs(slack_frac) > 1e-4:
+        slack_frac = max(0.0, 1.0 - sum(n.fraction for n in nodes) - peeled_frac)
+        if slack_frac > 1e-4:
             nodes.append(
                 BudgetNode(
                     label="[slack]",
@@ -645,7 +666,13 @@ def _build_children(top_vk, lt, constraint, ctx, remaining_depth=float("inf")):
                     units=ctx.level_units,
                 )
             )
-    return nodes, peeled_frac
+        else:
+            slack_frac = 0.0
+    if remaining_depth > 0 and _is_redundant_leaf(nodes, peeled_frac):
+        # Single-monomial leaf: the lone child just duplicates the parent.
+        # Skip when the user truncated by depth (remaining_depth == 0).
+        return [], peeled_frac, slack_frac
+    return nodes, peeled_frac, slack_frac
 
 
 def _compute_cbe_ga(node):
@@ -722,10 +749,13 @@ def build_budget(  # pylint: disable=too-many-locals
             f"'{top_vk.name}' as the sole term on the greater-than side."
         )
     if len(matches) > 1:
-        warnings.warn(
-            f"Multiple budget constraints found for {top_vk}; "
-            "using highest-sensitivity one.",
-            stacklevel=2,
+        matches = _drop_nonbinding(matches)
+    if len(matches) > 1:
+        rhs_list = "\n  ".join(str(m[1]) for m in matches)
+        raise ValueError(
+            f"Cannot build a budget for {top_vk}: multiple budget constraints "
+            f"are simultaneously tight (the decomposition is ambiguous). "
+            f"Right-hand sides:\n  {rhs_list}"
         )
 
     constraint, lt, _ = matches[0]
@@ -748,7 +778,7 @@ def build_budget(  # pylint: disable=too-many-locals
         level_units=display_units,
         visited=frozenset({top_vk}),
     )
-    children, peeled_frac = _build_children(
+    children, peeled_frac, _ = _build_children(
         top_vk, lt, constraint, ctx, remaining_depth=depth - 1
     )
     for child in children:
