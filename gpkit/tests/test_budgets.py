@@ -318,21 +318,32 @@ class TestBudgetErrors:
             build_budget(sol, model, "m")
 
     def test_spar_budget_leaf(self):
-        # Spar.m >= m_min is a single-monomial RHS — no decomposition row
+        # Spar.m >= m_min: m_min is a bare variable, kept as a child row.
         model = Aircraft()
         sol, _ = solve(model)
         b = build_budget(sol, model, model.wing.spar.m)
-        assert not b.children
+        assert any("m_min" in c.label for c in b.children)
 
-    def test_single_monomial_leaf_suppressed_under_aircraft(self):
-        # Aircraft.m -> Wing.m -> {Spar.m, Skin.m}; each leaf has m >= m_min
-        # (single monomial). Those leaves should render with no further children.
-        model = Aircraft()
+    def test_compound_leaf_suppressed_when_alone(self):
+        # Compound monomial expressions (multiple variables, like rho*A*L)
+        # are dropped when they're the only child of their parent.
+        class Inner(Model):
+            """Mass equals a 3-variable compound monomial expression."""
+
+            m: Variable
+
+            def setup(self):  # pylint: disable=attribute-defined-outside-init
+                rho = Variable("rho", 7800, "kg/m^3")
+                length = Variable("L", 0.1, "m")
+                area = Variable("A", 1e-4, "m^2")
+                self.m = Variable("m", "kg")
+                self.cost = self.m
+                return [self.m >= rho * length * area]
+
+        model = Inner()
         sol, _ = solve(model)
         b = build_budget(sol, model, model.m)
-        wing_node = b.children[0]
-        for leaf in wing_node.children:
-            assert leaf.children == []
+        assert b.children == []
 
     def test_multi_term_posynomial_keeps_children(self):
         # Wing.m >= Spar.m + Skin.m has two terms — both rows must stay.
@@ -448,29 +459,15 @@ class TestBudgetWithGrowth:
         for node in _walk_all_nodes(b.children):
             assert node.cbe_value + node.ga_value == pytest.approx(node.value, rel=1e-4)
 
-    def test_growth_leaf_suppresses_lone_term_at_top_level(self):
-        # GrowthSpar has m >= e + m_growth; once growth is peeled the lone
-        # non-growth term is redundant and gets suppressed.
+    def test_growth_leaf_keeps_named_var(self):
+        # GrowthSpar has m >= e + m_growth; e is a bare variable so its row
+        # is kept (the user named it for a reason).
         model = GrowthSpar()
         sol, _ = solve(model)
         b = build_budget(sol, model, model.m)
-        assert b.children == []
+        assert any(c.label == "e" for c in b.children)
         assert b.cbe_total == pytest.approx(50.0, rel=1e-4)
         assert b.ga_total == pytest.approx(10.0, rel=1e-4)
-        assert b.total == pytest.approx(60.0, rel=1e-4)
-
-    def test_growth_leaf_suppresses_lone_term_under_parent(self):
-        # GrowthWing has spar1, spar2 each with their own growth + 'e' leaf.
-        # The 'e' grandchildren are suppressed; cbe/ga still split correctly.
-        model = GrowthWing()
-        sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
-        # Wing has two children (spar1, spar2), no grandchildren.
-        assert len(b.children) == 2
-        for spar_node in b.children:
-            assert spar_node.children == []
-            assert spar_node.cbe_value == pytest.approx(50.0, rel=1e-4)
-            assert spar_node.ga_value == pytest.approx(10.0, rel=1e-4)
 
     def test_mixed_growth_and_plain_children(self):
         model = GrowthMixedWing()
@@ -528,13 +525,17 @@ class TestBudgetRenderingWithGrowth:
 class TestBudgetGrowthCellBlanking:
     """GA cell renders blank for rows with no growth in their subtree."""
 
-    def test_growth_leaf_has_no_redundant_e_row(self):
-        # The lone non-growth term ('e') is redundant with the parent's CBE
-        # column and gets suppressed.
+    def test_leaf_row_in_growth_subtree_has_blank_ga(self):
+        # The 'e' row (bare named variable) is rendered; its Growth column
+        # should be blank because e itself has no growth allowance.
         model = GrowthSpar()
         sol, _ = solve(model)
         out = build_budget(sol, model, model.m).text()
-        assert not any(line.lstrip().startswith("e ") for line in out.splitlines())
+        e_line = next(
+            line for line in out.splitlines() if line.lstrip().startswith("e ")
+        )
+        tokens = e_line.split()
+        assert tokens == ["e", "50", "50", "[kg]", "83.3%"]
 
     def test_non_growth_submodel_has_blank_ga_despite_noise(self):
         model = GrowthMixedWing()
@@ -570,13 +571,13 @@ class TestBudgetGrowthCellBlanking:
         assert "10" in tokens
 
     def test_has_growth_propagates_in_to_dict(self):
-        # Growth-bearing top with a single non-growth term: child row is
-        # suppressed but has_growth is still surfaced at the top.
         model = GrowthSpar()
         sol, _ = solve(model)
         d = build_budget(sol, model, model.m).to_dict()
         assert d["has_growth"] is True
-        assert d["children"] == []
+        # The leaf 'e' child has no growth of its own.
+        e_child = next(c for c in d["children"] if c["label"] == "e")
+        assert e_child["has_growth"] is False
 
 
 def _walk_all_nodes(nodes):
@@ -716,22 +717,26 @@ class MixedUnitCoeffModel(Model):
 class TestMixedUnitCoeff:
     """Values must be correct when unit conversion is baked into hmap coefficient."""
 
-    def test_children_sum_to_total(self):
+    def test_total_in_kg(self):
+        # Top total is in the parent's level units (kg) regardless of how
+        # children are rendered.
         model = MixedUnitCoeffModel()
         sol, _ = solve(model)
         b = build_budget(sol, model, model.m)
-        child_sum = sum(n.value for n in b.children)
-        assert abs(child_sum - b.total) / b.total < 1e-4
+        # 1 lb (≈ 0.4536 kg) + 1 kg ≈ 1.4536 kg total
+        assert b.total == pytest.approx(1.45359237, rel=1e-4)
 
-    def test_component_values_correct(self):
-        """m_a ≈ 0.4536 kg, m_b = 1.0 kg."""
+    def test_component_values_in_native_units(self):
+        # Each child renders in its declared units: m_a in lbs, m_b in kg.
         model = MixedUnitCoeffModel()
         sol, _ = solve(model)
         b = build_budget(sol, model, model.m)
-        m_b_node = next(n for n in b.children if "m_b" in n.label)
-        assert m_b_node.value == pytest.approx(1.0, rel=1e-4)
         m_a_node = next(n for n in b.children if "m_a" in n.label)
-        assert m_a_node.value == pytest.approx(0.45359237, rel=1e-4)
+        assert m_a_node.units == "lbs"
+        assert m_a_node.value == pytest.approx(1.0, rel=1e-4)
+        m_b_node = next(n for n in b.children if "m_b" in n.label)
+        assert m_b_node.units == "kg"
+        assert m_b_node.value == pytest.approx(1.0, rel=1e-4)
 
     def test_labels_show_physical_coeff(self):
         """Pure unit-conversion terms should NOT show a numeric coefficient."""
@@ -903,6 +908,43 @@ class TestBudgetDepth:
         b_inf = build_budget(sol, model, model.m, depth=math.inf)
         assert len(b_default.children) == len(b_inf.children)
         assert len(b_default.children[0].children) == len(b_inf.children[0].children)
+
+    def test_compound_leaf_dropped_at_depth_boundary(self):
+        # Compound monomial expressions (rho*A*L) must be suppressed even
+        # when they happen to land at the depth boundary the user picked.
+        class Inner(Model):
+            """Mass equals a 3-variable compound monomial expression."""
+
+            m: Variable
+
+            def setup(self):  # pylint: disable=attribute-defined-outside-init
+                rho = Variable("rho", 7800, "kg/m^3")
+                length = Variable("L", 0.1, "m")
+                area = Variable("A", 1e-4, "m^2")
+                self.m = Variable("m", "kg")
+                self.cost = self.m
+                return [self.m >= rho * length * area]
+
+        class Outer(Model):
+            """Wraps Inner with a single-monomial relay constraint."""
+
+            inner: Inner
+            m: Variable
+
+            def setup(self):  # pylint: disable=attribute-defined-outside-init
+                self.inner = Inner()
+                self.m = Variable("m", "kg")
+                self.cost = self.m
+                return [self.m >= self.inner.m, self.inner]
+
+        model = Outer()
+        sol = model.solve(verbosity=0)
+        # depth=2 traverses Outer -> Inner -> rho*L*A; the compound
+        # grandchild row should be dropped, leaving Inner.m as a leaf.
+        b = build_budget(sol, model, model.m, depth=2)
+        inner_node = b.children[0]
+        assert "Inner.m" in inner_node.label
+        assert inner_node.children == []
 
     def test_solution_budget_depth_kwarg(self):
         """Solution.budget() accepts and respects depth=."""

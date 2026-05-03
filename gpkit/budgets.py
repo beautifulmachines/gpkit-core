@@ -225,9 +225,9 @@ class BudgetNode:  # pylint: disable=too-many-instance-attributes
     cbe_value: float = 0.0
     ga_value: float = 0.0
     has_growth: bool = False
-    # True when a sub-budget exists but expansion was deliberately stopped
-    # (e.g. multiple tight bounds on the same variable — ambiguous).
-    terminate: bool = False
+    # True when the term is a bare variable (e.g. ``m``); false for compound
+    # expressions (``rho*A``, ``1/m``, ``2*m``) that get suppressed when alone.
+    is_var: bool = False
 
 
 @dataclass
@@ -522,12 +522,8 @@ def _attach_sub_budget(node, child_vk, ctx, remaining_depth=float("inf")):
     sub_matches = find_budget_constraints(ctx.model, child_vk, ctx.solution)
     if len(sub_matches) > 1:
         sub_matches = _drop_nonbinding(sub_matches)
-    if not sub_matches:
-        return
-    if len(sub_matches) > 1:
-        # Multiple genuinely tight bounds — stop expansion. Mark the node so
-        # the caller doesn't treat its empty children as a redundant leaf.
-        node.terminate = True
+    if not sub_matches or len(sub_matches) > 1:
+        # No bound, or multiple genuinely tight bounds — leaf, stop expansion.
         return
     sub_c, sub_lt = sub_matches[0][0], sub_matches[0][1]
     child_units = child_vk.unitrepr if child_vk.unitrepr != "-" else "dimensionless"
@@ -543,73 +539,77 @@ def _attach_sub_budget(node, child_vk, ctx, remaining_depth=float("inf")):
     )
     node.has_growth = peeled_frac > 0
     node.slack = slack_frac
-    if not node.children and peeled_frac > 0:
-        # Suppression dropped the lone non-growth term; record this level's
-        # peeled growth so _compute_cbe_ga's leaf branch derives cbe correctly.
-        node.ga_value = node.value * peeled_frac
+
+
+def _term_is_var(term):
+    "True when *term* is a bare variable reference."
+    if term.ast_label is not None:
+        # AST tracked the term — trust its var/expression classification.
+        return term.is_var_node is True
+    if len(term.exp) != 1:
+        return False
+    (exp_value,) = term.exp.values()
+    return exp_value == 1 and abs(term.phys_coeff - 1.0) <= 1e-10
 
 
 def _process_term(top_vk, term, ctx, remaining_depth=float("inf")):
-    """Build a single BudgetNode for one term in a budget constraint's RHS."""
-    free_in_term = {vk for vk in term.exp if vk not in ctx.solution.constants}
+    """Build a single BudgetNode for one term in a budget constraint's RHS.
+
+    Bare-variable terms (``m``, ``m_min``) become recursable nodes — we try
+    to expand a sub-budget below them.  Compound terms (``rho*A``, ``1/m``,
+    ``2*m``) become non-recursing leaves; ``_is_redundant_leaf`` drops them
+    when they're the only child of their parent.
+    """
     parent_prefix = top_vk.lineagestr() if top_vk.lineage else None
-    is_simple = len(free_in_term) == 1 and term.exp.get(next(iter(free_in_term))) == 1
-    if is_simple:
-        child_vk = next(iter(free_in_term))
-        if term.ast_label is not None:
-            label = term.ast_label
-        else:
-            has_constants = any(vk in ctx.solution.constants for vk in term.exp)
-            if has_constants or abs(term.phys_coeff - 1.0) > 1e-10:
-                label = _format_term_label(
-                    term.exp, term.phys_coeff, strip_prefix=parent_prefix
-                )
-            else:
-                label = _vk_display(child_vk, lineage=True, strip_prefix=parent_prefix)
-        # Use the child variable's own declared units for per-row display
-        native_units = (
-            child_vk.unitrepr if child_vk.unitrepr != "-" else ctx.level_units
+    is_var = _term_is_var(term)
+    if not is_var:
+        label = (
+            term.ast_label
+            if term.ast_label is not None
+            else _format_term_label(
+                term.exp, term.phys_coeff, strip_prefix=parent_prefix
+            )
         )
-        if native_units != ctx.level_units and term.term_qty is not None:
-            try:
-                native_val = float(term.term_qty.to(native_units).magnitude)
-            except (DimensionalityError, AttributeError, TypeError, ValueError):
-                native_units = ctx.level_units
-                native_val = term.term_val
-        else:
-            native_units = ctx.level_units
-            native_val = term.term_val
-        node = BudgetNode(
+        return BudgetNode(
             label=label,
-            vk=child_vk,
-            value=native_val,
+            vk=None,
+            value=term.term_val,
             fraction=0.0,
             slack=0.0,
-            units=native_units,
+            units=ctx.level_units,
+            is_var=False,
         )
-        can_recurse = term.ast_label is None or term.is_var_node is True
-        if (
-            can_recurse
-            and child_vk not in ctx.visited
-            and child_vk.units is not None
-            and child_vk.units.is_compatible_with(ctx.level_units)
-            and remaining_depth > 0
-        ):
-            _attach_sub_budget(node, child_vk, ctx, remaining_depth=remaining_depth - 1)
-        return node
+    (child_vk,) = term.exp.keys()
     label = (
         term.ast_label
         if term.ast_label is not None
-        else _format_term_label(term.exp, term.phys_coeff, strip_prefix=parent_prefix)
+        else _vk_display(child_vk, lineage=True, strip_prefix=parent_prefix)
     )
-    return BudgetNode(
+    # Render in the variable's own declared units when they differ from
+    # the parent's level units.
+    units = child_vk.unitrepr if child_vk.unitrepr != "-" else ctx.level_units
+    if units != ctx.level_units and term.term_qty is not None:
+        val = float(term.term_qty.to(units).magnitude)
+    else:
+        units = ctx.level_units
+        val = term.term_val
+    node = BudgetNode(
         label=label,
-        vk=None,
-        value=term.term_val,
+        vk=child_vk,
+        value=val,
         fraction=0.0,
         slack=0.0,
-        units=ctx.level_units,
+        units=units,
+        is_var=True,
     )
+    if (
+        child_vk not in ctx.visited
+        and child_vk.units is not None
+        and child_vk.units.is_compatible_with(ctx.level_units)
+        and remaining_depth > 0
+    ):
+        _attach_sub_budget(node, child_vk, ctx, remaining_depth=remaining_depth - 1)
+    return node
 
 
 def _is_allowance_term(term, parent_vk):
@@ -622,12 +622,9 @@ def _is_allowance_term(term, parent_vk):
     return vk.name == f"{parent_vk.name}_growth" and vk.lineage == parent_vk.lineage
 
 
-def _is_redundant_leaf(nodes):
-    "True when *nodes* is a single child that visually duplicates its parent."
-    if len(nodes) != 1:
-        return False
-    only = nodes[0]
-    return not only.children and not only.terminate and only.label != "[slack]"
+def _is_monomial_leaf(nodes):
+    "True when *nodes* is a single compound (non-bare-var) row — drop it."
+    return len(nodes) == 1 and not nodes[0].is_var
 
 
 def _build_children(top_vk, lt, constraint, ctx, remaining_depth=float("inf")):
@@ -672,19 +669,15 @@ def _build_children(top_vk, lt, constraint, ctx, remaining_depth=float("inf")):
             )
         else:
             slack_frac = 0.0
-    if remaining_depth > 0 and _is_redundant_leaf(nodes):
-        # Single-monomial leaf: the lone child just duplicates the parent.
-        # Skip when the user truncated by depth (remaining_depth == 0).
+    if _is_monomial_leaf(nodes):
+        # Compound monomial expression as a lone child — visually redundant
+        # with the parent's value; drop it regardless of depth.
         return [], peeled_frac, slack_frac
     return nodes, peeled_frac, slack_frac
 
 
 def _compute_cbe_ga(node):
-    """Post-order cbe/ga split.
-
-    Non-leaves: ``cbe`` is the sum of children's cbe; ``ga`` is the
-    remainder.  Leaves: ``ga`` is pre-set when growth was peeled (zero
-    otherwise) and ``cbe`` is derived from it.
+    """Post-order: cbe = sum of leaf values; ga = value − cbe.
 
     Also propagates ``has_growth`` up: a node has growth if it owns a peeled
     allowance (set in _attach_sub_budget) or any descendant does.
@@ -694,9 +687,9 @@ def _compute_cbe_ga(node):
             _compute_cbe_ga(child)
         node.cbe_value = sum(c.cbe_value for c in node.children)
         node.has_growth = node.has_growth or any(c.has_growth for c in node.children)
-        node.ga_value = node.value - node.cbe_value
     else:
-        node.cbe_value = node.value - node.ga_value
+        node.cbe_value = node.value
+    node.ga_value = node.value - node.cbe_value
 
 
 def _resolve_vk(var):
@@ -791,11 +784,7 @@ def build_budget(  # pylint: disable=too-many-locals
     )
     for child in children:
         _compute_cbe_ga(child)
-    cbe_total = (
-        sum(c.cbe_value for c in children)
-        if children
-        else total_val * (1.0 - peeled_frac)
-    )
+    cbe_total = sum(c.cbe_value for c in children) if children else total_val
     has_growth = peeled_frac > 0 or any(c.has_growth for c in children)
     return Budget(
         top_vk=top_vk,
