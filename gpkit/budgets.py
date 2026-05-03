@@ -539,6 +539,11 @@ def _attach_sub_budget(node, child_vk, ctx, remaining_depth=float("inf")):
     )
     node.has_growth = peeled_frac > 0
     node.slack = slack_frac
+    if not node.children and peeled_frac > 0:
+        # Suppression dropped the lone non-growth (compound) term; record
+        # this level's peeled growth so _compute_cbe_ga's leaf branch can
+        # derive cbe = value − ga correctly.
+        node.ga_value = node.value * peeled_frac
 
 
 def _term_is_var(term):
@@ -677,7 +682,12 @@ def _build_children(top_vk, lt, constraint, ctx, remaining_depth=float("inf")):
 
 
 def _compute_cbe_ga(node):
-    """Post-order: cbe = sum of leaf values; ga = value − cbe.
+    """Post-order cbe/ga split.
+
+    Non-leaves: ``cbe`` is the sum of children's cbe; ``ga`` is the
+    remainder.  Leaves: ``ga_value`` is pre-set in ``_attach_sub_budget``
+    when growth was peeled but the lone non-growth term was suppressed
+    (zero otherwise); ``cbe`` is derived from it.
 
     Also propagates ``has_growth`` up: a node has growth if it owns a peeled
     allowance (set in _attach_sub_budget) or any descendant does.
@@ -687,9 +697,9 @@ def _compute_cbe_ga(node):
             _compute_cbe_ga(child)
         node.cbe_value = sum(c.cbe_value for c in node.children)
         node.has_growth = node.has_growth or any(c.has_growth for c in node.children)
+        node.ga_value = node.value - node.cbe_value
     else:
-        node.cbe_value = node.value
-    node.ga_value = node.value - node.cbe_value
+        node.cbe_value = node.value - node.ga_value
 
 
 def _resolve_vk(var):
@@ -784,7 +794,11 @@ def build_budget(  # pylint: disable=too-many-locals
     )
     for child in children:
         _compute_cbe_ga(child)
-    cbe_total = sum(c.cbe_value for c in children) if children else total_val
+    cbe_total = (
+        sum(c.cbe_value for c in children)
+        if children
+        else total_val * (1.0 - peeled_frac)
+    )
     has_growth = peeled_frac > 0 or any(c.has_growth for c in children)
     return Budget(
         top_vk=top_vk,

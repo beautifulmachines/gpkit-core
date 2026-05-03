@@ -469,6 +469,34 @@ class TestBudgetWithGrowth:
         assert b.cbe_total == pytest.approx(50.0, rel=1e-4)
         assert b.ga_total == pytest.approx(10.0, rel=1e-4)
 
+    def test_growth_with_compound_rollup_keeps_cbe_ga_split(self):
+        # When the rollup is compound (rho*A*L), the lone non-growth term
+        # is dropped — but the parent's cbe/ga split must still match
+        # value/(1+growth) and value*growth/(1+growth) respectively.
+        class GrowthCompoundExpr(Model):
+            """Mass with growth declared on a compound rollup expression."""
+
+            m: Variable
+
+            def setup(self):  # pylint: disable=attribute-defined-outside-init
+                rho = Variable("rho", 7800, "kg/m^3")
+                length = Variable("L", 0.1, "m")
+                area = Variable("A", 1e-4, "m^2")
+                self.m = Variable("m", "kg", growth=0.20)
+                self.cost = self.m
+                return self.m.grown_from(rho * length * area)
+
+        model = GrowthCompoundExpr()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        # rho * L * A = 7800 * 0.1 * 1e-4 = 0.078 kg.
+        # m = 0.078 * 1.20 = 0.0936 kg; cbe = 0.078; ga = 0.0156.
+        assert b.total == pytest.approx(0.0936, rel=1e-4)
+        assert b.cbe_total == pytest.approx(0.078, rel=1e-4)
+        assert b.ga_total == pytest.approx(0.0156, rel=1e-4)
+        # Compound term collapsed; no children rendered.
+        assert b.children == []
+
     def test_mixed_growth_and_plain_children(self):
         model = GrowthMixedWing()
         sol, _ = solve(model)
