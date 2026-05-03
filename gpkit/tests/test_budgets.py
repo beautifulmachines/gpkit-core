@@ -343,7 +343,7 @@ class TestBudgetErrors:
         model = Inner()
         sol, _ = solve(model)
         b = build_budget(sol, model, model.m)
-        assert b.children == []
+        assert not b.children
 
     def test_multi_term_posynomial_keeps_children(self):
         # Wing.m >= Spar.m + Skin.m has two terms — both rows must stay.
@@ -495,7 +495,7 @@ class TestBudgetWithGrowth:
         assert b.cbe_total == pytest.approx(0.078, rel=1e-4)
         assert b.ga_total == pytest.approx(0.0156, rel=1e-4)
         # Compound term collapsed; no children rendered.
-        assert b.children == []
+        assert not b.children
 
     def test_mixed_growth_and_plain_children(self):
         model = GrowthMixedWing()
