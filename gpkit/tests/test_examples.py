@@ -139,6 +139,11 @@ class TestExamples:
     def test_gettingstarted(self, example):
         assert example.sol.cost == pytest.approx(1.414, rel=1e-2)
 
+    def test_growth_allowance(self, example):
+        # Spar leaf: rho*t*A = 2700 * 0.005 * 1.0 = 13.5 kg per spar
+        # Spar.m = 1.20 * 13.5 = 16.2; Wing.m = 1.10 * 2 * 16.2 = 35.64
+        assert mag(example.sol.cost) == pytest.approx(35.64, rel=1e-3)
+
     def test_loose_constraintsets(self, example):
         m = example.m
         sol = m.solve(verbosity=0)

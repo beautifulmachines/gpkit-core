@@ -326,6 +326,232 @@ class TestBudgetErrors:
 
 
 # ---------------------------------------------------------------------------
+# Tests: growth allowance integration
+# ---------------------------------------------------------------------------
+
+
+class GrowthSpar(Model):
+    """Leaf component with a 20% growth allowance."""
+
+    m: Variable
+
+    def setup(self):
+        e = Variable("e", 50, "kg", "spar nominal estimate")
+        self.m = Variable("m", "kg", "spar mass", growth=0.20)
+        self.cost = self.m
+        return self.m.grown_from(e)
+
+
+class GrowthSkin(Model):
+    """Leaf component without a growth allowance."""
+
+    m: Variable
+
+    def setup(self):
+        e = Variable("e", 30, "kg", "skin nominal estimate")
+        self.m = Variable("m", "kg", "skin mass")
+        self.cost = self.m
+        return [self.m >= e]
+
+
+class GrowthWing(Model):
+    """Wing with 10% subsystem growth budgeted across two spars."""
+
+    spar1: GrowthSpar
+    spar2: GrowthSpar
+    m: Variable
+
+    def setup(self):
+        self.spar1 = GrowthSpar()
+        self.spar2 = GrowthSpar()
+        self.m = Variable("m", "kg", "wing mass", growth=0.10)
+        self.cost = self.m
+        return [
+            self.m.grown_from(self.spar1.m + self.spar2.m),
+            self.spar1,
+            self.spar2,
+        ]
+
+
+class GrowthMixedWing(Model):
+    """Wing with 10% growth, mixing a growth-enabled spar and a plain skin."""
+
+    spar: GrowthSpar
+    skin: GrowthSkin
+    m: Variable
+
+    def setup(self):
+        self.spar = GrowthSpar()
+        self.skin = GrowthSkin()
+        self.m = Variable("m", "kg", "wing mass", growth=0.10)
+        self.cost = self.m
+        return [
+            self.m.grown_from(self.spar.m + self.skin.m),
+            self.spar,
+            self.skin,
+        ]
+
+
+class TestBudgetWithGrowth:
+    """Budget walker peels off allowance terms and computes Nominal/Growth columns."""
+
+    def test_allowance_term_not_rendered_as_child(self):
+        model = GrowthSpar()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        labels = [n.label for n in b.children]
+        assert not any("growth" in (lbl or "") for lbl in labels)
+
+    def test_leaf_cbe_plus_ga_equals_total(self):
+        model = GrowthSpar()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        # m = 1.20 * 50 = 60; cbe = 50 (from leaf expr); ga = 10
+        assert b.total == pytest.approx(60.0, rel=1e-4)
+        assert b.cbe_total == pytest.approx(50.0, rel=1e-4)
+        assert b.ga_total == pytest.approx(10.0, rel=1e-4)
+        assert b.cbe_total + b.ga_total == pytest.approx(b.total, rel=1e-4)
+
+    def test_two_level_recursive_ga_accumulation(self):
+        model = GrowthWing()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        # spar_total = 60 each; wing_cbe constraint = 120; wing.m = 132
+        # leaf cbe sum (recursive) = 50 + 50 = 100
+        # ga (recursive) = 132 - 100 = 32 (Wing.m_growth=12 + 2*Spar.m_growth=20)
+        assert b.total == pytest.approx(132.0, rel=1e-4)
+        assert b.cbe_total == pytest.approx(100.0, rel=1e-4)
+        assert b.ga_total == pytest.approx(32.0, rel=1e-4)
+
+    def test_invariant_at_every_node(self):
+        model = GrowthWing()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        for node in _walk_all_nodes(b.children):
+            assert node.cbe_value + node.ga_value == pytest.approx(node.value, rel=1e-4)
+
+    def test_mixed_growth_and_plain_children(self):
+        model = GrowthMixedWing()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        # Spar: cbe=50, ga=10, total=60
+        # Skin: cbe=30, ga=0, total=30 (no growth declared)
+        # Wing.m_cbe = spar.m + skin.m = 90; Wing.m_growth = 9; Wing.m = 99
+        # Recursive cbe at wing = 50 + 30 = 80; ga = 99 - 80 = 19
+        assert b.total == pytest.approx(99.0, rel=1e-4)
+        assert b.cbe_total == pytest.approx(80.0, rel=1e-4)
+        assert b.ga_total == pytest.approx(19.0, rel=1e-4)
+        # Skin's row should have ga=0
+        skin_node = next(
+            n
+            for n in b.children
+            if n.vk and n.vk.name == "m" and "skin" in n.vk.lineagestr().lower()
+        )
+        assert skin_node.ga_value == pytest.approx(0.0, abs=1e-4)
+
+
+class TestBudgetRenderingWithGrowth:
+    """Text/markdown render adds Nominal and Growth columns when growth is present."""
+
+    def test_text_includes_nominal_and_growth_columns(self):
+        model = GrowthWing()
+        sol, _ = solve(model)
+        out = build_budget(sol, model, model.m).text()
+        assert "Nominal" in out
+        assert "Growth" in out
+
+    def test_markdown_includes_nominal_and_growth_columns(self):
+        model = GrowthWing()
+        sol, _ = solve(model)
+        out = build_budget(sol, model, model.m).markdown()
+        assert "Nominal" in out
+        assert "Growth" in out
+
+    def test_text_unchanged_for_no_growth_budget(self):
+        model = Aircraft()
+        sol, _ = solve(model)
+        out = build_budget(sol, model, model.m).text()
+        assert "Nominal" not in out
+        assert "Growth" not in out
+
+    def test_to_dict_always_has_cbe_ga(self):
+        model = GrowthSpar()
+        sol, _ = solve(model)
+        d = build_budget(sol, model, model.m).to_dict()
+        assert "cbe_total" in d
+        assert "ga_total" in d
+        assert d["cbe_total"] + d["ga_total"] == pytest.approx(d["total"], rel=1e-4)
+
+
+class TestBudgetGrowthCellBlanking:
+    """GA cell renders blank for rows with no growth in their subtree."""
+
+    def test_leaf_row_in_growth_subtree_has_blank_ga(self):
+        model = GrowthSpar()
+        sol, _ = solve(model)
+        out = build_budget(sol, model, model.m).text()
+        # Row for the leaf 'e' should NOT contain a numeric Growth value
+        # ("0", "0.0", "1e-08", etc). Find the e-row and check its GA col.
+        e_line = next(
+            line for line in out.splitlines() if line.lstrip().startswith("e ")
+        )
+        # Three numeric columns: Nominal, Growth, Total. Growth should be blank.
+        # Split-from-the-right since the Total/Units/Frac suffix is fixed.
+        tokens = e_line.split()
+        # Tokens: ['e', nominal, total, '[kg]', pct]  (no growth token)
+        assert tokens == ["e", "50", "50", "[kg]", "83.3%"]
+
+    def test_non_growth_submodel_has_blank_ga_despite_noise(self):
+        model = GrowthMixedWing()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        # Find the GrowthSkin.m node (no growth declared)
+        skin_node = next(n for n in b.children if n.vk and "Skin" in n.label)
+        assert skin_node.has_growth is False
+        # Even if numerical noise made ga_value tiny non-zero, render should
+        # be blank. Check the rendered line.
+        out = b.text()
+        skin_line = next(line for line in out.splitlines() if "GrowthSkin.m" in line)
+        # No numeric token between Nominal=30 and Total=30
+        tokens = skin_line.split()
+        assert tokens == ["GrowthSkin.m", "30", "30", "[kg]", "30.3%"]
+
+    def test_growth_enabled_row_still_renders_numeric_ga(self):
+        model = GrowthSpar()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        assert b.has_growth is True
+        # The top-row entry in the rendered table should carry the numeric GA
+        out = b.text()
+        # The first row beneath the divider line is the top-level "Spar.m"
+        # row; it should contain "10" (the growth allowance value).
+        top_row = next(
+            line
+            for line in out.splitlines()
+            if "GrowthSpar" in line and "Budget" not in line
+        )
+        tokens = top_row.split()
+        # Tokens: ['GrowthSpar.m', nominal=50, growth=10, total=60, units, frac]
+        assert "10" in tokens
+
+    def test_has_growth_propagates_in_to_dict(self):
+        model = GrowthSpar()
+        sol, _ = solve(model)
+        d = build_budget(sol, model, model.m).to_dict()
+        assert d["has_growth"] is True
+        # Find the leaf 'e' child — it should have has_growth False
+        e_child = next(c for c in d["children"] if c["label"] == "e")
+        assert e_child["has_growth"] is False
+
+
+def _walk_all_nodes(nodes):
+    "Yield every BudgetNode in a tree (depth-first)."
+    for n in nodes:
+        yield n
+        yield from _walk_all_nodes(n.children)
+
+
+# ---------------------------------------------------------------------------
 # Tests: unit-mismatch coefficient bug
 # ---------------------------------------------------------------------------
 

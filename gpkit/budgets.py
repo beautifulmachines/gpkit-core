@@ -182,7 +182,7 @@ def find_budget_constraints(model, vk, solution):
 
 
 @dataclass
-class BudgetNode:
+class BudgetNode:  # pylint: disable=too-many-instance-attributes
     """A single line in a hierarchical budget breakdown.
 
     Attributes
@@ -217,6 +217,9 @@ class BudgetNode:
     slack: float
     units: str = ""
     children: list = field(default_factory=list)
+    cbe_value: float = 0.0
+    ga_value: float = 0.0
+    has_growth: bool = False
 
 
 @dataclass
@@ -241,38 +244,43 @@ class Budget:
     total: float
     units: str
     children: list = field(default_factory=list)
+    cbe_total: float = 0.0
+    ga_total: float = 0.0
+    has_growth: bool = False
 
     # ------------------------------------------------------------------
     # Rendering
     # ------------------------------------------------------------------
 
+    def _show_growth_columns(self) -> bool:
+        "True when any growth allowance is present in this budget."
+        return abs(self.ga_total) > 1e-6 * max(abs(self.total), 1.0)
+
     def text(self) -> str:
-        """Return an aligned-column plain-text budget table."""
+        """Return an aligned-column plain-text budget table.
+
+        When the budget contains any growth allowance, two extra columns
+        (Nominal and Growth) appear before the totals column.
+        """
         top_label = _vk_display(self.top_vk, lineage=True)
         header = f"Budget  —  {top_label}"
-
-        # Collect all rows as (indent_depth, label, value_str, units_str, pct_str)
-        rows = [(0, top_label, f"{self.total:.4g}", f"[{self.units}]", "100.0%")]
-        _collect_text_rows(self.children, rows, depth=1)
-
-        # Compute column widths
-        lbl_w = max(r[0] * 2 + len(r[1]) for r in rows)
-        val_w = max(len(r[2]) for r in rows)
-        unt_w = max(len(r[3]) for r in rows)
-        pct_w = max(len(r[4]) for r in rows)
-
-        lines = [header, "-" * len(header)]
-        for depth, label, val_str, units_str, pct_str in rows:
-            lines.append(
-                f"  {'  ' * depth}{label}"
-                f"{' ' * (lbl_w - depth * 2 - len(label))}  "
-                f"{val_str:>{val_w}}  {units_str:>{unt_w}}  {pct_str:>{pct_w}}"
-            )
-        return "\n".join(lines)
+        if self._show_growth_columns():
+            return _render_growth_text(self, top_label, header)
+        return _render_plain_text(self, top_label, header)
 
     def markdown(self) -> str:
         """Return a GitHub-flavored markdown budget table."""
         top_label = _vk_display(self.top_vk, lineage=True)
+        if self._show_growth_columns():
+            lines = [
+                "| Component | Nominal | Growth | Total | Units | Fraction |",
+                "| --- | ---: | ---: | ---: | :--- | ---: |",
+                f"| **{top_label}** | **{self.cbe_total:.4g}** "
+                f"| **{self.ga_total:.4g}** | **{self.total:.4g}** "
+                f"| **[{self.units}]** | **100.0%** |",
+            ]
+            _collect_md_rows(self.children, lines, depth=0, show_growth=True)
+            return "\n".join(lines)
         lines = [
             "| Component | Value | Units | Fraction |",
             "| --- | ---: | :--- | ---: |",
@@ -287,6 +295,9 @@ class Budget:
         return {
             "variable": str(self.top_vk),
             "total": self.total,
+            "cbe_total": self.cbe_total,
+            "ga_total": self.ga_total,
+            "has_growth": self.has_growth,
             "units": self.units,
             "children": [_node_to_dict(n) for n in self.children],
         }
@@ -317,42 +328,126 @@ def _vk_display(vk, lineage=False, strip_prefix=None):
     return vk.str_without(["units", "lineage"])
 
 
-def _collect_text_rows(nodes, rows, depth):
+def _render_plain_text(budget, top_label, header):
+    rows = [(0, top_label, f"{budget.total:.4g}", f"[{budget.units}]", "100.0%")]
+    _collect_text_rows(budget.children, rows, depth=1)
+    lbl_w = max(r[0] * 2 + len(r[1]) for r in rows)
+    val_w = max(len(r[2]) for r in rows)
+    unt_w = max(len(r[3]) for r in rows)
+    pct_w = max(len(r[4]) for r in rows)
+    lines = [header, "-" * len(header)]
+    for depth, label, val_str, units_str, pct_str in rows:
+        lines.append(
+            f"  {'  ' * depth}{label}"
+            f"{' ' * (lbl_w - depth * 2 - len(label))}  "
+            f"{val_str:>{val_w}}  {units_str:>{unt_w}}  {pct_str:>{pct_w}}"
+        )
+    return "\n".join(lines)
+
+
+def _render_growth_text(budget, top_label, header):
+    rows = [
+        (
+            0,
+            top_label,
+            f"{budget.cbe_total:.4g}",
+            f"{budget.ga_total:.4g}",
+            f"{budget.total:.4g}",
+            f"[{budget.units}]",
+            "100.0%",
+        )
+    ]
+    _collect_text_rows(budget.children, rows, depth=1, show_growth=True)
+    w = {
+        "lbl": max(r[0] * 2 + len(r[1]) for r in rows),
+        "cbe": max(max(len(r[2]) for r in rows), len("Nominal")),
+        "ga": max(max(len(r[3]) for r in rows), len("Growth")),
+        "tot": max(max(len(r[4]) for r in rows), len("Total")),
+        "unt": max(len(r[5]) for r in rows),
+        "pct": max(len(r[6]) for r in rows),
+    }
+    lines = [
+        header,
+        "-" * len(header),
+        f"  {' ' * w['lbl']}  {'Nominal':>{w['cbe']}}  {'Growth':>{w['ga']}}  "
+        f"{'Total':>{w['tot']}}  {'':>{w['unt']}}  {'':>{w['pct']}}",
+    ]
+    for row in rows:
+        lines.append(_format_growth_row(row, w))
+    return "\n".join(lines)
+
+
+def _format_growth_row(row, w):
+    depth, label, cbe_s, ga_s, tot_s, unt_s, pct_s = row
+    return (
+        f"  {'  ' * depth}{label}"
+        f"{' ' * (w['lbl'] - depth * 2 - len(label))}  "
+        f"{cbe_s:>{w['cbe']}}  {ga_s:>{w['ga']}}  {tot_s:>{w['tot']}}  "
+        f"{unt_s:>{w['unt']}}  {pct_s:>{w['pct']}}"
+    )
+
+
+def _collect_text_rows(nodes, rows, depth, show_growth=False):
     for node in nodes:
         label = node.label
         if node.slack > 1e-4:
             label += f"  (slack {node.slack * 100:.1f}%)"
-        rows.append(
-            (
-                depth,
-                label,
-                f"{node.value:.4g}",
-                f"[{node.units}]",
-                f"{node.fraction * 100:.1f}%",
+        if show_growth:
+            ga_str = f"{node.ga_value:.4g}" if node.has_growth else ""
+            rows.append(
+                (
+                    depth,
+                    label,
+                    f"{node.cbe_value:.4g}",
+                    ga_str,
+                    f"{node.value:.4g}",
+                    f"[{node.units}]",
+                    f"{node.fraction * 100:.1f}%",
+                )
             )
-        )
+        else:
+            rows.append(
+                (
+                    depth,
+                    label,
+                    f"{node.value:.4g}",
+                    f"[{node.units}]",
+                    f"{node.fraction * 100:.1f}%",
+                )
+            )
         if node.children:
-            _collect_text_rows(node.children, rows, depth + 1)
+            _collect_text_rows(node.children, rows, depth + 1, show_growth=show_growth)
 
 
-def _collect_md_rows(nodes, lines, depth):
+def _collect_md_rows(nodes, lines, depth, show_growth=False):
     indent = "&nbsp;" * (4 * depth)
     for node in nodes:
         label = f"{indent}{node.label}"
         if node.slack > 1e-4:
             label += f" *(slack {node.slack * 100:.1f}%)*"
-        lines.append(
-            f"| {label} | {node.value:.4g} | [{node.units}] "
-            f"| {node.fraction * 100:.1f}% |"
-        )
+        if show_growth:
+            ga_str = f"{node.ga_value:.4g}" if node.has_growth else ""
+            lines.append(
+                f"| {label} | {node.cbe_value:.4g} | {ga_str} "
+                f"| {node.value:.4g} | [{node.units}] "
+                f"| {node.fraction * 100:.1f}% |"
+            )
+        else:
+            lines.append(
+                f"| {label} | {node.value:.4g} | [{node.units}] "
+                f"| {node.fraction * 100:.1f}% |"
+            )
         if node.children:
-            _collect_md_rows(node.children, lines, depth + 1)
+            _collect_md_rows(node.children, lines, depth + 1, show_growth=show_growth)
 
 
 def _node_to_dict(node):
     return {
         "label": node.label,
         "value": node.value,
+        "cbe_value": node.cbe_value,
+        "ga_value": node.ga_value,
+        "has_growth": node.has_growth,
         "units": node.units,
         "fraction": node.fraction,
         "slack": node.slack,
@@ -434,11 +529,12 @@ def _attach_sub_budget(node, child_vk, ctx, remaining_depth=float("inf")):
         level_units=child_units,
         visited=ctx.visited | {child_vk},
     )
-    node.children = _build_children(
+    node.children, peeled_frac = _build_children(
         child_vk, sub_lt, sub_c, sub_ctx, remaining_depth=remaining_depth
     )
+    node.has_growth = peeled_frac > 0
     non_slack_frac = sum(c.fraction for c in node.children if c.label != "[slack]")
-    node.slack = max(0.0, 1.0 - non_slack_frac)
+    node.slack = max(0.0, 1.0 - non_slack_frac - peeled_frac)
 
 
 def _process_term(top_vk, term, ctx, remaining_depth=float("inf")):
@@ -504,21 +600,40 @@ def _process_term(top_vk, term, ctx, remaining_depth=float("inf")):
     )
 
 
+def _is_allowance_term(term, parent_vk):
+    "True if *term* is the auto-generated growth allowance term of *parent_vk*."
+    if parent_vk.growth is None or len(term.exp) != 1:
+        return False
+    (vk,) = term.exp
+    if term.exp[vk] != 1:
+        return False
+    return vk.name == f"{parent_vk.name}_growth" and vk.lineage == parent_vk.lineage
+
+
 def _build_children(top_vk, lt, constraint, ctx, remaining_depth=float("inf")):
-    """Recursively build BudgetNode children from the lt side of a budget constraint."""
+    """Recursively build BudgetNode children from the lt side of a budget constraint.
+
+    When *top_vk* declares a growth allowance, the auto-generated allowance
+    term in its budget constraint is peeled off rather than rendered as a
+    child row — its value flows into the parent's ``ga_value`` instead.
+    """
     total_val = float(ctx.solution[top_vk].to(ctx.level_units).magnitude)
     is_tight = abs(ctx.solution.sens.constraints.get(constraint, 0.0)) > 1e-5
     ast_labels, ast_is_var = _ast_label_map(
         lt, strip_prefix=top_vk.lineagestr() if top_vk.lineage else None
     )
     nodes = []
+    peeled_frac = 0.0
     for mon in lt.chop():
         term = _make_term(mon, lt.hmap.units, ast_labels, ast_is_var, ctx)
+        if _is_allowance_term(term, top_vk):
+            peeled_frac += term.term_val / total_val if total_val else 0.0
+            continue
         node = _process_term(top_vk, term, ctx, remaining_depth=remaining_depth)
         node.fraction = term.term_val / total_val if total_val else 0.0
         nodes.append(node)
     if not is_tight and total_val:
-        slack_frac = 1.0 - sum(n.fraction for n in nodes)
+        slack_frac = 1.0 - sum(n.fraction for n in nodes) - peeled_frac
         if abs(slack_frac) > 1e-4:
             nodes.append(
                 BudgetNode(
@@ -530,7 +645,23 @@ def _build_children(top_vk, lt, constraint, ctx, remaining_depth=float("inf")):
                     units=ctx.level_units,
                 )
             )
-    return nodes
+    return nodes, peeled_frac
+
+
+def _compute_cbe_ga(node):
+    """Post-order: cbe = sum of leaf values; ga = value − cbe.
+
+    Also propagates ``has_growth`` up: a node has growth if it owns a peeled
+    allowance (set in _attach_sub_budget) or any descendant does.
+    """
+    if node.children:
+        for child in node.children:
+            _compute_cbe_ga(child)
+        node.cbe_value = sum(c.cbe_value for c in node.children)
+        node.has_growth = node.has_growth or any(c.has_growth for c in node.children)
+    else:
+        node.cbe_value = node.value
+    node.ga_value = node.value - node.cbe_value
 
 
 def _resolve_vk(var):
@@ -545,7 +676,9 @@ def _resolve_vk(var):
     )
 
 
-def build_budget(solution, model, var, display_units=None, depth=float("inf")):
+def build_budget(  # pylint: disable=too-many-locals
+    solution, model, var, display_units=None, depth=float("inf")
+):
     """Build a :class:`Budget` for a variable by scanning the model's constraints.
 
     Parameters
@@ -599,7 +732,14 @@ def build_budget(solution, model, var, display_units=None, depth=float("inf")):
     total_val = float(solution[top_vk].to(display_units).magnitude)
 
     if depth == 0:
-        return Budget(top_vk=top_vk, total=total_val, units=display_units, children=[])
+        return Budget(
+            top_vk=top_vk,
+            total=total_val,
+            units=display_units,
+            children=[],
+            cbe_total=total_val,
+            ga_total=0.0,
+        )
 
     ctx = _BudgetCtx(
         solution=solution,
@@ -608,8 +748,19 @@ def build_budget(solution, model, var, display_units=None, depth=float("inf")):
         level_units=display_units,
         visited=frozenset({top_vk}),
     )
-    children = _build_children(top_vk, lt, constraint, ctx, remaining_depth=depth - 1)
-
+    children, peeled_frac = _build_children(
+        top_vk, lt, constraint, ctx, remaining_depth=depth - 1
+    )
+    for child in children:
+        _compute_cbe_ga(child)
+    cbe_total = sum(c.cbe_value for c in children) if children else total_val
+    has_growth = peeled_frac > 0 or any(c.has_growth for c in children)
     return Budget(
-        top_vk=top_vk, total=total_val, units=display_units, children=children
+        top_vk=top_vk,
+        total=total_val,
+        units=display_units,
+        children=children,
+        cbe_total=cbe_total,
+        ga_total=total_val - cbe_total,
+        has_growth=has_growth,
     )

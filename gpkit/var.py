@@ -34,11 +34,20 @@ class Var:  # pylint: disable=too-few-public-methods
       Var descriptors automatically become N-element vector variables.
     """
 
-    def __init__(self, units: str, label: str = "", *, value=None, latex: str = None):
+    def __init__(  # pylint: disable=too-many-arguments
+        self,
+        units: str,
+        label: str = "",
+        *,
+        value=None,
+        latex: str = None,
+        growth: float = None,
+    ):
         self.units = units
         self.label = label
         self.value = value
         self.latex = latex
+        self.growth = growth
         self.name: str | None = None
 
     def __set_name__(self, owner, name):
@@ -73,6 +82,9 @@ class Var:  # pylint: disable=too-few-public-methods
         if self.value is not None:
             args.append(self.value)
         args.extend([self.units, self.label])
-        v = Variable(*args)
+        kwargs = {}
+        if self.growth is not None:
+            kwargs["growth"] = self.growth
+        v = Variable(*args, **kwargs)
         obj.__dict__[key] = v
         return v
