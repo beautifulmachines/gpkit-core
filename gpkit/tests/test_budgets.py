@@ -483,6 +483,67 @@ class TestBudgetRenderingWithGrowth:
         assert d["cbe_total"] + d["ga_total"] == pytest.approx(d["total"], rel=1e-4)
 
 
+class TestBudgetGrowthCellBlanking:
+    """GA cell renders blank for rows with no growth in their subtree."""
+
+    def test_leaf_row_in_growth_subtree_has_blank_ga(self):
+        model = GrowthSpar()
+        sol, _ = solve(model)
+        out = build_budget(sol, model, model.m).text()
+        # Row for the leaf 'e' should NOT contain a numeric Growth value
+        # ("0", "0.0", "1e-08", etc). Find the e-row and check its GA col.
+        e_line = next(
+            line for line in out.splitlines() if line.lstrip().startswith("e ")
+        )
+        # Three numeric columns: Nominal, Growth, Total. Growth should be blank.
+        # Split-from-the-right since the Total/Units/Frac suffix is fixed.
+        tokens = e_line.split()
+        # Tokens: ['e', nominal, total, '[kg]', pct]  (no growth token)
+        assert tokens == ["e", "50", "50", "[kg]", "83.3%"]
+
+    def test_non_growth_submodel_has_blank_ga_despite_noise(self):
+        model = GrowthMixedWing()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        # Find the GrowthSkin.m node (no growth declared)
+        skin_node = next(n for n in b.children if n.vk and "Skin" in n.label)
+        assert skin_node.has_growth is False
+        # Even if numerical noise made ga_value tiny non-zero, render should
+        # be blank. Check the rendered line.
+        out = b.text()
+        skin_line = next(line for line in out.splitlines() if "GrowthSkin.m" in line)
+        # No numeric token between Nominal=30 and Total=30
+        tokens = skin_line.split()
+        assert tokens == ["GrowthSkin.m", "30", "30", "[kg]", "30.3%"]
+
+    def test_growth_enabled_row_still_renders_numeric_ga(self):
+        model = GrowthSpar()
+        sol, _ = solve(model)
+        b = build_budget(sol, model, model.m)
+        assert b.has_growth is True
+        # The top-row entry in the rendered table should carry the numeric GA
+        out = b.text()
+        # The first row beneath the divider line is the top-level "Spar.m"
+        # row; it should contain "10" (the growth allowance value).
+        top_row = next(
+            line
+            for line in out.splitlines()
+            if "GrowthSpar" in line and "Budget" not in line
+        )
+        tokens = top_row.split()
+        # Tokens: ['GrowthSpar.m', nominal=50, growth=10, total=60, units, frac]
+        assert "10" in tokens
+
+    def test_has_growth_propagates_in_to_dict(self):
+        model = GrowthSpar()
+        sol, _ = solve(model)
+        d = build_budget(sol, model, model.m).to_dict()
+        assert d["has_growth"] is True
+        # Find the leaf 'e' child — it should have has_growth False
+        e_child = next(c for c in d["children"] if c["label"] == "e")
+        assert e_child["has_growth"] is False
+
+
 def _walk_all_nodes(nodes):
     "Yield every BudgetNode in a tree (depth-first)."
     for n in nodes:

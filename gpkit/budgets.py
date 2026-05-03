@@ -219,6 +219,7 @@ class BudgetNode:  # pylint: disable=too-many-instance-attributes
     children: list = field(default_factory=list)
     cbe_value: float = 0.0
     ga_value: float = 0.0
+    has_growth: bool = False
 
 
 @dataclass
@@ -245,6 +246,7 @@ class Budget:
     children: list = field(default_factory=list)
     cbe_total: float = 0.0
     ga_total: float = 0.0
+    has_growth: bool = False
 
     # ------------------------------------------------------------------
     # Rendering
@@ -295,6 +297,7 @@ class Budget:
             "total": self.total,
             "cbe_total": self.cbe_total,
             "ga_total": self.ga_total,
+            "has_growth": self.has_growth,
             "units": self.units,
             "children": [_node_to_dict(n) for n in self.children],
         }
@@ -390,12 +393,13 @@ def _collect_text_rows(nodes, rows, depth, show_growth=False):
         if node.slack > 1e-4:
             label += f"  (slack {node.slack * 100:.1f}%)"
         if show_growth:
+            ga_str = f"{node.ga_value:.4g}" if node.has_growth else ""
             rows.append(
                 (
                     depth,
                     label,
                     f"{node.cbe_value:.4g}",
-                    f"{node.ga_value:.4g}",
+                    ga_str,
                     f"{node.value:.4g}",
                     f"[{node.units}]",
                     f"{node.fraction * 100:.1f}%",
@@ -422,8 +426,9 @@ def _collect_md_rows(nodes, lines, depth, show_growth=False):
         if node.slack > 1e-4:
             label += f" *(slack {node.slack * 100:.1f}%)*"
         if show_growth:
+            ga_str = f"{node.ga_value:.4g}" if node.has_growth else ""
             lines.append(
-                f"| {label} | {node.cbe_value:.4g} | {node.ga_value:.4g} "
+                f"| {label} | {node.cbe_value:.4g} | {ga_str} "
                 f"| {node.value:.4g} | [{node.units}] "
                 f"| {node.fraction * 100:.1f}% |"
             )
@@ -442,6 +447,7 @@ def _node_to_dict(node):
         "value": node.value,
         "cbe_value": node.cbe_value,
         "ga_value": node.ga_value,
+        "has_growth": node.has_growth,
         "units": node.units,
         "fraction": node.fraction,
         "slack": node.slack,
@@ -526,6 +532,7 @@ def _attach_sub_budget(node, child_vk, ctx, remaining_depth=float("inf")):
     node.children, peeled_frac = _build_children(
         child_vk, sub_lt, sub_c, sub_ctx, remaining_depth=remaining_depth
     )
+    node.has_growth = peeled_frac > 0
     non_slack_frac = sum(c.fraction for c in node.children if c.label != "[slack]")
     node.slack = max(0.0, 1.0 - non_slack_frac - peeled_frac)
 
@@ -642,11 +649,16 @@ def _build_children(top_vk, lt, constraint, ctx, remaining_depth=float("inf")):
 
 
 def _compute_cbe_ga(node):
-    """Post-order: cbe = sum of leaf values; ga = value − cbe."""
+    """Post-order: cbe = sum of leaf values; ga = value − cbe.
+
+    Also propagates ``has_growth`` up: a node has growth if it owns a peeled
+    allowance (set in _attach_sub_budget) or any descendant does.
+    """
     if node.children:
         for child in node.children:
             _compute_cbe_ga(child)
         node.cbe_value = sum(c.cbe_value for c in node.children)
+        node.has_growth = node.has_growth or any(c.has_growth for c in node.children)
     else:
         node.cbe_value = node.value
     node.ga_value = node.value - node.cbe_value
@@ -664,7 +676,9 @@ def _resolve_vk(var):
     )
 
 
-def build_budget(solution, model, var, display_units=None, depth=float("inf")):
+def build_budget(  # pylint: disable=too-many-locals
+    solution, model, var, display_units=None, depth=float("inf")
+):
     """Build a :class:`Budget` for a variable by scanning the model's constraints.
 
     Parameters
@@ -734,12 +748,13 @@ def build_budget(solution, model, var, display_units=None, depth=float("inf")):
         level_units=display_units,
         visited=frozenset({top_vk}),
     )
-    children, _ = _build_children(
+    children, peeled_frac = _build_children(
         top_vk, lt, constraint, ctx, remaining_depth=depth - 1
     )
     for child in children:
         _compute_cbe_ga(child)
     cbe_total = sum(c.cbe_value for c in children) if children else total_val
+    has_growth = peeled_frac > 0 or any(c.has_growth for c in children)
     return Budget(
         top_vk=top_vk,
         total=total_val,
@@ -747,4 +762,5 @@ def build_budget(solution, model, var, display_units=None, depth=float("inf")):
         children=children,
         cbe_total=cbe_total,
         ga_total=total_val - cbe_total,
+        has_growth=has_growth,
     )
