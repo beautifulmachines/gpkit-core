@@ -6,6 +6,7 @@ constraints as a plain list. The Tight-subclass wrapper that adds slack
 diagnostics lives in :mod:`gpkit.constraints.growth` (a higher layer).
 """
 
+from ..util.globals import NamedVariables
 from ..varkey import VarKey
 from .variables import Variable
 
@@ -59,6 +60,11 @@ def make_growth_constraints(parent, expr):
         )
     growth = sibling_growth(parent_vk)
     f_growth = sibling_fraction(parent_vk)
+    # Register siblings into the parent's setup-time variable list so they
+    # appear in model.unique_varkeys (and thus in tools like apply_subs that
+    # look up substitutable variables by name in unique_varkeys).
+    if parent_vk.lineage in NamedVariables.namedvars:
+        NamedVariables.namedvars[parent_vk.lineage].extend([growth, f_growth])
     th = theta()
     return [
         growth >= th * f_growth * expr,

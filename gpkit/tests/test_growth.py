@@ -99,6 +99,45 @@ class TestThetaSingleton:
         assert sol[m].to("kg").magnitude == pytest.approx(150.0)
 
 
+class TestSiblingsInUniqueVarkeys:
+    """Auto-generated siblings must appear in model.unique_varkeys.
+
+    Tools like gpkit.toml.apply_subs look variables up by name in
+    unique_varkeys; siblings absent from that set are silently skipped.
+    """
+
+    def _build_wing(self):
+        class Wing(Model):
+            "Test fixture: wing mass with declared growth."
+
+            def setup(self):
+                self.m = Variable("m", "kg", "wing mass", growth=0.25)
+                e = Variable("e", 100, "kg")
+                self.cost = self.m
+                return self.m.grown_from(e)
+
+        return Wing()
+
+    def test_growth_sibling_in_unique_varkeys(self):
+        wing = self._build_wing()
+        names = {vk.name for vk in wing.unique_varkeys}
+        assert "m_growth" in names
+
+    def test_fraction_sibling_in_unique_varkeys(self):
+        wing = self._build_wing()
+        names = {vk.name for vk in wing.unique_varkeys}
+        assert "f_growth_m" in names
+
+    def test_apply_subs_can_override_fraction(self):
+        # pylint: disable=import-outside-toplevel
+        from gpkit.toml import apply_subs
+
+        wing = self._build_wing()
+        apply_subs(wing, {"Wing": {"f_growth_m": 0.50}})
+        sol = wing.solve(verbosity=0)
+        assert sol[wing.m].to("kg").magnitude == pytest.approx(150.0, rel=1e-4)
+
+
 class TestVarDescriptorGrowth:
     """The Var class-level descriptor accepts and propagates growth=..."""
 
