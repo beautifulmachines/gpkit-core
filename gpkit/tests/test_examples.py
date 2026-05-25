@@ -330,6 +330,11 @@ class TestExamples:
     def test_unbounded(self, example):
         assert example.sol.cost == pytest.approx(1e-30, rel=1e-2)
 
+    def test_beam(self, example):
+        b = example.Beam.default()
+        sol = b.solve(verbosity=0)
+        assert not np.isnan(sol["w"]).any()
+
     def test_bemt_hover(self, example):
         # Minimum induced power for a 5-bin BEMT rotor at 1e4 N vehicle weight
         assert example.sol.cost == pytest.approx(43582.47, rel=1e-2)

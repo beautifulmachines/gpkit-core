@@ -31,6 +31,10 @@ jobs:
     - name: Install
       run: uv sync --group test
 
+    - name: Regenerate example outputs
+      run: |
+        make examples
+
     - name: Run tests with coverage
       run: |
         make coverage

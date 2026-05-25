@@ -1,4 +1,4 @@
-.PHONY: clean check-clean test coverage lint pylint format
+.PHONY: clean check-clean test coverage lint pylint format examples
 
 # Code quality
 lint:
@@ -14,11 +14,10 @@ format:
 	uv run black gpkit
 
 # Testing
-regen-examples:  # Regenerate catalog example output files for docs
+examples:  # Regenerate catalog example output files for docs
 	uv run python scripts/regen_examples.py
 
-test:  # Regenerate catalog example outputs, then run all tests
-	$(MAKE) regen-examples
+test:  # Run all tests
 	uv run pytest gpkit/tests -v
 
 coverage:  # Run tests with coverage reporting
@@ -48,8 +47,8 @@ help:
 	@echo "  lint              Run fast lint checks"
 	@echo "  pylint            Run pylint (slow)"
 	@echo "  format            Format code with isort and black"
-	@echo "  regen-examples    Regenerate catalog example output files"
-	@echo "  test              Regen examples, then run all tests"
+	@echo "  examples          Regenerate catalog example output files"
+	@echo "  test              Run all tests"
 	@echo "  coverage          Run tests with coverage reporting"
 	@echo "  clean             Clean build artifacts"
 	@echo "  check-clean       Check no uncommitted changes"

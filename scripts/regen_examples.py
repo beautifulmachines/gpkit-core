@@ -60,6 +60,9 @@ def main():
         if result.returncode != 0:
             print(f"  FAIL {name}:\n{result.stderr}")
             failed.append(name)
+        elif not result.stdout:
+            print(f"  WARN {name}: produced no output, skipping write")
+            failed.append(name)
         else:
             out_file.write_text(result.stdout)
             lines = result.stdout.count("\n")

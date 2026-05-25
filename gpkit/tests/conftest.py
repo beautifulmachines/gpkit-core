@@ -1,6 +1,7 @@
 """Pytest configuration and fixtures for gpkit tests"""
 
 import importlib
+import io
 import os
 import sys
 
@@ -17,16 +18,6 @@ def assert_logtol(first, second, logtol=1e-6):
     np.testing.assert_allclose(
         np.log(mag(first)), np.log(mag(second)), atol=logtol, rtol=0
     )
-
-
-class NullFile:
-    "A fake file interface that does nothing"
-
-    def write(self, string):
-        "Do not write, do not pass go."
-
-    def close(self):
-        "Having not written, cease."
 
 
 class NewDefaultSolver:
@@ -47,25 +38,23 @@ class NewDefaultSolver:
 
 
 class StdoutCaptured:
-    "Puts everything that would have printed to stdout in a log file instead"
+    "Captures stdout; writes to logfilepath only when non-empty."
 
     def __init__(self, logfilepath=None):
         self.logfilepath = logfilepath
         self.original_stdout = None
+        self._buf = io.StringIO()
 
     def __enter__(self):
-        "Capture stdout"
         self.original_stdout = sys.stdout
-        sys.stdout = (
-            open(self.logfilepath, mode="w", encoding="utf-8")
-            if self.logfilepath
-            else NullFile()
-        )
+        sys.stdout = self._buf
 
     def __exit__(self, *args):
-        "Return stdout"
-        sys.stdout.close()
         sys.stdout = self.original_stdout
+        content = self._buf.getvalue()
+        if self.logfilepath and content:
+            with open(self.logfilepath, "w", encoding="utf-8") as f:
+                f.write(content)
 
 
 @pytest.fixture(name="solver", params=settings["installed_solvers"])

@@ -10,9 +10,22 @@ import importlib
 import tomllib
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from gpkit.util.small_scripts import mag
+
+# Expected (cost, rel_tol) for each gpkit-core catalog entry by id.
+# External repos using run_catalog_test can put expected_cost/expected_cost_tol
+# directly in their catalog.toml entries instead.
+_EXPECTED_COSTS = {
+    "box": (0.003674, 0.01),
+    "water_tank": (1.293, 0.01),
+    "beam": (0.7825, 0.001),
+    "fuel_burn": (7561.15, 0.01),
+    "wing": (35.64, 0.001),
+    "bemt_hover": (43582.47, 0.01),
+}
 
 
 def _find_catalog(start):
@@ -42,10 +55,7 @@ def run_catalog_test(model_entry):
     mod = importlib.import_module(model_entry["module"])
     cls = getattr(mod, model_entry["class"])
 
-    if hasattr(cls, "default"):
-        m = cls.default()
-    else:
-        m = cls()
+    m = cls.default()
 
     assert m.cost is not None, (
         f"{cls.__name__} did not set self.cost. " "setup() must assign self.cost."
@@ -53,13 +63,26 @@ def run_catalog_test(model_entry):
 
     sol = m.solve(verbosity=0) if m.is_gp() else m.localsolve(verbosity=0)
     assert sol is not None
+    for val in sol.primal.values():
+        assert not np.isnan(
+            np.atleast_1d(mag(val))
+        ).any(), f"{cls.__name__}: NaN in solution"
 
+    # expected_cost in the catalog entry takes precedence (for external repos);
+    # fall back to the built-in table for gpkit-core entries.
     if "expected_cost" in model_entry:
+        expected = model_entry["expected_cost"]
         tol = model_entry.get("expected_cost_tol", 0.01)
-        assert mag(sol.cost) == pytest.approx(model_entry["expected_cost"], rel=tol), (
-            f"{cls.__name__} cost {mag(sol.cost):.6g} does not match "
-            f"expected {model_entry['expected_cost']} (rel tol {tol})"
-        )
+    else:
+        entry = _EXPECTED_COSTS.get(model_entry.get("id"))
+        if entry is None:
+            return
+        expected, tol = entry
+
+    assert mag(sol.cost) == pytest.approx(expected, rel=tol), (
+        f"{cls.__name__} cost {mag(sol.cost):.6g} does not match "
+        f"expected {expected} (rel tol {tol})"
+    )
 
 
 try:

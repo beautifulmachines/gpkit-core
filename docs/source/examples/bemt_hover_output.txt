@@ -1,0 +1,93 @@
+
+           ┃┓           ┓          ^┓
+           ┃┃           ┃           ┃
+           ┃┃           ┣╸dP[0]    ^┣╸1/dC_T[2]
+           ┃┃           ┛ (9,235W) ^┛ (24.3)
+           ┃┃           ┓          ^┓
+           ┃┃           ┃           ┃
+           ┃┃           ┣╸dP[1]    ^┣╸1/dC_T[2]
+           ┃┃           ┛ (8,818W) ^┛
+           ┃┃           ┓          ^┓
+      Cost╺┫┃           ┃           ┃
+ (43,582W) ┃┣╸P         ┣╸dP[2]    ^┣╸1/dC_T[2]
+           ┃┃ (43,582W) ┛ (8,818W) ^┛
+           ┃┃           ┓          ^┓
+           ┃┃           ┃           ┃
+           ┃┃           ┣╸dP[3]    ^┣╸1/dC_T[2]
+           ┃┃           ┛ (8,818W) ^┛
+           ┃┃           ┓          ^┓
+           ┃┃           ┃           ┃
+           ┃┃           ┣╸dP[4]    ^┣╸1/dC_T[2]
+           ┃┛           ┛ (7,895W) ^┛
+
+
+
+           ┃┣╸P ≥ dP[:].sum()
+           ┃┓
+           ┃┃
+ BEMTHover╺┫┃
+           ┃┣╸[35 terms]
+           ┃┃
+           ┃┃
+           ┃┛
+
+
+Optimal Cost
+------------
+BEMTHover.P : 4.358e+04 [W]
+
+Solution
+--------
+BEMTHover
+          A : 201.1     [m²]           disk area
+      Omega : 16.73     [rpm]          rotor RPM
+          P : 4.358e+04 [W]            total induced power
+          R : 8         [m]            rotor radius
+     V_i[:] : [ 4.62      4.41      4.41      4.41      3.95     ] [m/s] induced velocity
+\Delta r[:] : [ 0.435     0.177     0.139     0.119     0.13     ]       non-dimensional radius step
+    dC_P[:] : [ 0.0136    0.0129    0.0129    0.0129    0.0116   ]       incremental power coefficient
+    dC_T[:] : [ 0.0412    0.0412    0.0412    0.0412    0.0412   ]       incremental thrust coefficient
+      dP[:] : [ 9.24e+03  8.82e+03  8.82e+03  8.82e+03  7.89e+03 ] [W]   incremental power
+       r[:] : [ 0.218     0.589     0.747     0.876     1        ]       non-dimensional radius
+...constants
+      R_max : 8         [m]     (-1)   maximum rotor radius
+        rho : 1.23      [kg/m³] (-0.5) air density
+     dr_min : 0.001             (~0)   minimum bin width (non-dimensional)
+  Omega_max : 280       [rpm]   (~0)   maximum rotor RPM
+  Omega_min : 1         [rpm]   (~0)   minimum rotor RPM
+      R_min : 0.1       [m]     (~0)   minimum rotor radius
+     \xi[:] : [ 2e+03   2e+03   2e+03   2e+03   2e+03  ] [N]   thrust per bin (fixed)
+         sens ( +0.318  +0.303  +0.303  +0.303  +0.272 )
+
+Most Sensitive Constraints
+--------------------------
+BEMTHover
++1      : P ≥ dP[:].sum()
++1      : R ≤ R_max
++0.5134 : r[4] ≤ 1
++0.5    : A = 3.14·R²
++0.4866 : \Delta r[:].sum() ≤ 1
++0.4228 : r[4] ≥ r[3] + 0.5·\Delta r[3] + 0.5·\Delta r[4]
+-0.3179 : V_i[0]²·r[0]·\Delta r[0]/(dC_T[0]·(Omega·R)²) = 0.25
++0.3179 : \xi[0] = rho·A·(Omega·R)²·dC_T[0]
+-0.3035 : V_i[1]²·r[1]·\Delta r[1]/(dC_T[1]·(Omega·R)²) = 0.25
++0.3035 : \xi[1] = rho·A·(Omega·R)²·dC_T[1]
+-0.3035 : V_i[2]²·r[2]·\Delta r[2]/(dC_T[2]·(Omega·R)²) = 0.25
++0.3035 : \xi[2] = rho·A·(Omega·R)²·dC_T[2]
+-0.3035 : V_i[3]²·r[3]·\Delta r[3]/(dC_T[3]·(Omega·R)²) = 0.25
++0.3035 : \xi[3] = rho·A·(Omega·R)²·dC_T[3]
+-0.2717 : V_i[4]²·r[4]·\Delta r[4]/(dC_T[4]·(Omega·R)²) = 0.25
++0.2717 : \xi[4] = rho·A·(Omega·R)²·dC_T[4]
++0.2691 : r[3] ≥ r[2] + 0.5·\Delta r[2] + 0.5·\Delta r[3]
++0.2119 : V_i[0]³·r[0]·\Delta r[0]/(dC_P[0]·(Omega·R)³) = 0.25
+-0.2119 : dP[0] = rho·A·(Omega·R)³·dC_P[0]
++0.2023 : V_i[1]³·r[1]·\Delta r[1]/(dC_P[1]·(Omega·R)³) = 0.25
+-0.2023 : dP[1] = rho·A·(Omega·R)³·dC_P[1]
++0.2023 : V_i[2]³·r[2]·\Delta r[2]/(dC_P[2]·(Omega·R)³) = 0.25
+-0.2023 : dP[2] = rho·A·(Omega·R)³·dC_P[2]
++0.2023 : V_i[3]³·r[3]·\Delta r[3]/(dC_P[3]·(Omega·R)³) = 0.25
+-0.2023 : dP[3] = rho·A·(Omega·R)³·dC_P[3]
++0.1811 : V_i[4]³·r[4]·\Delta r[4]/(dC_P[4]·(Omega·R)³) = 0.25
+-0.1811 : dP[4] = rho·A·(Omega·R)³·dC_P[4]
++0.1283 : r[2] ≥ r[1] + 0.5·\Delta r[1] + 0.5·\Delta r[2]
++0.106  : r[0] = \Delta r[0]/2
