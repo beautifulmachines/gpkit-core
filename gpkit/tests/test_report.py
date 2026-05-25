@@ -88,7 +88,8 @@ class TestReportDataclasses:
         ve = VarEntry(
             name="x", latex="x", value=2.0, sensitivity=0.1, units="m", label="span"
         )
-        cg = CGroup(label="Aero", constraints=[("x", ">=", "1")])
+        x_test = Variable("x_to_dict_test")
+        cg = CGroup(label="Aero", constraints=[x_test >= 1])
         rs = ReportSection(
             title="Fuselage",
             description="fuselage drag model",
@@ -107,6 +108,42 @@ class TestReportDataclasses:
         restored = json.loads(json_str)
         assert restored["free_variables"][0]["name"] == "x"
         assert restored["constraint_groups"][0]["label"] == "Aero"
+
+    def test_to_dict_non_constraint_object_in_cgroup(self):
+        """to_dict() falls back to str() for objects without str_without()."""
+        cg = CGroup(label="Raw", constraints=[("x", ">=", "1")])
+        rs = ReportSection(
+            title="T",
+            description="",
+            assumptions=[],
+            free_variables=[],
+            fixed_variables=[],
+            constraint_groups=[cg],
+            children=[],
+        )
+        d = rs.to_dict()
+        assert d["constraint_groups"][0]["constraints"] == ["('x', '>=', '1')"]
+
+    def test_to_dict_constraint_names_abbreviated_by_lineage(self):
+        """to_dict() abbreviates variable names via magic_prefix like text renderer."""
+
+        class _AbbrParent(Model):
+            def setup(self):
+                child = _AbbrChild()
+                return [child]
+
+        class _AbbrChild(Model):
+            def setup(self):
+                x = Variable("x_abbr")
+                return {"group": [x >= 1]}
+
+        m = _AbbrParent()
+        ir = build_report_ir(m)
+        child_ir = ir.children[0]
+        d = child_ir.to_dict()
+        cg = d["constraint_groups"][0]
+        # Variable name should not carry the child's own prefix
+        assert all("_AbbrChild" not in s for s in cg["constraints"])
 
 
 # ── build_report_ir() ────────────────────────────────────────────────────────

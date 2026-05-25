@@ -47,7 +47,7 @@ class CGroup:
     """A named constraint group within a report section."""
 
     label: str  # "" for unnamed groups
-    constraints: list  # raw constraint objects; to_dict() serializes via str()
+    constraints: list  # raw constraint objects; str_without() or str() fallback
 
 
 @dataclass
@@ -86,6 +86,23 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
     objective_units: str = ""  # unit string for the cost expression
     objective_direction: str = "minimize"  # "minimize" or "maximize"
 
+    def _render_constraint_groups(self) -> list:
+        """Render constraint groups using the same lineage context as the text path."""
+        excluded = {"units"}
+        if self.magic_prefix:
+            excluded.add(":MAGIC:" + self.magic_prefix)
+        with lineage_display_context(self.lineage_map):
+            return [
+                {
+                    "label": cg.label,
+                    "constraints": [
+                        c.str_without(excluded) if hasattr(c, "str_without") else str(c)
+                        for c in cg.constraints
+                    ],
+                }
+                for cg in self.constraint_groups
+            ]
+
     def to_dict(self) -> dict:
         """JSON-serializable dict (for format='dict' and future API)."""
         return {
@@ -106,10 +123,7 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
             "objective_units": self.objective_units,
             "free_variables": [v.to_dict() for v in self.free_variables],
             "fixed_variables": [v.to_dict() for v in self.fixed_variables],
-            "constraint_groups": [
-                {"label": cg.label, "constraints": [str(c) for c in cg.constraints]}
-                for cg in self.constraint_groups
-            ],
+            "constraint_groups": self._render_constraint_groups(),
             "children": [c.to_dict() for c in self.children],
         }
 
@@ -333,7 +347,7 @@ def _build_constraint_groups(model) -> List[CGroup]:
             CGroup(
                 label=label,
                 constraints=_collect_leaf_constraints(
-                    items if isinstance(items, list) else [items]
+                    items if isinstance(items, (list, tuple)) else [items]
                 ),
             )
             for label, items in model.cgroups.items()

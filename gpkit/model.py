@@ -96,7 +96,7 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
             elif isinstance(items, dict):
                 for item in items.values():
                     _scan_for_children(item)
-            elif isinstance(items, list):
+            elif isinstance(items, (list, tuple)):
                 for item in items:
                     _scan_for_children(item)
 
