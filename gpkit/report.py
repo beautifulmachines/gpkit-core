@@ -47,7 +47,7 @@ class CGroup:
     """A named constraint group within a report section."""
 
     label: str  # "" for unnamed groups
-    constraints: list  # raw constraint objects; to_dict() serializes via str()
+    constraints: list  # raw constraint objects; str_without() or str() fallback
 
 
 @dataclass
@@ -95,7 +95,10 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
             return [
                 {
                     "label": cg.label,
-                    "constraints": [c.str_without(excluded) for c in cg.constraints],
+                    "constraints": [
+                        c.str_without(excluded) if hasattr(c, "str_without") else str(c)
+                        for c in cg.constraints
+                    ],
                 }
                 for cg in self.constraint_groups
             ]
@@ -344,7 +347,7 @@ def _build_constraint_groups(model) -> List[CGroup]:
             CGroup(
                 label=label,
                 constraints=_collect_leaf_constraints(
-                    items if isinstance(items, list) else [items]
+                    items if isinstance(items, (list, tuple)) else [items]
                 ),
             )
             for label, items in model.cgroups.items()
