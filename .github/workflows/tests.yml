@@ -31,6 +31,9 @@ jobs:
     - name: Install
       run: uv sync --group test
 
+    - name: Build gpkit (configure solvers)
+      run: uv run python -c "import gpkit"
+
     - name: Regenerate example outputs
       run: |
         make examples
