@@ -41,4 +41,5 @@ jobs:
 
     - name: Check for file changes
       run: |
+        git diff
         make check-clean
