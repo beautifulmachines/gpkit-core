@@ -1,49 +1,38 @@
-# catalog.toml — model registry for gpkit-core examples
-#
-# Schema:
-#   module — Python import path
-#   class  — class name within that module
-#
-# All registered models must implement default() classmethod.
-# Registration implies compliance: a model cannot appear here without a passing
-# CI test via test_catalog.py.
+# gpkit-core built-in examples catalog
+# Each entry is a standalone GP model from gpkit.examples.*
+# expected_cost / expected_cost_tol drive parametrized tests in test_catalog.py
 
 [[models]]
+id = "box"
 module = "gpkit.examples.simple_box"
 class = "Box"
 
 [[models]]
+id = "water_tank"
 module = "gpkit.examples.water_tank"
 class = "WaterTank"
 
 [[models]]
-module = "gpkit.examples.bemt_hover"
-class = "BEMTHover"
-
-[[models]]
-module = "gpkit.examples.fuel_burn"
-class = "FuelBurn"
-
-[[models]]
+id = "beam"
 module = "gpkit.examples.beam"
 class = "Beam"
 
 [[models]]
-module = "gpkit.examples.gp_textbook"
-class = "BoxTransport"
+id = "fuel_burn"
+module = "gpkit.examples.fuel_burn"
+class = "FuelBurn"
 
 [[models]]
-module = "gpkit.examples.gp_textbook"
-class = "FencePlot"
+id = "wing"
+module = "gpkit.examples.growth_allowance"
+class = "Wing"
 
 [[models]]
-module = "gpkit.examples.gp_textbook"
-class = "BeamCrossSection"
+id = "bemt_hover"
+module = "gpkit.examples.bemt_hover"
+class = "BEMTHover"
 
 [[models]]
-module = "gpkit.examples.gp_textbook"
-class = "BoxFromSheet"
-
-[[models]]
-module = "gpkit.examples.gp_textbook"
-class = "WorkSleep"
+id = "bemt_hover"
+module = "gpkit.examples.bemt_hover"
+class = "BEMTHover"

@@ -50,6 +50,7 @@ class Wing(Model):
         ]
 
 
-wing = Wing()
-sol = wing.solve(verbosity=0)
-print(build_budget(sol, wing, wing.m).text())
+if __name__ == "__main__":
+    wing = Wing()
+    sol = wing.solve(verbosity=0)
+    print(build_budget(sol, wing, wing.m).text())

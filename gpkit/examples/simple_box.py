@@ -4,7 +4,7 @@ from gpkit import Model, Var
 
 
 class Box(Model):
-    "Box volume maximization."
+    "Maximize box volume given wall area, floor area, and aspect ratio constraints."
 
     # Parameters
     alpha = Var("-", "lower limit, wall aspect ratio", value=2)
@@ -32,5 +32,6 @@ class Box(Model):
         ]
 
 
-m = Box()
-print(m.solve(verbosity=0).table())
+if __name__ == "__main__":
+    m = Box()
+    print(m.solve(verbosity=0).table())
