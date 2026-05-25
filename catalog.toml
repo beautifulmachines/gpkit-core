@@ -1,49 +1,93 @@
-# catalog.toml — model registry for gpkit-core examples
-#
-# Schema:
-#   module — Python import path
-#   class  — class name within that module
-#
-# All registered models must implement default() classmethod.
-# Registration implies compliance: a model cannot appear here without a passing
-# CI test via test_catalog.py.
+# gpkit-core built-in examples catalog
+# Each entry is a standalone GP model from gpkit.examples.*
+# expected_cost / expected_cost_tol drive parametrized tests in test_catalog.py
 
 [[models]]
+id = "box"
+name = "Simple Box"
+description = "Maximize box volume given area and aspect ratio constraints"
 module = "gpkit.examples.simple_box"
 class = "Box"
+expected_cost = 0.003674
+expected_cost_tol = 0.01
 
 [[models]]
+id = "water_tank"
+name = "Water Tank"
+description = "Minimize rectangular tank surface area for a particular volume"
 module = "gpkit.examples.water_tank"
 class = "WaterTank"
+expected_cost = 1.293
+expected_cost_tol = 0.01
 
 [[models]]
-module = "gpkit.examples.bemt_hover"
-class = "BEMTHover"
-
-[[models]]
-module = "gpkit.examples.fuel_burn"
-class = "FuelBurn"
-
-[[models]]
+id = "beam"
+name = "Euler Beam"
+description = "Discretized Euler-Bernoulli beam equations with distributed load"
 module = "gpkit.examples.beam"
 class = "Beam"
+expected_cost = 0.7825
+expected_cost_tol = 0.001
 
 [[models]]
+id = "fuel_burn"
+name = "Fuel Burn"
+description = "Multi-point aircraft fuel burn minimization"
+module = "gpkit.examples.fuel_burn"
+class = "FuelBurn"
+expected_cost = 7561.15
+expected_cost_tol = 0.01
+
+[[models]]
+id = "box_transport"
+name = "Box Transport"
+description = "Minimize ferry and box cost to transport a fixed volume of gravel"
 module = "gpkit.examples.gp_textbook"
 class = "BoxTransport"
+expected_cost = 100.0
+expected_cost_tol = 0.01
 
 [[models]]
+id = "fence_plot"
+name = "Fence Plot"
+description = "Maximize rectangular plot area with a fixed fence length"
 module = "gpkit.examples.gp_textbook"
 class = "FencePlot"
+expected_cost = 8.0
+expected_cost_tol = 0.01
 
 [[models]]
+id = "beam_cross_section"
+name = "Beam Cross-Section"
+description = "Maximize bending stiffness of a rectangular beam cut from a log"
 module = "gpkit.examples.gp_textbook"
 class = "BeamCrossSection"
+expected_cost = 0.1925
+expected_cost_tol = 0.01
 
 [[models]]
+id = "box_from_sheet"
+name = "Box from Sheet"
+description = "Maximize open-top box volume cut from a square tin sheet"
 module = "gpkit.examples.gp_textbook"
 class = "BoxFromSheet"
+expected_cost = 13.5
+expected_cost_tol = 0.01
 
 [[models]]
+id = "work_sleep"
+name = "Work/Sleep Allocation"
+description = "Maximize daily savings with work/sleep/leisure time allocation"
 module = "gpkit.examples.gp_textbook"
 class = "WorkSleep"
+expected_cost = 0.009006
+expected_cost_tol = 0.01
+
+[[models]]
+id = "wing"
+name = "Wing Mass Budget"
+description = "Wing spar mass budget with layered growth allowances"
+module = "gpkit.examples.growth_allowance"
+class = "Wing"
+expected_cost = 35.64
+expected_cost_tol = 0.001

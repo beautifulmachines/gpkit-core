@@ -1,0 +1,210 @@
+=== 1. Box Transport ===
+
+       ┃┓
+       ┃┃
+       ┃┃
+       ┃┣╸1/h/length/w
+       ┃┃ (1)
+       ┃┃
+       ┃┛
+  Cost╺┫┓
+ (100) ┃┣╸h·w
+       ┃┛ (0.5)
+       ┃┓
+       ┃┣╸h·length
+       ┃┛ (1)
+       ┃┓
+       ┃┣╸length·w
+       ┃┛ (2)
+
+
+
+              ┃┓
+              ┃┃
+              ┃┣╸V1 = 400
+              ┃┃
+              ┃┛
+              ┃┓
+              ┃┃
+ BoxTransport╺┫┣╸c_ferry = 0.1
+              ┃┃
+              ┃┛
+              ┃┓
+              ┃┃
+              ┃┣╸c_sides = 10
+              ┃┛
+              ┃┣╸c_ends = 20
+              ┃┛
+
+
+Optimal Cost
+------------
+BoxTransport.c_ferry·BoxTransport.V1/(BoxTransport.length·BoxTransport.w·BoxTransport.h) + BoxTransport.c_ends·2·BoxTransport.w·BoxTransport.h + BoxTransport.c_sides·(2·BoxTransport.length·BoxTransport.h + BoxTransport.w·BoxTransport.length) : 100
+
+Solution
+--------
+BoxTransport
+      h : 0.5         box height
+ length : 2           box length
+      w : 1           box width
+...constants
+c_sides : 10   (+0.4) cost of box sides and bottom (per unit area)
+     V1 : 400  (+0.4) volume of gravel to transport
+c_ferry : 0.1  (+0.4) cost per ferry trip
+ c_ends : 20   (+0.2) cost of box ends (per unit area)
+
+=== 2. Fence Plot ===
+
+      ┃┓
+ Cost╺┫┃
+  (8) ┃┣╸1/(length·w)
+      ┃┛ (8)
+
+
+
+           ┃┓
+           ┃┃
+           ┃┣╸L = 1
+ FencePlot╺┫┛
+           ┃┓
+           ┃┃
+           ┃┣╸L ≥ 2·w + length
+           ┃┛
+
+
+Optimal Cost
+------------
+1/(FencePlot.length·FencePlot.w) : 8
+
+Solution
+--------
+FencePlot
+length : 0.5        plot side parallel to river
+     w : 0.25       plot side perpendicular to river
+...constants
+     L : 1     (-2) total fence length
+
+=== 3. Beam Cross-Section ===
+
+         ┃┓
+    Cost╺┫┃
+ (0.192) ┃┣╸1/(w·d³)
+         ┃┛ (0.192)
+
+
+
+                  ┃┓
+                  ┃┃
+                  ┃┣╸R = 1
+ BeamCrossSection╺┫┃
+                  ┃┛
+                  ┃┓
+                  ┃┣╸R² ≥ (d/2)² + (w/2)²
+                  ┃┛
+
+
+Optimal Cost
+------------
+1/(BeamCrossSection.w·BeamCrossSection.d³) : 0.1925
+
+Solution
+--------
+BeamCrossSection
+d : 1.732       beam depth
+w : 1           beam width
+...constants
+R : 1      (-4) log radius
+
+=== 4. Box from Sheet ===
+
+        ┃┓
+   Cost╺┫┃
+ (13.5) ┃┣╸1/(length·w·h)
+        ┃┛ (13.5)
+
+
+
+              ┃┓
+              ┃┃
+              ┃┃
+              ┃┃
+              ┃┃
+              ┃┣╸L = 1
+              ┃┃
+              ┃┃
+              ┃┃
+ BoxFromSheet╺┫┛
+              ┃┓
+              ┃┃
+              ┃┣╸L ≥ length + 2·cy
+              ┃┛
+              ┃┓
+              ┃┃
+              ┃┣╸L ≥ w + 2·cx
+              ┃┛
+              ┃┣╸cx ≥ h
+              ┃┣╸cy ≥ h
+
+
+Optimal Cost
+------------
+1/(BoxFromSheet.length·BoxFromSheet.w·BoxFromSheet.h) : 13.5
+
+Solution
+--------
+BoxFromSheet
+    cx : 0.1667       corner cutout length in x dimension
+    cy : 0.1667       corner cutout length in y dimension
+     h : 0.1667       box height
+length : 0.6667       box length
+     w : 0.6667       box width
+...constants
+     L : 1       (-3) tin sheet side length
+
+=== 5. Work/Sleep Allocation ===
+
+           ┃┓
+      Cost╺┫┃
+ (0.00901) ┃┣╸1/s
+           ┃┛ (0.00901)
+
+
+
+           ┃┓
+           ┃┃
+           ┃┃
+           ┃┃
+           ┃┃
+           ┃┣╸tw + ts + to ≤ 24
+           ┃┃
+           ┃┃
+           ┃┃
+ WorkSleep╺┫┛
+           ┃┓
+           ┃┃
+           ┃┣╸p = 0.5
+           ┃┛
+           ┃┓
+           ┃┃
+           ┃┣╸p·tw^1.5·ts^0.75·tm^0.1 ≥ s + c·tm
+           ┃┛
+           ┃┣╸te = 3
+           ┃┣╸to ≥ te
+
+
+Optimal Cost
+------------
+1/WorkSleep.s : 0.009006
+
+Solution
+--------
+WorkSleep
+ s : 111              savings accrued per day
+tm : 2.467            hours spent listening to music
+to : 3                hours spent eating and/or listening
+ts : 7                hours spent sleeping
+tw : 14               hours spent working
+...constants
+ p : 0.5    (-1.111)  pay rate per unit productivity
+te : 3      (+0.3571) hours required for eating
+ c : 5      (+0.1111) cost of new records per hour

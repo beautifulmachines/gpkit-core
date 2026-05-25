@@ -32,5 +32,6 @@ class Box(Model):
         ]
 
 
-m = Box()
-print(m.solve(verbosity=0).table())
+if __name__ == "__main__":
+    m = Box()
+    print(m.solve(verbosity=0).table())

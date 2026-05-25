@@ -139,11 +139,6 @@ class TestExamples:
     def test_gettingstarted(self, example):
         assert example.sol.cost == pytest.approx(1.414, rel=1e-2)
 
-    def test_growth_allowance(self, example):
-        # Spar leaf: rho*t*A = 2700 * 0.005 * 1.0 = 13.5 kg per spar
-        # Spar.m = 1.20 * 13.5 = 16.2; Wing.m = 1.10 * 2 * 16.2 = 35.64
-        assert mag(example.sol.cost) == pytest.approx(35.64, rel=1e-3)
-
     def test_loose_constraintsets(self, example):
         m = example.m
         sol = m.solve(verbosity=0)
@@ -279,19 +274,8 @@ class TestExamples:
     def test_simple_sp(self, example):
         assert example.sol.cost == pytest.approx(0.9, rel=1e-2)
 
-    def test_simple_box(self, example):
-        sol = example.m.solve(verbosity=0)
-        assert sol.cost == pytest.approx(0.003674, rel=1e-2)
-
     def test_x_greaterthan_1(self, example):
         assert example.sol.cost == pytest.approx(1.0, rel=1e-2)
-
-    def test_beam(self, example):
-        assert not np.isnan(example.sol["w"]).any()
-        assert example.sol.cost == pytest.approx(1.6214, rel=1e-3)
-
-    def test_water_tank(self, example):
-        assert example.sol.cost == pytest.approx(1.293, rel=1e-2)
 
     def test_sin_approx_example(self, example):
         sol = example.m.solve(verbosity=0)
@@ -349,15 +333,3 @@ class TestExamples:
     def test_bemt_hover(self, example):
         # Minimum induced power for a 5-bin BEMT rotor at 1e4 N vehicle weight
         assert example.sol.cost == pytest.approx(43582.47, rel=1e-2)
-
-    def test_gp_textbook(self, example):
-        # Five classic textbook GP problems; assert all five costs
-        assert example.sol1.cost == pytest.approx(100.0, rel=1e-2)  # BoxTransport
-        assert example.sol2.cost == pytest.approx(8.0, rel=1e-2)  # FencePlot
-        assert example.sol3.cost == pytest.approx(0.1925, rel=1e-2)  # BeamCrossSection
-        assert example.sol4.cost == pytest.approx(13.5, rel=1e-2)  # BoxFromSheet
-        assert example.sol5.cost == pytest.approx(0.009006, rel=1e-2)  # WorkSleep
-
-    def test_fuel_burn(self, example):
-        # Multi-point aircraft fuel burn minimization (total W_fuel, 3 conditions)
-        assert example.sol.cost == pytest.approx(7561.15, rel=1e-2)

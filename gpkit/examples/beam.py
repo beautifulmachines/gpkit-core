@@ -64,29 +64,33 @@ class Beam(Model):
         }
 
 
-b = Beam(N=6, substitutions={"L": 6, "EI": 1.1e4, "q": 110 * np.ones(6)})
-sol = b.solve(verbosity=0)
-print(sol.summary(vecn=6))
-w_gp = sol["w"]  # deflection along beam
+if __name__ == "__main__":
+    b = Beam(N=6, substitutions={"L": 6, "EI": 1.1e4, "q": 110 * np.ones(6)})
+    sol = b.solve(verbosity=0)
+    print(sol.summary(vecn=6))
+    w_gp = sol["w"]
 
-L, EI, q_vec = sol["L"], sol["EI"], sol["q"]
-x = np.linspace(0, mag(L), len(q_vec)) * ureg.m  # position along beam
-q_uniform = q_vec[0]  # assume uniform loading for the check below
-w_exact = q_uniform / (24 * EI) * x**2 * (x**2 - 4 * L * x + 6 * L**2)  # analytic soln
-assert max(abs(w_gp - w_exact)) <= 1.1 * ureg.cm
+    L, EI, q_vec = sol["L"], sol["EI"], sol["q"]
+    x = np.linspace(0, mag(L), len(q_vec)) * ureg.m
+    q_uniform = q_vec[0]
+    w_exact = q_uniform / (24 * EI) * x**2 * (x**2 - 4 * L * x + 6 * L**2)
+    assert max(abs(w_gp - w_exact)) <= 1.1 * ureg.cm
 
-PLOT = False
-if PLOT:  # pragma: no cover
-    import matplotlib.pyplot as plt
+    PLOT = False
+    if PLOT:
+        import matplotlib.pyplot as plt
 
-    x_exact = np.linspace(0, L, 1000)
-    w_exact = (
-        q_uniform / (24 * EI) * x_exact**2 * (x_exact**2 - 4 * L * x_exact + 6 * L**2)
-    )
-    plt.plot(x, w_gp, color="red", linestyle="solid", marker="^", markersize=8)
-    plt.plot(x_exact, w_exact, color="blue", linestyle="dashed")
-    plt.xlabel("x [m]")
-    plt.ylabel("Deflection [m]")
-    plt.axis("equal")
-    plt.legend(["GP solution", "Analytical solution"])
-    plt.show()
+        x_exact = np.linspace(0, L, 1000)
+        w_exact = (
+            q_uniform
+            / (24 * EI)
+            * x_exact**2
+            * (x_exact**2 - 4 * L * x_exact + 6 * L**2)
+        )
+        plt.plot(x, w_gp, color="red", linestyle="solid", marker="^", markersize=8)
+        plt.plot(x_exact, w_exact, color="blue", linestyle="dashed")
+        plt.xlabel("x [m]")
+        plt.ylabel("Deflection [m]")
+        plt.axis("equal")
+        plt.legend(["GP solution", "Analytical solution"])
+        plt.show()

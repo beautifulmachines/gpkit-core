@@ -187,8 +187,7 @@ class FuelBurn(Model):
         ]
 
 
-m = FuelBurn()
-sol = m.solve(verbosity=0)
-
 if __name__ == "__main__":
+    m = FuelBurn()
+    sol = m.solve(verbosity=0)
     print(sol.table())

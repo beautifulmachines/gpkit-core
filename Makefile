@@ -14,7 +14,11 @@ format:
 	uv run black gpkit
 
 # Testing
-test:  # Run tests with pytest
+regen-examples:  # Regenerate catalog example output files for docs
+	uv run python scripts/regen_examples.py
+
+test:  # Regenerate catalog example outputs, then run all tests
+	$(MAKE) regen-examples
 	uv run pytest gpkit/tests -v
 
 coverage:  # Run tests with coverage reporting
@@ -44,7 +48,8 @@ help:
 	@echo "  lint              Run fast lint checks"
 	@echo "  pylint            Run pylint (slow)"
 	@echo "  format            Format code with isort and black"
-	@echo "  test              Run tests with pytest"
+	@echo "  regen-examples    Regenerate catalog example output files"
+	@echo "  test              Regen examples, then run all tests"
 	@echo "  coverage          Run tests with coverage reporting"
 	@echo "  clean             Clean build artifacts"
 	@echo "  check-clean       Check no uncommitted changes"

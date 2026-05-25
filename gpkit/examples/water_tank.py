@@ -22,6 +22,7 @@ class WaterTank(Model):
         ]
 
 
-m = WaterTank()
-sol = m.solve(verbosity=0)
-print(sol.summary())
+if __name__ == "__main__":
+    m = WaterTank()
+    sol = m.solve(verbosity=0)
+    print(sol.summary())
