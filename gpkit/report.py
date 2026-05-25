@@ -86,6 +86,20 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
     objective_units: str = ""  # unit string for the cost expression
     objective_direction: str = "minimize"  # "minimize" or "maximize"
 
+    def _render_constraint_groups(self) -> list:
+        """Render constraint groups using the same lineage context as the text path."""
+        excluded = {"units"}
+        if self.magic_prefix:
+            excluded.add(":MAGIC:" + self.magic_prefix)
+        with lineage_display_context(self.lineage_map):
+            return [
+                {
+                    "label": cg.label,
+                    "constraints": [c.str_without(excluded) for c in cg.constraints],
+                }
+                for cg in self.constraint_groups
+            ]
+
     def to_dict(self) -> dict:
         """JSON-serializable dict (for format='dict' and future API)."""
         return {
@@ -106,10 +120,7 @@ class ReportSection:  # pylint: disable=too-many-instance-attributes
             "objective_units": self.objective_units,
             "free_variables": [v.to_dict() for v in self.free_variables],
             "fixed_variables": [v.to_dict() for v in self.fixed_variables],
-            "constraint_groups": [
-                {"label": cg.label, "constraints": [str(c) for c in cg.constraints]}
-                for cg in self.constraint_groups
-            ],
+            "constraint_groups": self._render_constraint_groups(),
             "children": [c.to_dict() for c in self.children],
         }
 

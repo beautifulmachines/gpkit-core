@@ -88,7 +88,8 @@ class TestReportDataclasses:
         ve = VarEntry(
             name="x", latex="x", value=2.0, sensitivity=0.1, units="m", label="span"
         )
-        cg = CGroup(label="Aero", constraints=[("x", ">=", "1")])
+        x_test = Variable("x_to_dict_test")
+        cg = CGroup(label="Aero", constraints=[x_test >= 1])
         rs = ReportSection(
             title="Fuselage",
             description="fuselage drag model",
