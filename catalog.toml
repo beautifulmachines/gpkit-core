@@ -38,50 +38,6 @@ class = "FuelBurn"
 expected_cost = 7561.15
 expected_cost_tol = 0.01
 
-[[models]]
-id = "box_transport"
-name = "Box Transport"
-description = "Minimize ferry and box cost to transport a fixed volume of gravel"
-module = "gpkit.examples.gp_textbook"
-class = "BoxTransport"
-expected_cost = 100.0
-expected_cost_tol = 0.01
-
-[[models]]
-id = "fence_plot"
-name = "Fence Plot"
-description = "Maximize rectangular plot area with a fixed fence length"
-module = "gpkit.examples.gp_textbook"
-class = "FencePlot"
-expected_cost = 8.0
-expected_cost_tol = 0.01
-
-[[models]]
-id = "beam_cross_section"
-name = "Beam Cross-Section"
-description = "Maximize bending stiffness of a rectangular beam cut from a log"
-module = "gpkit.examples.gp_textbook"
-class = "BeamCrossSection"
-expected_cost = 0.1925
-expected_cost_tol = 0.01
-
-[[models]]
-id = "box_from_sheet"
-name = "Box from Sheet"
-description = "Maximize open-top box volume cut from a square tin sheet"
-module = "gpkit.examples.gp_textbook"
-class = "BoxFromSheet"
-expected_cost = 13.5
-expected_cost_tol = 0.01
-
-[[models]]
-id = "work_sleep"
-name = "Work/Sleep Allocation"
-description = "Maximize daily savings with work/sleep/leisure time allocation"
-module = "gpkit.examples.gp_textbook"
-class = "WorkSleep"
-expected_cost = 0.009006
-expected_cost_tol = 0.01
 
 [[models]]
 id = "wing"
