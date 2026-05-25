@@ -129,8 +129,8 @@ class TestReportDataclasses:
 
         class _AbbrParent(Model):
             def setup(self):
-                self.child = _AbbrChild()
-                return [self.child]
+                child = _AbbrChild()
+                return [child]
 
         class _AbbrChild(Model):
             def setup(self):
