@@ -333,3 +333,21 @@ class TestExamples:
     def test_bemt_hover(self, example):
         # Minimum induced power for a 5-bin BEMT rotor at 1e4 N vehicle weight
         assert example.sol.cost == pytest.approx(43582.47, rel=1e-2)
+
+    def test_gp_textbook(self, example):
+        # Five classical GP textbook problems; solves run directly on classes
+        assert example.BoxTransport().solve(verbosity=0).cost == pytest.approx(
+            100.0, rel=1e-2
+        )
+        assert example.FencePlot().solve(verbosity=0).cost == pytest.approx(
+            8.0, rel=1e-2
+        )
+        assert example.BeamCrossSection().solve(verbosity=0).cost == pytest.approx(
+            0.1925, rel=1e-2
+        )
+        assert example.BoxFromSheet().solve(verbosity=0).cost == pytest.approx(
+            13.5, rel=1e-2
+        )
+        assert example.WorkSleep().solve(verbosity=0).cost == pytest.approx(
+            0.009006, rel=1e-2
+        )

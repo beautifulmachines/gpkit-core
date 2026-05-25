@@ -4,7 +4,7 @@ from gpkit import Model, Var, VectorVariable
 
 
 class WaterTank(Model):
-    "Rectangular tank surface area minimization."
+    "Minimize surface area of a rectangular tank for a fixed water volume."
 
     M = Var("kg", "mass of water", value=100)
     rho = Var("kg/m^3", "density of water", value=1000)

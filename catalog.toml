@@ -4,8 +4,6 @@
 
 [[models]]
 id = "box"
-name = "Simple Box"
-description = "Maximize box volume given area and aspect ratio constraints"
 module = "gpkit.examples.simple_box"
 class = "Box"
 expected_cost = 0.003674
@@ -13,8 +11,6 @@ expected_cost_tol = 0.01
 
 [[models]]
 id = "water_tank"
-name = "Water Tank"
-description = "Minimize rectangular tank surface area for a particular volume"
 module = "gpkit.examples.water_tank"
 class = "WaterTank"
 expected_cost = 1.293
@@ -22,8 +18,6 @@ expected_cost_tol = 0.01
 
 [[models]]
 id = "beam"
-name = "Euler Beam"
-description = "Discretized Euler-Bernoulli beam equations with distributed load"
 module = "gpkit.examples.beam"
 class = "Beam"
 expected_cost = 0.7825
@@ -31,18 +25,13 @@ expected_cost_tol = 0.001
 
 [[models]]
 id = "fuel_burn"
-name = "Fuel Burn"
-description = "Multi-point aircraft fuel burn minimization"
 module = "gpkit.examples.fuel_burn"
 class = "FuelBurn"
 expected_cost = 7561.15
 expected_cost_tol = 0.01
 
-
 [[models]]
 id = "wing"
-name = "Wing Mass Budget"
-description = "Wing spar mass budget with layered growth allowances"
 module = "gpkit.examples.growth_allowance"
 class = "Wing"
 expected_cost = 35.64
