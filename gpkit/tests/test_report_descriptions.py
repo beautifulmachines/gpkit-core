@@ -12,7 +12,6 @@ from gpkit import Model, Variable
 from gpkit.report import (
     ReportSection,
     build_report_ir,
-    objective_block,
     render_markdown,
     render_text,
 )
@@ -437,22 +436,16 @@ class TestObjective:
         assert ir.children[0].objective_str == ""  # child does not
 
     def test_render_text_objective(self):
-        """Objective is no longer auto-rendered; use objective_block() instead."""
+        """Objective is not auto-rendered in text output."""
         m, sol = self._solved_box()
         out = m.report(solution=sol, fmt="text")
-        assert "Objective" not in out  # removed from auto-render
-        block = objective_block(m, sol)
-        assert "maximize" in block.lower()
-        assert "Attained" in block
+        assert "Objective" not in out
 
     def test_render_markdown_objective(self):
-        """Objective is no longer auto-rendered; use objective_block() instead."""
+        """Objective is not auto-rendered in markdown output."""
         m, sol = self._solved_box()
         out = m.report(solution=sol, fmt="md")
-        assert "Objective" not in out  # removed from auto-render
-        block = objective_block(m, sol)
-        assert "maximize" in block.lower()
-        assert "Attained" in block
+        assert "Objective" not in out
 
     def test_render_text_no_objective_when_empty(self):
         """render_text omits objective section when cost has no variables."""

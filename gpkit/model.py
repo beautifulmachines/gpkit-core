@@ -361,10 +361,6 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
                 def report_preamble(cls):
                     return "This section covers aerodynamic and structural wing sizing."
 
-        For preambles that depend on model-specific counts (free variables,
-        constraints, objective), use :func:`gpkit.report.feasibility_block`
-        and :func:`gpkit.report.sensitivities_block` instead, and pass the
-        result via the *front_matter* argument of :meth:`report`.
         """
         return ""
 
@@ -379,15 +375,7 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
             Output format: "dict", "text", "md", or "latex".
         front_matter : str, optional
             Raw text/markdown prepended before the entire report (before the
-            root model's heading).  Combine with
-            :func:`gpkit.report.feasibility_block` and
-            :func:`gpkit.report.sensitivities_block` to add standard GP
-            explanatory text::
-
-                from gpkit.report import feasibility_block, sensitivities_block
-                m.report(sol, fmt="md",
-                         front_matter=feasibility_block(m) + "\\n\\n"
-                                      + sensitivities_block())
+            root model's heading).
         toc : bool, optional
             If True, a table-of-contents marker is inserted (Markdown only).
         """
