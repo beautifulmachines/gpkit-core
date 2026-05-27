@@ -158,6 +158,15 @@ def _child_to_ir(child):
         return child.to_ir()
     if isinstance(child, (int, float)):
         return child
+    if isinstance(child, slice):
+        return {
+            "node": "slice",
+            "start": child.start,
+            "stop": child.stop,
+            "step": child.step,
+        }
+    if isinstance(child, tuple):
+        return {"node": "tuple", "items": [_child_to_ir(el) for el in child]}
     # numpy scalars and similar numeric types
     try:
         return float(child)
@@ -195,6 +204,10 @@ def ast_from_ir(ir_dict, var_registry):
             else:
                 children.append(c)  # raw number
         return ExprNode(ir_dict["op"], tuple(children))
+    if node == "slice":
+        return slice(ir_dict.get("start"), ir_dict.get("stop"), ir_dict.get("step"))
+    if node == "tuple":
+        return tuple(ast_from_ir(el, var_registry) for el in ir_dict["items"])
     raise ValueError(f"Unknown AST IR node type: {node}")
 
 
