@@ -176,6 +176,11 @@ def _child_to_ir(child):
         ) from exc
 
 
+def _list_from_ir(items, var_registry):
+    "Deserialize a list of AST children: dicts recurse, raw values pass through."
+    return [ast_from_ir(c, var_registry) if isinstance(c, dict) else c for c in items]
+
+
 def ast_from_ir(ir_dict, var_registry):
     """Reconstruct an AST node from its IR dict.
 
@@ -197,20 +202,12 @@ def ast_from_ir(ir_dict, var_registry):
     if node == "pi":
         return PiNode()
     if node == "expr":
-        children = []
-        for c in ir_dict["children"]:
-            if isinstance(c, dict):
-                children.append(ast_from_ir(c, var_registry))
-            else:
-                children.append(c)  # raw number
+        children = _list_from_ir(ir_dict["children"], var_registry)
         return ExprNode(ir_dict["op"], tuple(children))
     if node == "slice":
         return slice(ir_dict.get("start"), ir_dict.get("stop"), ir_dict.get("step"))
     if node == "tuple":
-        return tuple(
-            ast_from_ir(el, var_registry) if isinstance(el, dict) else el
-            for el in ir_dict["items"]
-        )
+        return tuple(_list_from_ir(ir_dict["items"], var_registry))
     raise ValueError(f"Unknown AST IR node type: {node}")
 
 
