@@ -51,7 +51,7 @@ class BEMTHover(Model):
             # Thrust per bin: fixed to equal share of vehicle weight
             xi = Variable("xi", W_vehicle / N, "N", "thrust per bin (fixed)")
             r = Variable("r", "-", "non-dimensional radius")
-            dr = Variable("dr", "-", "non-dimensional radius step")
+            dr = Variable("Delta_r", "-", "non-dimensional radius step")
             Vi = Variable("V_i", "m/s", "induced velocity")
             dCT = Variable("dC_T", "-", "incremental thrust coefficient")
             dCP = Variable("dC_P", "-", "incremental power coefficient")

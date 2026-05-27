@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 import gpkit
-from gpkit import Model, SignomialsEnabled, Variable, VarKey, VectorVariable
+from gpkit import Model, SignomialsEnabled, Variable, VarKey, Vectorize, VectorVariable
 from gpkit.ast_nodes import (
     ConstNode,
     ExprNode,
@@ -748,17 +748,24 @@ class TestConstraintIR:
         This pattern appears in vectorized integration constraints like
         r[j] >= dr[:j].sum() used in BEMTHover and similar models.
         """
-        from gpkit import Vectorize
-
         with Vectorize(4):
             dr = Variable("dr", "-", "bin width")
 
         x = Variable("x", "-")
         m = Model(x, [x >= dr[:2].sum()])
         ir = m.to_ir()
-        # Must be JSON-serializable (the original failure mode)
         json.dumps(ir)
-        # Round-trip must reconstruct an equivalent solvable model
+        m2 = Model.from_ir(ir)
+        assert len(list(m2)) == len(list(m))
+
+    def test_tuple_with_integer_index_in_ast_round_trips(self):
+        """2D array indexed with [int, :] produces a tuple child containing a
+        raw integer in the IR. ast_from_ir must not assert on that integer."""
+        a = VectorVariable((2, 3), "a", "-")
+        x = Variable("x", "-")
+        m = Model(x, [x >= a[0, :].sum()])
+        ir = m.to_ir()
+        json.dumps(ir)
         m2 = Model.from_ir(ir)
         assert len(list(m2)) == len(list(m))
 

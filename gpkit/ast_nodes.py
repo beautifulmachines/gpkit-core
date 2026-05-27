@@ -207,7 +207,10 @@ def ast_from_ir(ir_dict, var_registry):
     if node == "slice":
         return slice(ir_dict.get("start"), ir_dict.get("stop"), ir_dict.get("step"))
     if node == "tuple":
-        return tuple(ast_from_ir(el, var_registry) for el in ir_dict["items"])
+        return tuple(
+            ast_from_ir(el, var_registry) if isinstance(el, dict) else el
+            for el in ir_dict["items"]
+        )
     raise ValueError(f"Unknown AST IR node type: {node}")
 
 
