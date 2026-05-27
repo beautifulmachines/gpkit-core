@@ -231,6 +231,8 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
             ir["label"] = self.label
         if self.idx is not None:
             ir["idx"] = list(self.idx)
+            if self.veckey is not None:
+                ir["veckey_ref"] = self.veckey.ref
         if self.shape:
             ir["shape"] = list(self.shape)
         return ir
