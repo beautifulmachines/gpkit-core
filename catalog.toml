@@ -31,8 +31,3 @@ class = "Wing"
 id = "bemt_hover"
 module = "gpkit.examples.bemt_hover"
 class = "BEMTHover"
-
-[[models]]
-id = "bemt_hover"
-module = "gpkit.examples.bemt_hover"
-class = "BEMTHover"

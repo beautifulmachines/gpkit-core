@@ -158,6 +158,15 @@ def _child_to_ir(child):
         return child.to_ir()
     if isinstance(child, (int, float)):
         return child
+    if isinstance(child, slice):
+        return {
+            "node": "slice",
+            "start": child.start,
+            "stop": child.stop,
+            "step": child.step,
+        }
+    if isinstance(child, tuple):
+        return {"node": "tuple", "items": [_child_to_ir(el) for el in child]}
     # numpy scalars and similar numeric types
     try:
         return float(child)
@@ -165,6 +174,45 @@ def _child_to_ir(child):
         raise IRSerializationError(
             f"Cannot serialize AST child of type {type(child).__name__}: {child!r}"
         ) from exc
+
+
+def _list_from_ir(items, var_registry):
+    "Deserialize a list of AST children: dicts recurse, raw values pass through."
+    return [ast_from_ir(c, var_registry) if isinstance(c, dict) else c for c in items]
+
+
+def _ast_from_ir_var(d, reg):
+    return VarNode(reg[d["ref"]])
+
+
+def _ast_from_ir_const(d, _reg):
+    return ConstNode(d["value"])
+
+
+def _ast_from_ir_pi(_d, _reg):
+    return PiNode()
+
+
+def _ast_from_ir_expr(d, reg):
+    return ExprNode(d["op"], tuple(_list_from_ir(d["children"], reg)))
+
+
+def _ast_from_ir_slice(d, _reg):
+    return slice(d.get("start"), d.get("stop"), d.get("step"))
+
+
+def _ast_from_ir_tuple(d, reg):
+    return tuple(_list_from_ir(d["items"], reg))
+
+
+_AST_NODE_BUILDERS = {
+    "var": _ast_from_ir_var,
+    "const": _ast_from_ir_const,
+    "pi": _ast_from_ir_pi,
+    "expr": _ast_from_ir_expr,
+    "slice": _ast_from_ir_slice,
+    "tuple": _ast_from_ir_tuple,
+}
 
 
 def ast_from_ir(ir_dict, var_registry):
@@ -180,22 +228,10 @@ def ast_from_ir(ir_dict, var_registry):
     if not isinstance(ir_dict, dict):
         assert var_registry is None
         return ir_dict  # raw number passthrough (e.g., exponent in pow)
-    node = ir_dict["node"]
-    if node == "var":
-        return VarNode(var_registry[ir_dict["ref"]])
-    if node == "const":
-        return ConstNode(ir_dict["value"])
-    if node == "pi":
-        return PiNode()
-    if node == "expr":
-        children = []
-        for c in ir_dict["children"]:
-            if isinstance(c, dict):
-                children.append(ast_from_ir(c, var_registry))
-            else:
-                children.append(c)  # raw number
-        return ExprNode(ir_dict["op"], tuple(children))
-    raise ValueError(f"Unknown AST IR node type: {node}")
+    builder = _AST_NODE_BUILDERS.get(ir_dict["node"])
+    if builder is None:
+        raise ValueError(f"Unknown AST IR node type: {ir_dict['node']}")
+    return builder(ir_dict, var_registry)
 
 
 def to_ast(obj):

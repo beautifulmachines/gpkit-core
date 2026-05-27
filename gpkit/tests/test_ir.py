@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 import gpkit
-from gpkit import Model, SignomialsEnabled, Variable, VarKey, VectorVariable
+from gpkit import Model, SignomialsEnabled, Variable, VarKey, Vectorize, VectorVariable
 from gpkit.ast_nodes import (
     ConstNode,
     ExprNode,
@@ -21,7 +21,6 @@ from gpkit.ast_nodes import (
 )
 from gpkit.constraints import ArrayConstraint
 from gpkit.constraints.set import build_model_tree
-from gpkit.exceptions import IRSerializationError
 from gpkit.nomials.map import NomialMap
 from gpkit.nomials.math import (
     Monomial,
@@ -742,6 +741,34 @@ class TestConstraintIR:
             assert ir_dict["type"] == "PosynomialInequality"
             assert ir_dict["oper"] == ">="
 
+    def test_slice_in_ast_serializes(self):
+        """Posynomial whose AST contains a slice (e.g. from arr[:j].sum())
+        must round-trip through model to_ir / from_ir without error.
+
+        This pattern appears in vectorized integration constraints like
+        r[j] >= dr[:j].sum() used in BEMTHover and similar models.
+        """
+        with Vectorize(4):
+            dr = Variable("dr", "-", "bin width")
+
+        x = Variable("x", "-")
+        m = Model(x, [x >= dr[:2].sum()])
+        ir = m.to_ir()
+        json.dumps(ir)
+        m2 = Model.from_ir(ir)
+        assert len(list(m2)) == len(list(m))
+
+    def test_tuple_with_integer_index_in_ast_round_trips(self):
+        """2D array indexed with [int, :] produces a tuple child containing a
+        raw integer in the IR. ast_from_ir must not assert on that integer."""
+        a = VectorVariable((2, 3), "a", "-")
+        x = Variable("x", "-")
+        m = Model(x, [x >= a[0, :].sum()])
+        ir = m.to_ir()
+        json.dumps(ir)
+        m2 = Model.from_ir(ir)
+        assert len(list(m2)) == len(list(m))
+
     def test_constraint_from_ir_dispatch(self):
         """constraint_from_ir dispatches to the correct class."""
         x = Variable("x")
@@ -1351,18 +1378,11 @@ def test_to_ir_monomial_substitution():
 
 @pytest.mark.parametrize("model_entry", _CORE_CATALOG, ids=catalog_ids(_CORE_CATALOG))
 def test_core_catalog_ir_roundtrip(model_entry):
-    """gpkit-core catalog model: IR must be identical after round-trip.
-
-    If to_ir() itself raises (e.g. BEMTHover slice AST gap), the test is
-    skipped so the gap is visible in CI output without failing.
-    """
+    """gpkit-core catalog model: IR must serialize and round-trip cleanly."""
     mod = importlib.import_module(model_entry["module"])
     cls = getattr(mod, model_entry["class"])
     m = cls.default()
-    try:
-        ir1 = m.to_ir()
-    except IRSerializationError as exc:
-        pytest.skip(f"{cls.__name__}.to_ir() failed (known IR gap): {exc}")
+    ir1 = m.to_ir()
     m2 = Model.from_ir(ir1)
     ir2 = m2.to_ir()
     diff = ir_diff(ir1, ir2)
