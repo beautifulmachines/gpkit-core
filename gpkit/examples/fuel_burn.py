@@ -50,12 +50,12 @@ class FuelBurn(Model):
     eta_v = Var("-", "propeller viscous efficiency", value=0.85)
     h_fuel = Var("J/kg", "fuel heating value", value=42e6)
     V_sprint_reqt = Var("m/s", "sprint speed requirement", value=150)
-    W_pay = Var("N", "payload weight", value=500 * 9.81)
+    W_pay = Var("N", "payload weight", value=500 * 9.8)
     R_min = Var("m", "minimum airplane range", value=5e6)
-    V_stallmax = Var("m/s", "stall speed limit", value=40)
+    V_stallmax = Var("m/s", "stall speed limit", value=38)
     CDA0 = Var("m^2", "fuselage zero-lift drag area", value=0.05)
-    # Empirical engine weight fit: W_eng [N] = 0.0372 * P_max^0.8083 [W^0.8083]
-    W_eng_coeff = Var("N/W^0.8083", "engine weight fit coefficient", value=0.0372)
+    # Empirical engine weight fit: W_eng [N] = 0.0372 * P_max^0.803 [W^0.803]
+    W_eng_coeff = Var("N/W^0.803", "engine weight fit coefficient", value=9.8 * 0.0038)
     # Unit normalization constants for wing structural model
     # (dimensionless normalized bending moment: divide by 1 N)
     W_ref = Var("N", "structural normalization weight", value=1)
@@ -148,11 +148,11 @@ class FuelBurn(Model):
             C_D >= self.CDA0 / S + C_Dp + C_L**2 / (pi * e * A),
             1
             >= (
-                2.56 * C_L**5.88 / (Re**1.54 * tau**3.32 * C_Dp**2.62)
-                + 3.8e-9 * tau**6.23 / (C_L**0.92 * Re**1.38 * C_Dp**9.57)
-                + 2.2e-3 * Re**0.14 * tau**0.033 / (C_L**0.01 * C_Dp**0.73)
-                + 1.19e4 * C_L**9.78 * tau**1.76 / (Re * C_Dp**0.91)
-                + 6.14e-6 * C_L**6.53 / (Re**0.99 * tau**0.52 * C_Dp**5.19)
+                2.556 * C_L**5.881 / (Re**1.541 * tau**3.319 * C_Dp**2.617)
+                + 3.823e-9 * tau**6.229 / (C_L**0.914 * Re**1.379 * C_Dp**9.57)
+                + 2.151e-3 * Re**0.1441 * tau**0.03325 / (C_L**0.0079 * C_Dp**0.7337)
+                + 1.19e4 * C_L**9.783 * tau**1.764 / (Re**0.998 * C_Dp**0.909)
+                + 6.143e-6 * C_L**6.535 / (Re**0.995 * tau**0.521 * C_Dp**5.192)
             ),
             # Propulsive efficiency chain
             eta_0 <= eta_eng * eta_prop,
@@ -165,7 +165,7 @@ class FuelBurn(Model):
             # Weight build-up
             W_tw >= W_fixed + W_pay + W_eng,
             W_zfw >= W_tw + W_wing,
-            W_eng >= self.W_eng_coeff * P_max**0.8083,
+            W_eng >= self.W_eng_coeff * P_max**0.803,
             W_wing / f_wadd >= W_cap + W_web,
             W[0] >= W_zfw + W_fuel[1],
             W[1] >= W_zfw,
@@ -173,8 +173,8 @@ class FuelBurn(Model):
             W[2] == W[0],
             # Wing structural model (Hoburg & Abbeel)
             2 * q >= 1 + p,
-            p >= 2.2,
-            tau <= 0.25,
+            p >= 1.9,
+            tau <= 0.15,
             M_rbar >= W_tw * A * p / (24 * self.W_ref),
             0.92**2 / 2 * w_wb * tau**2 * t_cap
             >= I_cap * self.k_shear + 0.92 * w_wb * tau * t_cap**2,
