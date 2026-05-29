@@ -5,20 +5,20 @@
           ┃┃            ┃           ┃
           ┃┃            ┃           ┃
           ┃┣╸W_fuel[0] /┣╸W[0]      ┣╸W_zfw╶⎨
-          ┃┃ (3,975N)   ┃ (35,792N) ┃ (32,206N)
+          ┃┃ (3,731N)   ┃ (34,888N) ┃ (31,514N)
           ┃┃            ┃           ┃
           ┃┃            ┃           ┃
      Cost╺┫┃            ┃           ┛
- (7,561N) ┃┛           /┛           ┣╸W_fuel[1]
+ (7,105N) ┃┛           /┛           ┣╸W_fuel[1]
           ┃┓           ┓       ┓           ┓
           ┃┃           ┃       ┃           ┃
           ┃┃           ┃       ┃           ┣╸W_fixed
           ┃┃           ┃       ┣╸W_tw      ┛ (14,700N, fixed)
-          ┃┣╸W_fuel[1] ┣╸W_zfw ┃ (23,107N) ┣╸W_pay
+          ┃┣╸W_fuel[1] ┣╸W_zfw ┃ (22,549N) ┣╸W_pay
           ┃┃           ┃       ┛           ┣╸W_eng
           ┃┃           ┃       ┓          ┓
           ┃┃           ┃       ┣╸W_wing   ┣╸I_cap/t_cap
-          ┃┛           ┛       ┛ (9,099N) ┛ (0.0126m⁴)
+          ┃┛           ┛       ┛ (8,965N) ┛ (0.00447m⁴)
 
 
 
@@ -30,120 +30,120 @@
 
 Optimal Cost
 ------------
-FuelBurn.W_fuel[:].sum() : 7561 [N]
+FuelBurn.W_fuel[:].sum() : 7105 [N]
 
 Solution
 --------
 FuelBurn
-             A : 21.08                            aspect ratio
-         I_cap : 6.709e-05 [m⁴]                   spar cap area moment of inertia per unit chord
-        M_rbar : 4.466e+04                        normalized root bending moment
-         P_max : 1.423e+06 [W]                    maximum shaft power
-             R : 5e+06     [m]                    airplane range
-             S : 26.94     [m²]                   wing area
-       V_stall : 40        [m/s]                  stall speed
-         W_cap : 4379      [N]                    spar cap weight
-         W_eng : 3502      [N]                    engine weight
-         W_mto : 3.977e+04 [N]                    maximum takeoff weight
-          W_tw : 2.311e+04 [N]                    tare weight (fixed + payload + engine)
-         W_web : 171.1     [N]                    shear web weight
-        W_wing : 9099      [N]                    wing weight
-         W_zfw : 3.221e+04 [N]                    zero fuel weight
-            nu : 0.7658                           wing taper/shape parameter
-             p : 2.2                              wing taper ratio parameter
-             q : 1.6                              wing taper ratio parameter 2
-         t_cap : 0.005321                         spar cap thickness/chord ratio
-         t_web : 0.0005545                        shear web thickness/chord ratio
-           tau : 0.2499                           airfoil thickness/chord ratio
-        C_D[:] : [ 0.016     0.0161    0.00951  ]       wing drag coefficient
-        C_L[:] : [ 0.67      0.671     0.13     ]       wing lift coefficient
-    C_{D_p}[:] : [ 0.00704   0.00708   0.00739  ]       profile drag coefficient
-         Re[:] : [ 4.02e+06  3.81e+06  9.13e+06 ]       Reynolds number
-          T[:] : [ 856       772       2.62e+03 ] [N]   thrust force
-          V[:] : [ 66        62.6      150      ] [m/s] flight speed
-          W[:] : [ 3.58e+04  3.22e+04  3.58e+04 ] [N]   aircraft weight
-     W_fuel[:] : [ 3.97e+03  3.59e+03 ] [N]   fuel weight per segment
-     \eta_0[:] : [ 0.265     0.265     0.277    ]       overall propulsive efficiency
-     \eta_i[:] : [ 0.891     0.891     0.929    ]       ideal propulsive efficiency
-\eta_{prop}[:] : [ 0.757     0.757     0.79     ]       propeller efficiency
-      z_bre[:] : [ 0.105     0.106    ]       Breguet range parameter
+             A : 18.1                            aspect ratio
+         I_cap : 1.908e-05 [m⁴]                  spar cap area moment of inertia per unit chord
+        M_rbar : 3.231e+04                       normalized root bending moment
+         P_max : 1.26e+06  [W]                   maximum shaft power
+             R : 5e+06     [m]                   airplane range
+             S : 28.99     [m²]                  wing area
+       V_stall : 38        [m/s]                 stall speed
+         W_cap : 4347      [N]                   spar cap weight
+         W_eng : 2949      [N]                   engine weight
+         W_mto : 3.862e+04 [N]                   maximum takeoff weight
+          W_tw : 2.255e+04 [N]                   tare weight (fixed + payload + engine)
+         W_web : 135.2     [N]                   shear web weight
+        W_wing : 8965      [N]                   wing weight
+         W_zfw : 3.151e+04 [N]                   zero fuel weight
+            nu : 0.786                           wing taper/shape parameter
+             p : 1.9                             wing taper ratio parameter
+             q : 1.45                            wing taper ratio parameter 2
+         t_cap : 0.004272                        spar cap thickness/chord ratio
+         t_web : 0.0005907                       shear web thickness/chord ratio
+           tau : 0.15                            airfoil thickness/chord ratio
+        C_D[:] : [ 0.0129    0.0129    0.00788  ]       wing drag coefficient
+        C_L[:] : [ 0.552     0.552     0.118    ]       wing lift coefficient
+    C_{D_p}[:] : [ 0.00555   0.00556   0.0059   ]       profile drag coefficient
+         Re[:] : [ 4.72e+06  4.48e+06  1.02e+07 ]       Reynolds number
+          T[:] : [ 816       738       2.34e+03 ] [N]   thrust force
+          V[:] : [ 69.2      65.8      150      ] [m/s] flight speed
+          W[:] : [ 3.49e+04  3.15e+04  3.49e+04 ] [N]   aircraft weight
+     W_fuel[:] : [ 3.73e+03  3.37e+03 ] [N]   fuel weight per segment
+     \eta_0[:] : [ 0.269     0.269     0.279    ]       overall propulsive efficiency
+     \eta_i[:] : [ 0.903     0.903     0.936    ]       ideal propulsive efficiency
+\eta_{prop}[:] : [ 0.767     0.767     0.796    ]       propeller efficiency
+      z_bre[:] : [ 0.102     0.102    ]       Breguet range parameter
 ...constants
-             g : 9.8       [m/s²]      (+1.504)   gravitational constant
-       eta_eng : 0.35                  (-1.311)   engine efficiency
-         eta_v : 0.85                  (-1.311)   propeller viscous efficiency
-         R_min : 5e+06     [m]         (+1.16)    minimum airplane range
-        h_fuel : 4.2e+07   [J/kg]      (-1.16)    fuel heating value
-       W_fixed : 1.47e+04  [N]         (+0.7854)  fixed weight
-             e : 0.95                  (-0.571)   wing spanwise efficiency
-    V_stallmax : 40        [m/s]       (-0.4952)  stall speed limit
- V_sprint_reqt : 150       [m/s]       (+0.4452)  sprint speed requirement
-        N_lift : 6                     (+0.3609)  wing loading multiplier
-        EI_ref : 1         [m⁶·Pa]     (+0.348)   structural normalization stiffness
-         W_ref : 1         [N]         (-0.348)   structural normalization weight
-     sigma_max : 2.5e+08   [Pa]        (-0.348)   allowable stress, 6061-T6
-       k_shear : 1         [1/m⁴]      (+0.348)   structural normalization shear factor
-        f_wadd : 2                     (+0.344)   wing added weight fraction
-      rho_alum : 2700      [kg/m³]     (+0.344)   density of aluminum
-         W_pay : 4905      [N]         (+0.2621)  payload weight
-        C_Lmax : 1.5                   (-0.2476)  maximum C_L, flaps down
-        rho_sl : 1.23      [kg/m³]     (-0.2476)  air density, sea level
-   W_eng_coeff : 0.0372    [N/W⁰⋅⁸⁰⁸³] (+0.1871)  engine weight fit coefficient
-          CDA0 : 0.05      [m²]        (+0.1787)  fuselage zero-lift drag area
-        A_prop : 0.785     [m²]        (-0.1242)  propeller disk area
-           rho : 0.91      [kg/m³]     (+0.1129)  air density, 3000m
-            mu : 1.69e-05  [kg/m/s]    (+0.06818) dynamic viscosity, 3000m
-             w : 0.5                   (-0.01689) wing-box width/chord
-           r_h : 0.75                  (+0.01294) wing strut taper parameter
-sigma_maxshear : 1.67e+08  [Pa]        (-0.01294) allowable shear stress
+             g : 9.8       [m/s²]     (+1.475)   gravitational constant
+       eta_eng : 0.35                 (-1.267)   engine efficiency
+         eta_v : 0.85                 (-1.267)   propeller viscous efficiency
+         R_min : 5e+06     [m]        (+1.141)   minimum airplane range
+        h_fuel : 4.2e+07   [J/kg]     (-1.141)   fuel heating value
+       W_fixed : 1.47e+04  [N]        (+0.7782)  fixed weight
+             e : 0.95                 (-0.5472)  wing spanwise efficiency
+ V_sprint_reqt : 150       [m/s]      (+0.3708)  sprint speed requirement
+    V_stallmax : 38        [m/s]      (-0.3605)  stall speed limit
+        N_lift : 6                    (+0.3559)  wing loading multiplier
+        EI_ref : 1         [m⁶·Pa]    (+0.3459)  structural normalization stiffness
+         W_ref : 1         [N]        (-0.3459)  structural normalization weight
+       k_shear : 1         [1/m⁴]     (+0.3459)  structural normalization shear factor
+     sigma_max : 2.5e+08   [Pa]       (-0.3459)  allowable stress, 6061-T6
+        f_wadd : 2                    (+0.3331)  wing added weight fraction
+      rho_alum : 2700      [kg/m³]    (+0.3331)  density of aluminum
+         W_pay : 4900      [N]        (+0.2594)  payload weight
+          CDA0 : 0.05      [m²]       (+0.1949)  fuselage zero-lift drag area
+        C_Lmax : 1.5                  (-0.1803)  maximum C_L, flaps down
+        rho_sl : 1.23      [kg/m³]    (-0.1803)  air density, sea level
+   W_eng_coeff : 0.03724   [N/W⁰⋅⁸⁰³] (+0.1561)  engine weight fit coefficient
+           rho : 0.91      [kg/m³]    (+0.1108)  air density, 3000m
+        A_prop : 0.785     [m²]       (-0.1087)  propeller disk area
+            mu : 1.69e-05  [kg/m/s]   (+0.02395) dynamic viscosity, 3000m
+             w : 0.5                  (-0.02283) wing-box width/chord
+           r_h : 0.75                 (+0.01005) wing strut taper parameter
+sigma_maxshear : 1.67e+08  [Pa]       (-0.01005) allowable shear stress
 
 Most Sensitive Constraints
 --------------------------
 FuelBurn
-+1.235   : W_tw ≥ W_fixed + W_pay + W_eng
-+1.218   : W_zfw ≥ W_tw + W_wing
-+1.16    : R ≥ R_min
-+0.7964  : p ≥ 2.2
-+0.7578  : W[0] ≥ W_zfw + W_fuel[1]
-+0.7219  : 2·q ≥ 1 + p
-+0.637   : C_D[1] ≥ C_{D_p}[1] + CDA0/S + C_L[1]²/(π·e·A)
-+0.637   : T[1] ≥ 0.5·rho·C_D[1]·S·V[1]²
-+0.637   : C_D[0] ≥ C_{D_p}[0] + CDA0/S + C_L[0]²/(π·e·A)
-+0.637   : T[0] ≥ 0.5·rho·C_D[0]·S·V[0]²
-+0.5799  : \eta_0[0] ≤ eta_eng·\eta_{prop}[0]
-+0.5799  : \eta_{prop}[0] ≤ \eta_i[0]·eta_v
-+0.5799  : z_bre[0] ≥ g·R·T[0]/(h_fuel·\eta_0[0]·W[0])
-+0.5798  : \eta_0[1] ≤ eta_eng·\eta_{prop}[1]
-+0.5798  : \eta_{prop}[1] ≤ \eta_i[1]·eta_v
-+0.5798  : z_bre[1] ≥ g·R·T[1]/(h_fuel·\eta_0[1]·W[1])
-+0.5657  : W[0] = 0.5·rho·C_L[0]·S·V[0]²
-+0.5654  : W[1] = 0.5·rho·C_L[1]·S·V[1]²
-+0.5504  : W_fuel[0]/W[0] ≥ z_bre[0]^1 + z_bre[0]²/2 + z_bre[0]³/6 + z_bre[0]⁴/24
-+0.5502  : W_fuel[1]/W[1] ≥ z_bre[1]^1 + z_bre[1]²/2 + z_bre[1]³/6 + z_bre[1]⁴/24
-+0.5358  : W[1] ≥ W_zfw
-+0.5229  : \eta_i[0]·4 + T[0]·\eta_i[0]²/(0.5·rho·V[0]²·A_prop) ≤ 4
-+0.5226  : \eta_i[1]·4 + T[1]·\eta_i[1]²/(0.5·rho·V[1]²·A_prop) ≤ 4
-+0.4952  : V_stall ≤ V_stallmax
-+0.4452  : V[2] ≥ V_sprint_reqt
-+0.3649  : 0.423·w·tau²·t_cap ≥ I_cap·k_shear + 0.92·w·tau·t_cap²
-+0.348   : M_rbar ≥ W_tw·A·p/(24·W_ref)
-+0.348   : N_lift·M_rbar·A·q²·tau·EI_ref/(S·I_cap·sigma_max) ≤ 8
-+0.344   : W_wing/f_wadd ≥ W_cap + W_web
-+0.3311  : W_cap ≥ 8·rho_alum·g·w·t_cap·S^1.5·nu/(3·A^0.5)
-+0.2476  : W_mto ≤ 0.5·rho_sl·V_stall²·C_Lmax·S
-+0.2476  : W_mto ≥ W[0] + W_fuel[0]
-+0.1871  : W_eng ≥ W_eng_coeff·P_max^0.8083
-+0.1612  : C_D[2] ≥ C_{D_p}[2] + CDA0/S + C_L[2]²/(π·e·A)
-+0.1612  : T[2] ≥ 0.5·rho·C_D[2]·S·V[2]²
-+0.1512  : P_max ≥ T[2]·V[2]/\eta_0[2]
-+0.1512  : \eta_0[2] ≤ eta_eng·\eta_{prop}[2]
-+0.1512  : \eta_{prop}[2] ≤ \eta_i[2]·eta_v
-+0.1413  : \eta_i[2]·4 + T[2]·\eta_i[2]²/(0.5·rho·V[2]²·A_prop) ≤ 4
-+0.08732 : nu^3.94 ≥ 0.86·p^-2.38 + 0.14·p^0.56
-+0.07895 : C_L[0]^5.88·2.56/(Re[0]^1.54·tau^3.32·C_{D_p}[0]^2.62) + (C_L[0]^0.92·Re[0]^1.38·C_{D_p}[0]^9.57)^-1·3.8e-09·tau^6.23 + Re[0]^0.14·0.0022·tau^0.033/(C_L[0]^0.01·C_{D_p}[0]^0.73) + C_L[0]^9.78·1.19e+04·tau^1.76/(Re[0]·C_{D_p}[0]^0.91) + C_L[0]^6.53·6.14e-06/(Re[0]^0.99·tau^0.52·C_{D_p}[0]^5.19) ≤ 1
-+0.07779 : C_L[1]^5.88·2.56/(Re[1]^1.54·tau^3.32·C_{D_p}[1]^2.62) + (C_L[1]^0.92·Re[1]^1.38·C_{D_p}[1]^9.57)^-1·3.8e-09·tau^6.23 + Re[1]^0.14·0.0022·tau^0.033/(C_L[1]^0.01·C_{D_p}[1]^0.73) + C_L[1]^9.78·1.19e+04·tau^1.76/(Re[1]·C_{D_p}[1]^0.91) + C_L[1]^6.53·6.14e-06/(Re[1]^0.99·tau^0.52·C_{D_p}[1]^5.19) ≤ 1
-+0.03988 : C_L[2]^5.88·2.56/(Re[2]^1.54·tau^3.32·C_{D_p}[2]^2.62) + (C_L[2]^0.92·Re[2]^1.38·C_{D_p}[2]^9.57)^-1·3.8e-09·tau^6.23 + Re[2]^0.14·0.0022·tau^0.033/(C_L[2]^0.01·C_{D_p}[2]^0.73) + C_L[2]^9.78·1.19e+04·tau^1.76/(Re[2]·C_{D_p}[2]^0.91) + C_L[2]^6.53·6.14e-06/(Re[2]^0.99·tau^0.52·C_{D_p}[2]^5.19) ≤ 1
-+0.02884 : Re[1] = rho/mu·V[1]·(S/A)^0.5
-+0.0284  : Re[0] = rho/mu·V[0]·(S/A)^0.5
-+0.01294 : A·W_tw·N_lift·q²/(tau·S·t_web·sigma_maxshear) ≤ 12
-+0.01294 : W_web ≥ 8·rho_alum·g·r_h·tau·t_web·S^1.5·nu/(3·A^0.5)
-+0.01094 : Re[2] = rho/mu·V[2]·(S/A)^0.5
++1.194   : W_tw ≥ W_fixed + W_pay + W_eng
++1.171   : W_zfw ≥ W_tw + W_wing
++1.141   : R ≥ R_min
++0.7398  : p ≥ 1.9
++0.7118  : 2·q ≥ 1 + p
++0.7024  : W[0] ≥ W_zfw + W_fuel[1]
++0.6215  : C_D[1] ≥ C_{D_p}[1] + CDA0/S + C_L[1]²/(π·e·A)
++0.6215  : T[1] ≥ 0.5·rho·C_D[1]·S·V[1]²
++0.6211  : C_D[0] ≥ C_{D_p}[0] + CDA0/S + C_L[0]²/(π·e·A)
++0.6211  : T[0] ≥ 0.5·rho·C_D[0]·S·V[0]²
++0.5709  : \eta_0[1] ≤ eta_eng·\eta_{prop}[1]
++0.5709  : \eta_{prop}[1] ≤ \eta_i[1]·eta_v
++0.5709  : z_bre[1] ≥ g·R·T[1]/(h_fuel·\eta_0[1]·W[1])
++0.5706  : \eta_0[0] ≤ eta_eng·\eta_{prop}[0]
++0.5706  : \eta_{prop}[0] ≤ \eta_i[0]·eta_v
++0.5706  : z_bre[0] ≥ g·R·T[0]/(h_fuel·\eta_0[0]·W[0])
++0.5648  : W[0] = 0.5·rho·C_L[0]·S·V[0]²
++0.5645  : W[1] = 0.5·rho·C_L[1]·S·V[1]²
++0.5428  : W_fuel[1]/W[1] ≥ z_bre[1]^1 + z_bre[1]²/2 + z_bre[1]³/6 + z_bre[1]⁴/24
++0.5425  : W_fuel[0]/W[0] ≥ z_bre[0]^1 + z_bre[0]²/2 + z_bre[0]³/6 + z_bre[0]⁴/24
++0.5365  : W[1] ≥ W_zfw
++0.5203  : \eta_i[1]·4 + T[1]·\eta_i[1]²/(0.5·rho·V[1]²·A_prop) ≤ 4
++0.52    : \eta_i[0]·4 + T[0]·\eta_i[0]²/(0.5·rho·V[0]²·A_prop) ≤ 4
++0.3708  : V[2] ≥ V_sprint_reqt
++0.3687  : 0.423·w·tau²·t_cap ≥ I_cap·k_shear + 0.92·w·tau·t_cap²
++0.3605  : V_stall ≤ V_stallmax
++0.3459  : M_rbar ≥ W_tw·A·p/(24·W_ref)
++0.3459  : N_lift·M_rbar·A·q²·tau·EI_ref/(S·I_cap·sigma_max) ≤ 8
++0.3331  : W_wing/f_wadd ≥ W_cap + W_web
++0.323   : W_cap ≥ 8·rho_alum·g·w·t_cap·S^1.5·nu/(3·A^0.5)
++0.1803  : W_mto ≤ 0.5·rho_sl·V_stall²·C_Lmax·S
++0.1803  : W_mto ≥ W[0] + W_fuel[0]
++0.1561  : W_eng ≥ W_eng_coeff·P_max^0.803
++0.136   : C_L[0]^5.881·2.56/(Re[0]^1.541·tau^3.319·C_{D_p}[0]^2.617) + (C_L[0]^0.914·Re[0]^1.379·C_{D_p}[0]^9.57)^-1·3.82e-09·tau^6.229 + Re[0]^0.1441·0.00215·tau^0.03325/(C_L[0]^0.0079·C_{D_p}[0]^0.7337) + C_L[0]^9.783·1.19e+04·tau^1.764/(Re[0]^0.998·C_{D_p}[0]^0.909) + C_L[0]^6.535·6.14e-06/(Re[0]^0.995·tau^0.521·C_{D_p}[0]^5.192) ≤ 1
++0.1329  : C_D[2] ≥ C_{D_p}[2] + CDA0/S + C_L[2]²/(π·e·A)
++0.1329  : T[2] ≥ 0.5·rho·C_D[2]·S·V[2]²
++0.1323  : C_L[1]^5.881·2.56/(Re[1]^1.541·tau^3.319·C_{D_p}[1]^2.617) + (C_L[1]^0.914·Re[1]^1.379·C_{D_p}[1]^9.57)^-1·3.82e-09·tau^6.229 + Re[1]^0.1441·0.00215·tau^0.03325/(C_L[1]^0.0079·C_{D_p}[1]^0.7337) + C_L[1]^9.783·1.19e+04·tau^1.764/(Re[1]^0.998·C_{D_p}[1]^0.909) + C_L[1]^6.535·6.14e-06/(Re[1]^0.995·tau^0.521·C_{D_p}[1]^5.192) ≤ 1
++0.1275  : tau ≤ 0.15
++0.1254  : P_max ≥ T[2]·V[2]/\eta_0[2]
++0.1254  : \eta_0[2] ≤ eta_eng·\eta_{prop}[2]
++0.1254  : \eta_{prop}[2] ≤ \eta_i[2]·eta_v
++0.1178  : \eta_i[2]·4 + T[2]·\eta_i[2]²/(0.5·rho·V[2]²·A_prop) ≤ 4
++0.08454 : nu^3.94 ≥ 0.86·p^-2.38 + 0.14·p^0.56
++0.06428 : C_L[2]^5.881·2.56/(Re[2]^1.541·tau^3.319·C_{D_p}[2]^2.617) + (C_L[2]^0.914·Re[2]^1.379·C_{D_p}[2]^9.57)^-1·3.82e-09·tau^6.229 + Re[2]^0.1441·0.00215·tau^0.03325/(C_L[2]^0.0079·C_{D_p}[2]^0.7337) + C_L[2]^9.783·1.19e+04·tau^1.764/(Re[2]^0.998·C_{D_p}[2]^0.909) + C_L[2]^6.535·6.14e-06/(Re[2]^0.995·tau^0.521·C_{D_p}[2]^5.192) ≤ 1
++0.01266 : Re[1] = rho/mu·V[1]·(S/A)^0.5
++0.01153 : Re[0] = rho/mu·V[0]·(S/A)^0.5
++0.01005 : A·W_tw·N_lift·q²/(tau·S·t_web·sigma_maxshear) ≤ 12
++0.01005 : W_web ≥ 8·rho_alum·g·r_h·tau·t_web·S^1.5·nu/(3·A^0.5)
