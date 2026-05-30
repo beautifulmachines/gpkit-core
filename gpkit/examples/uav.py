@@ -352,8 +352,8 @@ if __name__ == "__main__":
         sol.table(
             tables=["condition_table"],
             condition_table={
-                "Outbound": m.mission.outbound_leg.perf,
-                "Return": m.mission.return_leg.perf,
+                "Outbound": m.mission.outbound_leg,
+                "Return": m.mission.return_leg,
                 "Sprint": m.sprint.perf,
             },
         )

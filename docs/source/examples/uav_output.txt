@@ -265,15 +265,20 @@ UAV.SprintCondition.AircraftPerf.WingAero
 Condition Comparison
 --------------------
 
-Variable  Units  Outbound  Return    Sprint    Label
-C_D              0.0129    0.0129    0.00788   total drag coefficient
-C_Di             0.00565   0.00565   0.000256  induced drag coefficient
-C_Dp             0.00555   0.00556   0.0059    profile drag coefficient
-C_L              0.552     0.552     0.118     wing lift coefficient
-Re               4.72e+06  4.48e+06  1.02e+07  Reynolds number
-T         [N]    816       738       2.34e+03  thrust force
-V         [m/s]  69.2      65.8      150       flight speed
-W         [N]    3.49e+04  3.15e+04  3.49e+04  aircraft weight
-eta_0            0.269     0.269     0.279     overall propulsive efficiency
-eta_i            0.903     0.903     0.936     ideal propulsive efficiency
-eta_prop         0.767     0.767     0.796     propeller efficiency
+Variable  Units   Outbound  Return    Sprint    Label
+C_D               0.0129    0.0129    0.00788   total drag coefficient
+C_Di              0.00565   0.00565   0.000256  induced drag coefficient
+C_Dp              0.00555   0.00556   0.0059    profile drag coefficient
+C_L               0.552     0.552     0.118     wing lift coefficient
+R         [m]     5e+06     5e+06     —         mission leg range
+Re                4.72e+06  4.48e+06  1.02e+07  Reynolds number
+T         [N]     816       738       2.34e+03  thrust force
+V         [m/s]   69.2      65.8      150       flight speed
+W         [N]     3.49e+04  3.15e+04  3.49e+04  aircraft weight
+W_fuel    [N]     3.73e+03  3.37e+03  —         fuel weight for this leg
+eta_0             0.269     0.269     0.279     overall propulsive efficiency
+eta_i             0.903     0.903     0.936     ideal propulsive efficiency
+eta_prop          0.767     0.767     0.796     propeller efficiency
+g         [m/s²]  9.8       9.8       —         gravitational constant
+h_fuel    [J/kg]  4.2e+07   4.2e+07   —         fuel heating value
+z_bre             0.102     0.102     —         Breguet range parameter
