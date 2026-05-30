@@ -612,16 +612,17 @@ class ConditionTable(SectionSpec):
         for name in all_names:
             units = label = ""
             vals: list[str] = []
+            raw_vals: list[float] = []
             for cname in cnames:
                 entry = col_data[cname].get(name)
                 if entry is not None:
                     v, units, label = entry
                     vals.append(f"{v:.{p-1}g}")
+                    raw_vals.append(v)
                 else:
                     vals.append("—")
-            # Suppress variables whose non-dash values are all identical
-            present = [v for v in vals if v != "—"]
-            if present and len(set(present)) == 1:
+            # Suppress when all non-dash exact values are identical
+            if raw_vals and len(set(raw_vals)) == 1:
                 continue
             rows.append([name, units] + vals + [label])
 
