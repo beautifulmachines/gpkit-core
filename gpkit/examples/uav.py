@@ -42,7 +42,7 @@ class Wing(Model):
     # Wing structural constants
     N_lift = Var("-", "wing loading multiplier", value=6.0)
     sigma_max = Var("MPa", "allowable stress, 6061-T6", value=250)
-    sigma_maxshear = Var("MPa", "allowable shear stress", value=167)
+    sigma_max_shear = Var("MPa", "allowable shear stress", value=167)
     rho_alum = Var("kg/m^3", "density of aluminum", value=2700)
     w = Var("-", "wing-box width/chord", value=0.5)
     r_h = Var("-", "wing strut taper parameter", value=0.75)
@@ -61,25 +61,38 @@ class Wing(Model):
         t_cap, t_web = self.t_cap, self.t_web
         W_cap, W_web = self.W_cap, self.W_web
         N_lift, sigma_max = self.N_lift, self.sigma_max
-        sigma_maxshear, rho_alum = self.sigma_maxshear, self.rho_alum
+        sigma_max_shear, rho_alum = self.sigma_max_shear, self.rho_alum
         w, r_h = self.w, self.r_h
-        return [
-            self.W / self.f_wadd >= W_cap + W_web,
-            2 * q >= 1 + p,
-            p >= 1.9,
-            tau <= 0.15,
-            M_rbar >= W_tilde * A * p / (24 * self.W_ref),
-            (
-                0.92**2 / 2 * w * tau**2 * t_cap
-                >= I_cap * self.k_shear + 0.92 * w * tau * t_cap**2
-            ),
-            8
-            >= N_lift * M_rbar * A * q**2 * tau * self.EI_ref / (S * I_cap * sigma_max),
-            12 >= A * W_tilde * N_lift * q**2 / (tau * S * t_web * sigma_maxshear),
-            nu**3.94 >= 0.86 * p**-2.38 + 0.14 * p**0.56,
-            W_cap >= 8 * rho_alum * g * w * t_cap * S**1.5 * nu / (3 * A**0.5),
-            W_web >= 8 * rho_alum * g * r_h * tau * t_web * S**1.5 * nu / (3 * A**0.5),
-        ]
+        return {
+            "Geometry": [
+                2 * q >= 1 + p,
+                p >= 1.9,
+                tau <= 0.15,
+                nu**3.94 >= 0.86 * p**-2.38 + 0.14 * p**0.56,
+            ],
+            "Root bending stress": [
+                M_rbar >= W_tilde * A * p / (24 * self.W_ref),
+                (
+                    0.92**2 / 2 * w * tau**2 * t_cap
+                    >= I_cap * self.k_shear + 0.92 * w * tau * t_cap**2
+                ),
+                8
+                >= N_lift
+                * M_rbar
+                * A
+                * q**2
+                * tau
+                * self.EI_ref
+                / (S * I_cap * sigma_max),
+                12 >= A * W_tilde * N_lift * q**2 / (tau * S * t_web * sigma_max_shear),
+            ],
+            "Weight rollup": [
+                W_cap >= 8 * rho_alum * g * w * t_cap * S**1.5 * nu / (3 * A**0.5),
+                W_web
+                >= 8 * rho_alum * g * r_h * tau * t_web * S**1.5 * nu / (3 * A**0.5),
+                self.W / self.f_wadd >= W_cap + W_web,
+            ],
+        }
 
     def perf(self, state):
         "Return a WingAero performance model for the given state."

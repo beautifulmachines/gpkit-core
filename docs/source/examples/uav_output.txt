@@ -65,32 +65,32 @@ W_eng_coeff : 0.03724  [N/W⁰⋅⁸⁰³] (+0.1561) engine weight fit coefficie
      A_prop : 0.785    [m²]       (-0.1087) propeller disk area
 
 UAV.Aircraft.Wing
-             A : 18.1                         aspect ratio
-         I_cap : 1.908e-05 [m⁴]               spar cap area moment of inertia per unit chord
-        M_rbar : 3.231e+04                    normalized root bending moment
-             S : 28.99     [m²]               wing area
-             W : 8965      [N]                wing weight
-         W_cap : 4347      [N]                spar cap weight
-         W_web : 135.2     [N]                shear web weight
-            nu : 0.786                        wing taper/shape parameter
-             p : 1.9                          wing taper ratio parameter
-             q : 1.45                         wing taper ratio parameter 2
-         t_cap : 0.004272                     spar cap thickness/chord ratio
-         t_web : 0.0005907                    shear web thickness/chord ratio
-           tau : 0.15                         airfoil thickness/chord ratio
+              A : 18.1                         aspect ratio
+          I_cap : 1.908e-05 [m⁴]               spar cap area moment of inertia per unit chord
+         M_rbar : 3.231e+04                    normalized root bending moment
+              S : 28.99     [m²]               wing area
+              W : 8965      [N]                wing weight
+          W_cap : 4347      [N]                spar cap weight
+          W_web : 135.2     [N]                shear web weight
+             nu : 0.786                        wing taper/shape parameter
+              p : 1.9                          wing taper ratio parameter
+              q : 1.45                         wing taper ratio parameter 2
+          t_cap : 0.004272                     spar cap thickness/chord ratio
+          t_web : 0.0005907                    shear web thickness/chord ratio
+            tau : 0.15                         airfoil thickness/chord ratio
 ...constants
-             e : 0.95              (-0.5472)  wing spanwise efficiency
-        N_lift : 6                 (+0.3559)  wing loading multiplier
-        EI_ref : 1         [m⁶·Pa] (+0.3459)  structural normalization stiffness
-         W_ref : 1         [N]     (-0.3459)  structural normalization weight
-       k_shear : 1         [1/m⁴]  (+0.3459)  structural normalization shear factor
-     sigma_max : 250       [MPa]   (-0.3459)  allowable stress, 6061-T6
-        f_wadd : 2                 (+0.3331)  wing added weight fraction
-      rho_alum : 2700      [kg/m³] (+0.3331)  density of aluminum
-        C_Lmax : 1.5               (-0.1803)  maximum C_L, flaps down
-             w : 0.5               (-0.02283) wing-box width/chord
-           r_h : 0.75              (+0.01005) wing strut taper parameter
-sigma_maxshear : 167       [MPa]   (-0.01005) allowable shear stress
+              e : 0.95              (-0.5472)  wing spanwise efficiency
+         N_lift : 6                 (+0.3559)  wing loading multiplier
+         EI_ref : 1         [m⁶·Pa] (+0.3459)  structural normalization stiffness
+          W_ref : 1         [N]     (-0.3459)  structural normalization weight
+        k_shear : 1         [1/m⁴]  (+0.3459)  structural normalization shear factor
+      sigma_max : 250       [MPa]   (-0.3459)  allowable stress, 6061-T6
+         f_wadd : 2                 (+0.3331)  wing added weight fraction
+       rho_alum : 2700      [kg/m³] (+0.3331)  density of aluminum
+         C_Lmax : 1.5               (-0.1803)  maximum C_L, flaps down
+              w : 0.5               (-0.02283) wing-box width/chord
+            r_h : 0.75              (+0.01005) wing strut taper parameter
+sigma_max_shear : 167       [MPa]   (-0.01005) allowable shear stress
 
 UAV.LandingCondition
    V_stall : 38   [m/s]             stall speed
@@ -200,7 +200,7 @@ UAV.Aircraft.Wing
 +0.323   : W_cap ≥ 8·rho_alum·g·w·t_cap·S^1.5·nu/(3·A^0.5)
 +0.1275  : tau ≤ 0.15
 +0.08454 : nu^3.94 ≥ 0.86·p^-2.38 + 0.14·p^0.56
-+0.01005 : A·W_tilde·N_lift·q²/(tau·S·t_web·sigma_maxshear) ≤ 12
++0.01005 : A·W_tilde·N_lift·q²/(tau·S·t_web·sigma_max_shear) ≤ 12
 +0.01005 : W_web ≥ 8·rho_alum·g·r_h·tau·t_web·S^1.5·nu/(3·A^0.5)
 
 UAV.LandingCondition
