@@ -619,9 +619,9 @@ class ConditionTable(SectionSpec):
                     vals.append(f"{v:.{p-1}g}")
                 else:
                     vals.append("—")
-            # Suppress variables that are present in all conditions with the same value
+            # Suppress variables whose non-dash values are all identical
             present = [v for v in vals if v != "—"]
-            if len(present) == len(cnames) and len(set(present)) == 1:
+            if present and len(set(present)) == 1:
                 continue
             rows.append([name, units] + vals + [label])
 
