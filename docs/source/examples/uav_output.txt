@@ -14,17 +14,7 @@
 
 
 
-       ┃┓     ┓          ┓
-       ┃┃     ┃          ┃
-       ┃┃     ┃          ┣╸Wing╶⎨
-       ┃┃     ┃          ┛
-       ┃┃     ┃          ┣╸Engine╶⎨
-       ┃┃     ┣╸Aircraft ┛
-       ┃┃     ┃          ┣╸W_tw ≥ W_fixed + W_pay + Engine.W
-       ┃┃     ┃          ┓
-       ┃┃     ┃          ┣╸[8 terms]
- Model╺┫┣╸UAV ┛          ┛
-       ┃┃     ┓         ┓
+       ┃┓     ┓         ┓
        ┃┃     ┃         ┣╸MissionLeg╶⎨
        ┃┃     ┃         ┛
        ┃┃     ┃         ┓
@@ -32,7 +22,17 @@
        ┃┃     ┃         ┛
        ┃┃     ┃         ┣╸SprintCondition╶⎨
        ┃┃     ┃         ┣╸R ≥ R_min
-       ┃┛     ┛         ┣╸[4 terms]
+       ┃┃     ┛         ┣╸[5 terms]
+ Model╺┫┣╸UAV ┓          ┓
+       ┃┃     ┃          ┃
+       ┃┃     ┃          ┣╸Wing╶⎨
+       ┃┃     ┃          ┛
+       ┃┃     ┣╸Aircraft ┓
+       ┃┃     ┃          ┣╸Engine╶⎨
+       ┃┃     ┃          ┛
+       ┃┃     ┃          ┣╸[5 terms]
+       ┃┃     ┛          ┛
+       ┃┛     ┣╸LandingCondition╶⎨
        ┃┣╸g = 9.8m/s²
 
 
@@ -46,17 +46,13 @@ Solution
 g : 9.8 [m/s²] (+1.475) gravitational constant
 
 UAV.Aircraft
-        W_mto : 3.862e+04 [N]               maximum takeoff weight
-         W_tw : 2.255e+04 [N]               tare weight (fixed + payload + engine)
-        W_zfw : 3.151e+04 [N]               zero fuel weight
+  W_mto : 3.862e+04 [N]            maximum takeoff weight
+   W_tw : 2.255e+04 [N]            tare weight (fixed + payload + engine)
+  W_zfw : 3.151e+04 [N]            zero fuel weight
 ...constants
-        R_min : 5000      [km]    (+1.141)  minimum range
-       h_fuel : 42        [MJ/kg] (-1.141)  fuel heating value
-      W_fixed : 14.7      [kN]    (+0.7782) fixed weight
-V_sprint_reqt : 150       [m/s]   (+0.3708) sprint speed requirement
-   V_stallmax : 38        [m/s]   (-0.3605) stall speed limit
-        W_pay : 4900      [N]     (+0.2594) payload weight
-         CDA0 : 0.05      [m²]    (+0.1949) fuselage zero-lift drag area
+W_fixed : 14.7      [kN] (+0.7782) fixed weight
+  W_pay : 4900      [N]  (+0.2594) payload weight
+   CDA0 : 0.05      [m²] (+0.1949) fuselage zero-lift drag area
 
 UAV.Aircraft.Engine
       P_max : 1.26e+06 [W]                  maximum shaft power
@@ -64,6 +60,7 @@ UAV.Aircraft.Engine
 ...constants
     eta_eng : 0.35                (-1.267)  engine efficiency
       eta_v : 0.85                (-1.267)  propeller viscous efficiency
+     h_fuel : 42       [MJ/kg]    (-1.141)  fuel heating value
 W_eng_coeff : 0.03724  [N/W⁰⋅⁸⁰³] (+0.1561) engine weight fit coefficient
      A_prop : 0.785    [m²]       (-0.1087) propeller disk area
 
@@ -96,12 +93,15 @@ UAV.Aircraft.Wing
 sigma_maxshear : 167       [MPa]   (-0.01005) allowable shear stress
 
 UAV.LandingCondition
-V_stall : 38   [m/s]             stall speed
+   V_stall : 38   [m/s]             stall speed
 ...constants
- rho_sl : 1.23 [kg/m³] (-0.1803) air density, sea level
+V_stallmax : 38   [m/s]   (-0.3605) stall speed limit
+    rho_sl : 1.23 [kg/m³] (-0.1803) air density, sea level
 
 UAV.Mission
-R : 5e+06 [m]  mission leg range
+    R : 5e+06 [m]           mission leg range
+...constants
+R_min : 5000  [km] (+1.141) minimum range requirement
 
 UAV.Mission.MissionLeg
 W_fuel : 3731   [N]  fuel weight for this leg
@@ -154,6 +154,10 @@ UAV.Mission.MissionLeg1.FlightState
 ...constants
  mu : 1.69e-05 [kg/m/s] (+0.01266) dynamic viscosity
 rho : 0.91     [kg/m³]  (-0.00633) air density
+
+UAV.Mission.SprintCondition
+...constants
+V_reqt : 150 [m/s] (+0.3708) sprint speed requirement
 
 UAV.Mission.SprintCondition.AircraftPerf
  C_D : 0.007884       total drag coefficient
@@ -248,7 +252,7 @@ UAV.Mission.MissionLeg1.AircraftPerf.WingAero
 +0.01266 : Re = rho/mu·V·(S/A)^0.5
 
 UAV.Mission.SprintCondition
-+0.3708 : V ≥ V_sprint_reqt
++0.3708 : V ≥ V_reqt
 +0.1254 : P_max ≥ T·V/eta_0
 
 UAV.Mission.SprintCondition.AircraftPerf

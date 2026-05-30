@@ -95,6 +95,7 @@ class Engine(Model):
     eta_v = Var("-", "propeller viscous efficiency", value=0.85)
     A_prop = Var("m^2", "propeller disk area", value=0.785)
     W_eng_coeff = Var("N/W^0.803", "engine weight fit coefficient", value=9.8 * 0.0038)
+    h_fuel = Var("MJ/kg", "fuel heating value", value=42)
 
     def setup(self):
         return [
@@ -107,18 +108,14 @@ class Engine(Model):
 
 
 class Aircraft(Model):
-    """System-level vehicle: weight buildup and vehicle-level constants."""
+    """System-level vehicle: weight buildup and fuselage drag."""
 
     W_zfw = Var("N", "zero fuel weight")
     W_tw = Var("N", "tare weight (fixed + payload + engine)")
     W_mto = Var("N", "maximum takeoff weight")
     W_fixed = Var("kN", "fixed weight", value=14.7)
     W_pay = Var("N", "payload weight", value=500 * 9.8)
-    R_min = Var("km", "minimum range", value=5e3)
-    V_stallmax = Var("m/s", "stall speed limit", value=38)
-    V_sprint_reqt = Var("m/s", "sprint speed requirement", value=150)
     CDA0 = Var("m^2", "fuselage zero-lift drag area", value=0.05)
-    h_fuel = Var("MJ/kg", "fuel heating value", value=42)
 
     def setup(self):
         self.wing = Wing(self.W_tw)
@@ -243,7 +240,7 @@ class MissionLeg(Model):
         z_sum = sum(z**k / math.factorial(k) for k in range(1, _BREGUET_ORDER + 1))
         return [
             self.perf,  # AircraftPerf already includes self.state
-            z >= g * R * T / (aircraft.h_fuel * eta_0 * W),
+            z >= g * R * T / (aircraft.engine.h_fuel * eta_0 * W),
             self.W_fuel / W >= z_sum,
         ]
 
@@ -260,6 +257,7 @@ class Mission(Model):
     """
 
     R = Var("m", "mission leg range")
+    R_min = Var("km", "minimum range requirement", value=5e3)
 
     def setup(self, aircraft):
         self.outbound_leg = MissionLeg(aircraft, self.R)
@@ -271,7 +269,7 @@ class Mission(Model):
             self.outbound_leg,
             self.return_leg,
             self.sprint,
-            self.R >= aircraft.R_min,
+            self.R >= self.R_min,
             W_out >= aircraft.W_zfw + self.return_leg.W_fuel,
             W_ret >= aircraft.W_zfw,
             aircraft.W_mto >= W_out + self.outbound_leg.W_fuel,
@@ -282,6 +280,8 @@ class Mission(Model):
 class SprintCondition(Model):
     """Sprint condition: engine sizing at the required sprint speed."""
 
+    V_reqt = Var("m/s", "sprint speed requirement", value=150)
+
     def setup(self, aircraft):
         self.state = FlightState()
         self.perf = aircraft.perf(self.state)
@@ -289,7 +289,7 @@ class SprintCondition(Model):
             self.perf,  # AircraftPerf already includes self.state
             aircraft.engine.P_max
             >= self.perf.T * self.state.V / self.perf.prop_perf.eta_0,
-            self.state.V >= aircraft.V_sprint_reqt,
+            self.state.V >= self.V_reqt,
         ]
 
 
@@ -297,6 +297,7 @@ class LandingCondition(Model):
     """Landing: stall speed constraint at MTOW and sea-level density."""
 
     V_stall = Var("m/s", "stall speed")
+    V_stallmax = Var("m/s", "stall speed limit", value=38)
     rho_sl = Var("kg/m^3", "air density, sea level", value=1.23)
 
     def setup(self, aircraft):
@@ -309,7 +310,7 @@ class LandingCondition(Model):
                 * aircraft.wing.C_Lmax
                 * aircraft.wing.S
             ),
-            self.V_stall <= aircraft.V_stallmax,
+            self.V_stall <= self.V_stallmax,
         ]
 
 
