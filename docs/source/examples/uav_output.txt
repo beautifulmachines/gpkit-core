@@ -30,9 +30,9 @@
        ┃┃     ┃         ┓
        ┃┃     ┣╸Mission ┣╸MissionLeg1╶⎨
        ┃┃     ┃         ┛
+       ┃┃     ┃         ┣╸SprintCondition╶⎨
        ┃┃     ┃         ┣╸R ≥ R_min
-       ┃┃     ┛         ┣╸[3 terms]
-       ┃┛     ┣╸SprintCondition╶⎨
+       ┃┛     ┛         ┣╸[4 terms]
        ┃┣╸g = 9.8m/s²
 
 
@@ -155,23 +155,23 @@ UAV.Mission.MissionLeg1.FlightState
  mu : 1.69e-05 [kg/m/s] (+0.01266) dynamic viscosity
 rho : 0.91     [kg/m³]  (-0.00633) air density
 
-UAV.SprintCondition.AircraftPerf
+UAV.Mission.SprintCondition.AircraftPerf
  C_D : 0.007884       total drag coefficient
 C_Di : 0.0002558      induced drag coefficient
    T : 2340      [N]  thrust force
    W : 3.489e+04 [N]  aircraft weight
 
-UAV.SprintCondition.AircraftPerf.PropulsionPerf
+UAV.Mission.SprintCondition.AircraftPerf.PropulsionPerf
    eta_0 : 0.2785   overall propulsive efficiency
    eta_i : 0.9362   ideal propulsive efficiency
 eta_prop : 0.7958   propeller efficiency
 
-UAV.SprintCondition.AircraftPerf.WingAero
+UAV.Mission.SprintCondition.AircraftPerf.WingAero
 C_Dp : 0.005903    profile drag coefficient
  C_L : 0.1175      wing lift coefficient
   Re : 1.022e+07   Reynolds number
 
-UAV.SprintCondition.FlightState
+UAV.Mission.SprintCondition.FlightState
   V : 150      [m/s]                 flight speed
 ...constants
 rho : 0.91     [kg/m³]  (+0.1229)    air density
@@ -247,20 +247,20 @@ UAV.Mission.MissionLeg1.AircraftPerf.WingAero
 +0.1323  : 2.56·C_L^5.881/(Re^1.541·tau^3.319·C_Dp^2.617) + 3.82e-09·tau^6.229/(C_L^0.914·Re^1.379·C_Dp^9.57) + 0.00215·Re^0.1441·tau^0.03325/(C_L^0.0079·C_Dp^0.7337) + 1.19e+04·C_L^9.783·tau^1.764/(Re^0.998·C_Dp^0.909) + 6.14e-06·C_L^6.535/(Re^0.995·tau^0.521·C_Dp^5.192) ≤ 1
 +0.01266 : Re = rho/mu·V·(S/A)^0.5
 
-UAV.SprintCondition
+UAV.Mission.SprintCondition
 +0.3708 : V ≥ V_sprint_reqt
 +0.1254 : P_max ≥ T·V/eta_0
 
-UAV.SprintCondition.AircraftPerf
+UAV.Mission.SprintCondition.AircraftPerf
 +0.1329 : C_D ≥ CDA0/S + C_Dp + C_Di
 +0.1329 : T ≥ 0.5·rho·C_D·S·V²
 
-UAV.SprintCondition.AircraftPerf.PropulsionPerf
+UAV.Mission.SprintCondition.AircraftPerf.PropulsionPerf
 +0.1254 : eta_0 ≤ eta_eng·eta_prop
 +0.1254 : eta_prop ≤ eta_i·eta_v
 +0.1178 : 4·eta_i + T·eta_i²/(0.5·rho·V²·A_prop) ≤ 4
 
-UAV.SprintCondition.AircraftPerf.WingAero
+UAV.Mission.SprintCondition.AircraftPerf.WingAero
 +0.06428 : 2.56·C_L^5.881/(Re^1.541·tau^3.319·C_Dp^2.617) + 3.82e-09·tau^6.229/(C_L^0.914·Re^1.379·C_Dp^9.57) + 0.00215·Re^0.1441·tau^0.03325/(C_L^0.0079·C_Dp^0.7337) + 1.19e+04·C_L^9.783·tau^1.764/(Re^0.998·C_Dp^0.909) + 6.14e-06·C_L^6.535/(Re^0.995·tau^0.521·C_Dp^5.192) ≤ 1
 
 Condition Comparison

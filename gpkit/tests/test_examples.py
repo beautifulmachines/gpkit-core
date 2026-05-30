@@ -206,7 +206,7 @@ class TestExamples:
             condition_table={
                 "Outbound": m.mission.outbound_leg.perf,
                 "Return": m.mission.return_leg.perf,
-                "Sprint": m.sprint.perf,
+                "Sprint": m.mission.sprint,
             },
         )
         assert "Condition Comparison" in table_str

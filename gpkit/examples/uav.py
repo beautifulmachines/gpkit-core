@@ -249,10 +249,11 @@ class MissionLeg(Model):
 
 
 class Mission(Model):
-    """Out-and-back mission: two cruise legs with weight chain and range requirement.
+    """Out-and-back mission: two cruise legs, sprint condition, weight chain.
 
     outbound_leg.perf.W is the turnaround weight — the final weight of the
-    outbound leg and initial weight of the return leg.
+    outbound leg and initial weight of the return leg.  The sprint condition
+    is sized at the turnaround weight.
 
     For a multi-segment cruise, replace the two named legs with:
         with Vectorize(N): self.segments = MissionSegment(aircraft, self.R)
@@ -263,15 +264,18 @@ class Mission(Model):
     def setup(self, aircraft):
         self.outbound_leg = MissionLeg(aircraft, self.R)
         self.return_leg = MissionLeg(aircraft, self.R)
+        self.sprint = SprintCondition(aircraft)
         W_out = self.outbound_leg.perf.W  # turnaround weight (end of outbound)
         W_ret = self.return_leg.perf.W  # landing weight (end of return)
         return [
             self.outbound_leg,
             self.return_leg,
+            self.sprint,
             self.R >= aircraft.R_min,
             W_out >= aircraft.W_zfw + self.return_leg.W_fuel,
             W_ret >= aircraft.W_zfw,
             aircraft.W_mto >= W_out + self.outbound_leg.W_fuel,
+            self.sprint.perf.W == W_out,
         ]
 
 
@@ -320,18 +324,12 @@ class UAV(Model):
     def setup(self):
         self.aircraft = Aircraft()
         self.mission = Mission(self.aircraft)
-        self.sprint = SprintCondition(self.aircraft)
         self.landing = LandingCondition(self.aircraft)
         self.cost = self.mission.outbound_leg.W_fuel + self.mission.return_leg.W_fuel
-        # Sprint uses the turnaround weight: final weight of the outbound leg,
-        # initial weight of the return leg.  Matches W[2] == W[0] in the
-        # monolithic reference model (fuel_burn.py).
         return [
             self.aircraft,
             self.mission,
-            self.sprint,
             self.landing,
-            self.sprint.perf.W == self.mission.outbound_leg.perf.W,
         ]
 
 
@@ -346,7 +344,7 @@ if __name__ == "__main__":
             condition_table={
                 "Outbound": m.mission.outbound_leg,
                 "Return": m.mission.return_leg,
-                "Sprint": m.sprint.perf,
+                "Sprint": m.mission.sprint,
             },
         )
     )
