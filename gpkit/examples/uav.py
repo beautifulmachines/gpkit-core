@@ -245,6 +245,14 @@ class MissionLeg(Model):
         ]
 
 
+class Outbound(MissionLeg):
+    """Outbound cruise leg."""
+
+
+class Return(MissionLeg):
+    """Return cruise leg."""
+
+
 class Mission(Model):
     """Out-and-back mission: two cruise legs, sprint condition, weight chain.
 
@@ -260,8 +268,8 @@ class Mission(Model):
     R_min = Var("km", "minimum range requirement", value=5e3)
 
     def setup(self, aircraft):
-        self.outbound_leg = MissionLeg(aircraft, self.R)
-        self.return_leg = MissionLeg(aircraft, self.R)
+        self.outbound_leg = Outbound(aircraft, self.R)
+        self.return_leg = Return(aircraft, self.R)
         self.sprint = SprintCondition(aircraft)
         W_out = self.outbound_leg.perf.W  # turnaround weight (end of outbound)
         W_ret = self.return_leg.perf.W  # landing weight (end of return)

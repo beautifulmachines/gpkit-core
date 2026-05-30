@@ -1,24 +1,24 @@
 
-          ┃┓                   /
+          ┃┓                 /
           ┃┃
           ┃┃
-          ┃┣╸MissionLeg.W_fuel /
+          ┃┣╸Outbound.W_fuel /
           ┃┃ (3,731N)
-     Cost╺┫┛                   /
- (7,105N) ┃┓                    ┓           ┓
-          ┃┃                    ┃           ┃
-          ┃┃                    ┃           ┣╸W_tw╶⎨
-          ┃┣╸MissionLeg1.W_fuel ┣╸W_zfw     ┛ (22,549N)
-          ┃┃ (3,374N)           ┃ (31,514N) ┣╸Wing.W╶⎨
-          ┃┛                    ┛           ┛ (8,965N)
+     Cost╺┫┛                 /
+ (7,105N) ┃┓               ┓           ┓
+          ┃┃               ┃           ┃
+          ┃┃               ┃           ┣╸W_tw╶⎨
+          ┃┣╸Return.W_fuel ┣╸W_zfw     ┛ (22,549N)
+          ┃┃ (3,374N)      ┃ (31,514N) ┣╸Wing.W╶⎨
+          ┃┛               ┛           ┛ (8,965N)
 
 
 
        ┃┓     ┓         ┓
-       ┃┃     ┃         ┣╸MissionLeg╶⎨
+       ┃┃     ┃         ┣╸Outbound╶⎨
        ┃┃     ┃         ┛
        ┃┃     ┃         ┓
-       ┃┃     ┣╸Mission ┣╸MissionLeg1╶⎨
+       ┃┃     ┣╸Mission ┣╸Return╶⎨
        ┃┃     ┃         ┛
        ┃┃     ┃         ┣╸SprintCondition╶⎨
        ┃┃     ┃         ┣╸R ≥ R_min
@@ -38,7 +38,7 @@
 
 Optimal Cost
 ------------
-UAV.Mission.MissionLeg.W_fuel + UAV.Mission.MissionLeg1.W_fuel : 7105 [N]
+UAV.Mission.Outbound.W_fuel + UAV.Mission.Return.W_fuel : 7105 [N]
 
 Solution
 --------
@@ -103,53 +103,53 @@ UAV.Mission
 ...constants
 R_min : 5000  [km] (+1.141) minimum range requirement
 
-UAV.Mission.MissionLeg
+UAV.Mission.Outbound
 W_fuel : 3731   [N]  fuel weight for this leg
  z_bre : 0.1016      Breguet range parameter
 
-UAV.Mission.MissionLeg.AircraftPerf
+UAV.Mission.Outbound.AircraftPerf
  C_D : 0.01292        total drag coefficient
 C_Di : 0.005648       induced drag coefficient
    T : 816.1     [N]  thrust force
    W : 3.489e+04 [N]  aircraft weight
 
-UAV.Mission.MissionLeg.AircraftPerf.PropulsionPerf
+UAV.Mission.Outbound.AircraftPerf.PropulsionPerf
    eta_0 : 0.2686   overall propulsive efficiency
    eta_i : 0.9028   ideal propulsive efficiency
 eta_prop : 0.7674   propeller efficiency
 
-UAV.Mission.MissionLeg.AircraftPerf.WingAero
+UAV.Mission.Outbound.AircraftPerf.WingAero
 C_Dp : 0.005547    profile drag coefficient
  C_L : 0.5524      wing lift coefficient
   Re : 4.716e+06   Reynolds number
 
-UAV.Mission.MissionLeg.FlightState
+UAV.Mission.Outbound.FlightState
   V : 69.2     [m/s]                flight speed
 ...constants
  mu : 1.69e-05 [kg/m/s] (+0.01153)  dynamic viscosity
 rho : 0.91     [kg/m³]  (-0.005767) air density
 
-UAV.Mission.MissionLeg1
+UAV.Mission.Return
 W_fuel : 3374   [N]  fuel weight for this leg
  z_bre : 0.1017      Breguet range parameter
 
-UAV.Mission.MissionLeg1.AircraftPerf
+UAV.Mission.Return.AircraftPerf
  C_D : 0.01293        total drag coefficient
 C_Di : 0.005645       induced drag coefficient
    T : 737.9     [N]  thrust force
    W : 3.151e+04 [N]  aircraft weight
 
-UAV.Mission.MissionLeg1.AircraftPerf.PropulsionPerf
+UAV.Mission.Return.AircraftPerf.PropulsionPerf
    eta_0 : 0.2686   overall propulsive efficiency
    eta_i : 0.9027   ideal propulsive efficiency
 eta_prop : 0.7673   propeller efficiency
 
-UAV.Mission.MissionLeg1.AircraftPerf.WingAero
+UAV.Mission.Return.AircraftPerf.WingAero
 C_Dp : 0.00556     profile drag coefficient
  C_L : 0.5522      wing lift coefficient
   Re : 4.483e+06   Reynolds number
 
-UAV.Mission.MissionLeg1.FlightState
+UAV.Mission.Return.FlightState
   V : 65.78    [m/s]               flight speed
 ...constants
  mu : 1.69e-05 [kg/m/s] (+0.01266) dynamic viscosity
@@ -213,41 +213,41 @@ UAV.Mission
 +0.5365 : W ≥ W_zfw
 +0.1803 : W_mto ≥ W + W_fuel
 
-UAV.Mission.MissionLeg
+UAV.Mission.Outbound
 +0.5706 : z_bre ≥ g·R·T/(h_fuel·eta_0·W)
 +0.5425 : W_fuel/W ≥ z_bre^1 + z_bre²/2 + z_bre³/6 + z_bre⁴/24
 
-UAV.Mission.MissionLeg.AircraftPerf
+UAV.Mission.Outbound.AircraftPerf
 +0.6211 : C_D ≥ CDA0/S + C_Dp + C_Di
 +0.6211 : T ≥ 0.5·rho·C_D·S·V²
 +0.5648 : W = 0.5·rho·C_L·S·V²
 +0.2715 : C_Di ≥ C_L²/(π·e·A)
 
-UAV.Mission.MissionLeg.AircraftPerf.PropulsionPerf
+UAV.Mission.Outbound.AircraftPerf.PropulsionPerf
 +0.5706 : eta_0 ≤ eta_eng·eta_prop
 +0.5706 : eta_prop ≤ eta_i·eta_v
 +0.52   : 4·eta_i + T·eta_i²/(0.5·rho·V²·A_prop) ≤ 4
 
-UAV.Mission.MissionLeg.AircraftPerf.WingAero
+UAV.Mission.Outbound.AircraftPerf.WingAero
 +0.136   : 2.56·C_L^5.881/(Re^1.541·tau^3.319·C_Dp^2.617) + 3.82e-09·tau^6.229/(C_L^0.914·Re^1.379·C_Dp^9.57) + 0.00215·Re^0.1441·tau^0.03325/(C_L^0.0079·C_Dp^0.7337) + 1.19e+04·C_L^9.783·tau^1.764/(Re^0.998·C_Dp^0.909) + 6.14e-06·C_L^6.535/(Re^0.995·tau^0.521·C_Dp^5.192) ≤ 1
 +0.01153 : Re = rho/mu·V·(S/A)^0.5
 
-UAV.Mission.MissionLeg1
+UAV.Mission.Return
 +0.5709 : z_bre ≥ g·R·T/(h_fuel·eta_0·W)
 +0.5428 : W_fuel/W ≥ z_bre^1 + z_bre²/2 + z_bre³/6 + z_bre⁴/24
 
-UAV.Mission.MissionLeg1.AircraftPerf
+UAV.Mission.Return.AircraftPerf
 +0.6215 : C_D ≥ CDA0/S + C_Dp + C_Di
 +0.6215 : T ≥ 0.5·rho·C_D·S·V²
 +0.5645 : W = 0.5·rho·C_L·S·V²
 +0.2714 : C_Di ≥ C_L²/(π·e·A)
 
-UAV.Mission.MissionLeg1.AircraftPerf.PropulsionPerf
+UAV.Mission.Return.AircraftPerf.PropulsionPerf
 +0.5709 : eta_0 ≤ eta_eng·eta_prop
 +0.5709 : eta_prop ≤ eta_i·eta_v
 +0.5203 : 4·eta_i + T·eta_i²/(0.5·rho·V²·A_prop) ≤ 4
 
-UAV.Mission.MissionLeg1.AircraftPerf.WingAero
+UAV.Mission.Return.AircraftPerf.WingAero
 +0.1323  : 2.56·C_L^5.881/(Re^1.541·tau^3.319·C_Dp^2.617) + 3.82e-09·tau^6.229/(C_L^0.914·Re^1.379·C_Dp^9.57) + 0.00215·Re^0.1441·tau^0.03325/(C_L^0.0079·C_Dp^0.7337) + 1.19e+04·C_L^9.783·tau^1.764/(Re^0.998·C_Dp^0.909) + 6.14e-06·C_L^6.535/(Re^0.995·tau^0.521·C_Dp^5.192) ≤ 1
 +0.01266 : Re = rho/mu·V·(S/A)^0.5
 
