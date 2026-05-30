@@ -313,8 +313,6 @@ class TestExamples:
                 sol_rat = sol.sens.variables[key] / val
                 assert abs(1 - sol_rat) < 1e-2
         os.remove("solution.pkl")
-        os.remove("referencesplot.json")
-        os.remove("referencesplot.html")
 
     def test_relaxation(self, example):
         sol1 = example.mr1.solve(verbosity=0)
