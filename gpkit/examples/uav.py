@@ -22,7 +22,7 @@ g = Variable("g", "m/s^2", "gravitational constant", value=9.8)
 class Wing(Model):
     """Wing structure: spar geometry, sizing constraints, and wing weight.
 
-    Receives W_tw (tare weight) from Aircraft for structural sizing; the spar
+    Receives W_tilde from Aircraft for structural sizing; the spar
     bending and shear constraints depend on the load the wing must carry.
     """
 
@@ -54,7 +54,7 @@ class Wing(Model):
     EI_ref = Var("Pa*m^6", "structural normalization stiffness", value=1)
     k_shear = Var("m^-4", "structural normalization shear factor", value=1)
 
-    def setup(self, W_tw):
+    def setup(self, W_tilde):
         S, A, tau = self.S, self.A, self.tau
         I_cap, M_rbar = self.I_cap, self.M_rbar
         nu, p, q = self.nu, self.p, self.q
@@ -68,14 +68,14 @@ class Wing(Model):
             2 * q >= 1 + p,
             p >= 1.9,
             tau <= 0.15,
-            M_rbar >= W_tw * A * p / (24 * self.W_ref),
+            M_rbar >= W_tilde * A * p / (24 * self.W_ref),
             (
                 0.92**2 / 2 * w * tau**2 * t_cap
                 >= I_cap * self.k_shear + 0.92 * w * tau * t_cap**2
             ),
             8
             >= N_lift * M_rbar * A * q**2 * tau * self.EI_ref / (S * I_cap * sigma_max),
-            12 >= A * W_tw * N_lift * q**2 / (tau * S * t_web * sigma_maxshear),
+            12 >= A * W_tilde * N_lift * q**2 / (tau * S * t_web * sigma_maxshear),
             nu**3.94 >= 0.86 * p**-2.38 + 0.14 * p**0.56,
             W_cap >= 8 * rho_alum * g * w * t_cap * S**1.5 * nu / (3 * A**0.5),
             W_web >= 8 * rho_alum * g * r_h * tau * t_web * S**1.5 * nu / (3 * A**0.5),
@@ -111,20 +111,20 @@ class Aircraft(Model):
     """System-level vehicle: weight buildup and fuselage drag."""
 
     W_zfw = Var("N", "zero fuel weight")
-    W_tw = Var("N", "tare weight (fixed + payload + engine)")
+    W_tilde = Var("N", "non-wing weight (fixed + payload + engine)")
     W_mto = Var("N", "maximum takeoff weight")
     W_fixed = Var("kN", "fixed weight", value=14.7)
     W_pay = Var("N", "payload weight", value=500 * 9.8)
     CDA0 = Var("m^2", "fuselage zero-lift drag area", value=0.05)
 
     def setup(self):
-        self.wing = Wing(self.W_tw)
+        self.wing = Wing(self.W_tilde)
         self.engine = Engine()
         return [
             self.wing,
             self.engine,
-            self.W_tw >= self.W_fixed + self.W_pay + self.engine.W,
-            self.W_zfw >= self.W_tw + self.wing.W,
+            self.W_tilde >= self.W_fixed + self.W_pay + self.engine.W,
+            self.W_zfw >= self.W_tilde + self.wing.W,
         ]
 
     def perf(self, state):

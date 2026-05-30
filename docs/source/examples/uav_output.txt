@@ -7,7 +7,7 @@
      Cost╺┫┛                 /
  (7,105N) ┃┓               ┓           ┓
           ┃┃               ┃           ┃
-          ┃┃               ┃           ┣╸W_tw╶⎨
+          ┃┃               ┃           ┣╸W_tilde╶⎨
           ┃┣╸Return.W_fuel ┣╸W_zfw     ┛ (22,549N)
           ┃┃ (3,374N)      ┃ (31,514N) ┣╸Wing.W╶⎨
           ┃┛               ┛           ┛ (8,965N)
@@ -47,7 +47,7 @@ g : 9.8 [m/s²] (+1.475) gravitational constant
 
 UAV.Aircraft
   W_mto : 3.862e+04 [N]            maximum takeoff weight
-   W_tw : 2.255e+04 [N]            tare weight (fixed + payload + engine)
+W_tilde : 2.255e+04 [N]            non-wing weight (fixed + payload + engine)
   W_zfw : 3.151e+04 [N]            zero fuel weight
 ...constants
 W_fixed : 14.7      [kN] (+0.7782) fixed weight
@@ -184,8 +184,8 @@ rho : 0.91     [kg/m³]  (+0.1229)    air density
 Most Sensitive Constraints
 --------------------------
 UAV.Aircraft
-+1.194 : W_tw ≥ W_fixed + W_pay + W
-+1.171 : W_zfw ≥ W_tw + W
++1.194 : W_tilde ≥ W_fixed + W_pay + W
++1.171 : W_zfw ≥ W_tilde + W
 
 UAV.Aircraft.Engine
 +0.1561 : W ≥ W_eng_coeff·P_max^0.803
@@ -194,13 +194,13 @@ UAV.Aircraft.Wing
 +0.7398  : p ≥ 1.9
 +0.7118  : 2·q ≥ 1 + p
 +0.3687  : 0.423·w·tau²·t_cap ≥ I_cap·k_shear + 0.92·w·tau·t_cap²
-+0.3459  : M_rbar ≥ W_tw·A·p/(24·W_ref)
++0.3459  : M_rbar ≥ W_tilde·A·p/(24·W_ref)
 +0.3459  : N_lift·M_rbar·A·q²·tau·EI_ref/(S·I_cap·sigma_max) ≤ 8
 +0.3331  : W/f_wadd ≥ W_cap + W_web
 +0.323   : W_cap ≥ 8·rho_alum·g·w·t_cap·S^1.5·nu/(3·A^0.5)
 +0.1275  : tau ≤ 0.15
 +0.08454 : nu^3.94 ≥ 0.86·p^-2.38 + 0.14·p^0.56
-+0.01005 : A·W_tw·N_lift·q²/(tau·S·t_web·sigma_maxshear) ≤ 12
++0.01005 : A·W_tilde·N_lift·q²/(tau·S·t_web·sigma_maxshear) ≤ 12
 +0.01005 : W_web ≥ 8·rho_alum·g·r_h·tau·t_web·S^1.5·nu/(3·A^0.5)
 
 UAV.LandingCondition
