@@ -43,21 +43,20 @@ UAV.Mission.MissionLeg.W_fuel + UAV.Mission.MissionLeg1.W_fuel : 7105 [N]
 Solution
 --------
 ...constants
-     g : 9.8  [m/s²]  (+1.475)  gravitational constant
-rho_sl : 1.23 [kg/m³] (-0.1803) air density, sea level
+g : 9.8 [m/s²] (+1.475) gravitational constant
 
 UAV.Aircraft
-        W_mto : 3.862e+04 [N]              maximum takeoff weight
-         W_tw : 2.255e+04 [N]              tare weight (fixed + payload + engine)
-        W_zfw : 3.151e+04 [N]              zero fuel weight
+        W_mto : 3.862e+04 [N]               maximum takeoff weight
+         W_tw : 2.255e+04 [N]               tare weight (fixed + payload + engine)
+        W_zfw : 3.151e+04 [N]               zero fuel weight
 ...constants
-        R_min : 5e+06     [m]    (+1.141)  minimum range
-       h_fuel : 4.2e+07   [J/kg] (-1.141)  fuel heating value
-      W_fixed : 1.47e+04  [N]    (+0.7782) fixed weight
-V_sprint_reqt : 150       [m/s]  (+0.3708) sprint speed requirement
-   V_stallmax : 38        [m/s]  (-0.3605) stall speed limit
-        W_pay : 4900      [N]    (+0.2594) payload weight
-         CDA0 : 0.05      [m²]   (+0.1949) fuselage zero-lift drag area
+        R_min : 5000      [km]    (+1.141)  minimum range
+       h_fuel : 42        [MJ/kg] (-1.141)  fuel heating value
+      W_fixed : 14.7      [kN]    (+0.7782) fixed weight
+V_sprint_reqt : 150       [m/s]   (+0.3708) sprint speed requirement
+   V_stallmax : 38        [m/s]   (-0.3605) stall speed limit
+        W_pay : 4900      [N]     (+0.2594) payload weight
+         CDA0 : 0.05      [m²]    (+0.1949) fuselage zero-lift drag area
 
 UAV.Aircraft.Engine
       P_max : 1.26e+06 [W]                  maximum shaft power
@@ -88,16 +87,18 @@ UAV.Aircraft.Wing
         EI_ref : 1         [m⁶·Pa] (+0.3459)  structural normalization stiffness
          W_ref : 1         [N]     (-0.3459)  structural normalization weight
        k_shear : 1         [1/m⁴]  (+0.3459)  structural normalization shear factor
-     sigma_max : 2.5e+08   [Pa]    (-0.3459)  allowable stress, 6061-T6
+     sigma_max : 250       [MPa]   (-0.3459)  allowable stress, 6061-T6
         f_wadd : 2                 (+0.3331)  wing added weight fraction
       rho_alum : 2700      [kg/m³] (+0.3331)  density of aluminum
         C_Lmax : 1.5               (-0.1803)  maximum C_L, flaps down
              w : 0.5               (-0.02283) wing-box width/chord
            r_h : 0.75              (+0.01005) wing strut taper parameter
-sigma_maxshear : 1.67e+08  [Pa]    (-0.01005) allowable shear stress
+sigma_maxshear : 167       [MPa]   (-0.01005) allowable shear stress
 
 UAV.LandingCondition
-V_stall : 38 [m/s]  stall speed
+V_stall : 38   [m/s]             stall speed
+...constants
+ rho_sl : 1.23 [kg/m³] (-0.1803) air density, sea level
 
 UAV.Mission
 R : 5e+06 [m]  mission leg range

@@ -1,20 +1,12 @@
 """Modular fixed-wing UAV for out-and-back mission.
 
 Demonstrates gpkit's component + performance-model pattern: each physical
-subsystem is a Model subclass with its own variables and a perf() factory
-that returns a performance model for a given operating condition.  A single
-flat GP is still solved under the hood.
+subsystem is a Model subclass with its own variables and an optional perf()
+factory that returns a performance model for a given operating condition.
+A single flat GP is still solved under the hood.
 
-Model hierarchy
----------------
-Wing, Engine  →  Aircraft
-FlightState, WingAero, PropulsionPerf  →  AircraftPerf
-FlightState, AircraftPerf  →  MissionLeg × 2  →  Mission
-                           →  SprintCondition
-                           →  LandingCondition
-Aircraft, Mission, SprintCondition, LandingCondition  →  UAV
-
-Reference: W. Hoburg PhD thesis, Chapter 6 (MIT EECS, 2013).
+Reference: W. Hoburg PhD thesis, Chapter 6 (2013)
+https://people.eecs.berkeley.edu/~pabbeel/papers/2013_Hoburg-phdthesis.pdf
 """
 
 import math
@@ -25,7 +17,6 @@ _BREGUET_ORDER = 4
 
 # Physical constants shared across components — not properties of any subsystem
 g = Variable("g", "m/s^2", "gravitational constant", value=9.8)
-rho_sl = Variable("rho_sl", "kg/m^3", "air density, sea level", value=1.23)
 
 
 class Wing(Model):
@@ -50,8 +41,8 @@ class Wing(Model):
     W = Var("N", "wing weight")
     # Wing structural constants
     N_lift = Var("-", "wing loading multiplier", value=6.0)
-    sigma_max = Var("Pa", "allowable stress, 6061-T6", value=250e6)
-    sigma_maxshear = Var("Pa", "allowable shear stress", value=167e6)
+    sigma_max = Var("MPa", "allowable stress, 6061-T6", value=250)
+    sigma_maxshear = Var("MPa", "allowable shear stress", value=167)
     rho_alum = Var("kg/m^3", "density of aluminum", value=2700)
     w = Var("-", "wing-box width/chord", value=0.5)
     r_h = Var("-", "wing strut taper parameter", value=0.75)
@@ -121,13 +112,13 @@ class Aircraft(Model):
     W_zfw = Var("N", "zero fuel weight")
     W_tw = Var("N", "tare weight (fixed + payload + engine)")
     W_mto = Var("N", "maximum takeoff weight")
-    W_fixed = Var("N", "fixed weight", value=14.7e3)
+    W_fixed = Var("kN", "fixed weight", value=14.7)
     W_pay = Var("N", "payload weight", value=500 * 9.8)
-    R_min = Var("m", "minimum range", value=5e6)
+    R_min = Var("km", "minimum range", value=5e3)
     V_stallmax = Var("m/s", "stall speed limit", value=38)
     V_sprint_reqt = Var("m/s", "sprint speed requirement", value=150)
     CDA0 = Var("m^2", "fuselage zero-lift drag area", value=0.05)
-    h_fuel = Var("J/kg", "fuel heating value", value=42e6)
+    h_fuel = Var("MJ/kg", "fuel heating value", value=42)
 
     def setup(self):
         self.wing = Wing(self.W_tw)
@@ -302,13 +293,14 @@ class LandingCondition(Model):
     """Landing: stall speed constraint at MTOW and sea-level density."""
 
     V_stall = Var("m/s", "stall speed")
+    rho_sl = Var("kg/m^3", "air density, sea level", value=1.23)
 
     def setup(self, aircraft):
         return [
             (
                 aircraft.W_mto
                 <= 0.5
-                * rho_sl
+                * self.rho_sl
                 * self.V_stall**2
                 * aircraft.wing.C_Lmax
                 * aircraft.wing.S
