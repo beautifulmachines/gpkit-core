@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from .exceptions import IRSerializationError
+from .units import ureg
 from .util.repr_conventions import (
     PI_STR,
     _render_ast_node,
@@ -197,6 +198,10 @@ def _ast_from_ir_expr(d, reg):
     return ExprNode(d["op"], tuple(_list_from_ir(d["children"], reg)))
 
 
+def _ast_from_ir_units(d, _reg):
+    return UnitsNode(ureg.Quantity(d["units"]))
+
+
 def _ast_from_ir_slice(d, _reg):
     return slice(d.get("start"), d.get("stop"), d.get("step"))
 
@@ -209,6 +214,7 @@ _AST_NODE_BUILDERS = {
     "var": _ast_from_ir_var,
     "const": _ast_from_ir_const,
     "pi": _ast_from_ir_pi,
+    "units": _ast_from_ir_units,
     "expr": _ast_from_ir_expr,
     "slice": _ast_from_ir_slice,
     "tuple": _ast_from_ir_tuple,

@@ -11,7 +11,7 @@ https://people.eecs.berkeley.edu/~pabbeel/papers/2013_Hoburg-phdthesis.pdf
 
 import math
 
-from gpkit import Model, Var, Variable, pi
+from gpkit import Model, Var, Variable, pi, units
 
 _BREGUET_ORDER = 4
 
@@ -102,17 +102,18 @@ class Wing(Model):
 class Engine(Model):
     """Engine: shaft power, weight fit, and propulsion constants."""
 
-    P_max = Var("W", "maximum shaft power")
+    P_max = Var("kW", "maximum shaft power")
     W = Var("N", "engine weight")
     eta_eng = Var("-", "engine efficiency", value=0.35)
     eta_v = Var("-", "propeller viscous efficiency", value=0.85)
     A_prop = Var("m^2", "propeller disk area", value=0.785)
-    W_eng_coeff = Var("N/W^0.803", "engine weight fit coefficient", value=9.8 * 0.0038)
+    W_eng_coeff = Var("N", "engine weight fit coefficient", value=9.8 * 0.0038)
     h_fuel = Var("MJ/kg", "fuel heating value", value=42)
 
     def setup(self):
+        P_ref = 1 * units("W")
         return [
-            self.W >= self.W_eng_coeff * self.P_max**0.803,
+            self.W >= self.W_eng_coeff * (self.P_max / P_ref) ** 0.803,
         ]
 
     def perf(self, state, T):

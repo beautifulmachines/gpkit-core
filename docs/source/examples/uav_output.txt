@@ -55,14 +55,14 @@ W_fixed : 14.7      [kN] (+0.7782) fixed weight
    CDA0 : 0.05      [m²] (+0.1949) fuselage zero-lift drag area
 
 UAV.Aircraft.Engine
-      P_max : 1.26e+06 [W]                  maximum shaft power
-          W : 2949     [N]                  engine weight
+      P_max : 1260    [kW]              maximum shaft power
+          W : 2949    [N]               engine weight
 ...constants
-    eta_eng : 0.35                (-1.267)  engine efficiency
-      eta_v : 0.85                (-1.267)  propeller viscous efficiency
-     h_fuel : 42       [MJ/kg]    (-1.141)  fuel heating value
-W_eng_coeff : 0.03724  [N/W⁰⋅⁸⁰³] (+0.1561) engine weight fit coefficient
-     A_prop : 0.785    [m²]       (-0.1087) propeller disk area
+    eta_eng : 0.35            (-1.267)  engine efficiency
+      eta_v : 0.85            (-1.267)  propeller viscous efficiency
+     h_fuel : 42      [MJ/kg] (-1.141)  fuel heating value
+W_eng_coeff : 0.03724 [N]     (+0.1561) engine weight fit coefficient
+     A_prop : 0.785   [m²]    (-0.1087) propeller disk area
 
 UAV.Aircraft.Wing
               A : 18.1                         aspect ratio

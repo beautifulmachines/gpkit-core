@@ -197,7 +197,7 @@ class TestExamples:
             3.489e4, rel=1e-3
         )
         assert mag(sol[m.aircraft.wing.S]) == pytest.approx(28.99, rel=1e-3)
-        assert mag(sol[m.aircraft.engine.P_max]) == pytest.approx(1.26e6, rel=1e-3)
+        assert mag(sol[m.aircraft.engine.P_max]) == pytest.approx(1.26e3, rel=1e-3)
         assert mag(sol[m.aircraft.wing.W]) == pytest.approx(8965, rel=1e-3)
 
         # Verify condition table renders without error and suppresses shared constants
