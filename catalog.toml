@@ -18,9 +18,9 @@ module = "gpkit.examples.beam"
 class = "Beam"
 
 [[models]]
-id = "fuel_burn"
-module = "gpkit.examples.fuel_burn"
-class = "FuelBurn"
+id = "uav"
+module = "gpkit.examples.uav"
+class = "UAV"
 
 [[models]]
 id = "wing"
