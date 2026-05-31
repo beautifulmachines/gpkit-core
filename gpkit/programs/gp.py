@@ -498,10 +498,6 @@ class GeometricProgram:
                         before = cost_senss.get(c, 0)
                         cost_senss[c] = before + dlogcost_dlogv * dlogv_dlogc
 
-        # Add fixed variable sensitivities to models
-        for vk, senss in gpv_ss.items():
-            m_senss[lineagestr(vk)] += abs(senss)
-
         return cost_senss, gpv_ss, absv_ss, m_senss, constraint_senss
 
     def _compile_result(self, solver_out):

@@ -6,7 +6,7 @@ from contextlib import nullcontext
 import numpy as np
 
 from ..nomials import NomialArray, Variable
-from ..util.repr_conventions import ReprMixin
+from ..util.repr_conventions import ReprMixin, lineagestr
 from ..util.small_scripts import try_str_without
 from ..varkey import lineage_display_context
 from ..varmap import VarMap, VarSet, _compute_collision_depths
@@ -301,8 +301,8 @@ def build_model_tree(model):
         lineage = getattr(cset, "lineage", None) or ()
         if lineage:
             class_name, _ = lineage[-1]
-            instance_id = ".".join(f"{n}{i}" for n, i in lineage)
-            # e.g. "Aircraft0.Wing0"
+            instance_id = lineagestr(lineage)
+            # e.g. "Aircraft.Wing" — same format as sol.sens.models keys
         else:
             class_name = type(cset).__name__
             instance_id = ""

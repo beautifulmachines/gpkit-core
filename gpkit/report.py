@@ -447,10 +447,7 @@ def build_report_ir(
     """
     is_anon = type(model) is _Model  # pylint: disable=unidiomatic-typecheck
     own_name = "" if is_anon else type(model).__name__
-    if own_name:
-        lineage_path = f"{_parent_path}.{own_name}" if _parent_path else own_name
-    else:
-        lineage_path = _parent_path  # transparent: inherit parent path
+    lineage_path = model.lineagestr() if own_name else _parent_path
     lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
     cgroups = _build_constraint_groups(model)
     free_vars, fixed_vars = _build_split_var_entries(
