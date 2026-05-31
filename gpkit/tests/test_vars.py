@@ -209,15 +209,15 @@ class TestRef:
 
     def test_with_lineage(self):
         vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 0)))
-        assert vk.ref == "Aircraft0.Wing0.S"
+        assert vk.ref == "Aircraft.Wing.S"
 
     def test_with_lineage_nonzero_num(self):
         vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 1)))
-        assert vk.ref == "Aircraft0.Wing1.S"
+        assert vk.ref == "Aircraft.Wing1.S"
 
     def test_with_lineage_and_units(self):
         vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 0)), units="m^2")
-        assert vk.ref == "Aircraft0.Wing0.S|m ** 2"  # canonical pint format
+        assert vk.ref == "Aircraft.Wing.S|m ** 2"  # canonical pint format
         assert vk.unitrepr == "m^2"  # preserves user's format
 
     def test_unit_format_equivalence(self):
@@ -239,7 +239,7 @@ class TestRef:
 
     def test_lineage_and_index(self):
         vk = VarKey("c_l", lineage=(("Wing", 0),), idx=(1,), shape=(3,))
-        assert vk.ref == "Wing0.c_l[1]#3"
+        assert vk.ref == "Wing.c_l[1]#3"
 
     def test_with_shape_only(self):
         vk = VarKey("t", shape=(3,))
@@ -259,6 +259,60 @@ class TestRef:
         vk2 = VarKey("x", units="ft")
         assert vk1 != vk2
         assert vk1.ref != vk2.ref
+
+    def test_ref_omits_zero_modelnum(self):
+        vk = VarKey("S", lineage=(("Wing", 0),))
+        assert vk.ref == "Wing.S"
+
+    def test_ref_keeps_nonzero_modelnum(self):
+        vk = VarKey("S", lineage=(("Wing", 1),))
+        assert vk.ref == "Wing1.S"
+
+    def test_mixed_modelnums(self):
+        vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 1)))
+        assert vk.ref == "Aircraft.Wing1.S"
+
+
+class TestRefEquality:
+    """Tests for VarKey equality with ref strings and dict interoperability."""
+
+    def test_varkey_eq_its_ref(self):
+        vk = VarKey("x")
+        assert vk == vk.ref
+        assert vk.ref == vk
+
+    def test_varkey_eq_its_ref_with_units(self):
+        vk = VarKey("x", units="m")
+        assert vk == vk.ref
+        assert vk.ref == vk
+
+    def test_varkey_eq_its_ref_with_lineage(self):
+        vk = VarKey("S", lineage=(("Wing", 0),))
+        assert vk == vk.ref
+        assert vk.ref == vk
+
+    def test_varkey_eq_its_ref_with_nonzero_lineage(self):
+        vk = VarKey("S", lineage=(("Wing", 1),))
+        assert vk == vk.ref
+        assert vk.ref == vk
+
+    def test_varkey_neq_nonref_string(self):
+        vk = VarKey("x")
+        assert vk != "y"
+        assert vk != 42
+
+    def test_dict_lookup_by_ref(self):
+        vk = VarKey("x")
+        assert {vk: 42}[vk.ref] == 42
+
+    def test_dict_lookup_ref_keyed_by_vk(self):
+        vk = VarKey("x")
+        assert {vk.ref: 99}[vk] == 99
+
+    def test_dict_lookup_lineaged_by_ref(self):
+        vk = VarKey("S", lineage=(("Wing", 0),))
+        assert {vk: 7}[vk.ref] == 7
+        assert {vk.ref: 7}[vk] == 7
 
 
 class TestVariable:
