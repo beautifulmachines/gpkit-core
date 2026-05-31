@@ -19,7 +19,7 @@ _BREGUET_ORDER = 4
 g = Variable("g", "m/s^2", "gravitational constant", value=9.8)
 
 
-class Wing(Model):
+class Wing(Model):  # pylint: disable=too-many-locals
     """Wing structure: spar geometry, sizing constraints, and wing weight.
 
     Receives W_tilde from Aircraft for structural sizing; the spar
