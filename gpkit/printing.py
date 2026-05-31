@@ -20,6 +20,7 @@ class PrintOptions:
     topn: int | None = None  # truncation per-group
     vecn: int = 6  # max vector elements to print before ...
     vec_width: int | None = None  # None -> auto-align elements when applicable
+    condition_table: Any = None  # dict[str, Model] for ConditionTable section
 
 
 @dataclass(frozen=True, slots=True)
@@ -566,6 +567,76 @@ class DiffFreeVariables(DiffSection):
         return [f"{name} :", diffstr, label]
 
 
+class ConditionTable(SectionSpec):
+    """Side-by-side comparison of named operating conditions within a model.
+
+    Rows are variables; columns are condition names.  A dash is shown when a
+    variable is absent in a condition.  Variables whose values are identical
+    across every condition they appear in are suppressed (they add no signal).
+
+    Pass via sol.table(tables=["condition_table"], condition_table={...}).
+    """
+
+    title = "Condition Comparison"
+
+    def row_from(self, item):
+        raise NotImplementedError  # ConditionTable uses format() directly
+
+    def _collect_condition_data(self, sol, conditions):
+        col_data: dict[str, dict[str, tuple[float, str, str]]] = {}
+        all_names: list[str] = []
+        seen_names: set[str] = set()
+        for cname, model in conditions.items():
+            col_data[cname] = {}
+            for vk in sorted(model.vks, key=lambda v: v.name):
+                if vk in sol.primal:
+                    val = sol.primal[vk]
+                elif vk in sol.constants:
+                    val = sol.constants[vk]
+                else:
+                    continue
+                if np.shape(val):
+                    continue
+                col_data[cname][vk.name] = (float(val), _unitstr(vk), vk.label or "")
+                if vk.name not in seen_names:
+                    all_names.append(vk.name)
+                    seen_names.add(vk.name)
+        return col_data, all_names
+
+    def _build_row(self, name, cnames, col_data, p):
+        unitlabel = label = ""
+        vals: list[str] = []
+        raw_vals: list[float] = []
+        for cname in cnames:
+            entry = col_data[cname].get(name)
+            if entry is not None:
+                v, unitlabel, label = entry
+                vals.append(f"{v:.{p-1}g}")
+                raw_vals.append(v)
+            else:
+                vals.append("—")
+        if raw_vals and len(set(raw_vals)) == 1:
+            return None  # suppress when identical across all conditions
+        return [name, unitlabel] + vals + [label]
+
+    def format(self, ctx) -> list[str]:
+        conditions = self.options.condition_table
+        if not conditions:
+            return []
+        col_data, all_names = self._collect_condition_data(ctx.sol, conditions)
+        cnames = list(conditions.keys())
+        rows = [["Variable", "Units"] + cnames + ["Label"]]
+        for name in all_names:
+            row = self._build_row(name, cnames, col_data, self.options.precision)
+            if row is not None:
+                rows.append(row)
+        if len(rows) == 1:  # header only
+            return []
+        lines = [self.title, "-" * len(self.title), ""]
+        lines.extend(_format_aligned_columns(rows, None, "  "))
+        return lines
+
+
 SECTION_SPECS = {
     "cost": Cost,
     "warnings": Warnings,
@@ -575,6 +646,7 @@ SECTION_SPECS = {
     "sweeps": Sweeps,
     "tightest constraints": TightConstraints,
     "slack constraints": SlackConstraints,
+    "condition_table": ConditionTable,
 }
 
 

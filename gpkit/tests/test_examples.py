@@ -1,14 +1,11 @@
 """Unit testing of tests in docs/source/examples"""
 
-import json
 import os
-import pickle
 
 import numpy as np
 import pytest
 
 from gpkit import Model, Variable, settings, ureg
-from gpkit.constraints.loose import Loose
 from gpkit.exceptions import (
     DualInfeasible,
     PrimalInfeasible,
@@ -187,36 +184,36 @@ class TestExamples:
     def test_plot_sweep1d(self, example):
         pass
 
-    def test_performance_modeling(self, example):
-        m = Model(example.M.cost, Loose(example.M), example.M.substitutions)
+    def test_uav(self, example):
+        m = example.UAV()
         sol = m.solve(verbosity=0)
-        assert sol.cost == pytest.approx(2.1963, rel=1e-3)
-        sol.table()
-        sol.save("solution.pkl")
-        sol.table()
-        with open("solution.pkl", "rb") as fil:
-            sol_loaded = pickle.load(fil)
-        assert "Solution" in sol_loaded.table()
-        os.remove("solution.pkl")
+        assert sol.cost == pytest.approx(7105.40, rel=1e-2)
 
-        sweepsol = m.sweep({example.AC.fuse.W: (50, 100, 150)}, verbosity=0)
-        sweepsol.table()
-        sweepsol.save("sweepsolution.pkl")
-        assert "Swept Variables" in sweepsol.table()
-        with open("sweepsolution.pkl", "rb") as fil:
-            sol_loaded = pickle.load(fil)
-        assert "Swept Variables" in sol_loaded.table()
-        os.remove("sweepsolution.pkl")
+        # Spot-checks against thesis Chapter 6 table (example.tex)
+        assert mag(sol[m.mission.outbound_leg.state.V]) == pytest.approx(69.2, rel=1e-3)
+        assert mag(sol[m.mission.return_leg.state.V]) == pytest.approx(65.78, rel=1e-3)
+        assert mag(sol[m.mission.outbound_leg.W_fuel]) == pytest.approx(3731, rel=1e-3)
+        assert mag(sol[m.mission.outbound_leg.perf.W]) == pytest.approx(
+            3.489e4, rel=1e-3
+        )
+        assert mag(sol[m.aircraft.wing.S]) == pytest.approx(28.99, rel=1e-3)
+        assert mag(sol[m.aircraft.engine.P_max]) == pytest.approx(1.26e3, rel=1e-3)
+        assert mag(sol[m.aircraft.wing.W]) == pytest.approx(8965, rel=1e-3)
 
-        # testing savejson
-        sol.savejson("solution.json")
-        json_dict = {}
-        with open("solution.json", "r", encoding="utf-8") as rf:
-            json_dict = json.load(rf)
-        os.remove("solution.json")
-        for var in sol.primal:
-            assert np.all(json_dict[str(var.key)]["v"] == sol.primal[var.key])
-            assert json_dict[str(var.key)]["u"] == var.unitstr()
+        # Verify condition table renders without error and suppresses shared constants
+        table_str = sol.table(
+            tables=["condition_table"],
+            condition_table={
+                "Outbound": m.mission.outbound_leg.perf,
+                "Return": m.mission.return_leg.perf,
+                "Sprint": m.mission.sprint,
+            },
+        )
+        assert "Condition Comparison" in table_str
+        # V differs across conditions — must appear
+        assert "V" in table_str
+        # rho is the same in all three conditions — must be suppressed
+        assert "rho" not in table_str
 
     def test_sp_to_gp_sweep(self, example):
         sol = example.sol
@@ -316,8 +313,6 @@ class TestExamples:
                 sol_rat = sol.sens.variables[key] / val
                 assert abs(1 - sol_rat) < 1e-2
         os.remove("solution.pkl")
-        os.remove("referencesplot.json")
-        os.remove("referencesplot.html")
 
     def test_relaxation(self, example):
         sol1 = example.mr1.solve(verbosity=0)

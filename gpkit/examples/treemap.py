@@ -3,7 +3,9 @@
 # import plotly
 from gpkit.interactive.plotting import treemap
 
-from .performance_modeling import M
+from .uav import UAV
+
+M = UAV()
 
 fig = treemap(M)
 # plotly.offline.plot(fig, filename="treemap.html")  # uncomment to show

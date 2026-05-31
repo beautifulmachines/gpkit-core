@@ -394,6 +394,14 @@ class TestASTNodeIR:
         node2 = ast_from_ir(ir, None)
         assert isinstance(node2, PiNode)
 
+    def test_unitsnode_ir_roundtrip(self):
+        node = UnitsNode(units("W").hmap.units)
+        ir = node.to_ir()
+        assert ir == {"node": "units", "units": "1 watt"}
+        node2 = ast_from_ir(ir, None)
+        assert isinstance(node2, UnitsNode)
+        assert node2.units == node.units
+
     def test_to_ast_gpkit_pi(self):
         result = to_ast(gpkit.pi)
         assert isinstance(result, PiNode)

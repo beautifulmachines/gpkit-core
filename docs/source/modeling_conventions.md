@@ -340,6 +340,12 @@ class WingAero(Model):
 Multi-condition analysis combines multiple Perf instances (one per operating condition) with
 coupling constraints between them. Use `Vectorize(N)` to create N simultaneous instances.
 
+A complete working example of this pattern is in `gpkit/examples/uav.py`: a fixed-wing UAV
+with two mission legs (outbound and return) plus a sprint condition. `Wing`, `Engine`, and
+`Aircraft` are Component models; `FlightState`, `WingAero`, and `PropulsionPerf` are Perf
+models; `MissionLeg` orchestrates one leg with `Vectorize`; and `UAV` is the named top-level
+model with a `default()` classmethod.
+
 ```python
 class Mission(Model):
     """A sequence of flight segments"""
@@ -764,8 +770,7 @@ Wzfw >= sum(summing_vars(components, "W")) + Wpay + Wavn
 ```
 
 **Anti-pattern note:** `summing_vars` appears throughout existing models and still functions
-correctly. The audit table in `model_inventory.md` flags non-conformant uses for reference; do
-not retrofit during Phase 2.
+correctly. For new code, prefer the attribute-access form shown above.
 
 ---
 
@@ -811,7 +816,7 @@ in new code.
 whose name matches — fragile, fails silently on rename, and cannot be verified by static
 analysis. Variable object keys are exact references: renaming the variable at the `Var` declaration
 automatically updates any code that uses attribute access to reach it. This is the same
-correctness argument as for constraint-level attribute access (CONV-06) applied to the
+correctness argument as for constraint-level attribute access (Anti-pattern D) applied to the
 substitutions dict.
 
 ```python
@@ -819,7 +824,7 @@ substitutions dict.
 self.emp.substitutions[self.emp.vtail.Vv] = 0.04
 model.substitutions[model.fs.altitude] = 10000        # ft
 
-# WRONG — string key; first-match lookup, breaks silently on rename (CONV-06 violation)
+# WRONG — string key; first-match lookup, breaks silently on rename
 model.substitutions["Vv"] = 0.04
 model.substitutions["altitude"] = 10000
 ```
@@ -976,10 +981,6 @@ levels without compromising the variable's natural home or its vectorization beh
 
 ---
 
-See also: Model Inventory and Conformance Audit — `.planning/model_inventory.md` in the beautifulmachines meta-repo (covers cross-repo model variants: gassolar, jho, lunar/apollo, liberty)
-
----
-
 ## 10. `default()` Classmethod Convention
 
 Any Model that can stand alone as a complete GP (or SP) problem should define a
@@ -1025,7 +1026,7 @@ class Box(Model):
 
 **Pattern B — canonical models (cost NOT in `setup()`, set at call site):**
 
-For models following the canonical CONV-09 pattern (Section 9.1), `setup()` does not set
+For models following the canonical pattern (Section 9.1), `setup()` does not set
 cost. `default()` sets it using attribute access, then applies any required substitutions:
 
 ```python
@@ -1038,7 +1039,7 @@ class AircraftMission(Model):
     @classmethod
     def default(cls):
         m = cls()
-        m.cost = m.aircraft.W_total   # attribute access, CONV-06 compliant
+        m.cost = m.aircraft.W_total   # attribute access
         m.substitutions[m.aircraft.W_payload] = 500  # Variable object key
         return m
 ```
@@ -1111,7 +1112,7 @@ in `prop/` and `wing/`; `README.md` files where applicable.
 
 ---
 
-## 8. Model Graph — `submodels`, `walk()`, `get_var()`
+## 12. Model Graph — `submodels`, `walk()`, `get_var()`
 
 Every gpkit model maintains an explicit live graph of its direct children,
 populated during `__init__`. This enables traversal and variable lookup
