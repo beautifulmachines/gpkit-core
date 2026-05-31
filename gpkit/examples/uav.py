@@ -19,7 +19,7 @@ _BREGUET_ORDER = 4
 g = Variable("g", "m/s^2", "gravitational constant", value=9.8)
 
 
-class Wing(Model):  # pylint: disable=too-many-locals
+class Wing(Model):
     """Wing structure: spar geometry, sizing constraints, and wing weight.
 
     Receives W_tilde from Aircraft for structural sizing; the spar
@@ -59,9 +59,6 @@ class Wing(Model):  # pylint: disable=too-many-locals
         I_cap, M_rbar = self.I_cap, self.M_rbar
         nu, p, q = self.nu, self.p, self.q
         t_cap, t_web = self.t_cap, self.t_web
-        W_cap, W_web = self.W_cap, self.W_web
-        N_lift, sigma_max = self.N_lift, self.sigma_max
-        sigma_max_shear, rho_alum = self.sigma_max_shear, self.rho_alum
         w, r_h = self.w, self.r_h
         return {
             "Geometry": [
@@ -77,20 +74,34 @@ class Wing(Model):  # pylint: disable=too-many-locals
                     >= I_cap * self.k_shear + 0.92 * w * tau * t_cap**2
                 ),
                 8
-                >= N_lift
+                >= self.N_lift
                 * M_rbar
                 * A
                 * q**2
                 * tau
                 * self.EI_ref
-                / (S * I_cap * sigma_max),
-                12 >= A * W_tilde * N_lift * q**2 / (tau * S * t_web * sigma_max_shear),
+                / (S * I_cap * self.sigma_max),
+                12
+                >= A
+                * W_tilde
+                * self.N_lift
+                * q**2
+                / (tau * S * t_web * self.sigma_max_shear),
             ],
             "Weight rollup": [
-                W_cap >= 8 * rho_alum * g * w * t_cap * S**1.5 * nu / (3 * A**0.5),
-                W_web
-                >= 8 * rho_alum * g * r_h * tau * t_web * S**1.5 * nu / (3 * A**0.5),
-                self.W / self.f_wadd >= W_cap + W_web,
+                self.W_cap
+                >= 8 * self.rho_alum * g * w * t_cap * S**1.5 * nu / (3 * A**0.5),
+                self.W_web
+                >= 8
+                * self.rho_alum
+                * g
+                * r_h
+                * tau
+                * t_web
+                * S**1.5
+                * nu
+                / (3 * A**0.5),
+                self.W / self.f_wadd >= self.W_cap + self.W_web,
             ],
         }
 
