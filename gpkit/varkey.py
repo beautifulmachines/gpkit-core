@@ -206,7 +206,7 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
         "Canonical identity string: [lineage.]name[idx][#shape][|units]"
         parts = []
         if self.lineage:
-            parts.extend(f"{name}{num}" for name, num in self.lineage)
+            parts.extend(f"{name}{num or ''}" for name, num in self.lineage)
         parts.append(self.name)
         ref = ".".join(parts)
         if self.idx:
@@ -285,6 +285,8 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
         return name
 
     def __eq__(self, other):
+        if isinstance(other, str):
+            return self.ref == other
         if not isinstance(other, VarKey):
-            return False
+            return NotImplemented
         return self.ref == other.ref

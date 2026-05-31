@@ -949,12 +949,12 @@ class TestModelIR:
         ir = ac.to_ir()
 
         # Verify lineage in variable refs
-        assert "Aircraft0.W" in ir["variables"]
-        assert "Aircraft0.Wing0.W" in ir["variables"]
-        assert "Aircraft0.Wing0.S" in ir["variables"]
+        assert "Aircraft.W" in ir["variables"]
+        assert "Aircraft.Wing.W" in ir["variables"]
+        assert "Aircraft.Wing.S" in ir["variables"]
 
         # Verify lineage metadata
-        wing_s = ir["variables"]["Aircraft0.Wing0.S"]
+        wing_s = ir["variables"]["Aircraft.Wing.S"]
         assert wing_s["lineage"] == [["Aircraft", 0], ["Wing", 0]]
 
         # Round-trip solve
@@ -969,8 +969,8 @@ class TestModelIR:
         ir = w.to_ir()
 
         # Both Sub instances should be present
-        assert "Widget0.Sub0.m" in ir["variables"]
-        assert "Widget0.Sub1.m" in ir["variables"]
+        assert "Widget.Sub.m" in ir["variables"]
+        assert "Widget.Sub1.m" in ir["variables"]
 
         # Round-trip solve
         sol = w.solve(verbosity=0)

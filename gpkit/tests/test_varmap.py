@@ -5,7 +5,7 @@ import pytest
 
 from gpkit import Variable, VectorVariable, ureg
 from gpkit.varkey import VarKey
-from gpkit.varmap import VarMap, _compute_collision_depths
+from gpkit.varmap import VarMap, VarSet, _compute_collision_depths
 
 
 @pytest.fixture(name="vm")
@@ -51,7 +51,7 @@ class TestVarMap:
         assert vm[x] == 52
         assert vm[x.key] == 52
         assert vm["x"] == 52
-        # assert vm["Motor.x"] == 52
+        assert vm["Motor.x"] == 52
         assert "Someothermodelname.x" not in vm
 
     def test_failed_getitem(self, vm):
@@ -73,10 +73,17 @@ class TestVarMap:
         assert len(vks) == 2
 
     def test_multiple_varkeys_same_name(self, vm, x):
+        x_ft = VarKey(name="x", units="ft")
         vm[x] = 1
-        vm[VarKey(name="x", units="ft")] = 3
+        vm[x_ft] = 3
+        # Exact ref lookup is always unambiguous
+        assert vm["x"] == 1  # ref "x" (no units) resolves to x
+        assert vm["x|ft"] == 3  # ref "x|ft" resolves to x_ft
+        # Two keys both with units: "x" matches no ref, name lookup is ambiguous
+        x_m = VarKey(name="x", units="m")
+        vm2 = VarMap({x_m: 5, x_ft: 7})
         with pytest.raises(KeyError):
-            _ = vm["x"]  # Ambiguous
+            _ = vm2["x"]  # "x" not in _by_ref; by_name("x") returns both
 
     def test_delitem(self, vm, x):
         vm[x] = 1
@@ -218,6 +225,40 @@ class TestVarMap:
         vm[x] = 1
         assert x in vm
         assert set(vm) == set([x.key])
+
+
+class TestRefLookup:
+    """Tests for VarMap/VarSet full-ref string lookups."""
+
+    def test_varmap_lookup_by_full_ref(self):
+        x = Variable("x", lineage=[("Motor", 0)])
+        vm = VarMap({x: 52})
+        assert vm[x.key.ref] == 52
+
+    def test_varmap_contains_full_ref(self):
+        x = Variable("x", lineage=[("Motor", 0)])
+        vm = VarMap({x: 52})
+        assert x.key.ref in vm
+
+    def test_varset_contains_full_ref(self):
+        vk = VarKey("x", lineage=(("Motor", 0),))
+        vs = VarSet([vk])
+        assert vk.ref in vs
+
+    def test_varset_resolve_full_ref(self):
+        vk = VarKey("x", lineage=(("Motor", 0),))
+        vs = VarSet([vk])
+        assert vs.resolve(vk.ref) is vk
+
+    def test_full_ref_beats_name_ambiguity(self):
+        """Full ref lookup succeeds even when short name is ambiguous."""
+        vk1 = VarKey("x", lineage=(("MotorA", 0),))
+        vk2 = VarKey("x", lineage=(("MotorB", 0),))
+        vm = VarMap({vk1: 1, vk2: 2})
+        assert vm[vk1.ref] == 1
+        assert vm[vk2.ref] == 2
+        with pytest.raises(KeyError):
+            _ = vm["x"]  # still ambiguous by short name
 
 
 class TestComputeCollisionDepths:

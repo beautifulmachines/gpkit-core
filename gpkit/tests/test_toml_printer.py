@@ -196,7 +196,7 @@ class TestRefToName:
         assert _ref_to_name("wing0.S|ft²") == "S"
 
     def test_deep_lineage(self):
-        assert _ref_to_name("Aircraft0.Wing0.S|ft²") == "S"
+        assert _ref_to_name("Aircraft.Wing.S|ft²") == "S"
 
     def test_vector_element(self):
         assert _ref_to_name("d[0]#3|ft") == "d[0]"

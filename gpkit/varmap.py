@@ -61,6 +61,7 @@ class VarSet(set):
         super().__init__()
         self._by_name = {}
         self._by_vec = {}
+        self._by_ref = {}
         self.update(keys)
 
     def add(self, key):
@@ -74,6 +75,7 @@ class VarSet(set):
         self._by_name[name].discard(key)
         if not self._by_name[name]:
             del self._by_name[name]
+        self._by_ref.pop(key.ref, None)
         # handle vector element case
         idx = getattr(key, "idx", None)
         if idx is not None:
@@ -85,6 +87,8 @@ class VarSet(set):
 
     def by_name(self, name):
         """Return all VarKeys for a given name string."""
+        if not isinstance(name, str):
+            return set()
         return self._by_name.get(name, set()).copy()
 
     def by_vec(self, veckey):
@@ -94,7 +98,11 @@ class VarSet(set):
     def keys(self, key):
         "set of all keys in self that the input key refers to"
         key = getattr(key, "key", None) or key  # Variable case
-        out = {key} if super().__contains__(key) else set()
+        # Only add key to out if it's a VarKey directly in the set, not a str lookup
+        out = {key} if not isinstance(key, str) and super().__contains__(key) else set()
+        # For full ref strings (e.g. "Motor.x"), resolve via _by_ref
+        if isinstance(key, str) and key in self._by_ref:
+            out.add(self._by_ref[key])
         for k in self.by_name(key).union((key,) if is_veckey(key) else ()):
             if is_veckey(k):
                 out.update(self.by_vec(k).flat)
@@ -107,6 +115,8 @@ class VarSet(set):
         "Return *one* canonical VarKey for (Variable, str, or veckey) key"
         if hasattr(key, "key"):
             return key.key
+        if isinstance(key, str) and key in self._by_ref:
+            return self._by_ref[key]
         vks = self.by_name(key)
         if not vks:
             raise KeyError(f"unrecognized key {key}")
@@ -132,7 +142,7 @@ class VarSet(set):
         return ks
 
     def _register_key(self, key):
-        "adds the key to _by_name and, if applicable, _by_vec"
+        "adds the key to _by_name, _by_ref, and, if applicable, _by_vec"
         name = getattr(key, "name", None)
         if name is None:
             raise TypeError("VarSet keys must be VarKey instances")
@@ -140,6 +150,7 @@ class VarSet(set):
             self._by_name[name] = set()
         idx = getattr(key, "idx", None)
         self._by_name[name].add(key if not idx else key.veckey)
+        self._by_ref[key.ref] = key
         if idx is not None:
             if key.veckey not in self._by_vec:
                 self._by_vec[key.veckey] = np.empty(key.shape, dtype=object)
@@ -148,6 +159,8 @@ class VarSet(set):
     def __contains__(self, key):
         key = getattr(key, "key", None) or key  # Variable case
         if super().__contains__(key):
+            return True
+        if isinstance(key, str) and key in self._by_ref:
             return True
         return key in self._by_name or key in self._by_vec
 

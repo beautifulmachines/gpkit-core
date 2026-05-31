@@ -15,7 +15,7 @@ from ..ast_nodes import ASTNode, ConstNode, ExprNode, VarNode, ast_from_ir
 #   scalar with units:     "h|ft"
 #   vector:                "d#3|ft"
 #   vector element:        "d[0]#3|ft"
-#   with lineage:          "Aircraft0.Wing0.S|ft²"
+#   with lineage:          "Aircraft.Wing.S|ft²"
 #   lineage + vector:      "wing0.d[0]#3|ft"
 # We want just the bare name: "x", "h", "A_wall", "d", "d[0]"
 _REF_STRIP = re.compile(r"(#\d+)?(\|.*)?$")
