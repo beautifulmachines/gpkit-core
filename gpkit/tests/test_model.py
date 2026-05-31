@@ -244,6 +244,16 @@ class TestGP:
         assert senss[fuel_per_nm] == pytest.approx(0.41, abs=0.01)
         assert senss[W_payload] == pytest.approx(0.39, abs=0.01)
 
+    def test_model_sens_is_sum_of_lambdas(self, solver):
+        # sens.models[lineage] should equal sum(|lambda_i|) for constraints
+        # owned by that lineage — not inflated by fixed-variable sensitivities.
+        x = Variable("x")
+        c = Variable("c", 2.0, "-")
+        m = Model(x, [x >= c])
+        sol = m.solve(solver=solver, verbosity=0)
+        sum_lambdas = sum(abs(v) for v in sol.sens.constraints.values())
+        assert sol.sens.models.get("", 0) == pytest.approx(sum_lambdas, rel=1e-4)
+
     def test_mdd_example(self, solver):
         Cl = Variable("Cl", 0.5, "-", "Lift Coefficient")
         Mdd = Variable("Mdd", "-", "Drag Divergence Mach Number")

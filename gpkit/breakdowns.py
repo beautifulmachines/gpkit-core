@@ -81,33 +81,6 @@ def get_model_breakdown(solution):
         if " at 0x" in constrstr:  # don't print memory addresses
             constrstr = constrstr[: constrstr.find(" at 0x")] + ">"
         subbd[constrstr] = {"|sensitivity|": senss}
-    for vk in solution.sens.variables:
-        # could this be done away with for backwards compatibility?
-        if not isinstance(vk, VarKey) or (vk.shape and not vk.idx):
-            continue
-        senss = abs(solution.sens.variables[vk])
-        if hasattr(senss, "shape"):
-            senss = np.nansum(senss)
-        if senss <= 1e-5:
-            continue
-        subbd = breakdowns
-        subbd["|sensitivity|"] += senss
-        for parent in vk.lineagestr().split("."):
-            if parent == "":
-                continue
-            if parent not in subbd:
-                subbd[parent] = {}
-            subbd = subbd[parent]
-            if "|sensitivity|" not in subbd:
-                subbd["|sensitivity|"] = 0
-            subbd["|sensitivity|"] += senss
-        # treat vectors as namespace (indexing vectors above)
-        vk = vk.str_without({"lineage"}) + get_valstr(vk, solution, " = %s").replace(
-            ", fixed", ""
-        )
-        subbd[vk] = {"|sensitivity|": senss}
-    # TODO: track down in a live-solve environment why this isn't the same
-    # print(breakdowns["HyperloopSystem"]["|sensitivity|"])
     return breakdowns
 
 
