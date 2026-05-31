@@ -579,17 +579,13 @@ class ConditionTable(SectionSpec):
 
     title = "Condition Comparison"
 
-    def format(self, ctx) -> list[str]:
-        conditions = self.options.condition_table
-        if not conditions:
-            return []
-        sol = ctx.sol
-        p = self.options.precision
+    def row_from(self, item):
+        raise NotImplementedError  # ConditionTable uses format() directly
 
+    def _collect_condition_data(self, sol, conditions):
         col_data: dict[str, dict[str, tuple[float, str, str]]] = {}
         all_names: list[str] = []
         seen_names: set[str] = set()
-
         for cname, model in conditions.items():
             col_data[cname] = {}
             for vk in sorted(model.vks, key=lambda v: v.name):
@@ -600,32 +596,40 @@ class ConditionTable(SectionSpec):
                 else:
                     continue
                 if np.shape(val):
-                    continue  # skip vector variables (shown element-wise if needed)
+                    continue
                 col_data[cname][vk.name] = (float(val), _unitstr(vk), vk.label or "")
                 if vk.name not in seen_names:
                     all_names.append(vk.name)
                     seen_names.add(vk.name)
+        return col_data, all_names
 
+    def _build_row(self, name, cnames, col_data, p):
+        unitlabel = label = ""
+        vals: list[str] = []
+        raw_vals: list[float] = []
+        for cname in cnames:
+            entry = col_data[cname].get(name)
+            if entry is not None:
+                v, unitlabel, label = entry
+                vals.append(f"{v:.{p-1}g}")
+                raw_vals.append(v)
+            else:
+                vals.append("—")
+        if raw_vals and len(set(raw_vals)) == 1:
+            return None  # suppress when identical across all conditions
+        return [name, unitlabel] + vals + [label]
+
+    def format(self, ctx) -> list[str]:
+        conditions = self.options.condition_table
+        if not conditions:
+            return []
+        col_data, all_names = self._collect_condition_data(ctx.sol, conditions)
         cnames = list(conditions.keys())
-        header = ["Variable", "Units"] + cnames + ["Label"]
-        rows = [header]
+        rows = [["Variable", "Units"] + cnames + ["Label"]]
         for name in all_names:
-            units = label = ""
-            vals: list[str] = []
-            raw_vals: list[float] = []
-            for cname in cnames:
-                entry = col_data[cname].get(name)
-                if entry is not None:
-                    v, units, label = entry
-                    vals.append(f"{v:.{p-1}g}")
-                    raw_vals.append(v)
-                else:
-                    vals.append("—")
-            # Suppress when all non-dash exact values are identical
-            if raw_vals and len(set(raw_vals)) == 1:
-                continue
-            rows.append([name, units] + vals + [label])
-
+            row = self._build_row(name, cnames, col_data, self.options.precision)
+            if row is not None:
+                rows.append(row)
         if len(rows) == 1:  # header only
             return []
         lines = [self.title, "-" * len(self.title), ""]
