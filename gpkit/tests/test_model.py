@@ -226,24 +226,6 @@ class TestGP:
             1.0, abs=10 ** (-get_ndig(solver))
         )
 
-    def test_sensitivities(self, solver):
-        W_payload = Variable("W_{payload}", 175 * (195 + 30), "lbf")
-        f_oew = Variable("f_{oew}", 0.53, "-", "OEW/MTOW")
-        fuel_per_nm = Variable("\\theta_{fuel}", 13.75, "lbf/nautical_mile")
-        R = Variable("R", 3000, "nautical_miles", "range")
-        mtow = Variable("MTOW", "lbf", "max take off weight")
-
-        m = Model(
-            61.3e6 * units.USD * (mtow / (1e5 * units.lbf)) ** 0.807,
-            [mtow >= W_payload + f_oew * mtow + fuel_per_nm * R],
-        )
-        sol = m.solve(solver=solver, verbosity=0)
-        senss = sol.sens.variables
-        assert senss[f_oew] == pytest.approx(0.91, abs=0.01)
-        assert senss[R] == pytest.approx(0.41, abs=0.01)
-        assert senss[fuel_per_nm] == pytest.approx(0.41, abs=0.01)
-        assert senss[W_payload] == pytest.approx(0.39, abs=0.01)
-
     def test_mdd_example(self, solver):
         Cl = Variable("Cl", 0.5, "-", "Lift Coefficient")
         Mdd = Variable("Mdd", "-", "Drag Divergence Mach Number")
@@ -382,6 +364,24 @@ class TestGP:
 
 class TestGPSensitivities:
     "test cases for GP sensitivity output -- run for each installed solver"
+
+    def test_sensitivities(self, solver):
+        W_payload = Variable("W_{payload}", 175 * (195 + 30), "lbf")
+        f_oew = Variable("f_{oew}", 0.53, "-", "OEW/MTOW")
+        fuel_per_nm = Variable("\\theta_{fuel}", 13.75, "lbf/nautical_mile")
+        R = Variable("R", 3000, "nautical_miles", "range")
+        mtow = Variable("MTOW", "lbf", "max take off weight")
+
+        m = Model(
+            61.3e6 * units.USD * (mtow / (1e5 * units.lbf)) ** 0.807,
+            [mtow >= W_payload + f_oew * mtow + fuel_per_nm * R],
+        )
+        sol = m.solve(solver=solver, verbosity=0)
+        senss = sol.sens.variables
+        assert senss[f_oew] == pytest.approx(0.91, abs=0.01)
+        assert senss[R] == pytest.approx(0.41, abs=0.01)
+        assert senss[fuel_per_nm] == pytest.approx(0.41, abs=0.01)
+        assert senss[W_payload] == pytest.approx(0.39, abs=0.01)
 
     def test_model_sens_is_sum_of_lambdas(self, solver):
         # sens.models[lineage] should equal sum(|lambda_i|) for constraints
