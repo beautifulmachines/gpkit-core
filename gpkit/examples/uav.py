@@ -238,7 +238,7 @@ class AircraftPerf(Model):
             state,
             self.wing_aero,
             self.prop_perf,
-            self.W == 0.5 * rho * C_L * S * V**2,
+            self.W <= 0.5 * rho * C_L * S * V**2,
             self.T >= 0.5 * rho * self.C_D * S * V**2,
             self.C_Di >= C_L**2 / (pi * e * A),
             self.C_D >= aircraft.CDA0 / S + C_Dp + self.C_Di,
