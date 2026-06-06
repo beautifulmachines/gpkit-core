@@ -352,12 +352,16 @@ class HeavyLandingCase(Model):
 
 
 class UAV(Model):
-    """Fixed-wing UAV: minimize total fuel for an out-and-back mission.
+    """Fixed-wing UAV minimizing fuel for a symmetric out-and-back mission.
 
-    Submodels are accessed via attributes (e.g. self.aircraft.wing,
-    self.mission.outbound_leg) rather than string-key indexing.  String-key
-    access via model["name"] remains available for programmatic traversal.
+    Submodels are accessed via attributes (aircraft.wing, mission.outbound_leg).
     """
+
+    references = [
+        'W. Hoburg, "Geometric Programming for Aircraft Design Optimization,"'
+        " PhD thesis, MIT/UC Berkeley, 2013."
+        " https://people.eecs.berkeley.edu/~pabbeel/papers/2013_Hoburg-phdthesis.pdf"
+    ]
 
     def setup(self):
         self.aircraft = Aircraft()
