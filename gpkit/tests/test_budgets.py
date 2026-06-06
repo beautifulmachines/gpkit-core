@@ -2,6 +2,7 @@
 
 # pylint: disable=attribute-defined-outside-init,too-many-lines
 
+import json
 import math
 import warnings
 
@@ -87,6 +88,25 @@ class SlackModel(Model):
         return [
             self.m_total >= self.m_wing,  # budget constraint (slack: 100 > 60)
             self.m_wing >= m_wing_min,  # wing: forces m_wing = 60 kg
+        ]
+
+
+class ZeroTermBudgetModel(Model):
+    """Budget where one term has a zero substitution (value=0).
+
+    Substituting 0 into a GP Monomial can produce a Signomial rather than a
+    numeric quantity, causing _make_term to silently return NaN and to_dict()
+    to emit values that strict JSON serializers reject.
+    """
+
+    def setup(self):  # pylint: disable=attribute-defined-outside-init
+        m_pay = Variable("m_pay", 0, "kg", "zero-valued term")
+        self.m_struct = Variable("m_struct", "kg", "structural mass")
+        self.m = Variable("m", "kg", "total mass")
+        self.cost = self.m
+        return [
+            self.m >= self.m_struct + m_pay,
+            self.m_struct >= Variable("m_struct_min", 10, "kg"),
         ]
 
 
@@ -295,6 +315,20 @@ class TestBudgetRendering:
         assert d["units"] == "kg"
         assert isinstance(d["children"], list)
         assert d["total"] == pytest.approx(b.total)
+
+    def test_to_dict_zero_term_json_safe(self):
+        """A zero-substituted budget term must not produce NaN in to_dict().
+
+        Substituting 0 into a GP Monomial via Solution.__getitem__ returns a
+        Signomial rather than a numeric quantity, making _make_term fall back
+        to NaN.  NaN is not valid JSON when serialized with allow_nan=False
+        (as used by Starlette and other strict HTTP frameworks).
+        """
+        model = ZeroTermBudgetModel()
+        sol, _ = solve(model)
+        d = build_budget(sol, model, model.m).to_dict()
+        # allow_nan=False mirrors strict serializers (e.g. Starlette JSONResponse)
+        json.dumps(d, allow_nan=False)
 
     def test_repr_is_text(self):
         model = Aircraft()
