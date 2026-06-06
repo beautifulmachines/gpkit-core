@@ -330,8 +330,8 @@ class SprintCondition(Model):
         ]
 
 
-class LandingCondition(Model):
-    """Landing: stall speed constraint at MTOW and sea-level density."""
+class HeavyLandingCase(Model):
+    """Sizing case: stall speed constraint at MTOW and sea-level density."""
 
     V_stall = Var("m/s", "stall speed")
     V_stallmax = Var("m/s", "stall speed limit", value=38)
@@ -362,12 +362,12 @@ class UAV(Model):
     def setup(self):
         self.aircraft = Aircraft()
         self.mission = Mission(self.aircraft)
-        self.landing = LandingCondition(self.aircraft)
+        self.heavy_landing = HeavyLandingCase(self.aircraft)
         self.cost = self.mission.outbound_leg.W_fuel + self.mission.return_leg.W_fuel
         return [
             self.aircraft,
             self.mission,
-            self.landing,
+            self.heavy_landing,
         ]
 
 
