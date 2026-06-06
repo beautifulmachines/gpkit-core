@@ -291,6 +291,7 @@ class Mission(Model):
 
     R = Var("m", "mission leg range")
     R_min = Var("km", "minimum range requirement", value=5e3)
+    W_fuel = Var("N", "total fuel weight")
 
     def setup(self, aircraft):
         self.outbound_leg = Outbound(aircraft, self.R)
@@ -303,10 +304,13 @@ class Mission(Model):
             self.return_leg,
             self.sprint,
             self.R >= self.R_min,
+            # Sequential mission dynamics (Breguet correctness, sprint sizing):
             W_out >= aircraft.W_zfw + self.return_leg.W_fuel,
             W_ret >= aircraft.W_zfw,
-            aircraft.W_mto >= W_out + self.outbound_leg.W_fuel,
             self.sprint.perf.W == W_out,
+            # Budget-friendly takeoff weight chain:
+            self.W_fuel >= self.outbound_leg.W_fuel + self.return_leg.W_fuel,
+            aircraft.W_mto >= aircraft.W_zfw + self.W_fuel,
         ]
 
 

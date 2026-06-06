@@ -21,6 +21,7 @@ class = "Beam"
 id = "uav"
 module = "gpkit.examples.uav"
 class = "UAV"
+budget_vars = ["W_mto"]
 
 [[models]]
 id = "wing"
