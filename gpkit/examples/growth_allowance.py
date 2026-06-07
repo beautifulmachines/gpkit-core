@@ -31,7 +31,7 @@ class Spar(Model):
         return self.m.grown_from(rho * t * area)
 
 
-class GrowthAllowanceExample(Model):
+class GrowthAllowance(Model):
     """Growth allowances demo: wing mass budgeted across two spars.
 
     Spars carry 20% component-level allowances; the wing applies an additional
@@ -55,6 +55,6 @@ class GrowthAllowanceExample(Model):
 
 
 if __name__ == "__main__":
-    model = GrowthAllowanceExample()
+    model = GrowthAllowance()
     sol = model.solve(verbosity=0)
     print(build_budget(sol, model, model.m).text())

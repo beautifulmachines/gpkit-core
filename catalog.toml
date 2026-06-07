@@ -26,7 +26,7 @@ budget_vars = ["W_mto"]
 [[models]]
 id = "growth"
 module = "gpkit.examples.growth_allowance"
-class = "GrowthAllowanceExample"
+class = "GrowthAllowance"
 budget_vars = ["m"]
 
 [[models]]
