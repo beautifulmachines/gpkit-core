@@ -1,6 +1,6 @@
-Budget  —  Wing.m
------------------
-             Nominal  Growth  Total              
-  Wing.m          27    8.64  35.64  [kg]  100.0%
-    Spar.m      13.5     2.7   16.2  [kg]   45.5%
-    Spar1.m     13.5     2.7   16.2  [kg]   45.5%
+Budget  —  GrowthAllowance.m
+----------------------------
+                     Nominal  Growth  Total              
+  GrowthAllowance.m       27    8.64  35.64  [kg]  100.0%
+    Spar.m              13.5     2.7   16.2  [kg]   45.5%
+    Spar1.m             13.5     2.7   16.2  [kg]   45.5%
