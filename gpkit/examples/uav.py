@@ -238,7 +238,7 @@ class AircraftPerf(Model):
             state,
             self.wing_aero,
             self.prop_perf,
-            self.W == 0.5 * rho * C_L * S * V**2,
+            self.W <= 0.5 * rho * C_L * S * V**2,
             self.T >= 0.5 * rho * self.C_D * S * V**2,
             self.C_Di >= C_L**2 / (pi * e * A),
             self.C_D >= aircraft.CDA0 / S + C_Dp + self.C_Di,
@@ -291,6 +291,7 @@ class Mission(Model):
 
     R = Var("m", "mission leg range")
     R_min = Var("km", "minimum range requirement", value=5e3)
+    W_fuel = Var("N", "total fuel weight")
 
     def setup(self, aircraft):
         self.outbound_leg = Outbound(aircraft, self.R)
@@ -303,10 +304,13 @@ class Mission(Model):
             self.return_leg,
             self.sprint,
             self.R >= self.R_min,
+            # Sequential mission dynamics (Breguet correctness, sprint sizing):
             W_out >= aircraft.W_zfw + self.return_leg.W_fuel,
             W_ret >= aircraft.W_zfw,
-            aircraft.W_mto >= W_out + self.outbound_leg.W_fuel,
             self.sprint.perf.W == W_out,
+            # Budget-friendly takeoff weight chain:
+            self.W_fuel >= self.outbound_leg.W_fuel + self.return_leg.W_fuel,
+            aircraft.W_mto >= aircraft.W_zfw + self.W_fuel,
         ]
 
 
@@ -326,8 +330,8 @@ class SprintCondition(Model):
         ]
 
 
-class LandingCondition(Model):
-    """Landing: stall speed constraint at MTOW and sea-level density."""
+class HeavyLandingCase(Model):
+    """Sizing case: stall speed constraint at MTOW and sea-level density."""
 
     V_stall = Var("m/s", "stall speed")
     V_stallmax = Var("m/s", "stall speed limit", value=38)
@@ -348,22 +352,26 @@ class LandingCondition(Model):
 
 
 class UAV(Model):
-    """Fixed-wing UAV: minimize total fuel for an out-and-back mission.
+    """Fixed-wing UAV minimizing fuel for a symmetric out-and-back mission.
 
-    Submodels are accessed via attributes (e.g. self.aircraft.wing,
-    self.mission.outbound_leg) rather than string-key indexing.  String-key
-    access via model["name"] remains available for programmatic traversal.
+    Submodels are accessed via attributes (aircraft.wing, mission.outbound_leg).
     """
+
+    references = [
+        'W. Hoburg, "Geometric Programming for Aircraft Design Optimization,"'
+        " PhD thesis, MIT/UC Berkeley, 2013."
+        " https://people.eecs.berkeley.edu/~pabbeel/papers/2013_Hoburg-phdthesis.pdf"
+    ]
 
     def setup(self):
         self.aircraft = Aircraft()
         self.mission = Mission(self.aircraft)
-        self.landing = LandingCondition(self.aircraft)
+        self.heavy_landing = HeavyLandingCase(self.aircraft)
         self.cost = self.mission.outbound_leg.W_fuel + self.mission.return_leg.W_fuel
         return [
             self.aircraft,
             self.mission,
-            self.landing,
+            self.heavy_landing,
         ]
 
 

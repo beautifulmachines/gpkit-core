@@ -1,10 +1,10 @@
 
-          ┃┓                 /
-          ┃┃
-          ┃┃
-          ┃┣╸Outbound.W_fuel /
-          ┃┃ (3,731N)
-     Cost╺┫┛                 /
+          ┃┓                 ┓
+          ┃┃                 ┃
+          ┃┃                 ┃
+          ┃┣╸Outbound.W_fuel ┣╸Outbound.AircraftPerf.W╶⎨
+          ┃┃ (3,731N)        ┃ (34,888N)
+     Cost╺┫┛                 ┛
  (7,105N) ┃┓               ┓           ┓
           ┃┃               ┃           ┃
           ┃┃               ┃           ┣╸W_tilde╶⎨
@@ -33,7 +33,7 @@
      ┃┣╸Aircraft ┛
      ┃┃          ┣╸W_tilde ≥ W_fixed + W_pay + Engine.W
      ┃┛          ┣╸W_zfw ≥ W_tilde + Wing.W
-     ┃┣╸LandingCondition╶⎨
+     ┃┣╸HeavyLandingCase╶⎨
 
 
 Optimal Cost
@@ -92,16 +92,17 @@ UAV.Aircraft.Wing
             r_h : 0.75              (+0.01005) wing strut taper parameter
 sigma_max_shear : 167       [MPa]   (-0.01005) allowable shear stress
 
-UAV.LandingCondition
+UAV.HeavyLandingCase
    V_stall : 38   [m/s]             stall speed
 ...constants
 V_stallmax : 38   [m/s]   (-0.3605) stall speed limit
     rho_sl : 1.23 [kg/m³] (-0.1803) air density, sea level
 
 UAV.Mission
-    R : 5e+06 [m]           mission leg range
+     R : 5e+06 [m]           mission leg range
+W_fuel : 7105  [N]           total fuel weight
 ...constants
-R_min : 5000  [km] (+1.141) minimum range requirement
+ R_min : 5000  [km] (+1.141) minimum range requirement
 
 UAV.Mission.Outbound
 W_fuel : 3731   [N]  fuel weight for this leg
@@ -179,7 +180,7 @@ UAV.Mission.SprintCondition.FlightState
   V : 150      [m/s]                 flight speed
 ...constants
 rho : 0.91     [kg/m³]  (+0.1229)    air density
- mu : 1.69e-05 [kg/m/s] (-0.0002407) dynamic viscosity
+ mu : 1.69e-05 [kg/m/s] (-0.0002408) dynamic viscosity
 
 Most Sensitive Constraints
 --------------------------
@@ -203,15 +204,16 @@ UAV.Aircraft.Wing
 +0.01005 : A·W_tilde·N_lift·q²/(tau·S·t_web·sigma_max_shear) ≤ 12
 +0.01005 : W_web ≥ 8·rho_alum·g·r_h·tau·t_web·S^1.5·nu/(3·A^0.5)
 
-UAV.LandingCondition
+UAV.HeavyLandingCase
 +0.3605 : V_stall ≤ V_stallmax
 +0.1803 : W_mto ≤ 0.5·rho_sl·V_stall²·C_Lmax·S
 
 UAV.Mission
-+1.141  : R ≥ R_min
-+0.7024 : W ≥ W_zfw + W_fuel
-+0.5365 : W ≥ W_zfw
-+0.1803 : W_mto ≥ W + W_fuel
++1.141   : R ≥ R_min
++0.5395  : W ≥ W_zfw + W_fuel
++0.5365  : W ≥ W_zfw
++0.1803  : W_mto ≥ W_zfw + W_fuel
++0.03316 : W_fuel ≥ W_fuel + W_fuel
 
 UAV.Mission.Outbound
 +0.5706 : z_bre ≥ g·R·T/(h_fuel·eta_0·W)
@@ -220,7 +222,7 @@ UAV.Mission.Outbound
 UAV.Mission.Outbound.AircraftPerf
 +0.6211 : C_D ≥ CDA0/S + C_Dp + C_Di
 +0.6211 : T ≥ 0.5·rho·C_D·S·V²
-+0.5648 : W = 0.5·rho·C_L·S·V²
++0.5648 : W ≤ 0.5·rho·C_L·S·V²
 +0.2715 : C_Di ≥ C_L²/(π·e·A)
 
 UAV.Mission.Outbound.AircraftPerf.PropulsionPerf
@@ -239,7 +241,7 @@ UAV.Mission.Return
 UAV.Mission.Return.AircraftPerf
 +0.6215 : C_D ≥ CDA0/S + C_Dp + C_Di
 +0.6215 : T ≥ 0.5·rho·C_D·S·V²
-+0.5645 : W = 0.5·rho·C_L·S·V²
++0.5645 : W ≤ 0.5·rho·C_L·S·V²
 +0.2714 : C_Di ≥ C_L²/(π·e·A)
 
 UAV.Mission.Return.AircraftPerf.PropulsionPerf
