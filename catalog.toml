@@ -24,9 +24,10 @@ class = "UAV"
 budget_vars = ["W_mto"]
 
 [[models]]
-id = "wing"
+id = "growth"
 module = "gpkit.examples.growth_allowance"
-class = "Wing"
+class = "GrowthAllowanceExample"
+budget_vars = ["m"]
 
 [[models]]
 id = "bemt_hover"
