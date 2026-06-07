@@ -465,6 +465,8 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
     # pylint: disable=attribute-defined-outside-init
     def _simplify_posy_ineq(self, hmap, pmap=None, fixed=None):
         "Simplify a posy <= 1 by moving constants to the right side."
+        if not hmap:
+            return None  # all terms zeroed out → constraint is 0 ≤ 1 (tautological)
         if EMPTY_HV not in hmap:
             return hmap
         coeff = 1 - hmap[EMPTY_HV]

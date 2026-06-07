@@ -179,6 +179,8 @@ class NomialMap(HashVector):
                 raise ValueError("Monomial substitutions are not supported.")
             for o_exp, exp in exps:
                 subinplace(cp, exp, o_exp, vk, cval, squished)
+        if not cp:
+            cp[EMPTY_HV] = 0.0
         return cp
 
     def mmap(self, orig):
@@ -228,8 +230,6 @@ def subinplace(cp, exp, o_exp, vk, cval, squished):
                 del cp[exp]  # remove zeros created during substitution
         elif value:
             cp[exp] = value
-        if not cp:  # make sure it's never an empty hmap
-            cp[EMPTY_HV] = 0.0
     elif exp in squished:
         exp.hashvalue ^= hash((vk, x))  # remove (key, value) from hashvalue
         del exp[vk]

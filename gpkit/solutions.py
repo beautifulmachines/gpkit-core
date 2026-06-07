@@ -109,9 +109,9 @@ class Solution:
             return self.constants.quantity(key)
         if hasattr(key, "sub"):
             subbed = key.sub(self.variables, require_positive=False)
-            # subbed should be a constant monomial
-            assert getattr(subbed, "exp", {}) == {}
-            c = getattr(subbed, "c", subbed)
+            # Use .cs rather than .c: a zero-valued sub produces a Signomial
+            # (0 ≤ 0 triggers any_nonpositive_cs), which lacks .c but has .cs.
+            (c,) = subbed.cs
             if isinstance(c, Quantity):
                 return c
             return Quantity(c, key.units or "dimensionless")
