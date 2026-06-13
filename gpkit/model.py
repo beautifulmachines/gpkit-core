@@ -17,6 +17,7 @@ from .exceptions import (
 from .nomials import Monomial, Variable
 from .nomials.map import DIMLESS_QUANTITY
 from .nomials.math import constraint_from_ir, nomial_from_ir
+from .nomials.substitution import is_linked
 from .programs.gp import GeometricProgram
 from .programs.prog_factories import progify, solvify
 from .programs.sgp import SequentialGeometricProgram
@@ -268,10 +269,11 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
         # Collect flat constraint list
         constraints_ir = [c.to_ir() for c in flatiter(self)]
 
-        # Serialize substitutions (skip callables)
+        # Serialize substitutions; linked (callable-computed) vars get null
         subs_ir = {}
         for vk, val in self.substitutions.items():
-            if callable(val):
+            if is_linked(val):
+                subs_ir[vk.ref] = None
                 continue
             if hasattr(
                 val, "hmap"
@@ -325,11 +327,18 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
             constraint_from_ir(c_ir, var_registry) for c_ir in ir_doc["constraints"]
         ]
 
-        # 4. Reconstruct substitutions
+        # 4. Reconstruct substitutions. Null entries represent linked subs
         subs = None
         if "substitutions" in ir_doc:
             subs = {}
             for ref, val in ir_doc["substitutions"].items():
+                if val is None:
+                    raise NotImplementedError(
+                        f"Cannot reconstruct model from IR: variable '{ref}' has a"
+                        " linked (callable-computed) substitution that is not"
+                        " serializable. Models with linked substitutions cannot be"
+                        " faithfully round-tripped through the IR."
+                    )
                 if ref in var_registry:
                     subs[var_registry[ref]] = val
 
