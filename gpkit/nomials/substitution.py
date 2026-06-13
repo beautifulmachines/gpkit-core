@@ -5,6 +5,11 @@ import numpy as np
 from ..varmap import VarSet
 
 
+def is_linked(val):
+    "Return True if val is a linked (callable-computed) substitution value."
+    return hasattr(val, "__call__") and not hasattr(val, "key")
+
+
 def parse_subs(varkeys, substitutions):
     "Return constant mappings {VarKey: val} w/ broadcasting and shape checks."
     out = {}
@@ -15,8 +20,7 @@ def parse_subs(varkeys, substitutions):
             # cast for shape and lookup by idx
             val = np.array(val) if not hasattr(val, "units") else val
             # else case is pint bug: Quantity's have __len__ but len() raises
-        if hasattr(val, "__call__") and not hasattr(val, "key"):
-            # linked case -- eventually make explicit instead of using subs
+        if is_linked(val):
             continue
         for key in varkeys.keys(var):
             if key.shape and getattr(val, "shape", None):
@@ -32,10 +36,10 @@ def parse_subs(varkeys, substitutions):
 
 
 def parse_linked(varkeys, substitutions):
-    "Extract linked-sweep callables and return {VarKey: function} mapping."
+    "Extract linked (callable-computed) substitutions as {VarKey: function}."
     out = {}
     for var, val in substitutions.items():
         for key in varkeys.keys(var):
-            if hasattr(val, "__call__") and not hasattr(val, "key"):
+            if is_linked(val):
                 out[key] = val
     return out
