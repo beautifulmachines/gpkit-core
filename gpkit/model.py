@@ -269,8 +269,7 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
         # Collect flat constraint list
         constraints_ir = [c.to_ir() for c in flatiter(self)]
 
-        # Serialize substitutions; linked (callable-computed) vars get null —
-        # present in subs signals "parameter", null signals "value not serializable"
+        # Serialize substitutions; linked (callable-computed) vars get null
         subs_ir = {}
         for vk, val in self.substitutions.items():
             if is_linked(val):
@@ -328,9 +327,7 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
             constraint_from_ir(c_ir, var_registry) for c_ir in ir_doc["constraints"]
         ]
 
-        # 4. Reconstruct substitutions. Null entries represent linked
-        #    (callable-computed) parameters whose values cannot be serialized;
-        #    models with linked subs are not round-trippable through the IR.
+        # 4. Reconstruct substitutions. Null entries represent linked subs
         subs = None
         if "substitutions" in ir_doc:
             subs = {}
