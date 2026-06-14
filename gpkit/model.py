@@ -114,7 +114,7 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
                         tuple(arg for arg in [cost, constraints] if arg is not None)
                         + args
                     )
-                    cs = self.setup(*args, **kwargs)  # pylint: disable=no-member
+                    cs = self.setup(*args, **kwargs)
                     if (
                         isinstance(cs, tuple)
                         and len(cs) == 2
