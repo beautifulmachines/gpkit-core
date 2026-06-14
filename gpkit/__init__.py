@@ -1,6 +1,6 @@
 "GP and SP modeling package"
 
-__version__ = "0.3.8"
+__version__ = "0.3.9"
 
 import numpy as _np
 
