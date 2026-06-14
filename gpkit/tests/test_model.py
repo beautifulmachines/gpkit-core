@@ -914,9 +914,6 @@ class TestVar:
         class _Component(Model):
             x = Var("-", "ratio")
 
-            def setup(self):
-                return []
-
         c = _Component()
         assert c.x.key.lineage == (("_Component", 0),)
 
@@ -926,9 +923,6 @@ class TestVar:
         class _Aero(Model):
             e = Var("-", "Oswald efficiency", value=0.9)
             x = Var("-", "ratio")
-
-            def setup(self):
-                return []
 
         m = _Aero()
         assert m.e.key in m.substitutions
@@ -940,12 +934,8 @@ class TestVar:
         class _Base(Model):
             W = Var("-", "weight ratio")
 
-            def setup(self):
-                return []
-
         class _Child(_Base):
-            def setup(self):
-                return []
+            pass
 
         c = _Child()
         assert hasattr(c.W, "key")
@@ -956,9 +946,6 @@ class TestVar:
 
         class _Segment(Model):
             V = Var("-", "speed ratio")
-
-            def setup(self):
-                return []
 
         with Vectorize(4):
             seg = _Segment()
@@ -973,9 +960,6 @@ class TestVar:
             class _Bad(Model):  # pylint: disable=unused-variable
                 cost = Var("-", "should raise")
 
-                def setup(self):
-                    return []
-
     def test_underscore_prefix_raises(self):
         "Declaring a Var whose name starts with _var_ raises at class definition"
         # Python 3.11 wraps __set_name__ exceptions in RuntimeError;
@@ -985,17 +969,11 @@ class TestVar:
             class _Bad2(Model):  # pylint: disable=unused-variable
                 _var_x = Var("-", "should raise")
 
-                def setup(self):
-                    return []
-
     def test_class_descriptor_access(self):
         "Accessing Var on the class (not instance) returns the Var descriptor itself"
 
         class _M(Model):
             x = Var("-", "ratio")
-
-            def setup(self):
-                return []
 
         assert isinstance(_M.x, Var)
 

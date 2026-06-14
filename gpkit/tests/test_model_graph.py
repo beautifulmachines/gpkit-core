@@ -96,8 +96,7 @@ class TestModelGraph:
         """
 
         class _EmptyChild(Model):
-            def setup(self):
-                return []
+            pass
 
         class _Parent(Model):
             def setup(self):

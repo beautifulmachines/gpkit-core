@@ -164,9 +164,6 @@ class FlightState(Model):
     rho = Var("kg/m^3", "air density", value=0.91)
     mu = Var("kg/m/s", "dynamic viscosity", value=1.69e-5)
 
-    def setup(self):
-        pass
-
 
 class WingAero(Model):
     """Wing aerodynamics: profile drag and Reynolds number at a flight state."""

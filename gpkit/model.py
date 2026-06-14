@@ -101,20 +101,28 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
                 for item in items:
                     _scan_for_children(item)
 
-        if hasattr(self, "setup"):
+        if type(self) is not Model:
             self.cost = None
             # lineage holds the (name, num) environment a model was created in,
             # including its own (name, num), and those of models above it
             with NamedVariables(self.__class__.__name__) as (self.lineage, setup_vars):
                 self._instantiate_var_descriptors()
-                args = (
-                    tuple(arg for arg in [cost, constraints] if arg is not None) + args
-                )
-                cs = self.setup(*args, **kwargs)  # pylint: disable=no-member
-                if isinstance(cs, tuple) and len(cs) == 2 and isinstance(cs[1], dict):
-                    constraints, substitutions = cs
+                if hasattr(self, "setup"):
+                    args = (
+                        tuple(arg for arg in [cost, constraints] if arg is not None)
+                        + args
+                    )
+                    cs = self.setup(*args, **kwargs)  # pylint: disable=no-member
+                    if (
+                        isinstance(cs, tuple)
+                        and len(cs) == 2
+                        and isinstance(cs[1], dict)
+                    ):
+                        constraints, substitutions = cs
+                    else:
+                        constraints = cs or []
                 else:
-                    constraints = cs
+                    constraints = []
             cost = self.cost
             # Named constraint groups from dict setup(); None for list setup().
             # Use `is None` checks — empty dict is a valid groups map.
