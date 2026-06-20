@@ -59,6 +59,7 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
     program = None
     solution = None
     computed = None  # dict of {VarKey: fn(solution) -> value} for post-solve
+    margin_objective = None
     _is_model_subclass = False  # True for any subclass; False for bare Model
 
     def __init_subclass__(cls, **kwargs):
@@ -306,14 +307,14 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
         # Phase 5: structural metadata for nested/composable models
         ir["model_tree"] = build_model_tree(self)
 
-        if getattr(self, "margin_objective", None) is not None:
+        if self.margin_objective is not None:
             mo = self.margin_objective
-            A_key = getattr(mo.plus_var, "key", mo.plus_var)
-            B_key = getattr(mo.minus_var, "key", mo.minus_var)
+            plus_key = getattr(mo.plus_var, "key", mo.plus_var)
+            minus_key = getattr(mo.minus_var, "key", mo.minus_var)
             ir["margin_objective"] = {
                 "name": mo.name,
-                "plus_var": A_key.ref,
-                "minus_var": B_key.ref,
+                "plus_var": plus_key.ref,
+                "minus_var": minus_key.ref,
             }
 
         return ir

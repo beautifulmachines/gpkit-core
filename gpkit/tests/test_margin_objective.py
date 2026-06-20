@@ -12,30 +12,30 @@ class SimpleMarginModel(Model):
     """B >= c * A_allow, cost = B/A, margin = A_allow - B."""
 
     def setup(self):
-        A = Variable("A_allow", 100.0, "kg", "Allowable mass")
-        B = Variable("B_mass", "kg", "System mass")
+        a = Variable("A_allow", 100.0, "kg", "Allowable mass")
+        b = Variable("B_mass", "kg", "System mass")
         c = Variable("c_frac", 0.8, "", "Mass fraction")
-        self.cost = B / A
+        self.cost = b / a
         self.margin_objective = MarginObjective(
             name="mass margin",
-            plus_var=A,
-            minus_var=B,
+            plus_var=a,
+            minus_var=b,
         )
-        return [B >= c * A]
+        return [b >= c * a]
 
 
 class BothFreeModel(Model):
     """A and B both free, each bounded by separate constants."""
 
     def setup(self):
-        A = Variable("A", "kg", "allowable")
-        B = Variable("B", "kg", "actual")
-        A_max = Variable("A_max", 120.0, "kg", "A upper bound")
-        B_min = Variable("B_min", 50.0, "kg", "B lower bound")
+        a = Variable("A", "kg", "allowable")
+        b = Variable("B", "kg", "actual")
+        a_max = Variable("A_max", 120.0, "kg", "A upper bound")
+        b_min = Variable("B_min", 50.0, "kg", "B lower bound")
         alpha = Variable("alpha", 1.5, "", "A–B ratio floor")
-        self.cost = B / A
-        self.margin_objective = MarginObjective("gap", plus_var=A, minus_var=B)
-        return [A <= A_max, B >= B_min, A >= alpha * B]
+        self.cost = b / a
+        self.margin_objective = MarginObjective("gap", plus_var=a, minus_var=b)
+        return [a <= a_max, b >= b_min, a >= alpha * b]
 
 
 class ConstMapModel(Model):
@@ -48,16 +48,16 @@ class ConstMapModel(Model):
     """
 
     def setup(self):
-        P_prop = Variable("P_prop", "W", "propulsion power")
-        P_avionics = Variable("P_avionics", 50.0, "W", "avionics power (fixed)")
-        P_max = Variable("P_max", 200.0, "W", "total power limit")
-        self.cost = P_max / P_prop  # minimize budget/propulsion → P_prop at upper bound
+        p_prop = Variable("P_prop", "W", "propulsion power")
+        p_avionics = Variable("P_avionics", 50.0, "W", "avionics power (fixed)")
+        p_max = Variable("P_max", 200.0, "W", "total power limit")
+        self.cost = p_max / p_prop  # minimize budget/propulsion → p_prop at upper bound
         self.margin_objective = MarginObjective(
             "power margin",
-            plus_var=P_max,
-            minus_var=P_prop,
+            plus_var=p_max,
+            minus_var=p_prop,
         )
-        return [P_prop + P_avionics <= P_max]
+        return [p_prop + p_avionics <= p_max]
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +154,8 @@ def test_no_margin_objective():
     """Models without margin_objective have sol.derived is None."""
 
     class Plain(Model):
+        """Minimal model with no margin_objective."""
+
         def setup(self):
             x = Variable("x")
             self.cost = x
@@ -213,6 +215,8 @@ def test_to_ir_no_margin_objective():
     """to_ir() has no margin_objective key for plain models."""
 
     class Plain(Model):
+        """Minimal model with no margin_objective."""
+
         def setup(self):
             x = Variable("x")
             self.cost = x

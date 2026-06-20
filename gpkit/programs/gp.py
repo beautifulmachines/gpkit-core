@@ -501,43 +501,51 @@ class GeometricProgram:
         return cost_senss, gpv_ss, absv_ss, m_senss, constraint_senss
 
     def _compute_variable_sensitivities(self, nu, primal_weights):
-        """Compute ∂(Σ w_i x_i)/∂log(c_m) via one linear solve.
+        """Compute ∂(Σ w_i x_i*)/∂log(c_m) via one linear solve.
+
+        The quantity of interest is a linear combination of primal values,
+        e.g. plus_val - minus_val for a margin.  Because the GP KKT system
+        is in log-space, the weight for variable x_i is w_i = coeff * x_i*
+        (the chain rule factor x_i* converts ∂log(x_i) to ∂x_i).
 
         Parameters
         ----------
         nu : array
             Full dual variable vector (length = total monomials, including cost).
         primal_weights : dict
-            {VarKey: float} — coefficient of each free variable in the quantity
-            of interest.  E.g. {A_key: A_val, B_key: -B_val} for margin A − B.
+            {VarKey: float} — per-variable weights w_i = sign * x_i* for each
+            free variable that appears in the quantity of interest.  Only free
+            variables (those in self.varcols) should be included; constants are
+            handled as direct corrections by the caller.
 
         Returns
         -------
-        (v_prime, qnu) : (np.ndarray, np.ndarray)
-            v_prime — solution to A_c^T v' = w, one entry per tight constraint
-            qnu     — sensitivity weight per constraint monomial:
-                      qnu[k] = (v'[i] / lambda_i) * nu_constr[k],
-                      where i is the tight-constraint index for monomial k and
-                      lambda_i = sum(nu_constr[monomials of constraint i]).
+        (v_prime, qnu, constraint_v) : tuple of np.ndarray
+            v_prime      — solution to ac^T v' = w, one entry per tight constraint
+            qnu          — sensitivity weight per constraint monomial:
+                           qnu[k] = (v'[i] / lambda_i) * nu_constr[k]
+            constraint_v — v'[i] broadcast to constraint index space
 
         Notes
         -----
-        A_c (n_tight × n_vars) is the matrix of nu-weighted average exponents,
-        one row per tight constraint: A_c[i,:] = nu_i @ A_i / lambda_i.
+        ac (n_tight × n_vars) is the matrix of nu-weighted average exponents,
+        one row per tight constraint: ac[i,:] = nu_i @ A_i / lambda_i.
         Slack constraints (lambda_i ≈ 0) are skipped; they contribute nothing.
         """
         obj_end = self.data.m_idxs[0].stop
-        A_constr = self.data.A.tocsr()[obj_end:, :]  # sparse (n_constr_mono, n_vars)
+        exponent_block = self.data.A.tocsr()[
+            obj_end:, :
+        ]  # sparse (n_constr_mono, n_vars)
         nu_constr = np.asarray(nu[obj_end:], dtype=float)
         n_vars = len(self.vars)
 
-        # Build A_c: one dense row per tight constraint.
-        # A_c[i,:] = nu_i @ A_i / lambda_i  (nu-weighted average of exponents).
+        # Build ac: one dense row per tight constraint.
+        # ac[i,:] = nu_i @ A_i / lambda_i  (nu-weighted average of exponents).
         # Relative threshold: skip constraints whose dual weight is negligible compared
         # to the overall dual magnitude (cvxopt solver tolerance ≈ 1e-5).
         nu_scale = float(nu_constr.sum()) + 1.0
 
-        a_c_rows = []
+        ac_rows = []
         tight_slices = (
             []
         )  # (q_start, q_end, lambda_i, constr_i) for each tight constraint
@@ -548,26 +556,26 @@ class GeometricProgram:
             lambda_i = float(nu_i.sum())
             if lambda_i < 1e-5 * nu_scale:
                 continue
-            # A_constr[q_start:q_end, :].T @ nu_i  →  dense (n_vars,)
-            a_c_row = np.asarray(A_constr[q_start:q_end, :].T.dot(nu_i)).ravel()
-            a_c_rows.append(a_c_row / lambda_i)
+            # exponent_block[q_start:q_end, :].T @ nu_i  →  dense (n_vars,)
+            ac_row = np.asarray(exponent_block[q_start:q_end, :].T.dot(nu_i)).ravel()
+            ac_rows.append(ac_row / lambda_i)
             tight_slices.append((q_start, q_end, lambda_i, constr_i))
 
         n_constr = len(self.data.m_idxs) - 1
         qnu = np.zeros(len(nu_constr))
         constraint_v = np.zeros(n_constr)
-        if not a_c_rows:
+        if not ac_rows:
             return np.zeros(0), qnu, constraint_v
 
-        A_c = np.vstack(a_c_rows)  # (n_tight × n_vars) dense
+        ac = np.vstack(ac_rows)  # (n_tight × n_vars) dense
 
         w = np.zeros(n_vars)
         for vk, coeff in primal_weights.items():
             if vk in self.varcols:
                 w[self.varcols[vk]] = coeff
 
-        # Solve A_c^T v' = w: (n_vars equations, n_tight unknowns)
-        v_prime, _, _, _ = np.linalg.lstsq(A_c.T, w, rcond=None)
+        # Solve ac^T v' = w: (n_vars equations, n_tight unknowns)
+        v_prime, _, _, _ = np.linalg.lstsq(ac.T, w, rcond=None)
 
         # For each tight constraint i, broadcast v'_i / lambda_i across its
         # constituent monomials, weighted by nu_constr.  Also record v'_i by
@@ -598,6 +606,20 @@ class GeometricProgram:
                     if vk not in self.varcols:  # constant VarKey
                         const_senss[vk] -= qnu_j * fraction * exp
 
+    def _apply_const_mmap_correction(self, const_senss, c, v_i):
+        """Apply const_mmap correction to const_senss for one constraint.
+
+        Constants absorbed into the constraint RHS shift the effective tight
+        condition when perturbed.  Mirrors the sens_from_dual correction but
+        scaled by v'_i (the per-constraint dual weight from the linear solve).
+        """
+        scale = (1 - c.const_coeff) / c.const_coeff
+        presub_exps = list(c.unsubbed[0].hmap)
+        for const_presub_idx, pct in c.const_mmap.items():
+            for vk, exp in presub_exps[const_presub_idx].items():
+                if vk not in self.varcols:
+                    const_senss[vk] -= v_i * pct * scale * exp
+
     def _compute_margin_sensitivity(self, nu, varvals, margin_obj):
         """Compute ∂(A−B)/∂log(c) for every constant c via one linear solve.
 
@@ -611,22 +633,22 @@ class GeometricProgram:
         varvals : VarMap
             Combined free-variable primal values and substituted constants.
         margin_obj : MarginObjective
-            Specifies plus_var (A) and minus_var (B).
+            Specifies plus_var and minus_var; margin = plus_val - minus_val.
 
         Returns
         -------
         MarginSolution
         """
-        A_vk = getattr(margin_obj.plus_var, "key", margin_obj.plus_var)
-        B_vk = getattr(margin_obj.minus_var, "key", margin_obj.minus_var)
-        A_val = float(varvals.get(A_vk, 0))
-        B_val = float(varvals.get(B_vk, 0))
+        plus_vk = getattr(margin_obj.plus_var, "key", margin_obj.plus_var)
+        minus_vk = getattr(margin_obj.minus_var, "key", margin_obj.minus_var)
+        plus_val = float(varvals.get(plus_vk, 0))
+        minus_val = float(varvals.get(minus_vk, 0))
 
         primal_weights = {}
-        if A_vk in self.varcols:
-            primal_weights[A_vk] = A_val
-        if B_vk in self.varcols:
-            primal_weights[B_vk] = -B_val
+        if plus_vk in self.varcols:
+            primal_weights[plus_vk] = plus_val
+        if minus_vk in self.varcols:
+            primal_weights[minus_vk] = -minus_val
 
         _, qnu, constraint_v = self._compute_variable_sensitivities(nu, primal_weights)
 
@@ -661,24 +683,14 @@ class GeometricProgram:
                         const_senss[vk] -= qnu_j * exp
             else:
                 self._accumulate_posy_const_sens(const_senss, hmap_qnu, c)
-                # const_mmap: constants absorbed into the constraint RHS shift the
-                # effective tight-condition when they're perturbed.  Apply the same
-                # correction that sens_from_dual uses, but scaled by v'_i instead
-                # of nu[i] (mirrors the pmap → qnu2 transform for the free-var terms).
                 if hasattr(c, "const_mmap"):
-                    v_i = constraint_v[i]
-                    scale = (1 - c.const_coeff) / c.const_coeff
-                    presub_exps = list(c.unsubbed[0].hmap)
-                    for const_presub_idx, pct in c.const_mmap.items():
-                        for vk, exp in presub_exps[const_presub_idx].items():
-                            if vk not in self.varcols:
-                                const_senss[vk] -= v_i * pct * scale * exp
+                    self._apply_const_mmap_correction(const_senss, c, constraint_v[i])
 
-        # Direct contributions when A or B are constants (no linear system needed)
-        if A_vk not in self.varcols:
-            const_senss[A_vk] += A_val
-        if B_vk not in self.varcols:
-            const_senss[B_vk] -= B_val
+        # Direct contributions when plus_var or minus_var are constants
+        if plus_vk not in self.varcols:
+            const_senss[plus_vk] += plus_val
+        if minus_vk not in self.varcols:
+            const_senss[minus_vk] -= minus_val
 
         # Chain rule for linked constants (same pattern as _calculate_sensitivities).
         # pywarnings suppresses RuntimeWarning from 0-division when val == 0.
@@ -691,12 +703,12 @@ class GeometricProgram:
                     dlogv_dlogc = dv_dc * self.substitutions[linked_c] / val
                     const_senss[linked_c] += d_margin_d_logv * dlogv_dlogc
 
-        units = A_vk.unitstr() if A_vk.units else ""
+        units = plus_vk.unitstr() if plus_vk.units else ""
         return MarginSolution(
             name=margin_obj.name,
-            value=A_val - B_val,
-            plus_value=A_val,
-            minus_value=B_val,
+            value=plus_val - minus_val,
+            plus_value=plus_val,
+            minus_value=minus_val,
             units=units,
             sensitivities=dict(const_senss),
         )
