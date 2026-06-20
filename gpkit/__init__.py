@@ -8,6 +8,7 @@ from .ast_nodes import PiNode as _PiNode
 from .constraints.costed import Objective
 from .constraints.set import ConstraintSet
 from .constraints.sigeq import SignomialEquality
+from .margin_objective import MarginObjective
 from .model import Model
 from .nomials import (
     ArrayVariable,

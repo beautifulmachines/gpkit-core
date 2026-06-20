@@ -81,6 +81,33 @@ class Sensitivities:
         raise NotImplementedError
 
 
+@dataclass(frozen=True, slots=True)
+class MarginSolution:
+    "Value and per-constant sensitivities for a MarginObjective"
+
+    name: str
+    value: float  # A* − B*
+    plus_value: float  # A*
+    minus_value: float  # B*
+    units: str  # unit string from plus_var.key.units (may be empty)
+    sensitivities: dict  # {VarKey: ∂(A−B)/∂log(c)} for each constant
+
+    def table(self) -> str:
+        "Format sensitivities sorted most-negative first."
+        u = f" {self.units}" if self.units else ""
+        lines = [
+            f"\n{self.name}: {self.value:.4g}{u}"
+            f"  (A={self.plus_value:.4g}{u}, B={self.minus_value:.4g}{u})",
+        ]
+        if not self.sensitivities:
+            return "\n".join(lines)
+        lines.append(f"  ∂({self.name})/∂log(c) [most negative first]:")
+        for vk, s in sorted(self.sensitivities.items(), key=lambda kv: kv[1]):
+            pct = 100 * s / self.value if self.value else 0
+            lines.append(f"    {vk.name:20s}  {s:+.4g}{u}  ({pct:+.1f}%)")
+        return "\n".join(lines)
+
+
 SUMMARY_TABLES = ("sweeps", "cost", "warnings", "solution")
 
 
@@ -94,6 +121,7 @@ class Solution:
     sens: Sensitivities
     # program : GP
     meta: dict
+    derived: "MarginSolution | None" = None
 
     @property
     def variables(self):
@@ -172,6 +200,8 @@ class Solution:
     def summary(self, **kwargs) -> str:
         "Print a summary table of this Solution"
         lines = self.cost_breakdown() + self.model_sens_breakdown() + [""]
+        if self.derived is not None:
+            lines.append(self.derived.table())
         table = printing.table(self, tables=SUMMARY_TABLES, **kwargs)
         return "\n".join(lines) + table
 
@@ -180,6 +210,8 @@ class Solution:
         lines = []
         if "tables" not in kwargs:  # don't add breakdowns if tables custom
             lines += self.cost_breakdown() + self.model_sens_breakdown() + [""]
+            if self.derived is not None:
+                lines.append(self.derived.table())
         return "\n".join(lines) + printing.table(self, **kwargs)
 
     def budget(self, var, display_units=None, depth=float("inf")):

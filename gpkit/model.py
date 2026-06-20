@@ -306,6 +306,16 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
         # Phase 5: structural metadata for nested/composable models
         ir["model_tree"] = build_model_tree(self)
 
+        if getattr(self, "margin_objective", None) is not None:
+            mo = self.margin_objective
+            A_key = getattr(mo.plus_var, "key", mo.plus_var)
+            B_key = getattr(mo.minus_var, "key", mo.minus_var)
+            ir["margin_objective"] = {
+                "name": mo.name,
+                "plus_var": A_key.ref,
+                "minus_var": B_key.ref,
+            }
+
         return ir
 
     @classmethod
