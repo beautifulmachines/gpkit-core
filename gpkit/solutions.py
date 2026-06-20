@@ -90,21 +90,26 @@ class MarginSolution:
     plus_value: float  # A*
     minus_value: float  # B*
     units: str  # unit string from plus_var.key.units (may be empty)
-    sensitivities: dict  # {VarKey: ∂(A−B)/∂log(c)} for each constant
+    sensitivities: dict  # {VarKey: ∂(margin)/∂c} for each constant
 
     def table(self) -> str:
         "Format sensitivities sorted most-negative first."
         u = f" {self.units}" if self.units else ""
         lines = [
             f"\n{self.name}: {self.value:.4g}{u}"
-            f"  (A={self.plus_value:.4g}{u}, B={self.minus_value:.4g}{u})",
+            f"  (plus={self.plus_value:.4g}{u}, minus={self.minus_value:.4g}{u})",
         ]
         if not self.sensitivities:
             return "\n".join(lines)
-        lines.append(f"  ∂({self.name})/∂log(c) [most negative first]:")
+        lines.append(f"  ∂({self.name})/∂c [most negative first]:")
         for vk, s in sorted(self.sensitivities.items(), key=lambda kv: kv[1]):
-            pct = 100 * s / self.value if self.value else 0
-            lines.append(f"    {vk.name:20s}  {s:+.4g}{u}  ({pct:+.1f}%)")
+            if self.units and vk.units:
+                c_units = vk.unitstr()
+                c_fmt = f"({c_units})" if "/" in c_units else c_units
+                su = f" {self.units}/{c_fmt}"
+            else:
+                su = u
+            lines.append(f"    {vk.name:20s}  {s:+.4g}{su}")
         return "\n".join(lines)
 
 

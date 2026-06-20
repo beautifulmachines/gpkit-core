@@ -703,6 +703,15 @@ class GeometricProgram:
                     dlogv_dlogc = dv_dc * self.substitutions[linked_c] / val
                     const_senss[linked_c] += d_margin_d_logv * dlogv_dlogc
 
+        # Convert ∂(margin)/∂log(c) → ∂(margin)/∂c by dividing by c*.
+        # This gives physically dimensioned sensitivities in [margin_units/c_units].
+        with pywarnings.catch_warnings():
+            pywarnings.simplefilter("ignore")
+            for vk in list(const_senss):
+                c_val = float(self.substitutions.get(vk, 0))
+                if c_val:
+                    const_senss[vk] /= c_val
+
         units = plus_vk.unitstr() if plus_vk.units else ""
         return MarginSolution(
             name=margin_obj.name,

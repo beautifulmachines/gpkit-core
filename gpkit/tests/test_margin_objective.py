@@ -66,18 +66,21 @@ class ConstMapModel(Model):
 
 
 def _fd_margin_sens(model_cls, const_name, eps=0.005):
-    """Return finite-difference ∂(margin)/∂log(c) for constant `const_name`."""
+    """Return finite-difference ∂(margin)/∂c for constant `const_name`."""
+    c0 = None
 
     def margin_at(factor):
+        nonlocal c0
         m = model_cls()
         for vk in m.substitutions:
             if vk.name == const_name:
+                c0 = float(m.substitutions[vk])
                 m.substitutions[vk] = m.substitutions[vk] * factor
                 break
-        sol = m.solve(verbosity=0)
-        return sol.derived.value
+        return m.solve(verbosity=0).derived.value
 
-    return (margin_at(1 + eps) - margin_at(1 - eps)) / (2 * eps)
+    fd_log = (margin_at(1 + eps) - margin_at(1 - eps)) / (2 * eps)
+    return fd_log / c0
 
 
 # ---------------------------------------------------------------------------
@@ -95,17 +98,16 @@ def test_simple_margin_value():
 
 
 def test_simple_margin_sensitivities_analytical():
-    """Analytical check of ∂margin/∂log(c) for SimpleMarginModel.
+    """Analytical check of ∂margin/∂c for SimpleMarginModel.
 
     B* = c_frac * A_allow = 80, margin = A_allow - B* = 20.
-    For A_allow: direct +A_val = +100, but B* = c*A also increases (linear in A),
-    so the constraint contributes -80, netting +20.
-    For c_frac: B* = c*A is tight, contribution -80.
+    ∂(margin)/∂A_allow: log-sens = +20 kg, divided by A_allow=100 kg → +0.2.
+    ∂(margin)/∂c_frac:  log-sens = -80 kg, divided by c_frac=0.8 → -100 kg.
     """
     sol = SimpleMarginModel().solve(verbosity=0)
     senss = {vk.name: v for vk, v in sol.derived.sensitivities.items()}
-    assert abs(senss["A_allow"] - 20.0) < 1e-4
-    assert abs(senss["c_frac"] - (-80.0)) < 1e-4
+    assert abs(senss["A_allow"] - 0.2) < 1e-6
+    assert abs(senss["c_frac"] - (-100.0)) < 1e-4
 
 
 def test_simple_margin_sensitivities_fd():
@@ -190,10 +192,22 @@ def test_growth_allowance_margin_fd():
                 break
         return m.solve(verbosity=0).derived.value
 
+    def c0_for(src_vk):
+        key = stable_key(src_vk)
+        m = GrowthAllowance()
+        for vk in m.substitutions:
+            if stable_key(vk) == key:
+                return float(m.substitutions[vk])
+        return 1.0
+
     sol = GrowthAllowance().solve(verbosity=0)
     eps = 0.005
     for vk, sens in sol.derived.sensitivities.items():
-        fd = (margin_at_factor(vk, 1 + eps) - margin_at_factor(vk, 1 - eps)) / (2 * eps)
+        c0 = c0_for(vk)
+        fd_log = (margin_at_factor(vk, 1 + eps) - margin_at_factor(vk, 1 - eps)) / (
+            2 * eps
+        )
+        fd = fd_log / c0
         assert (
             abs(sens - fd) / max(abs(sens), 1e-10) < 1e-2
         ), f"FD check failed for {vk.name} ({vk.ref}): computed={sens:.4g}, fd={fd:.4g}"
