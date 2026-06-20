@@ -6,15 +6,15 @@ Budget  —  GrowthAllowance.m
     Spar1.m             13.5     2.7   16.2  [kg]   45.5%
 
 mass margin: 4.36 kg  (plus=40 kg, minus=35.64 kg)
-  ∂(mass margin)/∂c [most negative first]:
+  ∂(mass margin)/∂c [by |GP sensitivity|]:
+    rho                   -0.0066 kg/(kg/m³)
     t                     -3564 kg/m
+    A                     -17.82 kg/m²
+    rho                   -0.0066 kg/(kg/m³)
     t                     -3564 kg/m
-    f_growth_m            -32.4 kg
     A                     -17.82 kg/m²
-    A                     -17.82 kg/m²
-    f_growth_m            -14.85 kg
-    f_growth_m            -14.85 kg
     theta                 -9.18 kg
-    rho                   -0.0066 kg/(kg/m³)
-    rho                   -0.0066 kg/(kg/m³)
+    f_growth_m            -32.4 kg
+    f_growth_m            -14.85 kg
+    f_growth_m            -14.85 kg
     m_budget              +1 kg/kg

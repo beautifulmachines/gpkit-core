@@ -92,8 +92,17 @@ class MarginSolution:
     units: str  # unit string from plus_var.key.units (may be empty)
     sensitivities: dict  # {VarKey: ∂(margin)/∂c} for each constant
 
-    def table(self) -> str:
-        "Format sensitivities sorted most-negative first."
+    def table(self, cost_sens=None) -> str:
+        """Format sensitivities, ordered by |GP cost sensitivity| when provided.
+
+        Parameters
+        ----------
+        cost_sens : dict, optional
+            {VarKey: ∂log(cost)/∂log(c)} from sol.sens.variables.  When given,
+            rows are ordered by descending |cost_sens| — a dimensionless,
+            unit-invariant ranking of each constant's influence.  When omitted,
+            rows are ordered by the margin sensitivity value (most negative first).
+        """
         u = f" {self.units}" if self.units else ""
         lines = [
             f"\n{self.name}: {self.value:.4g}{u}"
@@ -101,8 +110,18 @@ class MarginSolution:
         ]
         if not self.sensitivities:
             return "\n".join(lines)
-        lines.append(f"  ∂({self.name})/∂c [most negative first]:")
-        for vk, s in sorted(self.sensitivities.items(), key=lambda kv: kv[1]):
+        if cost_sens is not None:
+            label = "by |GP sensitivity|"
+            items = sorted(
+                self.sensitivities.items(),
+                key=lambda kv: abs(cost_sens.get(kv[0], 0)),
+                reverse=True,
+            )
+        else:
+            label = "most negative first"
+            items = sorted(self.sensitivities.items(), key=lambda kv: kv[1])
+        lines.append(f"  ∂({self.name})/∂c [{label}]:")
+        for vk, s in items:
             if self.units and vk.units:
                 c_units = vk.unitstr()
                 c_fmt = f"({c_units})" if "/" in c_units else c_units
