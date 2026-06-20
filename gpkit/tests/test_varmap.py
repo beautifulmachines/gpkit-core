@@ -289,6 +289,9 @@ class TestDisplayNames:
             assert (
                 names[vk] == "x"
             ), "vector elements with the same parent are not a collision"
+        veckey = vks[0].veckey
+        assert veckey in names, "parent veckey must appear in display_names result"
+        assert names[veckey] == "x"
 
 
 class TestComputeCollisionDepths:

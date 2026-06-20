@@ -326,24 +326,24 @@ def _collision_depths(varset):
 
     Returns {VarKey: int} where 0 means no lineage prefix needed and N means
     the last N lineage segments are required to make the name unique.
+    Includes both element keys and their parent veckeys.
     """
     result = {}
     name_collisions = defaultdict(set)
-    for key in varset:
+    # vector_parent_keys() yields each vector once via its parent veckey, so
+    # siblings share one representative and one lineagestr — required to avoid
+    # duplicate entries that would cause an infinite loop in
+    # _compute_collision_depths.
+    for key in varset.vector_parent_keys():
         if len(varset.by_name(key.name)) == 1:
             result[key] = 0
         else:
-            # Use veckey as representative for vector elements so that
-            # siblings of the same vector are deduplicated before collision
-            # detection and don't cause an infinite loop in
-            # _compute_collision_depths (they share the same lineagestr).
-            rep = key.veckey if getattr(key, "idx", None) is not None else key
-            name_collisions[key.name].add(rep)
-    depths = _compute_collision_depths(name_collisions)
+            name_collisions[key.name].add(key)
+    result.update(_compute_collision_depths(name_collisions))
+    # Propagate veckey depths to element keys.
     for key in varset:
         if key not in result:
-            rep = key.veckey if getattr(key, "idx", None) is not None else key
-            result[key] = depths.get(rep, 0)
+            result[key] = result.get(key.veckey, 0)
     return result
 
 
@@ -362,12 +362,7 @@ def display_names(varkeys):
             result[vk] = vk.name
         else:
             lineage_parts = vk.lineagestr().split(".")
-            prefix = (
-                ".".join(lineage_parts[-depth:])
-                if depth <= len(lineage_parts)
-                else vk.lineagestr()
-            )
-            result[vk] = f"{prefix}.{vk.name}"
+            result[vk] = f"{'.'.join(lineage_parts[-depth:])}.{vk.name}"
     return result
 
 
