@@ -112,7 +112,7 @@ Constraints
 
 Optimal Cost
 ------------
-C[:].prod()·x^0.01 : 2
+Relax1.C[:].prod()·x^0.01 : 2
 
 WARNINGS
 --------
