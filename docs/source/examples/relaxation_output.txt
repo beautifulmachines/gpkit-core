@@ -83,12 +83,12 @@ With constraints relaxed individually
 
 Cost Function
 -------------
- C[:].prod()·x^0.01
+ Relax1.C[:].prod()·x^0.01
 
 Constraints
 -----------
  "minimum relaxation":
-   C[:] ≥ 1
+   Relax1.C[:] ≥ 1
  "relaxed constraints":
    x ≤ C[0]·x_max
    x_min ≤ C[1]·x

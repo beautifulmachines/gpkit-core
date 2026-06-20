@@ -321,6 +321,56 @@ def _compute_collision_depths(name_collisions):
     return result
 
 
+def _collision_depths(varset):
+    """Minimum lineage depths for all VarKeys in a VarSet.
+
+    Returns {VarKey: int} where 0 means no lineage prefix needed and N means
+    the last N lineage segments are required to make the name unique.
+    """
+    result = {}
+    name_collisions = defaultdict(set)
+    for key in varset:
+        if len(varset.by_name(key.name)) == 1:
+            result[key] = 0
+        else:
+            # Use veckey as representative for vector elements so that
+            # siblings of the same vector are deduplicated before collision
+            # detection and don't cause an infinite loop in
+            # _compute_collision_depths (they share the same lineagestr).
+            rep = key.veckey if getattr(key, "idx", None) is not None else key
+            name_collisions[key.name].add(rep)
+    depths = _compute_collision_depths(name_collisions)
+    for key in varset:
+        if key not in result:
+            rep = key.veckey if getattr(key, "idx", None) is not None else key
+            result[key] = depths.get(rep, 0)
+    return result
+
+
+def display_names(varkeys):
+    """Minimum-lineage display names for a collection of VarKeys.
+
+    Returns {VarKey: str} mapping each key to its shortest unambiguous
+    display name: just the variable name when unique, or "Lineage.name"
+    with the minimum lineage prefix needed to disambiguate collisions.
+    """
+    varset = VarSet(varkeys)
+    depths = _collision_depths(varset)
+    result = {}
+    for vk, depth in depths.items():
+        if depth == 0:
+            result[vk] = vk.name
+        else:
+            lineage_parts = vk.lineagestr().split(".")
+            prefix = (
+                ".".join(lineage_parts[-depth:])
+                if depth <= len(lineage_parts)
+                else vk.lineagestr()
+            )
+            result[vk] = f"{prefix}.{vk.name}"
+    return result
+
+
 def get_lineage_map(solution):
     """Compute and cache lineage display mapping for solution variables.
 
@@ -328,18 +378,7 @@ def get_lineage_map(solution):
     needed to uniquely identify it among the solution's variables.
     """
     if "name_collision_varkeys" not in solution.meta:
-        solution.meta["name_collision_varkeys"] = {}
         varset = VarSet(solution.primal.varset)
         varset.update(solution.constants)
-        name_collisions = defaultdict(set)
-        for key in varset:
-            if len(varset.by_name(key.name)) == 1:  # unique
-                solution.meta["name_collision_varkeys"][key] = 0
-            else:
-                shortname = key.str_without(["lineage", "vec"])
-                if len(varset.by_name(shortname)) > 1:
-                    name_collisions[shortname].add(key)
-        solution.meta["name_collision_varkeys"].update(
-            _compute_collision_depths(name_collisions)
-        )
+        solution.meta["name_collision_varkeys"] = _collision_depths(varset)
     return solution.meta["name_collision_varkeys"]

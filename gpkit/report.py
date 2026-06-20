@@ -267,7 +267,7 @@ def _build_split_var_entries(
         except KeyError:
             return None, unitstr(vk) or "-"
 
-    lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
+    lineage_map = model._name_collision_varkeys  # pylint: disable=protected-access
     excluded = {":MAGIC:" + model.lineagestr()} if model.lineagestr() else set()
     free_entries: List[VarEntry] = []
     fixed_entries: List[VarEntry] = []
@@ -448,7 +448,7 @@ def build_report_ir(
     is_anon = type(model) is _Model  # pylint: disable=unidiomatic-typecheck
     own_name = "" if is_anon else type(model).__name__
     lineage_path = model.lineagestr() if own_name else _parent_path
-    lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
+    lineage_map = model._name_collision_varkeys  # pylint: disable=protected-access
     cgroups = _build_constraint_groups(model)
     free_vars, fixed_vars = _build_split_var_entries(
         model,
