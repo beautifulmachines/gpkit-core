@@ -2,6 +2,7 @@
 
 from collections import defaultdict
 from contextlib import nullcontext
+from functools import cached_property
 
 import numpy as np
 
@@ -9,7 +10,7 @@ from ..nomials import NomialArray, Variable
 from ..util.repr_conventions import ReprMixin, lineagestr
 from ..util.small_scripts import try_str_without
 from ..varkey import lineage_display_context
-from ..varmap import VarMap, VarSet, _compute_collision_depths
+from ..varmap import VarMap, VarSet, _collision_depths
 
 
 # pylint: disable=fixme
@@ -52,7 +53,6 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
     "Recursive container for ConstraintSets and Inequalities"
 
     unique_varkeys, idxlookup = frozenset(), {}
-    _name_collision_varkeys = None
     _varkeys = None
 
     def __init__(
@@ -211,30 +211,10 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
             f"{len(self.varkeys)} variable(s)>"
         )
 
-    def _get_lineage_map(self):
-        "Returns mapping of VarKey → lineage depth for display"
-        if self._name_collision_varkeys is None:
-            self._name_collision_varkeys = {}
-            name_collisions = defaultdict(set)
-            for key in self.varkeys:
-                if hasattr(key, "key"):
-                    if key.veckey and all(
-                        k.veckey == key.veckey for k in self.varkeys.keys(key.name)
-                    ):
-                        self._name_collision_varkeys[key] = 0
-                        self._name_collision_varkeys[key.veckey] = 0
-                    elif len(self.varkeys.keys(key.name)) == 1:
-                        self._name_collision_varkeys[key] = 0
-                    else:
-                        shortname = key.str_without(["lineage", "vec"])
-                        if len(self.varkeys.keys(shortname)) > 1:
-                            name_collisions[shortname].add(key)
-                else:
-                    raise ValueError(f"unexpected key {key} has no key attribute")
-            self._name_collision_varkeys.update(
-                _compute_collision_depths(name_collisions)
-            )
-        return self._name_collision_varkeys
+    @cached_property
+    def _name_collision_varkeys(self):
+        "Mapping of VarKey → lineage depth for display, computed once per instance."
+        return _collision_depths(self.varkeys)
 
     def lines_without(self, excluded):
         "Lines representation of a ConstraintSet."
@@ -242,7 +222,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
         root, rootlines = "root" not in excluded, []
         if root:
             excluded = {"root"}.union(excluded)
-            ctx = lineage_display_context(self._get_lineage_map())
+            ctx = lineage_display_context(self._name_collision_varkeys)
         else:
             ctx = nullcontext()
         with ctx:

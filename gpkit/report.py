@@ -251,8 +251,8 @@ def _build_split_var_entries(
     fixed_entries — Fixed Variables: prescribed constants with sensitivities.
 
     Local variables: names disambiguated within the section scope using
-    _get_lineage_map(); model's own lineage stripped so only sub-model context
-    is shown. Vector variables collapsed to a single VarEntry.
+    _name_collision_varkeys; model's own lineage stripped so only sub-model
+    context is shown. Vector variables collapsed to a single VarEntry.
 
     Cross-model variables (extra_vks): full dotted name stored in
     VarEntry.source for display in brackets.
@@ -267,7 +267,7 @@ def _build_split_var_entries(
         except KeyError:
             return None, unitstr(vk) or "-"
 
-    lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
+    lineage_map = model._name_collision_varkeys  # pylint: disable=protected-access
     excluded = {":MAGIC:" + model.lineagestr()} if model.lineagestr() else set()
     free_entries: List[VarEntry] = []
     fixed_entries: List[VarEntry] = []
@@ -448,7 +448,7 @@ def build_report_ir(
     is_anon = type(model) is _Model  # pylint: disable=unidiomatic-typecheck
     own_name = "" if is_anon else type(model).__name__
     lineage_path = model.lineagestr() if own_name else _parent_path
-    lineage_map = model._get_lineage_map()  # pylint: disable=protected-access
+    lineage_map = model._name_collision_varkeys  # pylint: disable=protected-access
     cgroups = _build_constraint_groups(model)
     free_vars, fixed_vars = _build_split_var_entries(
         model,
@@ -624,8 +624,8 @@ def _text_cgroup_lines(constraint_groups: list, pad: str, lineage_map: dict) -> 
 def _text_constraint_rows(constraints: list, lineage_map: dict = None) -> list:
     """Build aligned rows for a constraint group in text output.
 
-    lineage_map is the section's _get_lineage_map() result; activating it
-    makes variable names in constraints use section-local abbreviations.
+    lineage_map is a _name_collision_varkeys dict; activating it makes
+    variable names in constraints use section-local abbreviations.
     """
     ctx = lineage_display_context(lineage_map or {})
     with ctx:

@@ -25,6 +25,7 @@ from .util.build import build
 from .util.globals import NamedVariables, SignomialsEnabled, Vectorize, settings
 from .var import Var
 from .varkey import VarKey
+from .varmap import display_names
 
 pi = Monomial(_np.pi, ast=_PiNode())
 

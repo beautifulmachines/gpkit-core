@@ -5,7 +5,7 @@ import pytest
 
 from gpkit import Variable, VectorVariable, ureg
 from gpkit.varkey import VarKey
-from gpkit.varmap import VarMap, VarSet, _compute_collision_depths
+from gpkit.varmap import VarMap, VarSet, _compute_collision_depths, display_names
 
 
 @pytest.fixture(name="vm")
@@ -259,6 +259,42 @@ class TestRefLookup:
         assert vm[vk2.ref] == 2
         with pytest.raises(KeyError):
             _ = vm["x"]  # still ambiguous by short name
+
+
+class TestDisplayNames:
+    """Tests for display_names in varmap.py."""
+
+    def test_no_collision(self):
+        vk_s = VarKey("S", lineage=(("Wing", 0),))
+        vk_w = VarKey("W", lineage=(("Wing", 0),))
+        names = display_names([vk_s, vk_w])
+        assert names[vk_s] == "S"
+        assert names[vk_w] == "W"
+
+    def test_name_collision(self):
+        vk_a = VarKey("S", lineage=(("WingA", 0),))
+        vk_b = VarKey("S", lineage=(("WingB", 0),))
+        names = display_names([vk_a, vk_b])
+        assert names[vk_a] != names[vk_b], "colliding names must be disambiguated"
+        assert "WingA" in names[vk_a]
+        assert "WingB" in names[vk_b]
+        assert names[vk_a].endswith(".S")
+        assert names[vk_b].endswith(".S")
+
+    def test_vector_no_false_collision(self):
+        x = VectorVariable(3, "x")
+        vks = [v.key for v in x]
+        names = display_names(vks)
+        for vk in vks:
+            assert (
+                "." not in names[vk]
+            ), "vector elements with the same parent are not a collision"
+
+    def test_vector_veckey_display_name(self):
+        x = VectorVariable(3, "x")
+        veckey = x[0].key.veckey
+        names = display_names([veckey])
+        assert names[veckey] == "x[:]"
 
 
 class TestComputeCollisionDepths:

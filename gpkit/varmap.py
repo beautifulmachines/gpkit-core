@@ -7,6 +7,7 @@ import numpy as np
 
 from .units import Quantity, qty
 from .util.small_scripts import veclinkedfn
+from .varkey import lineage_display_context
 
 
 def _nested_lookup(nested_keys, val_dict):
@@ -321,6 +322,44 @@ def _compute_collision_depths(name_collisions):
     return result
 
 
+def _collision_depths(varset):
+    """Minimum lineage depths for all VarKeys in a VarSet.
+
+    Returns {VarKey: int} where 0 means no lineage prefix needed and N means
+    the last N lineage segments are required to make the name unique.
+    Includes both element keys and their parent veckeys.
+    """
+    result = {}
+    name_collisions = defaultdict(set)
+    # vector_parent_keys() yields each vector once via its parent veckey, so
+    # siblings share one representative and one lineagestr — required to avoid
+    # duplicate entries that would cause an infinite loop in
+    # _compute_collision_depths.
+    for key in varset.vector_parent_keys():
+        if len(varset.by_name(key.name)) == 1:
+            result[key] = 0
+        else:
+            name_collisions[key.name].add(key)
+    result.update(_compute_collision_depths(name_collisions))
+    # Propagate veckey depths to element keys.
+    for key in varset:
+        if key not in result:
+            result[key] = result.get(key.veckey, 0)
+    return result
+
+
+def display_names(varkeys, excluded=()):
+    """Minimum-lineage display names for a collection of VarKeys.
+
+    Returns {VarKey: str} mapping each key to its shortest unambiguous
+    display name, using the same formatting rules as VarKey.str_without.
+    Pass excluded strings (including ':MAGIC:' prefixes) to strip lineage.
+    """
+    varset = VarSet(varkeys)
+    with lineage_display_context(_collision_depths(varset)):
+        return {vk: vk.str_without(excluded) for vk in varkeys}
+
+
 def get_lineage_map(solution):
     """Compute and cache lineage display mapping for solution variables.
 
@@ -328,18 +367,7 @@ def get_lineage_map(solution):
     needed to uniquely identify it among the solution's variables.
     """
     if "name_collision_varkeys" not in solution.meta:
-        solution.meta["name_collision_varkeys"] = {}
         varset = VarSet(solution.primal.varset)
         varset.update(solution.constants)
-        name_collisions = defaultdict(set)
-        for key in varset:
-            if len(varset.by_name(key.name)) == 1:  # unique
-                solution.meta["name_collision_varkeys"][key] = 0
-            else:
-                shortname = key.str_without(["lineage", "vec"])
-                if len(varset.by_name(shortname)) > 1:
-                    name_collisions[shortname].add(key)
-        solution.meta["name_collision_varkeys"].update(
-            _compute_collision_depths(name_collisions)
-        )
+        solution.meta["name_collision_varkeys"] = _collision_depths(varset)
     return solution.meta["name_collision_varkeys"]

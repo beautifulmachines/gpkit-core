@@ -38,8 +38,11 @@ layers =
     # Algebra + mathematical objects (including constraint primitives)
     gpkit.nomials
 
-    # Variables and hashing
-    gpkit.varkey | gpkit.varmap
+    # Variable containers (VarMap, VarSet) — depends on varkey
+    gpkit.varmap
+
+    # Variable identity and display context (VarKey, lineage_display_context)
+    gpkit.varkey
 
     # Utilities (including globals, build)
     gpkit.util
