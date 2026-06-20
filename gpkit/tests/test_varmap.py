@@ -287,11 +287,14 @@ class TestDisplayNames:
         names = display_names(vks)
         for vk in vks:
             assert (
-                names[vk] == "x"
+                "." not in names[vk]
             ), "vector elements with the same parent are not a collision"
-        veckey = vks[0].veckey
-        assert veckey in names, "parent veckey must appear in display_names result"
-        assert names[veckey] == "x"
+
+    def test_vector_veckey_display_name(self):
+        x = VectorVariable(3, "x")
+        veckey = x[0].key.veckey
+        names = display_names([veckey])
+        assert names[veckey] == "x[:]"
 
 
 class TestComputeCollisionDepths:

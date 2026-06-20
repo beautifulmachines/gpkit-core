@@ -7,6 +7,7 @@ import numpy as np
 
 from .units import Quantity, qty
 from .util.small_scripts import veclinkedfn
+from .varkey import lineage_display_context
 
 
 def _nested_lookup(nested_keys, val_dict):
@@ -347,23 +348,16 @@ def _collision_depths(varset):
     return result
 
 
-def display_names(varkeys):
+def display_names(varkeys, excluded=()):
     """Minimum-lineage display names for a collection of VarKeys.
 
     Returns {VarKey: str} mapping each key to its shortest unambiguous
-    display name: just the variable name when unique, or "Lineage.name"
-    with the minimum lineage prefix needed to disambiguate collisions.
+    display name, using the same formatting rules as VarKey.str_without.
+    Pass excluded strings (including ':MAGIC:' prefixes) to strip lineage.
     """
     varset = VarSet(varkeys)
-    depths = _collision_depths(varset)
-    result = {}
-    for vk, depth in depths.items():
-        if depth == 0:
-            result[vk] = vk.name
-        else:
-            lineage_parts = vk.lineagestr().split(".")
-            result[vk] = f"{'.'.join(lineage_parts[-depth:])}.{vk.name}"
-    return result
+    with lineage_display_context(_collision_depths(varset)):
+        return {vk: vk.str_without(excluded) for vk in varkeys}
 
 
 def get_lineage_map(solution):
