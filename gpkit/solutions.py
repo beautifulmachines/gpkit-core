@@ -114,12 +114,16 @@ class MarginSolution:
             label = "by |GP sensitivity|"
             items = sorted(
                 self.sensitivities.items(),
-                key=lambda kv: (-abs(cost_sens.get(kv[0], 0)), kv[0].ref),
+                key=lambda kv: (
+                    -float(f"{abs(cost_sens.get(kv[0], 0)):.4g}"),
+                    kv[0].ref,
+                ),
             )
         else:
             label = "most negative first"
             items = sorted(
-                self.sensitivities.items(), key=lambda kv: (kv[1], kv[0].ref)
+                self.sensitivities.items(),
+                key=lambda kv: (float(f"{kv[1]:.4g}"), kv[0].ref),
             )
         lines.append(f"  ∂({self.name})/∂c [{label}]:")
         names = display_names([vk for vk, _ in items])

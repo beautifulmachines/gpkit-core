@@ -541,19 +541,21 @@ class GeometricProgram:
 
         ac = np.vstack(ac_rows)  # (n_tight × n_vars)
 
-        # Each column of W is a unit vector selecting one free variable.
-        W = np.zeros((n_vars, len(valid_vks)))
+        # Each column selects one free variable (unit vector at its index).
+        weight_cols = np.zeros((n_vars, len(valid_vks)))
         for j, vk in enumerate(valid_vks):
-            W[self.varcols[vk], j] = 1.0
+            weight_cols[self.varcols[vk], j] = 1.0
 
-        V, _, _, _ = np.linalg.lstsq(ac.T, W, rcond=None)
+        adjoint_cols, _, _, _ = np.linalg.lstsq(ac.T, weight_cols, rcond=None)
 
         for j, vk in enumerate(valid_vks):
             qnu = np.zeros(n_constr_mono)
             cv = np.zeros(n_constr)
             for i, (q_start, q_end, lambda_i, constr_i) in enumerate(tight_slices):
-                qnu[q_start:q_end] = (V[i, j] / lambda_i) * nu_constr[q_start:q_end]
-                cv[constr_i] = V[i, j]
+                qnu[q_start:q_end] = (adjoint_cols[i, j] / lambda_i) * nu_constr[
+                    q_start:q_end
+                ]
+                cv[constr_i] = adjoint_cols[i, j]
             result[vk] = (qnu, cv)
 
         return result

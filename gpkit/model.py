@@ -310,12 +310,10 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
 
         if self.margin_objective is not None:
             mo = self.margin_objective
-            plus_key = getattr(mo.plus_var, "key", mo.plus_var)
-            minus_key = getattr(mo.minus_var, "key", mo.minus_var)
             ir["margin_objective"] = {
                 "name": mo.name,
-                "plus_var": plus_key.ref,
-                "minus_var": minus_key.ref,
+                "plus_var": mo.plus_var.ref,
+                "minus_var": mo.minus_var.ref,
             }
 
         return ir

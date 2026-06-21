@@ -251,8 +251,6 @@ def test_margin_solution_table():
 
 def test_from_ir_preserves_margin_objective():
     """Model.from_ir(model.to_ir()) reconstructs a model w/ margin_objective intact."""
-    from gpkit import Model
-
     model = SimpleMarginModel()
     ir = model.to_ir()
     assert "margin_objective" in ir
