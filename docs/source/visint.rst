@@ -17,31 +17,6 @@ For example if the constraint ``x_total >= x1 + x2`` is tight (that is, has a se
 
 If permissivity is greater than 1, the breakdown will always proceed if a breakdown variable is available in the monomial, and will choose the most sensitive one if multiple are available. If permissivity is 1, breakdowns will stop when there are multiple breakdown variables multiplying each other. If permissivity is 0, breakdowns will stop when any free variables multiply each other. If permissivity is between 0 and 1, it will follow the behavior for 1 if the monomial represents a fraction of the total greater than ``1 - permissivity``, and the behavior for 0 otherwise.
 
-Model Hierarchy Treemaps
-========================
-
-.. code:: python
-
-    import plotly
-    from gpkit.interactive.plotting import treemap
-    from solar.solar import *
-    Vehicle = Aircraft(Npod=3, sp=True)
-    M = Mission(Vehicle, latitude=[20])
-    fig = treemap(M)
-    plotly.offline.plot(fig, filename="treemap.html")
-
-.. figure:: figures/treemap.png
-
-and, using sizing and counting by constraints instead of variables (the default):
-
-.. code:: python
-
-    fig = treemap(M, itemize="constraints", sizebycount=True)
-    plotly.offline.plot(fig, filename="sizedtreemap.html")
-
-.. figure:: figures/sizedconstrainttreemap.png
-
-
 Variable Reference Plots
 ========================
 
