@@ -501,13 +501,26 @@ class GeometricProgram:
         return cost_senss, gpv_ss, absv_ss, m_senss, constraint_senss
 
     def _compute_free_var_adjoints(self, nu, free_varkeys):
-        """Compute per-variable adjoint qnu vectors via one batched linear solve.
+        """Compute per-variable adjoint vectors for each vk in free_varkeys.
 
-        For each vk in free_varkeys, solves ac^T v_j = e_j (unit vector at
-        varcols[vk]) so that ∂x_j*/∂log(c) can be accumulated from qnu_j.
+        Three phases:
 
-        ac (n_tight × n_vars) has one row per active constraint:
-        ac[i,:] = nu_i @ A_i / lambda_i.  Slack constraints are skipped.
+        1. Build ac (n_tight × n_vars): one row per active constraint,
+           ac[i,:] = (A_i^T nu_i) / lambda_i.  Slack constraints are skipped.
+           This loop is unavoidable — m_idxs is an irregular per-constraint
+           slice structure that must be read entry by entry.
+
+        2. Batched linear solve: ac^T V = W, where each column of W is a unit
+           vector selecting one free variable.  One lstsq call solves all
+           free_varkeys simultaneously.  adjoint_cols[i,j] is how much
+           tight constraint i's activity shifts per unit change in log(x_j*).
+
+        3. Scatter results back to monomial indexing: adjoint_cols lives in
+           "one row per tight constraint" space; qnu must be in "one entry per
+           monomial" space.  The scatter loop distributes each constraint's
+           adjoint value into its monomial slice, weighted by nu_i / lambda_i.
+           (Could be vectorized via a precomputed monomial→tight-constraint
+           index array if extended to many free variables.)
 
         Returns {VarKey: (qnu_array, constraint_v_array)} for each vk in
         free_varkeys that is present in self.varcols.
