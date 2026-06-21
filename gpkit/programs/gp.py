@@ -500,55 +500,28 @@ class GeometricProgram:
 
         return cost_senss, gpv_ss, absv_ss, m_senss, constraint_senss
 
-    def _compute_variable_sensitivities(self, nu, primal_weights):
-        """Compute ∂(Σ w_i x_i*)/∂log(c_m) via one linear solve.
+    def _compute_free_var_adjoints(self, nu, free_varkeys):
+        """Compute per-variable adjoint qnu vectors via one batched linear solve.
 
-        The quantity of interest is a linear combination of primal values,
-        e.g. plus_val - minus_val for a margin.  Because the GP KKT system
-        is in log-space, the weight for variable x_i is w_i = coeff * x_i*
-        (the chain rule factor x_i* converts ∂log(x_i) to ∂x_i).
+        For each vk in free_varkeys, solves ac^T v_j = e_j (unit vector at
+        varcols[vk]) so that ∂x_j*/∂log(c) can be accumulated from qnu_j.
 
-        Parameters
-        ----------
-        nu : array
-            Full dual variable vector (length = total monomials, including cost).
-        primal_weights : dict
-            {VarKey: float} — per-variable weights w_i = sign * x_i* for each
-            free variable that appears in the quantity of interest.  Only free
-            variables (those in self.varcols) should be included; constants are
-            handled as direct corrections by the caller.
+        ac (n_tight × n_vars) has one row per active constraint:
+        ac[i,:] = nu_i @ A_i / lambda_i.  Slack constraints are skipped.
 
-        Returns
-        -------
-        (v_prime, qnu, constraint_v) : tuple of np.ndarray
-            v_prime      — solution to ac^T v' = w, one entry per tight constraint
-            qnu          — sensitivity weight per constraint monomial:
-                           qnu[k] = (v'[i] / lambda_i) * nu_constr[k]
-            constraint_v — v'[i] broadcast to constraint index space
-
-        Notes
-        -----
-        ac (n_tight × n_vars) is the matrix of nu-weighted average exponents,
-        one row per tight constraint: ac[i,:] = nu_i @ A_i / lambda_i.
-        Slack constraints (lambda_i ≈ 0) are skipped; they contribute nothing.
+        Returns {VarKey: (qnu_array, constraint_v_array)} for each vk in
+        free_varkeys that is present in self.varcols.
         """
         obj_end = self.data.m_idxs[0].stop
-        exponent_block = self.data.A.tocsr()[
-            obj_end:, :
-        ]  # sparse (n_constr_mono, n_vars)
+        exponent_block = self.data.A.tocsr()[obj_end:, :]
         nu_constr = np.asarray(nu[obj_end:], dtype=float)
         n_vars = len(self.vars)
+        n_constr_mono = len(nu_constr)
+        n_constr = len(self.data.m_idxs) - 1
 
-        # Build ac: one dense row per tight constraint.
-        # ac[i,:] = nu_i @ A_i / lambda_i  (nu-weighted average of exponents).
-        # Relative threshold: skip constraints whose dual weight is negligible compared
-        # to the overall dual magnitude (cvxopt solver tolerance ≈ 1e-5).
         nu_scale = float(nu_constr.sum()) + 1.0
-
         ac_rows = []
-        tight_slices = (
-            []
-        )  # (q_start, q_end, lambda_i, constr_i) for each tight constraint
+        tight_slices = []
         for constr_i, m_idx in enumerate(self.data.m_idxs[1:]):
             q_start = m_idx.start - obj_end
             q_end = m_idx.stop - obj_end
@@ -556,42 +529,52 @@ class GeometricProgram:
             lambda_i = float(nu_i.sum())
             if lambda_i < 1e-5 * nu_scale:
                 continue
-            # exponent_block[q_start:q_end, :].T @ nu_i  →  dense (n_vars,)
             ac_row = np.asarray(exponent_block[q_start:q_end, :].T.dot(nu_i)).ravel()
             ac_rows.append(ac_row / lambda_i)
             tight_slices.append((q_start, q_end, lambda_i, constr_i))
 
-        n_constr = len(self.data.m_idxs) - 1
-        qnu = np.zeros(len(nu_constr))
-        constraint_v = np.zeros(n_constr)
-        if not ac_rows:
-            return np.zeros(0), qnu, constraint_v
+        valid_vks = [vk for vk in free_varkeys if vk in self.varcols]
+        result = {vk: (np.zeros(n_constr_mono), np.zeros(n_constr)) for vk in valid_vks}
 
-        ac = np.vstack(ac_rows)  # (n_tight × n_vars) dense
+        if not ac_rows or not valid_vks:
+            return result
 
-        w = np.zeros(n_vars)
-        for vk, coeff in primal_weights.items():
-            if vk in self.varcols:
-                w[self.varcols[vk]] = coeff
+        ac = np.vstack(ac_rows)  # (n_tight × n_vars)
 
-        # Solve ac^T v' = w: (n_vars equations, n_tight unknowns)
-        v_prime, _, _, _ = np.linalg.lstsq(ac.T, w, rcond=None)
+        # Each column of W is a unit vector selecting one free variable.
+        W = np.zeros((n_vars, len(valid_vks)))
+        for j, vk in enumerate(valid_vks):
+            W[self.varcols[vk], j] = 1.0
 
-        # For each tight constraint i, broadcast v'_i / lambda_i across its
-        # constituent monomials, weighted by nu_constr.  Also record v'_i by
-        # constraint index so callers can apply const_mmap corrections.
-        for j, (q_start, q_end, lambda_i, constr_i) in enumerate(tight_slices):
-            qnu[q_start:q_end] = (v_prime[j] / lambda_i) * nu_constr[q_start:q_end]
-            constraint_v[constr_i] = v_prime[j]
+        V, _, _, _ = np.linalg.lstsq(ac.T, W, rcond=None)
 
-        return v_prime, qnu, constraint_v
+        for j, vk in enumerate(valid_vks):
+            qnu = np.zeros(n_constr_mono)
+            cv = np.zeros(n_constr)
+            for i, (q_start, q_end, lambda_i, constr_i) in enumerate(tight_slices):
+                qnu[q_start:q_end] = (V[i, j] / lambda_i) * nu_constr[q_start:q_end]
+                cv[constr_i] = V[i, j]
+            result[vk] = (qnu, cv)
 
-    def _accumulate_posy_const_sens(self, const_senss, hmap_qnu, c):
-        """Accumulate ∂(A−B)/∂log(c_m) contributions from one PosynomialInequality.
+        return result
 
-        The inner loops (pmap entries × exponent dict entries) are O(1) and
-        O(2-5) per monomial respectively in typical engineering models.
+    def _propagate_linked_derivs(self, sens_dict):
+        """Apply linked-constant chain rule to sens_dict in-place.
+
+        Pops each intermediate VarKey that has linked derivatives and
+        accumulates its sensitivity into the base constants.
         """
+        for v in list(v for v in sens_dict if self.linked_derivs.get(v)):
+            dsens_dlogv = sens_dict.pop(v)
+            val = np.array(self.substitutions[v])
+            for c, dv_dc in self.linked_derivs[v].items():
+                with pywarnings.catch_warnings():
+                    pywarnings.simplefilter("ignore")
+                    dlogv_dlogc = dv_dc * self.substitutions[c] / val
+                    sens_dict[c] = sens_dict.get(c, 0) + dsens_dlogv * dlogv_dlogc
+
+    def _accumulate_posy_const_sens(self, const_senss, hmap_qnu, c, presub_exps):
+        """Accumulate ∂(A−B)/∂log(c_m) contributions from one PosynomialInequality."""
         if not hasattr(c, "pmap"):
             raise RuntimeError(
                 f"Constraint {c!r} is missing pmap.  "
@@ -599,29 +582,26 @@ class GeometricProgram:
                 "_calculate_sensitivities (which deletes pmap).  "
                 "See issue #200."
             )
-        presub_exps = list(c.unsubbed[0].hmap)
         for k, qnu_j in enumerate(hmap_qnu):
             for presub_idx, fraction in c.pmap[k].items():
                 for vk, exp in presub_exps[presub_idx].items():
-                    if vk not in self.varcols:  # constant VarKey
+                    if vk not in self.varcols:
                         const_senss[vk] -= qnu_j * fraction * exp
 
-    def _apply_const_mmap_correction(self, const_senss, c, v_i):
+    def _apply_const_mmap_correction(self, const_senss, c, v_i, presub_exps):
         """Apply const_mmap correction to const_senss for one constraint.
 
-        Constants absorbed into the constraint RHS shift the effective tight
-        condition when perturbed.  Mirrors the sens_from_dual correction but
-        scaled by v'_i (the per-constraint dual weight from the linear solve).
+        Constants absorbed into the RHS shift the effective tight condition
+        when perturbed.  Mirrors the sens_from_dual correction scaled by v_i.
         """
         scale = (1 - c.const_coeff) / c.const_coeff
-        presub_exps = list(c.unsubbed[0].hmap)
         for const_presub_idx, pct in c.const_mmap.items():
             for vk, exp in presub_exps[const_presub_idx].items():
                 if vk not in self.varcols:
                     const_senss[vk] -= v_i * pct * scale * exp
 
     def _compute_margin_sensitivity(self, nu, varvals, margin_obj):
-        """Compute ∂(A−B)/∂log(c) for every constant c via one linear solve.
+        """Compute ∂(A−B)/∂c for every constant c via one batched adjoint solve.
 
         Must be called BEFORE _calculate_sensitivities() because pmap is deleted
         there.  See GitHub issue #200 for the pmap mutation discussion.
@@ -641,25 +621,35 @@ class GeometricProgram:
         """
         plus_vk = getattr(margin_obj.plus_var, "key", margin_obj.plus_var)
         minus_vk = getattr(margin_obj.minus_var, "key", margin_obj.minus_var)
-        plus_val = float(varvals.get(plus_vk, 0))
-        minus_val = float(varvals.get(minus_vk, 0))
+        assert (
+            not plus_vk.shape
+        ), f"MarginObjective plus_var must be scalar, got shape {plus_vk.shape!r}"
+        assert (
+            not minus_vk.shape
+        ), f"MarginObjective minus_var must be scalar, got shape {minus_vk.shape!r}"
 
-        primal_weights = {}
-        if plus_vk in self.varcols:
-            primal_weights[plus_vk] = plus_val
-        if minus_vk in self.varcols:
-            primal_weights[minus_vk] = -minus_val
+        plus_val = float(varvals[plus_vk])
+        minus_val = float(varvals[minus_vk])
 
-        _, qnu, constraint_v = self._compute_variable_sensitivities(nu, primal_weights)
+        # Compute per-variable adjoints for the free variables among plus/minus.
+        free_margin_vks = [vk for vk in [plus_vk, minus_vk] if vk in self.varcols]
+        adjoints = self._compute_free_var_adjoints(nu, free_margin_vks)
 
-        # Accumulate ∂(A−B)/∂log(c_m) = −Σ_j qnu_j * e_{jm} for each constant c_m.
-        # Slack constraints self-eliminate: complementarity gives nu_k = 0 for
-        # inactive constraints, so their qnu is zero and they contribute nothing.
+        # Combine linearly: margin = plus - minus → weights are +plus_val, -minus_val.
         obj_end = self.data.m_idxs[0].stop
+        nu_constr = np.asarray(nu[obj_end:], dtype=float)
+        n_constr = len(self.data.m_idxs) - 1
+        qnu = np.zeros(len(nu_constr))
+        constraint_v = np.zeros(n_constr)
+        weights = {plus_vk: plus_val, minus_vk: -minus_val}
+        for vk, (qnu_vk, cv_vk) in adjoints.items():
+            w = weights[vk]
+            qnu += w * qnu_vk
+            constraint_v += w * cv_vk
+
+        # Accumulate ∂(A−B)/∂log(c_m) for each constant c_m.
         const_senss = defaultdict(float)
-        meq_unsubbed_idx = defaultdict(
-            int
-        )  # which unsubbed to use per MonomialEquality
+        meq_unsubbed_idx = defaultdict(int)
 
         for i, hmap in enumerate(self.hmaps[1:]):
             c = hmap
@@ -672,7 +662,6 @@ class GeometricProgram:
 
             if getattr(hmap, "from_meq", False):
                 # MonomialEquality emits two hmaps sharing one parent object.
-                # Track which unsubbed index belongs to each (first=0, second=1).
                 parent_id = id(c)
                 unsubbed_idx = meq_unsubbed_idx[parent_id]
                 meq_unsubbed_idx[parent_id] += 1
@@ -682,33 +671,27 @@ class GeometricProgram:
                     if vk not in self.varcols:
                         const_senss[vk] -= qnu_j * exp
             else:
-                self._accumulate_posy_const_sens(const_senss, hmap_qnu, c)
+                presub_exps = list(c.unsubbed[0].hmap)
+                self._accumulate_posy_const_sens(const_senss, hmap_qnu, c, presub_exps)
                 if hasattr(c, "const_mmap"):
-                    self._apply_const_mmap_correction(const_senss, c, constraint_v[i])
+                    self._apply_const_mmap_correction(
+                        const_senss, c, constraint_v[i], presub_exps
+                    )
 
-        # Direct contributions when plus_var or minus_var are constants
+        # Direct contributions when plus_var or minus_var are constants.
         if plus_vk not in self.varcols:
             const_senss[plus_vk] += plus_val
         if minus_vk not in self.varcols:
             const_senss[minus_vk] -= minus_val
 
-        # Chain rule for linked constants (same pattern as _calculate_sensitivities).
-        # pywarnings suppresses RuntimeWarning from 0-division when val == 0.
-        for v in list(vk for vk in const_senss if self.linked_derivs.get(vk)):
-            d_margin_d_logv = const_senss.pop(v)
-            val = np.array(self.substitutions[v])
-            for linked_c, dv_dc in self.linked_derivs[v].items():
-                with pywarnings.catch_warnings():
-                    pywarnings.simplefilter("ignore")
-                    dlogv_dlogc = dv_dc * self.substitutions[linked_c] / val
-                    const_senss[linked_c] += d_margin_d_logv * dlogv_dlogc
+        self._propagate_linked_derivs(const_senss)
 
         # Convert ∂(margin)/∂log(c) → ∂(margin)/∂c by dividing by c*.
-        # This gives physically dimensioned sensitivities in [margin_units/c_units].
         with pywarnings.catch_warnings():
             pywarnings.simplefilter("ignore")
             for vk in list(const_senss):
-                c_val = float(self.substitutions.get(vk, 0))
+                c_val = float(self.substitutions[vk])
+                # Zero-valued constants have undefined log-space sensitivity; skip.
                 if c_val:
                     const_senss[vk] /= c_val
 

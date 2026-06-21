@@ -14,6 +14,7 @@ from .exceptions import (
     InvalidGPConstraint,
     VariableNotFound,
 )
+from .margin_objective import MarginObjective
 from .nomials import Monomial, Variable
 from .nomials.map import DIMLESS_QUANTITY
 from .nomials.math import constraint_from_ir, nomial_from_ir
@@ -363,7 +364,19 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
                 if ref in var_registry:
                     subs[var_registry[ref]] = val
 
-        return cls(cost, constraints, substitutions=subs)
+        model = cls(cost, constraints, substitutions=subs)
+
+        if "margin_objective" in ir_doc:
+            mo_ir = ir_doc["margin_objective"]
+            plus_vk = var_registry[mo_ir["plus_var"]]
+            minus_vk = var_registry[mo_ir["minus_var"]]
+            model.margin_objective = MarginObjective(
+                name=mo_ir["name"],
+                plus_var=plus_vk,
+                minus_var=minus_vk,
+            )
+
+        return model
 
     def save(self, path):
         """Write this Model's IR to a JSON file."""

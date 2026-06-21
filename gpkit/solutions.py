@@ -11,7 +11,7 @@ from .breakdowns import bdtable_gen
 from .budgets import build_budget
 from .units import Quantity
 from .varkey import VarKey
-from .varmap import VarMap
+from .varmap import VarMap, display_names
 
 
 class _WeakModelRef:
@@ -121,6 +121,7 @@ class MarginSolution:
             label = "most negative first"
             items = sorted(self.sensitivities.items(), key=lambda kv: kv[1])
         lines.append(f"  ∂({self.name})/∂c [{label}]:")
+        names = display_names([vk for vk, _ in items])
         for vk, s in items:
             if self.units and vk.units:
                 c_units = vk.unitstr()
@@ -128,7 +129,7 @@ class MarginSolution:
                 su = f" {self.units}/{c_fmt}"
             else:
                 su = u
-            lines.append(f"    {vk.name:20s}  {s:+.4g}{su}")
+            lines.append(f"    {names[vk]:20s}  {s:+.4g}{su}")
         return "\n".join(lines)
 
 

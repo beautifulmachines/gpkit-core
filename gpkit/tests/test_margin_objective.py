@@ -247,3 +247,21 @@ def test_margin_solution_table():
     assert isinstance(table, str)
     assert "mass margin" in table
     assert "A_allow" in table or "c_frac" in table
+
+
+def test_from_ir_preserves_margin_objective():
+    """Model.from_ir(model.to_ir()) reconstructs a model w/ margin_objective intact."""
+    from gpkit import Model
+
+    model = SimpleMarginModel()
+    ir = model.to_ir()
+    assert "margin_objective" in ir
+
+    model2 = Model.from_ir(ir)
+    assert model2.margin_objective is not None
+    assert model2.margin_objective.name == "mass margin"
+
+    sol = model2.solve(verbosity=0)
+    assert sol.derived is not None
+    assert sol.derived.name == "mass margin"
+    assert abs(sol.derived.value - 20.0) < 1e-4
