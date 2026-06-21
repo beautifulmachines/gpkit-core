@@ -1,9 +1,12 @@
-"""Mass budget with growth allowances at two levels.
+"""Mass budget with growth allowances and mass margin tracking.
 
 Each Spar declares a 20% allowance on top of its physics-based estimate; the
 Wing applies an additional 10% subsystem-level allowance on top of the spars'
 totals. The rendered budget table shows CBE + GA = Total at every row, and
 the GA column accumulates recursively up the tree.
+
+A MarginObjective tracks how much headroom remains against a fixed mass budget,
+and reports how each constant parameter drives or erodes that margin.
 
 The shared theta variable (``from gpkit.nomials.growth import theta``)
 defaults to 1.0 (auto-substituted), so models that don't care about it
@@ -13,7 +16,7 @@ simultaneously; freeing theta and adding it to the cost lets the optimizer
 choose how much margin to carry.
 """
 
-from gpkit import Model, Variable
+from gpkit import MarginObjective, Model, Variable
 from gpkit.budgets import build_budget
 
 
@@ -35,7 +38,8 @@ class GrowthAllowance(Model):
     """Growth allowances demo: wing mass budgeted across two spars.
 
     Spars carry 20% component-level allowances; the wing applies an additional
-    10% subsystem-level allowance on top of the spars' totals.
+    10% subsystem-level allowance on top of the spars' totals.  A MarginObjective
+    tracks remaining headroom against a fixed mass budget.
     """
 
     spar1: Spar
@@ -46,9 +50,16 @@ class GrowthAllowance(Model):
         self.spar1 = Spar()
         self.spar2 = Spar()
         self.m = Variable("m", "kg", "wing mass", growth=0.10)
+        m_budget = Variable("m_budget", 40.0, "kg", "mass budget")
         self.cost = self.m
+        self.margin_objective = MarginObjective(
+            "mass margin",
+            plus_var=m_budget,
+            minus_var=self.m,
+        )
         return [
             self.m.grown_from(self.spar1.m + self.spar2.m),
+            self.m <= m_budget,
             self.spar1,
             self.spar2,
         ]
@@ -58,3 +69,4 @@ if __name__ == "__main__":
     model = GrowthAllowance()
     sol = model.solve(verbosity=0)
     print(build_budget(sol, model, model.m).text())
+    print(sol.derived.table(sol.sens.variables))

@@ -11,7 +11,7 @@ from .breakdowns import bdtable_gen
 from .budgets import build_budget
 from .units import Quantity
 from .varkey import VarKey
-from .varmap import VarMap
+from .varmap import VarMap, display_names
 
 
 class _WeakModelRef:
@@ -81,6 +81,63 @@ class Sensitivities:
         raise NotImplementedError
 
 
+@dataclass(frozen=True, slots=True)
+class MarginSolution:
+    "Value and per-constant sensitivities for a MarginObjective"
+
+    name: str
+    value: float  # A* − B*
+    plus_value: float  # A*
+    minus_value: float  # B*
+    units: str  # unit string from plus_var.key.units (may be empty)
+    sensitivities: dict  # {VarKey: ∂(margin)/∂c} for each constant
+
+    def table(self, cost_sens=None) -> str:
+        """Format sensitivities, ordered by |GP cost sensitivity| when provided.
+
+        Parameters
+        ----------
+        cost_sens : dict, optional
+            {VarKey: ∂log(cost)/∂log(c)} from sol.sens.variables.  When given,
+            rows are ordered by descending |cost_sens| — a dimensionless,
+            unit-invariant ranking of each constant's influence.  When omitted,
+            rows are ordered by the margin sensitivity value (most negative first).
+        """
+        u = f" {self.units}" if self.units else ""
+        lines = [
+            f"\n{self.name}: {self.value:.4g}{u}"
+            f"  (plus={self.plus_value:.4g}{u}, minus={self.minus_value:.4g}{u})",
+        ]
+        if not self.sensitivities:
+            return "\n".join(lines)
+        if cost_sens is not None:
+            label = "by |GP sensitivity|"
+            items = sorted(
+                self.sensitivities.items(),
+                key=lambda kv: (
+                    -float(f"{abs(cost_sens.get(kv[0], 0)):.4g}"),
+                    kv[0].ref,
+                ),
+            )
+        else:
+            label = "most negative first"
+            items = sorted(
+                self.sensitivities.items(),
+                key=lambda kv: (float(f"{kv[1]:.4g}"), kv[0].ref),
+            )
+        lines.append(f"  ∂({self.name})/∂c [{label}]:")
+        names = display_names([vk for vk, _ in items])
+        for vk, s in items:
+            if self.units and vk.units:
+                c_units = vk.unitstr()
+                c_fmt = f"({c_units})" if "/" in c_units else c_units
+                su = f" {self.units}/{c_fmt}"
+            else:
+                su = u
+            lines.append(f"    {names[vk]:20s}  {s:+.4g}{su}")
+        return "\n".join(lines)
+
+
 SUMMARY_TABLES = ("sweeps", "cost", "warnings", "solution")
 
 
@@ -94,6 +151,7 @@ class Solution:
     sens: Sensitivities
     # program : GP
     meta: dict
+    derived: "MarginSolution | None" = None
 
     @property
     def variables(self):
@@ -172,6 +230,8 @@ class Solution:
     def summary(self, **kwargs) -> str:
         "Print a summary table of this Solution"
         lines = self.cost_breakdown() + self.model_sens_breakdown() + [""]
+        if self.derived is not None:
+            lines.append(self.derived.table())
         table = printing.table(self, tables=SUMMARY_TABLES, **kwargs)
         return "\n".join(lines) + table
 
@@ -180,6 +240,8 @@ class Solution:
         lines = []
         if "tables" not in kwargs:  # don't add breakdowns if tables custom
             lines += self.cost_breakdown() + self.model_sens_breakdown() + [""]
+            if self.derived is not None:
+                lines.append(self.derived.table())
         return "\n".join(lines) + printing.table(self, **kwargs)
 
     def budget(self, var, display_units=None, depth=float("inf")):

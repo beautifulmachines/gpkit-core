@@ -209,6 +209,9 @@ solutions and can be solved with 'Model.solve()'.""")
                 )
                 rel_improvement = cost = None
         # solved successfully!
+        # Wire model so generate_result can find margin_objective.
+        # Long-term fix: pass margin_obj explicitly (see issue #143).
+        gp.model = self.model
         self.result = gp.generate_result(solver_out, verbosity=verbosity - 3)
         self.result.meta["soltime"] = time() - starttime
         if verbosity > 1:
