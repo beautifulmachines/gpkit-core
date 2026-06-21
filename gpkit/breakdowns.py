@@ -1,5 +1,4 @@
 # TODO: cleanup weird conditionals
-#      add conversions to plotly/sankey
 
 import string
 import sys
@@ -8,8 +7,6 @@ from collections import defaultdict, namedtuple
 import numpy as np
 
 # pylint: skip-file
-import plotly.graph_objects as go
-
 from gpkit.nomials import Monomial, Posynomial
 from gpkit.nomials.map import NomialMap
 from gpkit.units import DimensionalityError
@@ -960,81 +957,6 @@ def get_valstr(key, solution, into="%s"):
     return into % (valuestr + unitstr)
 
 
-def plotlyify(tree, solution, minval=None):
-    """Plots model structure as Plotly TreeMap
-
-    Arguments
-    ---------
-    model: Model
-        GPkit model object
-
-    sizebycount (optional): bool
-        Whether to size blocks by number of variables/constraints or use
-        default sizing
-
-    Returns
-    -------
-    plotly.graph_objects.Figure
-        Plot of model hierarchy
-
-    """
-    ids = []
-    labels = []
-    parents = []
-    values = []
-
-    key, value, branches = tree
-    if isinstance(key, VarKey) and necessarylineage(key):
-        prefix = key.lineagestr()
-    else:
-        prefix = ""
-
-    if minval is None:
-        minval = value / 1000
-
-    parent_budgets = {}
-
-    def crawl(tree, parent_id=None):
-        key, value, branches = tree
-        if value > minval:
-            if isinstance(key, Transform):
-                id = parent_id
-            else:
-                id = len(ids) + 1
-                ids.append(id)
-                labels.append(get_keystr(key, solution, prefix))
-                if not isinstance(key, str):
-                    labels[-1] = labels[-1] + "<br>" + get_valstr(key, solution)
-                parents.append(parent_id)
-                if parent_id is not None:  # make sure there's no overflow
-                    if parent_budgets[parent_id] < value:
-                        value = parent_budgets[parent_id]  # take remainder
-                    parent_budgets[parent_id] -= value
-                values.append(value)
-                parent_budgets[id] = value
-            for branch in branches:
-                crawl(branch, id)
-
-    crawl(tree)
-    return ids, labels, parents, values
-
-
-def treemap(ids, labels, parents, values):
-    return go.Figure(
-        go.Treemap(
-            ids=ids, labels=labels, parents=parents, values=values, branchvalues="total"
-        )
-    )
-
-
-def icicle(ids, labels, parents, values):
-    return go.Figure(
-        go.Icicle(
-            ids=ids, labels=labels, parents=parents, values=values, branchvalues="total"
-        )
-    )
-
-
 class Breakdowns(object):
     def __init__(self, sol):
         self.sol = sol
@@ -1109,35 +1031,3 @@ class Breakdowns(object):
                 showlegend=showlegend,
                 maxwidth=maxwidth,
             )
-
-    def treemap(self, key, *, permissivity=2, returnfig=False, filename=None):
-        with lineage_display_context(self.lineage_map):
-            tree, _ = self.get_tree(key)
-            fig = treemap(*plotlyify(tree, self.sol))
-        if returnfig:
-            return fig
-        if filename is None:
-            filename = str(key) + "_treemap.html"
-            keepcharacters = (".", "_")
-            filename = "".join(
-                c for c in filename if c.isalnum() or c in keepcharacters
-            ).rstrip()
-        import plotly
-
-        plotly.offline.plot(fig, filename=filename)
-
-    def icicle(self, key, *, permissivity=2, returnfig=False, filename=None):
-        with lineage_display_context(self.lineage_map):
-            tree, _ = self.get_tree(key, permissivity=permissivity)
-            fig = icicle(*plotlyify(tree, self.sol))
-        if returnfig:
-            return fig
-        if filename is None:
-            filename = str(key) + "_icicle.html"
-            keepcharacters = (".", "_")
-            filename = "".join(
-                c for c in filename if c.isalnum() or c in keepcharacters
-            ).rstrip()
-        import plotly
-
-        plotly.offline.plot(fig, filename=filename)

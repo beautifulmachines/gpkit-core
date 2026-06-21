@@ -77,10 +77,6 @@ class TestExamples:
         assert_logtol(sol_ac["cost"], (a_ac / 3) ** 4, tol2)
         os.remove("autosweep.pkl")
 
-    def test_treemap(self, example):
-        # treemap.py is a visualization-only example; no model solve, no cost to assert
-        pass
-
     def test_checking_result_changes(self, example):
         sol = example.sol
         assert sol.cost == pytest.approx(0.48, abs=0.01)

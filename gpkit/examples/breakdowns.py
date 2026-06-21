@@ -63,10 +63,3 @@ if sys.platform[:3] != "win" and sol is not None:
     print("\nPermissivity = 1 (stops at Pelec = v·i)")
     print("----------------")
     bds.trace("AircraftPerf.AircraftDrag.Poper", permissivity=1)
-
-    # you can also produce Plotly treemaps/icicle plots of your breakdowns
-    fig = bds.treemap("model sensitivities", returnfig=True)
-    fig = bds.icicle("cost", returnfig=True)
-    # uncommenting any of the below makes and shows the plot directly
-    # bds.icicle("model sensitivities")
-    # bds.treemap("cost")
