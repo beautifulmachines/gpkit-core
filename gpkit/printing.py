@@ -163,7 +163,7 @@ class SectionSpec:
             if not np.shape(arr):
                 continue
             flat = np.asarray(arr).ravel()
-            w = max(w, max(len(f"{el:{self.pm}.{p - 1}g}") for el in flat))
+            w = max(w, *(len(f"{el:{self.pm}.{p - 1}g}") for el in flat))
         return w
 
 
@@ -307,7 +307,7 @@ class Constants(SectionSpec):
             lines.extend(_format_aligned_columns(rows, self.align, self.col_sep))
         if vector_items:
             name_w = max(
-                max(len(k.str_without("lineage")) for k, _ in vector_items),
+                *(len(k.str_without("lineage")) for k, _ in vector_items),
                 len("sens") - 2,
             )
             for key, (val, sens) in vector_items:

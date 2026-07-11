@@ -215,8 +215,7 @@ def create_settings(box):
         # pylint: disable=unused-argument
         def link_fn(name, new_value):
             "How to update the object's value given min/max on the slider."
-            if new_value >= slider.max:  # pylint: disable=consider-using-max-builtin
-                slider.max = new_value
+            slider.max = max(new_value, slider.max)
             # if any value is greater than the max, the max slides up
             # however, this is not held true for the minimum, because
             # during typing the max or value will grow, and we don't want

@@ -933,7 +933,7 @@ def get_valstr(key, solution, into="%s"):
     if isinstance(value, FixedScalar):
         value = value.value
     if 1e3 <= mag(value) < 1e6:
-        valuestr = "{:,.0f}".format(mag(value))
+        valuestr = f"{mag(value):,.0f}"
     else:
         valuestr = "%-.3g" % mag(value)
     # get unitstr

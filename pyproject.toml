@@ -62,6 +62,10 @@ extend-select = [
     "UP032",  # f-string modernization
     "S102",   # exec-used
 ]
+ignore = [
+    "PLR2004",  # magic-value-comparison: noisy, no precedent, revisit later
+    "PLW2901",  # redefined-loop-name: idiomatic here, bulk-fix risks bugs
+]
 
 [tool.ruff.lint.per-file-ignores]
 "__init__.py" = ["F401"]
