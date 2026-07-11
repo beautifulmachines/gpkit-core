@@ -41,9 +41,7 @@ class Signomial(Nomial):
 
     __hash__ = Nomial.__hash__
 
-    def __init__(
-        self, hmap=None, cs=1, require_positive=True, *, ast=None
-    ):  # pylint: disable=too-many-statements,too-many-branches
+    def __init__(self, hmap=None, cs=1, require_positive=True, *, ast=None):  # pylint: disable=too-many-statements,too-many-branches
         if not isinstance(hmap, NomialMap):
             if hasattr(hmap, "hmap"):
                 hmap = hmap.hmap
@@ -152,7 +150,7 @@ class Signomial(Nomial):
         psub = self.hmap.sub(x0, self.vks, parsedsubs=True)
         if EMPTY_HV not in psub or len(psub) > 1:
             raise ValueError(
-                f"Variables {psub} remained after substituting x0={x0}" f" into {self}"
+                f"Variables {psub} remained after substituting x0={x0} into {self}"
             )
         (c0,) = psub.values()
         c, exp = c0, HashVector()
@@ -340,9 +338,7 @@ class Monomial(Posynomial):
     def exp(self):
         "Creates exp or returns a cached exp"
         if not self._exp:
-            (self._exp,) = (
-                self.hmap.keys()
-            )  # pylint: disable=attribute-defined-outside-init
+            (self._exp,) = self.hmap.keys()  # pylint: disable=attribute-defined-outside-init
         return self._exp
 
     @property
@@ -527,9 +523,7 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
         out = []
         for posy in self.unsubbed:
             hmap = posy.hmap.sub(substitutions, posy.vks, parsedsubs=True)
-            self.pmap = hmap.mmap(
-                posy.hmap
-            )  # pylint: disable=attribute-defined-outside-init
+            self.pmap = hmap.mmap(posy.hmap)  # pylint: disable=attribute-defined-outside-init
             del hmap.expmap, hmap.csmap  # needed only for the mmap call above
             hmap = self._simplify_posy_ineq(hmap, self.pmap, substitutions)
             if hmap is not None:

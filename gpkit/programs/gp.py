@@ -236,6 +236,7 @@ class GeometricProgram:
                         ], {})
     >>> gp.solve()
     """
+
     _result = solve_log = solver_out = model = None
     choicevaridxs = integersolve = None
 
@@ -400,8 +401,7 @@ class GeometricProgram:
                 return self.model.debug(solver=solver)
             # else, raise a clarifying error
             msg += (
-                " Running `.debug()` or increasing verbosity may pinpoint"
-                " the trouble."
+                " Running `.debug()` or increasing verbosity may pinpoint the trouble."
             )
             raise infeasibility.__class__(msg) from infeasibility
 
@@ -636,12 +636,12 @@ class GeometricProgram:
         """
         plus_vk = getattr(margin_obj.plus_var, "key", margin_obj.plus_var)
         minus_vk = getattr(margin_obj.minus_var, "key", margin_obj.minus_var)
-        assert (
-            not plus_vk.shape
-        ), f"MarginObjective plus_var must be scalar, got shape {plus_vk.shape!r}"
-        assert (
-            not minus_vk.shape
-        ), f"MarginObjective minus_var must be scalar, got shape {minus_vk.shape!r}"
+        assert not plus_vk.shape, (
+            f"MarginObjective plus_var must be scalar, got shape {plus_vk.shape!r}"
+        )
+        assert not minus_vk.shape, (
+            f"MarginObjective minus_var must be scalar, got shape {minus_vk.shape!r}"
+        )
 
         plus_val = float(varvals[plus_vk])
         minus_val = float(varvals[minus_vk])
@@ -792,9 +792,7 @@ class GeometricProgram:
         return warnings
 
 
-def gen_meq_bounds(
-    missingbounds, exps, meq_idxs
-):  # pylint: disable=too-many-locals,too-many-branches
+def gen_meq_bounds(missingbounds, exps, meq_idxs):  # pylint: disable=too-many-locals,too-many-branches
     "Generate conditional monomial equality bounds"
     meq_bounds = defaultdict(set)
     for i in meq_idxs.first_half:

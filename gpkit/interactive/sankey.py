@@ -249,7 +249,7 @@ class Sankey:
         # ...is an insensitive constraint and we still have too many links
         self.filter(
             links,
-            lambda s, t, v: ("constraint" not in self.nodes[s] or abs(v) > INSENSITIVE),
+            lambda s, t, v: "constraint" not in self.nodes[s] or abs(v) > INSENSITIVE,
         )
         # ...is at culldepth, repeating up to a relative depth of 1 or 2
         culldepth = max(node.count(".") for node in self.nodes) - 1

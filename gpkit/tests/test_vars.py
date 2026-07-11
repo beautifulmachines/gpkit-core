@@ -104,9 +104,12 @@ class TestVarKey:
         assert gstrbefore == gstrafter
 
         cstr = str(2 * a >= a + np.ones((3, 2)) / 2)
-        assert cstr == """2·a[:] ≥ a[:] + [[0.5 0.5]
+        assert (
+            cstr
+            == """2·a[:] ≥ a[:] + [[0.5 0.5]
            [0.5 0.5]
            [0.5 0.5]]"""
+        )
 
     def test_eq_neq(self):
         """Test boolean equality operators"""

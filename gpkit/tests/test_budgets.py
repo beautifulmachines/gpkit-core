@@ -920,9 +920,9 @@ class TestMixedUnitCoeff:
         # m_a and m_b each appear with coefficient 1 in the original expression —
         # neither label should start with a digit (no spurious "0.4536·m_a")
         for node in b.children:
-            assert not node.label[
-                0
-            ].isdigit(), f"spurious coeff in label: {node.label!r}"
+            assert not node.label[0].isdigit(), (
+                f"spurious coeff in label: {node.label!r}"
+            )
 
 
 # ---------------------------------------------------------------------------

@@ -57,7 +57,7 @@ def diff(filename, diff_dict):
             for line_number, line in enumerate(a):
                 if line[:-1].strip() in diff_dict:
                     newline = diff_dict[line[:-1].strip()] + "\n"
-                    log(f"#\n#     Change in {filename}" f" on line {line_number + 1}")
+                    log(f"#\n#     Change in {filename} on line {line_number + 1}")
                     log("#     --", line[:-1][:70])
                     log("#     ++", newline[:70])
                     b.write(newline)

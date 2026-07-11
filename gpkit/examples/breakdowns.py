@@ -37,7 +37,7 @@ if sys.platform[:3] != "win" and sol is not None:
     print("Variable breakdowns (note the two methods of access)")
     print("===================")
     (varkey,) = sol["variables"].keymap[
-        ("Mission.FlightSegment.AircraftPerf" ".AircraftDrag.Poper")
+        ("Mission.FlightSegment.AircraftPerf.AircraftDrag.Poper")
     ]
     bds.plot(varkey)
     bds.plot("AircraftPerf.AircraftDrag.MotorPerf.Q")

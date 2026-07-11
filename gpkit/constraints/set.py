@@ -55,9 +55,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
     unique_varkeys, idxlookup = frozenset(), {}
     _varkeys = None
 
-    def __init__(
-        self, constraints, substitutions=None, *, bonusvks=None
-    ):  # pylint: disable=too-many-branches,too-many-statements
+    def __init__(self, constraints, substitutions=None, *, bonusvks=None):  # pylint: disable=too-many-branches,too-many-statements
         if isinstance(constraints, dict):
             keys, constraints = constraints.keys(), constraints.values()
             self.idxlookup = {k: i for i, k in enumerate(keys)}
@@ -399,11 +397,11 @@ def badelement(cns, i, constraint, cause=""):
     if len(cns) == 1:
         loc = "the only constraint"
     elif i == 0:
-        loc = f"at the start, before {cns[i+1]}"
+        loc = f"at the start, before {cns[i + 1]}"
     elif i == len(cns) - 1:
-        loc = f"at the end, after {cns[i-1]}"
+        loc = f"at the end, after {cns[i - 1]}"
     else:
-        loc = f"between {cns[i-1]} and {cns[i+1]}"
+        loc = f"between {cns[i - 1]} and {cns[i + 1]}"
     return ValueError(
         f"Invalid ConstraintSet element '{constraint!r}' "
         f"{type(constraint)} was {loc}.{cause}"

@@ -125,7 +125,7 @@ class SectionSpec:
 
     def _fmt_one(self, x, p, suff="") -> str:
         "Format a single scalar element for vector display."
-        return f"{x:{self.pm}.{p-1}g}{suff}".replace("+nan", "nan")
+        return f"{x:{self.pm}.{p - 1}g}{suff}".replace("+nan", "nan")
 
     def _fmt_val(self, val, suff="") -> str:
         n = self.options.vecn
@@ -163,7 +163,7 @@ class SectionSpec:
             if not np.shape(arr):
                 continue
             flat = np.asarray(arr).ravel()
-            w = max(w, max(len(f"{el:{self.pm}.{p-1}g}") for el in flat))
+            w = max(w, max(len(f"{el:{self.pm}.{p - 1}g}") for el in flat))
         return w
 
 
@@ -252,7 +252,7 @@ class Constants(SectionSpec):
         """Format a single sensitivity element: ~0 if near-zero, else +x."""
         if abs(x) < self.nearzero_tol:
             return "~0"
-        return f"{x:+.{p-1}g}".replace("+nan", "nan")
+        return f"{x:+.{p - 1}g}".replace("+nan", "nan")
 
     def _fmt_sens(self, sens) -> str:
         """Format scalar sensitivity as (+x) or (~0)."""
@@ -516,7 +516,6 @@ class SlackConstraints(Constraints):
 
 
 class DiffSection(SectionSpec):
-
     def row_from(self, item):
         "still abstract at this level"
         raise NotImplementedError
@@ -611,7 +610,7 @@ class ConditionTable(SectionSpec):
             entry = col_data[cname].get(name)
             if entry is not None:
                 v, unitlabel, label = entry
-                vals.append(f"{v:.{p-1}g}")
+                vals.append(f"{v:.{p - 1}g}")
                 raw_vals.append(v)
             else:
                 vals.append("—")

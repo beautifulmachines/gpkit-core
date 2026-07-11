@@ -151,9 +151,7 @@ class ArrayVariable(NomialArray):  # pylint: disable=too-many-locals
     where $name is the vector's name and i is the VarKey's index.
     """
 
-    def __new__(
-        cls, shape, *args, **descr
-    ):  # pylint: disable=too-many-branches, too-many-statements, arguments-differ
+    def __new__(cls, shape, *args, **descr):  # pylint: disable=too-many-branches, too-many-statements, arguments-differ
         if "idx" in descr:
             raise ValueError("the description field 'idx' is reserved")
 

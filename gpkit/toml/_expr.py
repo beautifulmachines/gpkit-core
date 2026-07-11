@@ -118,7 +118,7 @@ def _eval_name(node, ns):
     if node.id not in ns:
         available = sorted(k for k in ns if not k.startswith("_"))
         raise TomlExpressionError(
-            f"Unknown variable '{node.id}'. " f"Available: {', '.join(available)}"
+            f"Unknown variable '{node.id}'. Available: {', '.join(available)}"
         )
     val = ns[node.id]
     if getattr(val, "_is_ambiguous_sentinel", False):

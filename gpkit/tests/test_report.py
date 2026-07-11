@@ -219,9 +219,9 @@ class TestBuildReportIR:
         assert ir.constraint_groups[0].label == "Structural"
         # Tight should be unwrapped: two leaf constraints, not a Tight object
         for c in ir.constraint_groups[0].constraints:
-            assert not isinstance(
-                c, Tight
-            ), "Tight should be unwrapped into leaf constraints"
+            assert not isinstance(c, Tight), (
+                "Tight should be unwrapped into leaf constraints"
+            )
 
     def test_report_md_dict_cgroups_with_tight(self):
         """model.report(fmt='md') with Tight in dict cgroups must not raise."""
@@ -343,9 +343,9 @@ class TestValueUnitsContract:
         ir = build_report_ir(m, solution=sol)
         all_ves = _all_vars(ir) + [ve for ch in ir.children for ve in _all_vars(ch)]
         for ve in all_ves:
-            assert not isinstance(
-                ve.value, Quantity
-            ), f"VarEntry.value for {ve.name!r} is a Quantity; expected plain float"
+            assert not isinstance(ve.value, Quantity), (
+                f"VarEntry.value for {ve.name!r} is a Quantity; expected plain float"
+            )
 
 
 # ── Text format renderer ─────────────────────────────────────────────────────

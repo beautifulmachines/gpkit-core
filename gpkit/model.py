@@ -260,8 +260,7 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
             cls = self.__class__.__name__
             available = sorted(self._child_attrs.keys())
             raise VariableNotFound(
-                f"No child attribute '{head}' in {cls}. "
-                f"Available children: {available}"
+                f"No child attribute '{head}' in {cls}. Available children: {available}"
             )
         return self._child_attrs[head].get_var(rest)
 
@@ -290,9 +289,9 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
             if hasattr(
                 val, "hmap"
             ):  # constant Monomial or future GPkitUnit wrapper (#156)
-                assert not any(
-                    val.hmap.keys()
-                ), "substitution value should not contain variables"
+                assert not any(val.hmap.keys()), (
+                    "substitution value should not contain variables"
+                )
                 (val,) = val.hmap.to(vk.units or DIMLESS_QUANTITY).values()
             subs_ir[vk.ref] = float(val)
 

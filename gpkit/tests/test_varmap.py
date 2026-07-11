@@ -286,9 +286,9 @@ class TestDisplayNames:
         vks = [v.key for v in x]
         names = display_names(vks)
         for vk in vks:
-            assert (
-                "." not in names[vk]
-            ), "vector elements with the same parent are not a collision"
+            assert "." not in names[vk], (
+                "vector elements with the same parent are not a collision"
+            )
 
     def test_vector_veckey_display_name(self):
         x = VectorVariable(3, "x")

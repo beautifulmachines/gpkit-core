@@ -115,9 +115,9 @@ def test_simple_margin_sensitivities_fd():
     sol = SimpleMarginModel().solve(verbosity=0)
     for vk, sens in sol.derived.sensitivities.items():
         fd = _fd_margin_sens(SimpleMarginModel, vk.name)
-        assert (
-            abs(sens - fd) / max(abs(sens), 1e-10) < 1e-3
-        ), f"FD check failed for {vk.name}: computed={sens:.4g}, fd={fd:.4g}"
+        assert abs(sens - fd) / max(abs(sens), 1e-10) < 1e-3, (
+            f"FD check failed for {vk.name}: computed={sens:.4g}, fd={fd:.4g}"
+        )
 
 
 def test_both_free_model_fd():
@@ -128,9 +128,9 @@ def test_both_free_model_fd():
         fd = _fd_margin_sens(BothFreeModel, vk.name)
         # Use absolute tolerance for near-zero sensitivities (slack constraints)
         tol = max(1e-3 * max(abs(sens), abs(fd)), 1e-4)
-        assert (
-            abs(sens - fd) < tol
-        ), f"FD check failed for {vk.name}: computed={sens:.4g}, fd={fd:.4g}"
+        assert abs(sens - fd) < tol, (
+            f"FD check failed for {vk.name}: computed={sens:.4g}, fd={fd:.4g}"
+        )
 
 
 def test_const_mmap_fd():
@@ -147,9 +147,9 @@ def test_const_mmap_fd():
     for vk, sens in sol.derived.sensitivities.items():
         fd = _fd_margin_sens(ConstMapModel, vk.name)
         tol = max(1e-3 * max(abs(sens), abs(fd)), 1e-4)
-        assert (
-            abs(sens - fd) < tol
-        ), f"FD check failed for {vk.name}: computed={sens:.4g}, fd={fd:.4g}"
+        assert abs(sens - fd) < tol, (
+            f"FD check failed for {vk.name}: computed={sens:.4g}, fd={fd:.4g}"
+        )
 
 
 def test_no_margin_objective():
@@ -208,9 +208,9 @@ def test_growth_allowance_margin_fd():
             2 * eps
         )
         fd = fd_log / c0
-        assert (
-            abs(sens - fd) / max(abs(sens), 1e-10) < 1e-2
-        ), f"FD check failed for {vk.name} ({vk.ref}): computed={sens:.4g}, fd={fd:.4g}"
+        assert abs(sens - fd) / max(abs(sens), 1e-10) < 1e-2, (
+            f"FD check failed for {vk.name} ({vk.ref}): computed={sens:.4g}, fd={fd:.4g}"
+        )
 
 
 def test_to_ir_includes_margin_objective():

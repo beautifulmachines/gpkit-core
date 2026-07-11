@@ -32,7 +32,7 @@ pi = Monomial(_np.pi, ast=_PiNode())
 
 if "just built!" in settings:  # pragma: no cover
     print(f"""
-GPkit is now installed with solver(s) {settings['installed_solvers']}
+GPkit is now installed with solver(s) {settings["installed_solvers"]}
 To incorporate new solvers at a later date, run `gpkit.build()`.
 
 If you encounter any bugs or issues using GPkit, please open a new issue at

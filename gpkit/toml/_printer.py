@@ -107,9 +107,7 @@ class _RefNameRegistry(dict):
         return stub
 
 
-def _render_op(
-    op, children
-):  # pylint: disable=too-many-return-statements,too-many-branches
+def _render_op(op, children):  # pylint: disable=too-many-return-statements,too-many-branches
     """Render an AST operation to a plain expression string."""
     if op == "add":
         left = ast_to_expr(children[0])
@@ -362,9 +360,7 @@ def _root_model_id(tree, all_variables):
     return "main"
 
 
-def to_toml(
-    source, path=None
-):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+def to_toml(source, path=None):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
     """Generate a TOML model spec from a gpkit Model or IR dict.
 
     Parameters
