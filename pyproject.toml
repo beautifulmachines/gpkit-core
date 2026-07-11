@@ -32,10 +32,7 @@ dependencies = [
 [dependency-groups]
 dev = [{include-group = "lint"}, {include-group = "test"}]
 lint = [
-    "isort>=5.12.0",
-    "black>=26.1.0",
-    "flake8>=7.0.0",
-    "pylint>=4.0.0",
+    "ruff>=0.8.0",
     "import-linter>=2.3",
     "pre-commit>=4.0.0",
 ]
@@ -53,8 +50,21 @@ path = "gpkit/__init__.py"
 [tool.hatch.build.targets.wheel]
 packages = ["gpkit"]
 
-[tool.isort]
-profile = "black"
+[tool.ruff]
+target-version = "py311"
+
+[tool.ruff.lint]
+extend-select = [
+    "I",      # import sorting, replaces isort
+    "PL",     # pylint-parity category (convention/error/refactor/warning), stable rules only
+    "ARG",    # unused-argument family
+    "BLE",    # blind-except (broad-exception-caught)
+    "UP032",  # f-string modernization
+    "S102",   # exec-used
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
 
 [tool.pytest.ini_options]
 testpaths = ["gpkit/tests"]
