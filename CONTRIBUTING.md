@@ -37,12 +37,8 @@ Thank you for your interest in contributing to gpkit-core! This guide will help 
 
 ### Code Style
 
-We use several tools to maintain code quality:
-
-- **Black** for code formatting
-- **isort** for import sorting
-- **pylint** for code analysis
-- **flake8** for style checking
+We use [ruff](https://docs.astral.sh/ruff/) for code formatting, import sorting, and
+linting.
 
 To format your code:
 ```bash
