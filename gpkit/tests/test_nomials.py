@@ -163,8 +163,8 @@ class TestMonomial:
         assert x == xx
         assert not x != xx
 
-        assert x == x
-        assert not x != x
+        assert x == x  # noqa: PLR0124
+        assert not x != x  # noqa: PLR0124
 
         m = Monomial({}, 1)
         assert m == 1

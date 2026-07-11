@@ -48,7 +48,7 @@ class TestVarKey:
         y = VectorVariable(2, "y")
         assert y[0].key.latex() == "{\\vec{y}}_{0}"
 
-    def test_ast(self):  # pylint: disable=too-many-statements
+    def test_ast(self):  # noqa: PLR0915
         if sys.platform[:3] == "win":  # pragma: no cover
             return
 
@@ -117,12 +117,12 @@ class TestVarKey:
         vk2 = VarKey()
         assert vk1 != vk2
         assert not vk1 == vk2
-        assert vk1 == vk1  # pylint: disable=comparison-with-itself
+        assert vk1 == vk1  # noqa: PLR0124
         v = VarKey("v")
         vel = VarKey("v")
         assert v == vel
         assert not v != vel
-        assert vel == vel  # pylint: disable=comparison-with-itself
+        assert vel == vel  # noqa: PLR0124
         x1 = Variable("x", 3, "m")
         x2 = Variable("x", 2, "ft")
         x3 = Variable("x", 2, "m")

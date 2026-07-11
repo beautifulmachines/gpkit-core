@@ -239,7 +239,7 @@ class TestMonomialEquality:
         "Monomial Equalities with VectorVariables"
         x = VectorVariable(3, "x")
         assert not x == 3
-        assert x == x  # pylint: disable=comparison-with-itself
+        assert x == x  # noqa: PLR0124
 
     def test_inheritance(self):
         "Make sure MonomialEquality inherits from the right things"

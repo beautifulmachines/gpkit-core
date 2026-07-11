@@ -9,7 +9,7 @@ from gpkit.exceptions import DualInfeasible, UnknownInfeasible
 from ..solutions import RawSolution
 
 
-def optimize(prob, meq_idxs, use_leqs=True, **kwargs):
+def optimize(prob, meq_idxs, use_leqs=True, **kwargs):  # noqa: PLR0912, PLR0915
     """Interface to the CVXOPT solver
 
     Definitions

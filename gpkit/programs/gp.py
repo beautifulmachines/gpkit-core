@@ -315,7 +315,7 @@ class GeometricProgram:
         self.choicevaridxs = {vk: i for i, vk in enumerate(variables) if vk.choices}
         self.data = CompiledGP.from_hmaps(self.hmaps, self.varcols)
 
-    def solve(self, solver=None, *, verbosity=1, gen_result=True, **kwargs):
+    def solve(self, solver=None, *, verbosity=1, gen_result=True, **kwargs):  # noqa: PLR0912
         """Solves a GeometricProgram and returns the solution.
 
         Arguments

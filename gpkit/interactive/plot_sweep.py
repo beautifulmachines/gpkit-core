@@ -50,7 +50,7 @@ def format_and_label_axes(var, posys, axes, ylabel=True):
     plt.subplots_adjust(wspace=0.15)
 
 
-def plot_1dsweepgrid(model, sweeps, posys, origsol=None, tol=0.01, **solveargs):
+def plot_1dsweepgrid(model, sweeps, posys, origsol=None, tol=0.01, **solveargs):  # noqa: PLR0912
     """Creates and plots a sweep from an existing model
 
     Example usage:

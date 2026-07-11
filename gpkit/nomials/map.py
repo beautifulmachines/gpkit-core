@@ -126,7 +126,7 @@ class NomialMap(HashVector):
                 out[exp] = c
         return out
 
-    def sub(self, substitutions, varkeys, parsedsubs=False):
+    def sub(self, substitutions, varkeys, parsedsubs=False):  # noqa: PLR0912
         """Applies substitutions to a NomialMap
 
         Parameters
@@ -209,7 +209,7 @@ class NomialMap(HashVector):
         return pmap
 
 
-def subinplace(cp, exp, o_exp, vk, cval, squished):
+def subinplace(cp, exp, o_exp, vk, cval, squished):  # noqa: PLR0913
     "Modifies cp by substituing cval/expval for vk in exp"
     x = exp[vk]
     powval = float(cval) ** x if cval != 0 or x >= 0 else np.sign(cval) * np.inf

@@ -13,7 +13,7 @@ from ..exceptions import (
 from ..solutions import RawSolution
 
 
-def optimize(prob, **kwargs):
+def optimize(prob, **kwargs):  # noqa: PLR0912, PLR0915
     """
     Definitions
     -----------

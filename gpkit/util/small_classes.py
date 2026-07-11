@@ -46,7 +46,7 @@ def matrix_converter(name):
     return to_
 
 
-class CootMatrix:
+class CootMatrix:  # noqa: PLW1641
     "A very simple sparse matrix representation."
 
     def __init__(self, row, col, data):

@@ -111,7 +111,7 @@ solutions and can be solved with 'Model.solve()'.""")
             if last_cost_mon <= m_idx <= first_gp_mon:
                 self.a_idxs[self._gp.data.p_idxs[m_idx]].append(row_idx)
 
-    def localsolve(
+    def localsolve(  # noqa: PLR0912, PLR0913, PLR0915
         self,
         solver=None,
         *,

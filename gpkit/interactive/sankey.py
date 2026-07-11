@@ -100,7 +100,7 @@ class Sankey:
             total_sens += abs_var_sens
         return total_sens
 
-    def link(self, cset, target, vk, *, labeled=False, subarray=False):
+    def link(self, cset, target, vk, *, labeled=False, subarray=False):  # noqa: PLR0912
         "adds links of a given constraint set to self.links"
         total_sens = 0
         switchedtarget = False
@@ -153,7 +153,7 @@ class Sankey:
                 if not function(s, t, v):
                     del links[(s, t)]
 
-    def diagram(
+    def diagram(  # noqa: PLR0913
         self,
         variable=None,
         varlabel=None,

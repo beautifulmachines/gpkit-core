@@ -44,7 +44,7 @@ class Nomial(NomialData):
 
     sub = None
 
-    def str_without(self, excluded=()):
+    def str_without(self, excluded=()):  # noqa: PLR0912
         "String representation, excluding fields ('units', varkey attributes)"
         units = "" if "units" in excluded else self.unitstr(" [%s]")
         if hasattr(self, "key"):
