@@ -1,7 +1,7 @@
 """Unit tests for the VarSet class"""
 
 import numpy as np
-import pytest  # pylint: disable=import-error
+import pytest
 
 from gpkit import Variable, VectorVariable
 from gpkit.varmap import VarSet

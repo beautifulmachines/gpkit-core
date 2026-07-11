@@ -16,7 +16,6 @@ class NomialData(ReprMixin):
     units: pint.UnitsContainer
     """
 
-    # pylint: disable=too-many-instance-attributes
     _hashvalue = _varlocs = _exps = _cs = _varkeys = None
 
     def __init__(self, hmap):
@@ -41,7 +40,6 @@ class NomialData(ReprMixin):
         if self._cs is None:
             self._cs = np.array(list(self.hmap.values()))
             if self.hmap.units:
-                # pylint: disable=fixme
                 # TODO: treat vars as dimensionless, it's a hack
                 self._cs = self._cs * self.hmap.units
         return self._cs

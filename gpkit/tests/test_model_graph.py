@@ -1,7 +1,5 @@
 """Tests for Model graph: _children, submodels, walk(), and get_var()."""
 
-# pylint: disable=invalid-name,attribute-defined-outside-init
-
 import pytest
 
 from gpkit import Model, Variable

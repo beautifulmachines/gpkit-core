@@ -50,7 +50,6 @@ class DiffPair:
         return s
 
 
-# pylint: disable=missing-class-docstring
 class SectionSpec:
     align = None
     align_vecs = True  # aligns vectors if all same length
@@ -140,7 +139,6 @@ class SectionSpec:
         return f"{val:{self.pm}.{p}g}{suff}"
 
     def _passes_filter(self, item) -> bool:
-        # pylint: disable=not-callable
         if self.filterfun is None:
             return True
         k, v = item

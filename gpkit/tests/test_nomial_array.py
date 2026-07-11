@@ -42,7 +42,6 @@ class TestNomialArray:
         )
         assert x.outer(x) == m
 
-    # pylint: disable=no-member
     def test_elementwise_mult(self):
         m = Variable("m")
         x = VectorVariable(3, "x", label="dummy variable")
@@ -80,7 +79,7 @@ class TestNomialArray:
         constraint = ConstraintSet([x <= v])
         assert list(constraint.as_hmapslt1({})) == [e.hmap for e in p]
 
-    def test_substition(self):  # pylint: disable=no-member
+    def test_substition(self):
         x = VectorVariable(3, "x", label="dummy variable")
         c = {x: [1, 2, 3]}
         assert x.sub(c) == [Monomial({}, e) for e in [1, 2, 3]]
@@ -89,7 +88,6 @@ class TestNomialArray:
         d = p.sum()
         assert d.sub(c) == Monomial({}, 14)
 
-    # pylint: disable=no-member
     def test_units(self):
         # inspired by gpkit issue #106
         c = VectorVariable(5, "c", "m", "Local Chord")

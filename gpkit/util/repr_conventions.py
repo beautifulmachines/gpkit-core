@@ -464,7 +464,7 @@ class ReprMixin:
     def parse_ast(self, excluded=()):
         "Turns the AST of this object's construction into a faithful string"
         if self.ast is None:
-            return self.str_without(excluded)  # pylint: disable=no-member
+            return self.str_without(excluded)
         excluded = frozenset({"units"}.union(excluded))
         if self.cached_strs is None:
             self.cached_strs = {}
@@ -480,8 +480,8 @@ class ReprMixin:
 
     def __str__(self):
         "Returns default string."
-        return self.str_without()  # pylint: disable=no-member
+        return self.str_without()
 
     def _repr_latex_(self):
         "Returns default latex for automatic iPython Notebook rendering."
-        return "$$" + self.latex() + "$$"  # pylint: disable=no-member
+        return "$$" + self.latex() + "$$"

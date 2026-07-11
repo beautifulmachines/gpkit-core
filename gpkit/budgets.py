@@ -187,7 +187,7 @@ def _drop_nonbinding(matches, threshold=1e-5):
 
 
 @dataclass
-class BudgetNode:  # pylint: disable=too-many-instance-attributes
+class BudgetNode:
     """A single line in a hierarchical budget breakdown.
 
     Attributes
@@ -715,9 +715,7 @@ def _trim_to_depth(nodes, remaining_depth):
         _trim_to_depth(node.children, remaining_depth - 1)
 
 
-def build_budget(  # pylint: disable=too-many-locals
-    solution, model, var, display_units=None, depth=float("inf")
-):
+def build_budget(solution, model, var, display_units=None, depth=float("inf")):
     """Build a :class:`Budget` for a variable by scanning the model's constraints.
 
     Parameters

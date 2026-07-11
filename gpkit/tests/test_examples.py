@@ -17,7 +17,6 @@ from gpkit.util.small_classes import Quantity
 from gpkit.util.small_scripts import mag
 
 
-# pylint: disable=too-many-public-methods
 class TestExamples:
     """
     To test a new example, add a function called `test_$EXAMPLENAME`, where

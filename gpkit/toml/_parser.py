@@ -179,13 +179,13 @@ def _extract_model_vars(model_def):
 # ---------------------------------------------------------------------------
 
 
-class _TomlNamespace(types.SimpleNamespace):  # pylint: disable=too-few-public-methods
+class _TomlNamespace(types.SimpleNamespace):
     """SimpleNamespace subclass that opts in to TOML attribute access."""
 
     _toml_namespace = True
 
 
-class _AmbiguousVarSentinel:  # pylint: disable=too-few-public-methods
+class _AmbiguousVarSentinel:
     """Sentinel placed in namespace for names defined in multiple models.
 
     When _eval_name encounters this sentinel it raises a descriptive
@@ -409,7 +409,7 @@ def _build_submodels_namespace(sub_ids, per_model_vars):
     return _TomlNamespace(**sub_ns_dict)
 
 
-def _build_multi_model(models_section, dimension_overrides=None):  # pylint: disable=too-many-locals
+def _build_multi_model(models_section, dimension_overrides=None):
     """Build a single Model from multiple model sections with structure."""
 
     root_id, ordered_ids = _resolve_model_graph(models_section)

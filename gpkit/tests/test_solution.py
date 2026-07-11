@@ -79,7 +79,7 @@ class TestSolution:
         with SignomialsEnabled():
             m = Model(y, [y + 6 * x >= 13 + x**2])
         msol = m.localsolve(verbosity=0)
-        spsol = m.sp().localsolve(verbosity=0)  # pylint: disable=no-member
+        spsol = m.sp().localsolve(verbosity=0)
         gpsol = m.program.gps[-1].solve(verbosity=0)
         assert msol[x] == spsol[x]
         assert msol[x] == gpsol[x]

@@ -1,7 +1,5 @@
 """Tests for the IR (Intermediate Representation) infrastructure."""
 
-# pylint: disable=invalid-name,too-many-lines
-
 import importlib
 import json
 

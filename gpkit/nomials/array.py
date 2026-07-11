@@ -79,17 +79,14 @@ class NomialArray(ReprMixin, np.ndarray):
             result, ast=ExprNode("add", tuple(to_ast(x) for x in astorder))
         )
 
-    # pylint: disable=multiple-statements
     def __rmul__(self, other):
         return self.__mul__(other, reverse_order=True)
 
     def __radd__(self, other):
         return self.__add__(other, reverse_order=True)
 
-    def __pow__(self, expo):  # pylint: disable=arguments-differ
-        result = np.ndarray.__pow__(  # pylint: disable=too-many-function-args
-            self, expo
-        )
+    def __pow__(self, expo):
+        result = np.ndarray.__pow__(self, expo)
         return NomialArray(result, ast=ExprNode("pow", (to_ast(self), expo)))
 
     def __neg__(self):
@@ -107,7 +104,7 @@ class NomialArray(ReprMixin, np.ndarray):
         if "ast" not in excluded and self.ast:
             return self.parse_ast(excluded)
         if "key" not in excluded and hasattr(self, "key"):
-            return self.key.str_without(excluded)  # pylint: disable=no-member
+            return self.key.str_without(excluded)
         if not self.shape:
             return try_str_without(self.flatten()[0], excluded)
 
@@ -123,7 +120,7 @@ class NomialArray(ReprMixin, np.ndarray):
         "Returns latex representation without certain fields."
         units = self.latex_unitstr() if "units" not in excluded else ""
         if hasattr(self, "key"):
-            return self.key.latex(excluded) + units  # pylint: disable=no-member
+            return self.key.latex(excluded) + units
         return np.ndarray.__str__(self)
 
     def __hash__(self):
@@ -140,7 +137,6 @@ class NomialArray(ReprMixin, np.ndarray):
     def __array_finalize__(self, obj):
         "Finalizer. Required for objects inheriting from np.ndarray."
 
-    # pylint: disable=arguments-renamed,too-many-function-args
     def __array_wrap__(self, out_arr, context=None, return_scalar=True):
         """Called by numpy ufuncs.
         Special case to avoid creation of 0-dimensional arrays
@@ -170,14 +166,14 @@ class NomialArray(ReprMixin, np.ndarray):
         "Substitutes into the array"
         return self.vectorize(lambda nom: nom.sub(subs, require_positive))
 
-    def sum(self, *args, **kwargs):  # pylint: disable=arguments-differ
+    def sum(self, *args, **kwargs):
         "Returns a sum. O(N) if no arguments are given."
         if not self.size:
             raise ValueError("cannot sum NomialArray of size 0")
         if args or kwargs or not self.shape:
             return np.ndarray.sum(self, *args, **kwargs)
         hmap = NomialMap()
-        for p in self.flat:  # pylint:disable=not-an-iterable
+        for p in self.flat:
             if not hmap and hasattr(p, "units"):
                 hmap.units = p.units
             if hasattr(p, "hmap"):
@@ -190,7 +186,7 @@ class NomialArray(ReprMixin, np.ndarray):
                 hmap[EMPTY_HV] = p + hmap.get(EMPTY_HV, 0)
         return Signomial(hmap, ast=ExprNode("sum", (to_ast(self),)))
 
-    def prod(self, *args, **kwargs):  # pylint: disable=arguments-differ
+    def prod(self, *args, **kwargs):
         "Returns a product. O(N) if no arguments and only contains monomials."
         if not self.size:
             raise ValueError("cannot prod NomialArray of size 0")
@@ -198,7 +194,7 @@ class NomialArray(ReprMixin, np.ndarray):
             return np.ndarray.prod(self, *args, **kwargs)
         c, exp = 1.0, HashVector()
         hmap = NomialMap()
-        for m in self.flat:  # pylint:disable=not-an-iterable
+        for m in self.flat:
             try:
                 ((mexp, mc),) = m.hmap.items()
             except (AttributeError, ValueError):

@@ -11,7 +11,6 @@ from ..varmap import VarMap
 
 
 def evaluate_linked(constants, linked):
-    # pylint: disable=too-many-branches
     "Evaluates the values and derivatives of linked variables."
     kdc = VarMap({k: adnumber(maybe_flatten(v), k) for k, v in constants.items()})
     linked_derivs = {}

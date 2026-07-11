@@ -1,4 +1,3 @@
-# pylint: skip-file
 """Plotting methods"""
 
 import matplotlib.pyplot as plt
@@ -29,7 +28,7 @@ def compare(models, sweeps, posys, tol=0.001):
             else:
                 p = posy
             color = GPCOLORS[i % len(GPCOLORS)]
-            if sol._is_cost(p):  # pylint: disable=protected-access
+            if sol._is_cost(p):
                 ax.fill_between(
                     sol.sampled_at,
                     sol.cost_lb(),
