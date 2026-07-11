@@ -53,7 +53,7 @@ def _merge_lineage_sub(name, lineage_sub):
 
 
 @dataclass(frozen=True, eq=False)
-class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
+class VarKey(ReprMixin):
     """An object to correspond to each 'variable name'.
 
     Arguments
@@ -158,11 +158,10 @@ class VarKey(ReprMixin):  # pylint:disable=too-many-instance-attributes
     def __setstate__(self, state):
         """Unpickle: reconstruct VarKey from state dict."""
         new_vk = VarKey(**state)
-        # pylint: disable=no-member  # __dataclass_fields__ exists on dataclasses
         for name in self.__dataclass_fields__:
             object.__setattr__(self, name, getattr(new_vk, name))
 
-    def str_without(self, excluded=()):  # pylint:disable=too-many-branches
+    def str_without(self, excluded=()):  # noqa: PLR0912
         "Returns string without certain fields (such as 'lineage')."
         name = self.name
         if "lineage" not in excluded and self.lineage:

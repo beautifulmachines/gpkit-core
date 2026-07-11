@@ -6,7 +6,6 @@ import webbrowser
 from collections import defaultdict
 
 
-# pylint:disable=too-many-locals,too-many-branches
 def referencesplot(model, *, openimmediately=True):
     """Makes a references plot.
 

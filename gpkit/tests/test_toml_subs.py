@@ -31,7 +31,7 @@ class Aircraft(Model):
     def setup(self):
         """Set up aircraft with weight and engine."""
         weight = Variable("W", 5000, "N", "weight")
-        self.engine = Engine()  # pylint: disable=attribute-defined-outside-init
+        self.engine = Engine()
         self.cost = weight
         return [weight >= weight, self.engine]  # pylint: disable=comparison-with-itself
 
@@ -283,7 +283,7 @@ class TestApplySubs:
         }
 
         # New model: Aircraft without Engine
-        class Aircraft(Model):  # pylint: disable=redefined-outer-name
+        class Aircraft(Model):
             """Trimmed aircraft model without Engine submodel."""
 
             def setup(self):

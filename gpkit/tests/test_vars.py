@@ -40,7 +40,6 @@ class TestVarKey:
         # test name keyword
         x = VarKey(name="x")
         assert x.name == "x"
-        # pylint: disable=redundant-keyword-arg
         with pytest.raises(TypeError):
             VarKey("x", name="y")
         assert isinstance(x.latex(), str)
@@ -117,13 +116,11 @@ class TestVarKey:
         vk1 = VarKey()
         vk2 = VarKey()
         assert vk1 != vk2
-        # pylint: disable=unnecessary-negation  # testing __eq__ returns False
         assert not vk1 == vk2
         assert vk1 == vk1  # pylint: disable=comparison-with-itself
         v = VarKey("v")
         vel = VarKey("v")
         assert v == vel
-        # pylint: disable=unnecessary-negation  # testing __ne__ returns False
         assert not v != vel
         assert vel == vel  # pylint: disable=comparison-with-itself
         x1 = Variable("x", 3, "m")
@@ -158,7 +155,7 @@ class TestVarKey:
         """Regression: __getattr__ raises AttributeError for unknown attrs."""
         x = VarKey("x")
         with pytest.raises(AttributeError):
-            _ = x.nonexistent_attr  # pylint: disable=no-member
+            _ = x.nonexistent_attr
 
     def test_frozen(self):
         """VarKey is a frozen dataclass - attributes cannot be modified."""
@@ -386,7 +383,6 @@ class TestVariable:
         w = Variable("W", 5, "lbf", "weight of 1 bag of sugar")
         assert w != w.key
         assert w.key != w
-        # pylint: disable=unnecessary-negation  # testing __eq__ both operand orders
         assert not w == w.key
         assert not w.key == w
 

@@ -183,7 +183,7 @@ def _eval_attribute(node, ns):
         ) from None
 
 
-def _eval_node(node, ns):  # pylint: disable=too-many-return-statements
+def _eval_node(node, ns):  # noqa: PLR0911
     """Recursively evaluate an AST node against *ns* (name → object)."""
     if isinstance(node, ast.Expression):
         return _eval_node(node.body, ns)

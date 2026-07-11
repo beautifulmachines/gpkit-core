@@ -9,7 +9,6 @@ from gpkit.exceptions import DualInfeasible, UnknownInfeasible
 from ..solutions import RawSolution
 
 
-# pylint: disable=too-many-locals,too-many-statements,too-many-branches,invalid-name
 def optimize(prob, meq_idxs, use_leqs=True, **kwargs):
     """Interface to the CVXOPT solver
 

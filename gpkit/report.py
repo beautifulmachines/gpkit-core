@@ -51,7 +51,7 @@ class CGroup:
 
 
 @dataclass
-class ReportSection:  # pylint: disable=too-many-instance-attributes
+class ReportSection:
     """Format-independent intermediate representation for model reports.
 
     lineage_map is a rendering hint (VarKey→display-depth) that allows
@@ -168,7 +168,7 @@ def _resolve_sensitivity(vk, solution=None):
     if solution is None:
         return None
     try:
-        import numpy as np  # pylint: disable=import-outside-toplevel
+        import numpy as np  # noqa: PLC0415
 
         sens_vars = solution.sens.variables
         if vk not in sens_vars:
@@ -267,7 +267,7 @@ def _build_split_var_entries(
         except KeyError:
             return None, unitstr(vk) or "-"
 
-    lineage_map = model._name_collision_varkeys  # pylint: disable=protected-access
+    lineage_map = model._name_collision_varkeys
     excluded = {":MAGIC:" + model.lineagestr()} if model.lineagestr() else set()
     free_entries: List[VarEntry] = []
     fixed_entries: List[VarEntry] = []
@@ -445,10 +445,10 @@ def build_report_ir(
         a native TOC facility (e.g. ``[TOC]`` in Markdown).  Set only on the
         root ReportSection; not propagated to children.
     """
-    is_anon = type(model) is _Model  # pylint: disable=unidiomatic-typecheck
+    is_anon = type(model) is _Model
     own_name = "" if is_anon else type(model).__name__
     lineage_path = model.lineagestr() if own_name else _parent_path
-    lineage_map = model._name_collision_varkeys  # pylint: disable=protected-access
+    lineage_map = model._name_collision_varkeys
     cgroups = _build_constraint_groups(model)
     free_vars, fixed_vars = _build_split_var_entries(
         model,
@@ -504,7 +504,7 @@ def _fmt_value(val, precision: int = 4, vecn: int = 6, col_widths=()) -> str:
     col_widths is a per-column list of minimum widths so that element position i
     across all vector rows in the same table renders at the same width.
     """
-    import numpy as np  # pylint: disable=import-outside-toplevel
+    import numpy as np  # noqa: PLC0415
 
     if val is None:
         return "-"
@@ -535,7 +535,7 @@ _SENS_NEARZERO_TOL = 1e-7
 
 def _fmt_sensitivity(sens, vecn: int = 6, col_widths=()) -> str:
     """Format a sensitivity value for display, handling scalars and arrays."""
-    import numpy as np  # pylint: disable=import-outside-toplevel
+    import numpy as np  # noqa: PLC0415
 
     if sens is None:
         return "-"
@@ -561,7 +561,7 @@ def _fmt_sensitivity(sens, vecn: int = 6, col_widths=()) -> str:
 
 def _compute_vec_col_widths(variables: list, precision: int, vecn: int) -> list:
     """Pre-scan vector values to compute per-column widths for alignment."""
-    import numpy as np  # pylint: disable=import-outside-toplevel
+    import numpy as np  # noqa: PLC0415
 
     col_widths: list = []
     for ve in variables:

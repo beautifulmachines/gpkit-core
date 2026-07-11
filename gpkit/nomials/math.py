@@ -41,7 +41,7 @@ class Signomial(Nomial):
 
     __hash__ = Nomial.__hash__
 
-    def __init__(self, hmap=None, cs=1, require_positive=True, *, ast=None):  # pylint: disable=too-many-statements,too-many-branches
+    def __init__(self, hmap=None, cs=1, require_positive=True, *, ast=None):
         if not isinstance(hmap, NomialMap):
             if hasattr(hmap, "hmap"):
                 hmap = hmap.hmap
@@ -232,7 +232,7 @@ class Signomial(Nomial):
         if rev:
             astorder = tuple(reversed(astorder))
         if isinstance(other, np.ndarray):
-            from .array import NomialArray  # pylint: disable=import-outside-toplevel
+            from .array import NomialArray  # noqa: PLC0415
 
             return NomialArray(self, ast=self.ast) * other
         if isinstance(other, Numbers):
@@ -279,20 +279,16 @@ class Signomial(Nomial):
         return NotImplemented
 
     def __neg__(self):
-        if SignomialsEnabled:  # pylint: disable=using-constant-test
+        if SignomialsEnabled:
             out = -1 * self
             return Signomial(out.hmap, ast=ExprNode("neg", (to_ast(self),)))
         return NotImplemented
 
     def __sub__(self, other):
-        return (  # pylint: disable=using-constant-test
-            self + -other if SignomialsEnabled else NotImplemented
-        )
+        return self + -other if SignomialsEnabled else NotImplemented
 
     def __rsub__(self, other):
-        return (  # pylint: disable=using-constant-test
-            other + -self if SignomialsEnabled else NotImplemented
-        )
+        return other + -self if SignomialsEnabled else NotImplemented
 
     def chop(self):
         "Returns a list of monomials in the signomial."
@@ -338,14 +334,14 @@ class Monomial(Posynomial):
     def exp(self):
         "Creates exp or returns a cached exp"
         if not self._exp:
-            (self._exp,) = self.hmap.keys()  # pylint: disable=attribute-defined-outside-init
+            (self._exp,) = self.hmap.keys()
         return self._exp
 
     @property
     def c(self):
         "Creates c or returns a cached c"
         if not self._c:
-            (self._c,) = self.cs  # pylint: disable=attribute-defined-outside-init
+            (self._c,) = self.cs
         return self._c
 
     def __rtruediv__(self, other):
@@ -387,7 +383,7 @@ class Monomial(Posynomial):
 
     # Monomial.__le__ falls back on Posynomial.__le__
 
-    def mono_approximation(self, x0):
+    def mono_approximation(self, x0):  # noqa: ARG002
         return self
 
 
@@ -432,7 +428,6 @@ class ScalarSingleEquationConstraint(SingleEquationConstraint):
         return ir
 
 
-# pylint: disable=too-many-instance-attributes, invalid-unary-operand-type
 class PosynomialInequality(ScalarSingleEquationConstraint):
     """A constraint of the general form monomial >= posynomial
     Stored in the posylt1_rep attribute as a single Posynomial (self <= 1)
@@ -458,7 +453,6 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
                 for vk, x in exp.items():
                     self.bounded.add((vk, "upper" if x > 0 else "lower"))
 
-    # pylint: disable=attribute-defined-outside-init
     def _simplify_posy_ineq(self, hmap, pmap=None, fixed=None):
         "Simplify a posy <= 1 by moving constants to the right side."
         if not hmap:
@@ -523,7 +517,7 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
         out = []
         for posy in self.unsubbed:
             hmap = posy.hmap.sub(substitutions, posy.vks, parsedsubs=True)
-            self.pmap = hmap.mmap(posy.hmap)  # pylint: disable=attribute-defined-outside-init
+            self.pmap = hmap.mmap(posy.hmap)
             del hmap.expmap, hmap.csmap  # needed only for the mmap call above
             hmap = self._simplify_posy_ineq(hmap, self.pmap, substitutions)
             if hmap is not None:
@@ -577,7 +571,6 @@ class MonomialEquality(PosynomialInequality):
     oper = "="
 
     def __init__(self, left, right):
-        # pylint: disable=super-init-not-called,non-parent-init-called
         ScalarSingleEquationConstraint.__init__(self, left, self.oper, right)
         self.unsubbed = self._gen_unsubbed(self.left, self.right)
         self.bounded = set()
@@ -610,7 +603,7 @@ class MonomialEquality(PosynomialInequality):
             constraint.lineage = tuple(tuple(pair) for pair in ir_dict["lineage"])
         return constraint
 
-    def _gen_unsubbed(self, left, right):  # pylint: disable=arguments-renamed
+    def _gen_unsubbed(self, left, right):
         "Returns the unsubstituted posys <= 1."
         unsubbed = PosynomialInequality._gen_unsubbed
         l_over_r = unsubbed(self, left, right)
@@ -621,14 +614,14 @@ class MonomialEquality(PosynomialInequality):
         "Tags posynomials for dual feasibility checking"
         out = super().as_hmapslt1(substitutions)
         for h in out:
-            h.from_meq = True  # pylint: disable=attribute-defined-outside-init
+            h.from_meq = True
         return out
 
     def __bool__(self):
         'A constraint not guaranteed to be satisfied evaluates as "False".'
         return bool(self.left.c == self.right.c and self.left.exp == self.right.exp)
 
-    def sens_from_dual(self, la, nu, _):
+    def sens_from_dual(self, la, nu, _):  # noqa: ARG002
         "Returns the variable/constraint sensitivities from lambda/nu"
         self._las.append(la)
         if len(self._las) == 1:
@@ -706,7 +699,6 @@ class SignomialInequality(ScalarSingleEquationConstraint):
                 negy_hmap[o_exp] = -siglt0_us.hmap[o_exp]
             else:
                 posy_hmaps[exp - negy.exp][o_exp] = siglt0_us.hmap[o_exp]
-        # pylint: disable=attribute-defined-outside-init
         self._mons = [
             Monomial(NomialMap({k: v})) for k, v in (posy / negy).hmap.items()
         ]
@@ -734,9 +726,7 @@ class SignomialInequality(ScalarSingleEquationConstraint):
            d(coeff)/d(var)*1/negy + d(1/negy)/d(var)*coeff
            = d(coeff)/d(var)*1/negy - d(negy)/d(var)*coeff*1/negy**2
         """
-        # pylint: disable=too-many-locals, attribute-defined-outside-init
 
-        # pylint: disable=no-member
         def subval(posy):
             "Substitute solution into a posynomial and return the result"
             hmap = posy.sub(varvals, require_positive=False).hmap
@@ -790,7 +780,7 @@ class SingleSignomialEquality(SignomialInequality):
             constraint.lineage = tuple(tuple(pair) for pair in ir_dict["lineage"])
         return constraint
 
-    def as_hmapslt1(self, substitutions):
+    def as_hmapslt1(self, substitutions):  # noqa: ARG002
         "SignomialEquality is never considered GP-compatible"
         raise InvalidGPConstraint(self)
 

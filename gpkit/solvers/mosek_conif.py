@@ -1,7 +1,7 @@
 """Implements the GPkit interface to MOSEK (version >= 9)
 through python-based Optimizer API"""
 
-import mosek  # pylint: disable=import-error
+import mosek
 import numpy as np
 
 from ..exceptions import (
@@ -13,7 +13,6 @@ from ..exceptions import (
 from ..solutions import RawSolution
 
 
-# pylint: disable=too-many-locals,too-many-statements,too-many-branches,invalid-name
 def optimize(prob, **kwargs):
     """
     Definitions
@@ -188,12 +187,11 @@ def optimize(prob, **kwargs):
     #
     if log_c_lin is not None:
         task.appendcons(log_c_lin.size)
-        # pylint: disable=possibly-used-before-assignment
         rows = cur_con_idx + np.array(A_lin.row)
         task.putaijlist(rows, A_lin.col, A_lin.data)
         type_constraint = [mosek.boundkey.up] * log_c_lin.size
         con_indices = np.arange(cur_con_idx, cur_con_idx + log_c_lin.size)
-        h = -log_c_lin  # pylint: disable=invalid-unary-operand-type
+        h = -log_c_lin
         task.putconboundlist(con_indices, type_constraint, h, h)
         cur_con_idx += log_c_lin.size
     #

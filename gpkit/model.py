@@ -30,7 +30,7 @@ from .varkey import VarKey
 from .varmap import VarMap
 
 
-class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attributes
+class Model(CostedConstraintSet):
     # Model carries GP state (cost, lineage, unique_varkeys, computed),
     # tree state (_children, _child_attrs), and report state (cgroups,
     # vectorized_block). Tracked in github.com/beautifulmachines/gpkit-core/issues/172.
@@ -80,7 +80,6 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
         return not any(hasattr(cs, "as_gpconstr") for cs in self.flat())
 
     def __init__(self, cost=None, constraints=None, *args, **kwargs):
-        # pylint: disable=keyword-arg-before-vararg
         setup_vars = None
         substitutions = kwargs.pop("substitutions", None)  # reserved keyword
         # True if created inside a Vectorize context — report uses this to
@@ -419,8 +418,7 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
         toc : bool, optional
             If True, a table-of-contents marker is inserted (Markdown only).
         """
-        # pylint: disable=import-outside-toplevel
-        from .report import build_report_ir, render_report
+        from .report import build_report_ir, render_report  # noqa: PLC0415
 
         ir = build_report_ir(
             self, solution=solution, front_matter=front_matter, toc=toc
@@ -505,11 +503,13 @@ class Model(CostedConstraintSet):  # pylint: disable=too-many-instance-attribute
             sols.append(bst.sample_at(np.linspace(start, end, samplepoints)))
         return sols if len(sols) > 1 else sols[0]
 
-    # pylint: disable=import-outside-toplevel
     def debug(self, solver=None, verbosity=1, **solveargs):
         "Attempts to diagnose infeasible models."
-        from .constraints.bounded import Bounded
-        from .constraints.relax import ConstantsRelaxed, ConstraintsRelaxed
+        from .constraints.bounded import Bounded  # noqa: PLC0415
+        from .constraints.relax import (  # noqa: PLC0415
+            ConstantsRelaxed,
+            ConstraintsRelaxed,
+        )
 
         sol = None
         solveargs["solver"] = solver

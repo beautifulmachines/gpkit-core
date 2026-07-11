@@ -11,7 +11,7 @@ settings = {}
 
 def log(*args):
     "Print a line and append it to the log string."
-    global LOGSTR  # pylint: disable=global-statement
+    global LOGSTR  # noqa: PLW0603
     print(*args)
     LOGSTR += " ".join(args) + "\n"
 
@@ -66,7 +66,6 @@ def diff(filename, diff_dict):
     shutil.move(filename + ".new", filename)
 
 
-# pylint: disable=too-few-public-methods
 class SolverBackend:
     "Inheritable class for finding solvers. Logs."
 
@@ -74,7 +73,7 @@ class SolverBackend:
 
     def __init__(self):
         log(f"\n# Looking for `{self.name}`")
-        found_in = self.look()  # pylint: disable=not-callable
+        found_in = self.look()
         if found_in:
             log(f"\nFound {self.name} {found_in}")
             self.installed = True
@@ -88,7 +87,7 @@ class MosekCLI(SolverBackend):
 
     name = "mosek_cli"
 
-    def look(self):  # pylint: disable=too-many-return-statements
+    def look(self):
         "Looks in default install locations for a mosek before version 9."
         log('#   (A "success" is if mskexpopt complains that')
         log("#    we haven't specified a file for it to open.)")
@@ -141,12 +140,11 @@ class MosekCLI(SolverBackend):
         try:
             if call("mskexpopt") in (1052, 28):  # 28 for MacOSX
                 return where
-        except Exception:  # pylint: disable=broad-exception-caught
+        except Exception:  # noqa: BLE001
             pass  # exception type varies by operating system
         return None
 
 
-# pylint: disable=too-few-public-methods
 class CVXopt(SolverBackend):
     "CVXopt finder."
 
@@ -156,15 +154,13 @@ class CVXopt(SolverBackend):
         "Attempts to import cvxopt."
         try:
             log("#   Trying to import cvxopt...")
-            # pylint: disable=unused-import,import-outside-toplevel
-            import cvxopt  # noqa: F401
+            import cvxopt  # noqa: F401, PLC0415
 
             return "in the default PYTHONPATH"
         except ImportError:
             return ""
 
 
-# pylint: disable=too-few-public-methods
 class MosekConif(SolverBackend):
     "MOSEK exponential cone solver finder."
 
@@ -174,7 +170,7 @@ class MosekConif(SolverBackend):
         "Attempts to import a mosek supporting exponential cones."
         try:
             log("#   Trying to import mosek...")
-            import mosek  # pylint: disable=import-outside-toplevel
+            import mosek  # noqa: PLC0415
 
             if hasattr(mosek.conetype, "pexp"):
                 return "in the default PYTHONPATH"

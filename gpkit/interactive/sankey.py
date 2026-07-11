@@ -1,4 +1,3 @@
-# pylint: skip-file
 "implements Sankey"
 
 import os
@@ -37,7 +36,6 @@ def cleanfilename(string):
     return re.sub(r"\\/?|\"><:\*", "_", string)  # Replace invalid with _
 
 
-# pylint: disable=too-many-instance-attributes
 class Sankey:
     "Return Jupyter diagrams of sensitivity flow"
 
@@ -102,7 +100,6 @@ class Sankey:
             total_sens += abs_var_sens
         return total_sens
 
-    # pylint: disable=too-many-branches
     def link(self, cset, target, vk, *, labeled=False, subarray=False):
         "adds links of a given constraint set to self.links"
         total_sens = 0
@@ -156,7 +153,6 @@ class Sankey:
                 if not function(s, t, v):
                     del links[(s, t)]
 
-    # pylint: disable=too-many-locals
     def diagram(
         self,
         variable=None,

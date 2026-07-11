@@ -85,9 +85,9 @@ class Variable(Monomial):
 
     def to(self, units):
         "Create new Signomial converted to new units"
-        return Monomial(self).to(units)  # pylint: disable=no-member
+        return Monomial(self).to(units)
 
-    def sub(self, *args, **kwargs):  # pylint: disable=arguments-differ
+    def sub(self, *args, **kwargs):
         """Same as nomial substitution, but also allows single-argument calls
 
         Example
@@ -108,29 +108,26 @@ class Variable(Monomial):
     # GrowthAllowance.make_constraints for slack-warning diagnostics.
     def grown_from(self, expr):
         "Return the two bookkeeping constraints for self's growth allowance."
-        # pylint: disable=import-outside-toplevel
-        from .growth import make_growth_constraints
+        from .growth import make_growth_constraints  # noqa: PLC0415
 
         return make_growth_constraints(self, expr)
 
     @property
     def growth(self):
         "The auto-generated allowance Variable sibling."
-        # pylint: disable=import-outside-toplevel
-        from .growth import sibling_growth
+        from .growth import sibling_growth  # noqa: PLC0415
 
         return sibling_growth(self.key)
 
     @property
     def f_growth(self):
         "The auto-generated fraction Variable sibling."
-        # pylint: disable=import-outside-toplevel
-        from .growth import sibling_fraction
+        from .growth import sibling_fraction  # noqa: PLC0415
 
         return sibling_fraction(self.key)
 
 
-class ArrayVariable(NomialArray):  # pylint: disable=too-many-locals
+class ArrayVariable(NomialArray):
     """A described vector of singlet Monomials.
 
     Arguments
@@ -151,7 +148,7 @@ class ArrayVariable(NomialArray):  # pylint: disable=too-many-locals
     where $name is the vector's name and i is the VarKey's index.
     """
 
-    def __new__(cls, shape, *args, **descr):  # pylint: disable=too-many-branches, too-many-statements, arguments-differ
+    def __new__(cls, shape, *args, **descr):  # noqa: PLR0912, PLR0915
         if "idx" in descr:
             raise ValueError("the description field 'idx' is reserved")
 

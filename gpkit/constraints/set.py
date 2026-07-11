@@ -13,7 +13,6 @@ from ..varkey import lineage_display_context
 from ..varmap import VarMap, VarSet, _collision_depths
 
 
-# pylint: disable=fixme
 def add_meq_bounds(bounded, meq_bounded):  # TODO: collapse with GP version?
     "Iterates through meq_bounds until convergence"
     still_alive = True
@@ -49,13 +48,13 @@ def flatiter(iterable, yield_if_hasattr=None):
                 yield from flatiter(constraint, yield_if_hasattr)
 
 
-class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attributes
+class ConstraintSet(list, ReprMixin):
     "Recursive container for ConstraintSets and Inequalities"
 
     unique_varkeys, idxlookup = frozenset(), {}
     _varkeys = None
 
-    def __init__(self, constraints, substitutions=None, *, bonusvks=None):  # pylint: disable=too-many-branches,too-many-statements
+    def __init__(self, constraints, substitutions=None, *, bonusvks=None):  # noqa: PLR0912
         if isinstance(constraints, dict):
             keys, constraints = constraints.keys(), constraints.values()
             self.idxlookup = {k: i for i, k in enumerate(keys)}
@@ -225,7 +224,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
             ctx = nullcontext()
         with ctx:
             if root and hasattr(self, "_rootlines"):
-                rootlines = self._rootlines(excluded)  # pylint: disable=no-member
+                rootlines = self._rootlines(excluded)
             lines = recursively_line(self, excluded)
         indent = " " if root or getattr(self, "lineage", None) else ""
         return rootlines + [(indent + line).rstrip() for line in lines]
@@ -242,7 +241,7 @@ class ConstraintSet(list, ReprMixin):  # pylint: disable=too-many-instance-attri
             excluded += ("root",)
             lines.append("\\begin{array}{ll} \\text{}")
             if hasattr(self, "_rootlatex"):
-                lines.append(self._rootlatex(excluded))  # pylint: disable=no-member
+                lines.append(self._rootlatex(excluded))
         for constraint in self:
             cstr = try_str_without(constraint, excluded, latex=True)
             if cstr[:6] != "    & ":  # require indentation

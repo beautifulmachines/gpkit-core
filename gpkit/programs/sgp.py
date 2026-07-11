@@ -23,7 +23,6 @@ from .gp import GeometricProgram
 EPS = 1e-6  # 1 +/- this is used in a few relative differences
 
 
-# pylint: disable=too-many-instance-attributes
 class SequentialGeometricProgram:
     """Prepares a collection of signomials for a SP solve.
 
@@ -58,7 +57,6 @@ class SequentialGeometricProgram:
     with NamedVariables("RelaxPCCP"):
         slack = Variable("C")
 
-    # pylint: disable=too-many-arguments,too-many-locals
     def __init__(
         self, cost, model, substitutions, *, use_pccp=True, pccp_penalty=2e2, **kwargs
     ):
@@ -113,8 +111,6 @@ solutions and can be solved with 'Model.solve()'.""")
             if last_cost_mon <= m_idx <= first_gp_mon:
                 self.a_idxs[self._gp.data.p_idxs[m_idx]].append(row_idx)
 
-    # pylint: disable=too-many-locals,too-many-branches,too-many-statements
-    # pylint: disable=too-many-arguments
     def localsolve(
         self,
         solver=None,
@@ -254,7 +250,6 @@ solutions and can be solved with 'Model.solve()'.""")
             slcon = self.gpconstraints[0]
             slconsenss = self.result.sens.constraints[slcon]
             del self.result.sens.constraints[slcon]
-            # pylint: disable=fixme
             # TODO: create constraint in RelaxPCCP namespace
             self.result.sens.models[""] -= slconsenss
             if not self.result.sens.models[""]:

@@ -1,4 +1,3 @@
-# pylint: disable=import-error,import-outside-toplevel
 "Interactive GPkit widgets for iPython notebook"
 
 import ipywidgets as widgets
@@ -9,7 +8,6 @@ from ..small_classes import Numbers
 from ..small_scripts import is_sweepvar
 
 
-# pylint: disable=too-many-locals
 def modelinteract(model, fns_of_sol, ranges=None, **solvekwargs):
     """Easy model interaction in IPython / Jupyter
 
@@ -98,8 +96,7 @@ def modelinteract(model, fns_of_sol, ranges=None, **solvekwargs):
     return widgets.interactive(resolve, **ranges_out)
 
 
-# pylint: disable=too-many-locals, too-many-statements
-def modelcontrolpanel(model, showvars=(), fns_of_sol=None, **solvekwargs):
+def modelcontrolpanel(model, showvars=(), fns_of_sol=None, **solvekwargs):  # noqa: PLR0915
     """Easy model control in IPython / Jupyter
 
     Like interact(), but with the ability to control sliders and their showvars
@@ -158,14 +155,14 @@ def modelcontrolpanel(model, showvars=(), fns_of_sol=None, **solvekwargs):
 
     def append_plotfn():
         "Creates and adds plotfn to fn_of_sols"
-        from .plot_sweep import plot_1dsweepgrid
+        from .plot_sweep import plot_1dsweepgrid  # noqa: PLC0415
 
         yvars = [model.cost]
-        for varname in y_axes.value.split("  "):  # pylint: disable=no-member
+        for varname in y_axes.value.split("  "):
             varname = varname.strip()
             try:
                 yvars.append(model[varname])
-            except Exception:  # pylint: disable=broad-exception-caught
+            except Exception:  # noqa: BLE001
                 break
         ranges = {}
         for sb in sliderboxes[1:]:
@@ -190,7 +187,7 @@ def modelcontrolpanel(model, showvars=(), fns_of_sol=None, **solvekwargs):
             append_plotfn()
         if not fns_of_sol:
             fns_of_sol.append(__defaultfntable)
-        sl.value = sl.value * (1.000001)  # pylint: disable=undefined-loop-variable
+        sl.value = sl.value * (1.000001)
 
     sweep.observe(redo_plots, "value")
     y_axes.on_submit(redo_plots)
@@ -212,8 +209,7 @@ def create_settings(box):
     def slider_link(obj, attr):
         "Function to link one object to an attr of the slider."
 
-        # pylint: disable=unused-argument
-        def link_fn(name, new_value):
+        def link_fn(_name, new_value):
             "How to update the object's value given min/max on the slider."
             slider.max = max(new_value, slider.max)
             # if any value is greater than the max, the max slides up

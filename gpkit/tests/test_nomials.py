@@ -22,7 +22,7 @@ from gpkit.exceptions import InvalidPosynomial
 from gpkit.nomials import NomialMap
 
 
-class TestMonomial:  # pylint: disable=unnecessary-negation,comparison-with-itself
+class TestMonomial:
     """TestCase for the Monomial class"""
 
     def test_init(self):
@@ -43,8 +43,8 @@ class TestMonomial:  # pylint: disable=unnecessary-negation,comparison-with-itse
         # single (string) var with non-default c
         v = 0.1 * Variable("tau")
         tau = VarKey("tau")
-        assert v.exp == {tau: 1}  # pylint: disable=no-member
-        assert v.c == 0.1  # pylint: disable=no-member
+        assert v.exp == {tau: 1}
+        assert v.c == 0.1
 
         # variable names not compatible with python namespaces
         crazy_varstr = "what the !!!/$**?"
@@ -128,8 +128,8 @@ class TestMonomial:  # pylint: disable=unnecessary-negation,comparison-with-itse
     def test_latex_mixed_expr_constant_units_shown(self):
         """In expressions mixing a unit-bearing constant with variables,
         the constant's units must appear even with excluded=('units',)"""
-        wing_area = Variable("S", "m^2", "wing area")  # pylint: disable=invalid-name
-        wingspan = Variable("L", "m", "wingspan")  # pylint: disable=invalid-name
+        wing_area = Variable("S", "m^2", "wing area")
+        wingspan = Variable("L", "m", "wingspan")
         c = wing_area >= 4 * gpkit.units("m") * wingspan
         latex = c.latex(excluded=("units",))
         assert r"\mathrm" in latex  # constant's units appear
@@ -138,7 +138,7 @@ class TestMonomial:  # pylint: disable=unnecessary-negation,comparison-with-itse
 
     def test_str_with_units(self):
         "Make sure __str__() works when units are involved"
-        S = Variable("S", units="m^2")  # pylint: disable=invalid-name
+        S = Variable("S", units="m^2")
         rho = Variable("rho", units="kg/m^3")
         x = rho * S
         xstr = x.str_without()
@@ -250,9 +250,7 @@ class TestMonomial:  # pylint: disable=unnecessary-negation,comparison-with-itse
         c1, c2 = 1 / 700, 123e8
         m1 = Monomial({"x": 2, "y": 1}, c1)
         m2 = Monomial({"y": -1, "z": 3 / 2}, c2)
-        assert np.log((m1**4 * m2**3).c) == 4 * np.log(  # pylint: disable=no-member
-            c1
-        ) + 3 * np.log(c2)
+        assert np.log((m1**4 * m2**3).c) == 4 * np.log(c1) + 3 * np.log(c2)
 
     def test_units(self):
         "make sure multiplication with units works (issue 492)"
@@ -361,7 +359,7 @@ class TestPi:
 class TestPosynomial:
     """TestCase for the Posynomial class"""
 
-    def test_init(self):  # pylint:disable=too-many-locals
+    def test_init(self):
         "Test Posynomial construction"
         x = Variable("x")
         y = Variable("y")
@@ -399,7 +397,6 @@ class TestPosynomial:
         x = Variable("x")
         y = Variable("y")
         assert (1 + x) == (1 + x)
-        # pylint: disable=unnecessary-negation  # testing __eq__ returns False
         assert not (1 + x) == 2 * (1 + x)
         assert not (1 + x) == 0.5 * (1 + x)
         assert not (1 + x) == (1 + y)
@@ -414,7 +411,6 @@ class TestPosynomial:
         p2u = Variable("x", units="m") + Variable("y", units="m")
         assert p1 == p2
         assert p1u == p2u
-        # pylint: disable=unnecessary-negation  # testing __eq__ returns False
         assert not p1 == p1u
         assert p1 != p1u
 
@@ -473,8 +469,8 @@ class TestPosynomial:
         assert (y**2).diff(y) == 2 * y
         assert (x + y**2).diff(y) == 2 * y
         assert (x + y**2).diff(x.key) == 1
-        assert (x + x * y**2).diff(y) == 2 * x * y  # pylint: disable=no-member
-        assert (2 * y).diff(y) == 2  # pylint: disable=no-member
+        assert (x + x * y**2).diff(y) == 2 * x * y
+        assert (2 * y).diff(y) == 2
         # test with units
         x = Variable("x", units="ft")
         d = (3 * x**2).diff(x)
@@ -491,8 +487,6 @@ class TestPosynomial:
         y = Variable("y")
         p = y**2 + 1
         assert y.mono_lower_bound({y: 1}) == y
-        # pylint is confused because it thinks p is a Signomial
-        # pylint: disable=no-member
         assert p.mono_lower_bound({y: 1}) == 2 * y
         assert p.mono_lower_bound({y: 0}) == 1
         assert (x * y**2 + 1).mono_lower_bound({y: 1, x: 1}) == 2 * y * x**0.5

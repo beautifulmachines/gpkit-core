@@ -62,7 +62,7 @@ class ConstNode(ASTNode):
 
     value: float
 
-    def str_without(self, excluded=()):
+    def str_without(self, excluded=()):  # noqa: ARG002
         return f"{self.value:.3g}"
 
     def latex(self, _excluded=()):
@@ -84,7 +84,7 @@ class PiNode(ConstNode):
 
     value: float = field(default_factory=lambda: np.pi)
 
-    def str_without(self, excluded=()):
+    def str_without(self, excluded=()):  # noqa: ARG002
         return PI_STR
 
     def latex(self, _excluded=()):

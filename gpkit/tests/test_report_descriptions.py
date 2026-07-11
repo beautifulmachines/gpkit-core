@@ -328,7 +328,6 @@ class TestObjective:
     """Tests for objective expression and value in ReportSection and renderers."""
 
     def _solved_box(self):
-        # pylint: disable=import-outside-toplevel
         from gpkit.examples.simple_box import Box
 
         m = Box()

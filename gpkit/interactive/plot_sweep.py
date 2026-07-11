@@ -50,7 +50,6 @@ def format_and_label_axes(var, posys, axes, ylabel=True):
     plt.subplots_adjust(wspace=0.15)
 
 
-# pylint: disable=too-many-locals,too-many-branches,too-many-statements
 def plot_1dsweepgrid(model, sweeps, posys, origsol=None, tol=0.01, **solveargs):
     """Creates and plots a sweep from an existing model
 

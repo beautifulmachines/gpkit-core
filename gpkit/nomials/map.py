@@ -94,7 +94,7 @@ class NomialMap(HashVector):
         "Returns a new NomialMap of the given units"
         sunits = self.units or DIMLESS_QUANTITY
         nm = self * sunits.to(to_units).magnitude  # note that * creates a copy
-        nm.units_of_product(to_units)  # pylint: disable=no-member
+        nm.units_of_product(to_units)
         return nm
 
     def __add__(self, other):
@@ -143,7 +143,6 @@ class NomialMap(HashVector):
             to contain only keys in varkeys
 
         """
-        # pylint: disable=too-many-locals, too-many-branches
         if parsedsubs or not substitutions:
             fixed = substitutions
         else:
@@ -210,7 +209,6 @@ class NomialMap(HashVector):
         return pmap
 
 
-# pylint: disable=too-many-arguments,too-many-positional-arguments
 def subinplace(cp, exp, o_exp, vk, cval, squished):
     "Modifies cp by substituing cval/expval for vk in exp"
     x = exp[vk]

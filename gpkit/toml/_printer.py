@@ -107,7 +107,7 @@ class _RefNameRegistry(dict):
         return stub
 
 
-def _render_op(op, children):  # pylint: disable=too-many-return-statements,too-many-branches
+def _render_op(op, children):  # noqa: PLR0911, PLR0912
     """Render an AST operation to a plain expression string."""
     if op == "add":
         left = ast_to_expr(children[0])
@@ -360,7 +360,7 @@ def _root_model_id(tree, all_variables):
     return "main"
 
 
-def to_toml(source, path=None):  # pylint: disable=too-many-locals,too-many-branches,too-many-statements
+def to_toml(source, path=None):
     """Generate a TOML model spec from a gpkit Model or IR dict.
 
     Parameters
@@ -403,7 +403,7 @@ def to_toml(source, path=None):  # pylint: disable=too-many-locals,too-many-bran
     return _emit_lines(lines, path)
 
 
-def _emit_single_model(ir, lines):  # pylint: disable=too-many-locals
+def _emit_single_model(ir, lines):
     """Emit [vars] + [model] sections for a flat single-model IR."""
     variables = ir.get("variables", {})
     substitutions = ir.get("substitutions", {})
@@ -454,7 +454,7 @@ def _emit_single_model(ir, lines):  # pylint: disable=too-many-locals
         lines.append("]")
 
 
-def _emit_multi_model(ir, lines):  # pylint: disable=too-many-locals,too-many-branches
+def _emit_multi_model(ir, lines):
     """Emit [models.*] sections from a multi-model IR."""
     tree = ir["model_tree"]
     variables = ir.get("variables", {})
@@ -510,7 +510,7 @@ def _emit_multi_model(ir, lines):  # pylint: disable=too-many-locals,too-many-br
     )
 
 
-def _emit_model_section(
+def _emit_model_section(  # noqa: PLR0913
     model_id,
     node,
     child_ids,
@@ -521,7 +521,7 @@ def _emit_model_section(
     *,
     is_root,
     cost_ir,
-):  # pylint: disable=too-many-arguments,too-many-positional-arguments,too-many-locals
+):
     """Emit a single [models.X] section."""
     lines.append(f"[models.{model_id}]")
 

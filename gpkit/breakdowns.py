@@ -6,7 +6,6 @@ from collections import defaultdict, namedtuple
 
 import numpy as np
 
-# pylint: skip-file
 from gpkit.nomials import Monomial, Posynomial
 from gpkit.nomials.map import NomialMap
 from gpkit.units import DimensionalityError
@@ -102,7 +101,7 @@ def divide_out_vk(vk, pow, lt, gt):
 
 
 # @profile
-def get_breakdowns(basically_fixed_variables, solution):
+def get_breakdowns(basically_fixed_variables, solution):  # noqa: PLR0912, PLR0915
     """Returns {key: (lt, gt, constraint)} for breakdown constrain in solution.
 
     A breakdown constraint is any whose "gt" contains a single free variable.
@@ -244,7 +243,7 @@ def get_fixity(basically_fixed, key, bd, solution, visited=set()):
 
 
 # @profile  # ~84% of total last check # TODO: remove
-def crawl(
+def crawl(  # noqa: PLR0912, PLR0913, PLR0915
     basically_fixed_variables,
     key,
     bd,
@@ -510,7 +509,7 @@ for ambiguous_symbol in "lILT":
     SYMBOLS = SYMBOLS.replace(ambiguous_symbol, "")
 
 
-def get_spanstr(legend, length, label, leftwards, solution):
+def get_spanstr(legend, length, label, leftwards, solution):  # noqa: ARG001
     "Returns span visualization, collapsing labels to symbols"
     if label is None:
         return " " * length
@@ -544,7 +543,7 @@ def get_spanstr(legend, length, label, leftwards, solution):
         return "┃" * (longside + 1) + shortname + "┃" * (shortside + 1)
 
 
-def discretize(tree, extent, solution, collapse, depth=0, justsplit=False):
+def discretize(tree, extent, solution, collapse, depth=0, justsplit=False):  # noqa: PLR0912, PLR0913, PLR0915
     # TODO: add vertical simplification?
     key, val, branches = tree
     if collapse:  # collapse Transforms with power 1
@@ -726,7 +725,7 @@ def prune(tree, solution, maxlength, length=-1, prefix=""):
     )
 
 
-def simplify(tree, solution, extent, maxdepth, maxlength, collapse):
+def simplify(tree, solution, extent, maxdepth, maxlength, collapse):  # noqa: PLR0913
     "Discretize, prune, and layer a tree to prepare for printing"
     subtree = discretize(tree, extent, solution, collapse)
     if collapse and maxlength:
@@ -735,7 +734,7 @@ def simplify(tree, solution, extent, maxdepth, maxlength, collapse):
 
 
 # @profile  # ~16% of total last check # TODO: remove
-def graph(
+def graph(  # noqa: PLR0912, PLR0913, PLR0915
     tree,
     breakdowns,
     solution,
@@ -909,7 +908,7 @@ def legend_entry(key, shortname, solution, prefix, basically_fixed_variables):
     return ["%-4s" % shortname, keystr, valuestr, note]
 
 
-def get_keystr(key, solution, prefix=""):
+def get_keystr(key, solution, prefix=""):  # noqa: ARG001
     "Returns formatted string of the key in solution."
     if hasattr(key, "str_without"):
         out = key.str_without({"units", ":MAGIC:" + prefix})
