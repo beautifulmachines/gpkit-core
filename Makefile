@@ -1,17 +1,13 @@
-.PHONY: clean check-clean test coverage lint pylint format examples
+.PHONY: clean check-clean test coverage lint format examples
 
 # Code quality
 lint:
-	uv run flake8 gpkit
-
-pylint:
-	uv run pylint --rcfile=.pylintrc --ignore=examples gpkit/
-	uv run pylint --rcfile=.pylintrc.examples gpkit/examples/
+	uv run ruff check gpkit
 
 # Code formatting
 format:
-	uv run isort gpkit
-	uv run black gpkit
+	uv run ruff format gpkit
+	uv run ruff check --select I --fix gpkit
 
 # Testing
 examples:  # Regenerate catalog example output files for docs
@@ -44,9 +40,8 @@ check-clean:
 # Help
 help:
 	@echo "Available commands:"
-	@echo "  lint              Run fast lint checks"
-	@echo "  pylint            Run pylint (slow)"
-	@echo "  format            Format code with isort and black"
+	@echo "  lint              Run lint checks"
+	@echo "  format            Format code with ruff"
 	@echo "  examples          Regenerate catalog example output files"
 	@echo "  test              Run all tests"
 	@echo "  coverage          Run tests with coverage reporting"
