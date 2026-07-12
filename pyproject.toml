@@ -1,5 +1,5 @@
 [build-system]
-requires = ["hatchling"]
+requires = ["hatchling", "hatch-vcs"]
 build-backend = "hatchling.build"
 
 [project]
@@ -45,7 +45,10 @@ test = [
 Homepage = "https://www.github.com/beautifulmachines/gpkit-core"
 
 [tool.hatch.version]
-path = "gpkit/__init__.py"
+source = "vcs"
+
+[tool.hatch.version.raw-options]
+fallback_version = "0.0.0"
 
 [tool.hatch.build.targets.wheel]
 packages = ["gpkit"]

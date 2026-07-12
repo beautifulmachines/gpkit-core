@@ -1,6 +1,12 @@
 "GP and SP modeling package"
 
-__version__ = "0.3.9"
+from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
+from importlib.metadata import version as _pkg_version
+
+try:
+    __version__ = _pkg_version("gpkit-core")
+except _PackageNotFoundError:  # pragma: no cover
+    __version__ = "0.0.0"
 
 import numpy as _np
 

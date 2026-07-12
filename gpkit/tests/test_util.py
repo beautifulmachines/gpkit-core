@@ -2,7 +2,9 @@
 
 import pytest
 
+import gpkit
 from gpkit import Variable, units
+from gpkit.util.build import build
 from gpkit.util.repr_conventions import extract_subscript, latexify, unitstr
 from gpkit.util.small_classes import HashVector
 
@@ -116,3 +118,14 @@ class TestSmallScripts:
         # test for https://github.com/hgrecco/pint/issues/366
         assert unitstr(units("nautical_mile")) in ("nmi", "nautical_mile")
         assert units("nautical_mile") == units("nmi")
+
+
+class TestBuild:
+    """TestCase for gpkit.util.build"""
+
+    def test_build_reports_installed_version(self, capsys):
+        """build()'s banner must report the real installed version."""
+        build()
+        out = capsys.readouterr().out
+        assert "unknown" not in out
+        assert f"Building GPkit version {gpkit.__version__}" in out
