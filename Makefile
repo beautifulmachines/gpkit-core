@@ -2,12 +2,12 @@
 
 # Code quality
 lint:
-	uv run ruff check gpkit
+	uv run ruff check .
 
 # Code formatting
 format:
-	uv run ruff format gpkit
-	uv run ruff check --select I --fix gpkit
+	uv run ruff format .
+	uv run ruff check --select I --fix .
 
 # Testing
 examples:  # Regenerate catalog example output files for docs

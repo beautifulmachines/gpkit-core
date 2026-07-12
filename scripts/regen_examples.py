@@ -56,6 +56,7 @@ def main():
             [sys.executable, str(script)],
             capture_output=True,
             text=True,
+            check=False,
         )
         if result.returncode != 0:
             print(f"  FAIL {name}:\n{result.stderr}")
