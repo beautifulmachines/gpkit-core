@@ -1,4 +1,4 @@
-.PHONY: clean check-clean test coverage lint format examples
+.PHONY: clean check-clean test coverage lint format examples release
 
 # Code quality
 lint:
@@ -36,6 +36,23 @@ check-clean:
 		echo "Working directory is clean."; \
 	fi
 
+# Releasing
+release: check-clean  # Cut a release: make release VERSION=v0.4.0
+	@if [ -z "$(VERSION)" ]; then \
+		echo "Usage: make release VERSION=vX.Y.Z"; \
+		exit 1; \
+	fi
+	@echo "$(VERSION)" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$' || { \
+		echo "VERSION must look like vX.Y.Z (got '$(VERSION)')"; \
+		exit 1; \
+	}
+	@git fetch origin main --quiet
+	@if [ "$$(git rev-parse HEAD)" != "$$(git rev-parse origin/main)" ]; then \
+		echo "HEAD is not up to date with origin/main. Pull or push first."; \
+		exit 1; \
+	fi
+	gh release create $(VERSION) --generate-notes
+
 
 # Help
 help:
@@ -47,4 +64,5 @@ help:
 	@echo "  coverage          Run tests with coverage reporting"
 	@echo "  clean             Clean build artifacts"
 	@echo "  check-clean       Check no uncommitted changes"
+	@echo "  release           Cut a release (make release VERSION=vX.Y.Z)"
 	@echo "  help              Show this help message"
