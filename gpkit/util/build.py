@@ -4,6 +4,8 @@ import os
 import shutil
 import subprocess
 import sys
+from importlib.metadata import PackageNotFoundError as _PackageNotFoundError
+from importlib.metadata import version as _pkg_version
 
 LOGSTR = ""
 settings = {}
@@ -183,13 +185,10 @@ def build():
     "Builds GPkit"
     # Compute the gpkit package directory from util/build.py -> gpkit/
     gpkit_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    # Read version by parsing __init__.py directly, avoiding a circular import
-    version = "unknown"
-    with open(os.path.join(gpkit_dir, "__init__.py"), encoding="utf-8") as f:
-        for line in f:
-            if line.startswith("__version__"):
-                version = line.split('"')[1]
-                break
+    try:
+        version = _pkg_version("gpkit-core")
+    except _PackageNotFoundError:
+        version = "unknown"
 
     log(f"# Building GPkit version {version}")
     log("# Moving to the directory from which GPkit was imported.")
