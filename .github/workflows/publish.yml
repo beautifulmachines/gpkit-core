@@ -10,6 +10,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
       with:
+        ref: ${{ github.ref }}  # check out by tag name, not bare SHA (actions/checkout#1467)
         fetch-tags: true  # needed so hatch-vcs can resolve the release tag into a version
 
     - name: Set up uv
