@@ -58,15 +58,15 @@ def run_catalog_test(model_entry):
     m = cls.default()
 
     assert m.cost is not None, (
-        f"{cls.__name__} did not set self.cost. " "setup() must assign self.cost."
+        f"{cls.__name__} did not set self.cost. setup() must assign self.cost."
     )
 
     sol = m.solve(verbosity=0) if m.is_gp() else m.localsolve(verbosity=0)
     assert sol is not None
     for val in sol.primal.values():
-        assert not np.isnan(
-            np.atleast_1d(mag(val))
-        ).any(), f"{cls.__name__}: NaN in solution"
+        assert not np.isnan(np.atleast_1d(mag(val))).any(), (
+            f"{cls.__name__}: NaN in solution"
+        )
 
     # expected_cost in the catalog entry takes precedence (for external repos);
     # fall back to the built-in table for gpkit-core entries.

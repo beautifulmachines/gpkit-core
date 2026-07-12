@@ -22,7 +22,7 @@ class Engine(Model):
         thrust = Variable("T", 2000, "N", "thrust")
         eta = Variable("eta", 0.85, "-", "efficiency")
         self.cost = thrust
-        return [thrust >= thrust, eta >= eta]  # pylint: disable=comparison-with-itself
+        return [thrust >= thrust, eta >= eta]  # noqa: PLR0124
 
 
 class Aircraft(Model):
@@ -31,9 +31,9 @@ class Aircraft(Model):
     def setup(self):
         """Set up aircraft with weight and engine."""
         weight = Variable("W", 5000, "N", "weight")
-        self.engine = Engine()  # pylint: disable=attribute-defined-outside-init
+        self.engine = Engine()
         self.cost = weight
-        return [weight >= weight, self.engine]  # pylint: disable=comparison-with-itself
+        return [weight >= weight, self.engine]  # noqa: PLR0124
 
 
 class FreeVarsModel(Model):
@@ -87,7 +87,7 @@ class TestSaveSubs:
                 mu = Variable("mu", "km^2/s^2")
                 r = Variable("r", "km")
                 self.cost = r
-                return [r >= r, mu >= mu], {  # pylint: disable=comparison-with-itself
+                return [r >= r, mu >= mu], {  # noqa: PLR0124
                     mu: 9.0 * units("km^2/s^2")
                 }
 
@@ -105,7 +105,7 @@ class TestSaveSubs:
                 """Set up with a callable substitution."""
                 x = Variable("x", "m")
                 self.cost = x
-                return [x >= x], {  # pylint: disable=comparison-with-itself
+                return [x >= x], {  # noqa: PLR0124
                     x: lambda _: 1.0
                 }
 
@@ -132,7 +132,7 @@ class TestSaveSubs:
                 """Set up with gravitational acceleration."""
                 g = Variable("g", 9.80665, "m/s^2", "gravitational acceleration")
                 self.cost = g
-                return [g >= g]  # pylint: disable=comparison-with-itself
+                return [g >= g]  # noqa: PLR0124
 
         model = PhysicsModel()
         toml_str = save_subs(model)
@@ -283,14 +283,14 @@ class TestApplySubs:
         }
 
         # New model: Aircraft without Engine
-        class Aircraft(Model):  # pylint: disable=redefined-outer-name
+        class Aircraft(Model):
             """Trimmed aircraft model without Engine submodel."""
 
             def setup(self):
                 """Set up with weight only."""
                 weight = Variable("W", 5000, "N", "weight")
                 self.cost = weight
-                return [weight >= weight]  # pylint: disable=comparison-with-itself
+                return [weight >= weight]  # noqa: PLR0124
 
         model_new = Aircraft()
         with pytest.warns(UserWarning, match="Aircraft.Engine"):

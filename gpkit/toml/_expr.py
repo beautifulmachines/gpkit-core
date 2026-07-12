@@ -118,7 +118,7 @@ def _eval_name(node, ns):
     if node.id not in ns:
         available = sorted(k for k in ns if not k.startswith("_"))
         raise TomlExpressionError(
-            f"Unknown variable '{node.id}'. " f"Available: {', '.join(available)}"
+            f"Unknown variable '{node.id}'. Available: {', '.join(available)}"
         )
     val = ns[node.id]
     if getattr(val, "_is_ambiguous_sentinel", False):
@@ -183,7 +183,7 @@ def _eval_attribute(node, ns):
         ) from None
 
 
-def _eval_node(node, ns):  # pylint: disable=too-many-return-statements
+def _eval_node(node, ns):  # noqa: PLR0911
     """Recursively evaluate an AST node against *ns* (name → object)."""
     if isinstance(node, ast.Expression):
         return _eval_node(node.body, ns)

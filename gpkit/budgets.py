@@ -187,7 +187,7 @@ def _drop_nonbinding(matches, threshold=1e-5):
 
 
 @dataclass
-class BudgetNode:  # pylint: disable=too-many-instance-attributes
+class BudgetNode:
     """A single line in a hierarchical budget breakdown.
 
     Attributes
@@ -368,9 +368,9 @@ def _render_growth_text(budget, top_label, header):
     _collect_text_rows(budget.children, rows, depth=1, show_growth=True)
     w = {
         "lbl": max(r[0] * 2 + len(r[1]) for r in rows),
-        "cbe": max(max(len(r[2]) for r in rows), len("Nominal")),
-        "ga": max(max(len(r[3]) for r in rows), len("Growth")),
-        "tot": max(max(len(r[4]) for r in rows), len("Total")),
+        "cbe": max(*(len(r[2]) for r in rows), len("Nominal")),
+        "ga": max(*(len(r[3]) for r in rows), len("Growth")),
+        "tot": max(*(len(r[4]) for r in rows), len("Total")),
         "unt": max(len(r[5]) for r in rows),
         "pct": max(len(r[6]) for r in rows),
     }
@@ -715,9 +715,7 @@ def _trim_to_depth(nodes, remaining_depth):
         _trim_to_depth(node.children, remaining_depth - 1)
 
 
-def build_budget(  # pylint: disable=too-many-locals
-    solution, model, var, display_units=None, depth=float("inf")
-):
+def build_budget(solution, model, var, display_units=None, depth=float("inf")):
     """Build a :class:`Budget` for a variable by scanning the model's constraints.
 
     Parameters

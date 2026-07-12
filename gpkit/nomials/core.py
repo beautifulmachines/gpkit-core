@@ -44,12 +44,11 @@ class Nomial(NomialData):
 
     sub = None
 
-    # pylint: disable=too-many-branches
-    def str_without(self, excluded=()):
+    def str_without(self, excluded=()):  # noqa: PLR0912
         "String representation, excluding fields ('units', varkey attributes)"
         units = "" if "units" in excluded else self.unitstr(" [%s]")
         if hasattr(self, "key"):
-            return self.key.str_without(excluded) + units  # pylint: disable=no-member
+            return self.key.str_without(excluded) + units
         if "ast" not in excluded and self.ast:
             return self.parse_ast(excluded) + units
         mstrs = []
@@ -130,9 +129,7 @@ class Nomial(NomialData):
         """
         if isinstance(self, FixedScalar):
             return self.cs[0]
-        p = self.sub(  # pylint: disable=not-callable
-            {k: k.value for k in self.vks if k.value is not None}
-        )
+        p = self.sub({k: k.value for k in self.vks if k.value is not None})
         return p.cs[0] if isinstance(p, FixedScalar) else p
 
     def __eq__(self, other):
@@ -143,15 +140,14 @@ class Nomial(NomialData):
 
     __hash__ = NomialData.__hash__
 
-    # pylint: disable=multiple-statements
     def __ne__(self, other):
         return not Nomial.__eq__(self, other)
 
     def __radd__(self, other):
-        return self.__add__(other, rev=True)  # pylint: disable=no-member
+        return self.__add__(other, rev=True)
 
     def __rmul__(self, other):
-        return self.__mul__(other, rev=True)  # pylint: disable=no-member
+        return self.__mul__(other, rev=True)
 
     def prod(self):
         "Return self for compatibility with NomialArray"

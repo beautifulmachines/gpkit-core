@@ -43,7 +43,6 @@ def _safe_rmtree(path):  # pragma: no cover
     if sys.version_info >= (3, 12):
         shutil.rmtree(path, onexc=_handle_remove_readonly)
     else:
-        # pylint: disable-next=deprecated-argument
         shutil.rmtree(path, ignore_errors=False, onerror=_handle_remove_readonly)
 
 

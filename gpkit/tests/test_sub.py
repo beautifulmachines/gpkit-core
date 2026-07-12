@@ -19,8 +19,6 @@ from gpkit import (
 from gpkit.units import DimensionalityError
 from gpkit.util.small_scripts import mag
 
-# pylint: disable=invalid-name,attribute-defined-outside-init,unused-variable
-
 
 class TestNomialSubs:
     """Test substitution for nomial-family objects"""
@@ -122,7 +120,6 @@ class TestModelSubs:
     def test_quantity_sub(self):
         x = Variable("x", 1, "cm")
         y = Variable("y", 1)
-        # pylint: disable=no-member
         assert x.sub({x: 1 * gpkit.units.m}).c.magnitude == 100
         # NOTE: uncomment the below if requiring Quantity substitutions
         # with pytest.raises(ValueError): x.sub(x, 1)
@@ -277,7 +274,6 @@ class TestModelSubs:
         a, b = sol["xi"], xi_dist * gpkit.ureg.N
         assert all(abs(a - b) / (a + b) < 1e-7)
 
-    # pylint: disable=too-many-locals
     def test_model_composition_units(self):
         class Above(Model):
             """A simple upper bound on x

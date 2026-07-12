@@ -1,4 +1,3 @@
-# pylint: disable=possibly-used-before-assignment,import-outside-toplevel
 "Tools for optimal fits to GP sweeps"
 
 from time import time
@@ -11,7 +10,7 @@ from ..util.small_classes import Count
 from ..util.small_scripts import mag
 
 
-class BinarySweepTree:  # pylint: disable=too-many-instance-attributes
+class BinarySweepTree:
     """Spans a line segment. May contain two subtrees that divide the segment.
 
     Attributes
@@ -162,7 +161,7 @@ class BinarySweepTree:  # pylint: disable=too-many-instance-attributes
             >>> import cPickle as pickle
             >>> pickle.load(open("autosweep.p"))
         """
-        import pickle
+        import pickle  # noqa: PLC0415
 
         with open(filename, "wb") as fil:
             pickle.dump(self, fil)
@@ -212,10 +211,10 @@ class SolutionOracle:
 
     def plot(self, posys=None, axes=None):
         "Plots the sweep for each posy"
-        import matplotlib.pyplot as plt
+        import matplotlib.pyplot as plt  # noqa: PLC0415
 
-        from ..interactive.plot_sweep import assign_axes
-        from ..util import GPBLU
+        from ..interactive.plot_sweep import assign_axes  # noqa: PLC0415
+        from ..util import GPBLU  # noqa: PLC0415
 
         if not hasattr(posys, "__len__"):
             posys = [posys]
@@ -258,7 +257,7 @@ def autosweep_1d(model, logtol, sweepvar, bounds, **solvekwargs):
         sols()
     bst = BinarySweepTree(bounds, firstsols, sweepvar, model.cost)
     tol = recurse_splits(model, bst, sweepvar, logtol, solvekwargs, sols)
-    bst.nsols = sols()  # pylint: disable=attribute-defined-outside-init
+    bst.nsols = sols()
     if solvekwargs["verbosity"] > -1:
         print(f"Solved in {bst.nsols} passes, cost logtol +/-{tol:.3g}")
         print(f"Autosweeping took {(time() - start_time):.3g} seconds.")
@@ -269,8 +268,7 @@ def autosweep_1d(model, logtol, sweepvar, bounds, **solvekwargs):
     return bst
 
 
-# pylint: disable=too-many-arguments,too-many-positional-arguments
-def recurse_splits(model, bst, variable, logtol, solvekwargs, sols):
+def recurse_splits(model, bst, variable, logtol, solvekwargs, sols):  # noqa: PLR0913
     "Recursively splits a BST until logtol is reached"
     x, lb, ub = get_tol(bst.costs, bst.bounds, bst.sols, variable)
     tol = (ub - lb) / 2.0
@@ -289,7 +287,7 @@ def recurse_splits(model, bst, variable, logtol, solvekwargs, sols):
     return tol
 
 
-def get_tol(costs, bounds, sols, variable):  # pylint: disable=too-many-locals
+def get_tol(costs, bounds, sols, variable):
     "Gets the intersection point and corresponding bounds from two solutions."
     y0, y1 = costs
     x0, x1 = np.log(bounds)

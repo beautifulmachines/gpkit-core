@@ -1,7 +1,5 @@
 """Tests for GP and SP classes"""
 
-# pylint: disable=too-many-lines
-
 import sys
 from io import StringIO
 
@@ -41,9 +39,6 @@ from gpkit.util.small_classes import CootMatrix
 NDIGS = {"cvxopt": 5, "mosek_cli": 5, "mosek_conif": 3}
 # name: decimal places of accuracy achieved in these tests
 
-# pylint: disable=invalid-name,attribute-defined-outside-init
-# pylint: disable=unused-variable,undefined-variable,exec-used
-
 
 def get_ndig(solver_name):
     """Get the number of decimal places for a given solver"""
@@ -76,7 +71,6 @@ class TestGP:
         assert prob.is_gp()
         sol = prob.solve(solver=solver, verbosity=0)
         assert isinstance(prob.latex(), str)
-        # pylint: disable=protected-access
         assert isinstance(prob._repr_latex_(), str)
         assert sol["x"] == pytest.approx(np.sqrt(2.0), abs=10 ** (-get_ndig(solver)))
         assert sol["y"] == pytest.approx(
@@ -235,7 +229,6 @@ class TestGP:
         sol1 = m1.solve(solver=solver, verbosity=0)
         sol2 = m2.solve(solver=solver, verbosity=0)
         sol3 = m3.solve(solver=solver, verbosity=0)
-        # pylint: disable=no-member
         gp1, gp2, gp3 = [m.program for m in [m1, m2, m3]]
         assert gp1.data.A == CootMatrix(row=[0, 1, 2], col=[0, 0, 0], data=[-1, 1, -1])
         assert gp2.data.A == CootMatrix(row=[0, 1], col=[0, 0], data=[-1, 1])
@@ -249,7 +242,6 @@ class TestGP:
         x = Variable("x")
         m = Model(1 / x, [1 >= 5 * x + 0.5, 1 >= 5 * x])
         m.solve(solver=solver, verbosity=0)
-        # pylint: disable=no-member
         gp = m.program  # created by solve()
         assert gp.data.c[1] == 2 * gp.data.c[2]
         assert gp.data.A.data[1] == gp.data.A.data[2]
@@ -724,7 +716,7 @@ class TestSP:
         m.localsolve(verbosity=0, solver=solver)
         del m.substitutions[x_min]
         m.cost = 1 / x_min
-        assert x_min not in m.sp().gp().substitutions  # pylint: disable=no-member
+        assert x_min not in m.sp().gp().substitutions
 
     def test_unbounded_debugging(self, solver):
         "Test nearly-dual-feasible problems"
@@ -874,7 +866,6 @@ class TestModelNoSolve:
         m2 = Model(D + 1, [1 >= mi + 0.4, mi >= 0.1, D >= mi**2])
         gp1 = m1.gp()
         gp2 = m2.gp()
-        # pylint: disable=no-member
         assert gp1.data.A == gp2.data.A
         assert gp1.data.c == gp2.data.c
 
@@ -884,7 +875,7 @@ class TestModelNoSolve:
         y = Variable("y")
         with SignomialsEnabled():
             m = Model(x, [x + y >= 1, y <= 0.5])
-        gp = m.sp().gp(x0={x: 0.5})  # pylint: disable=no-member
+        gp = m.sp().gp(x0={x: 0.5})
         (first_gp_constr_posy_exp,) = gp.hmaps[1]  # first after cost
         assert first_gp_constr_posy_exp[x.key] == -1.0 / 3
 
@@ -957,7 +948,7 @@ class TestVar:
         # 3.12+ propagates directly
         with pytest.raises((ValueError, RuntimeError)):
 
-            class _Bad(Model):  # pylint: disable=unused-variable
+            class _Bad(Model):
                 cost = Var("-", "should raise")
 
     def test_underscore_prefix_raises(self):
@@ -966,7 +957,7 @@ class TestVar:
         # 3.12+ propagates directly
         with pytest.raises((ValueError, RuntimeError)):
 
-            class _Bad2(Model):  # pylint: disable=unused-variable
+            class _Bad2(Model):
                 _var_x = Var("-", "should raise")
 
     def test_class_descriptor_access(self):

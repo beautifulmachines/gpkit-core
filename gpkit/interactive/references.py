@@ -6,8 +6,7 @@ import webbrowser
 from collections import defaultdict
 
 
-# pylint:disable=too-many-locals,too-many-branches
-def referencesplot(model, *, openimmediately=True):
+def referencesplot(model, *, openimmediately=True):  # noqa: PLR0912
     """Makes a references plot.
 
     1) Creates the JSON file for a d3 references plot

@@ -1,7 +1,5 @@
 """Tests for gpkit.budgets — variable budget computation and display."""
 
-# pylint: disable=attribute-defined-outside-init,too-many-lines
-
 import json
 import math
 import warnings
@@ -99,7 +97,7 @@ class ZeroTermBudgetModel(Model):
     to emit values that strict JSON serializers reject.
     """
 
-    def setup(self):  # pylint: disable=attribute-defined-outside-init
+    def setup(self):
         m_pay = Variable("m_pay", 0, "kg", "zero-valued term")
         self.m_struct = Variable("m_struct", "kg", "structural mass")
         self.m = Variable("m", "kg", "total mass")
@@ -366,7 +364,7 @@ class TestBudgetErrors:
 
             m: Variable
 
-            def setup(self):  # pylint: disable=attribute-defined-outside-init
+            def setup(self):
                 rho = Variable("rho", 7800, "kg/m^3")
                 length = Variable("L", 0.1, "m")
                 area = Variable("A", 1e-4, "m^2")
@@ -549,7 +547,7 @@ class TestBudgetWithGrowth:
 
             m: Variable
 
-            def setup(self):  # pylint: disable=attribute-defined-outside-init
+            def setup(self):
                 rho = Variable("rho", 7800, "kg/m^3")
                 length = Variable("L", 0.1, "m")
                 area = Variable("A", 1e-4, "m^2")
@@ -820,7 +818,7 @@ class TestBudgetUnitMismatchCoeff:
 class Cylinder(Model):
     """Cylinder model with variables spanning different unit dimensions."""
 
-    def setup(self):  # pylint: disable=attribute-defined-outside-init
+    def setup(self):
         self.m = Variable("m", "kg", "mass")
         vol = Variable("V", "m^3", "volume")
         rho = Variable("rho", 7800, "kg/m^3", "density")
@@ -880,7 +878,7 @@ class TestBuildBudgetMixedUnits:
 class MixedUnitCoeffModel(Model):
     """Constraint has terms in different units; hmap carries conversion factor."""
 
-    def setup(self):  # pylint: disable=attribute-defined-outside-init
+    def setup(self):
         self.m = Variable("m", "kg", "total mass")
         m_a = Variable("m_a", 1, "lbs", "component A (1 lb ≈ 0.4536 kg)")
         m_b = Variable("m_b", 1, "kg", "component B (1 kg)")
@@ -920,9 +918,9 @@ class TestMixedUnitCoeff:
         # m_a and m_b each appear with coefficient 1 in the original expression —
         # neither label should start with a digit (no spurious "0.4536·m_a")
         for node in b.children:
-            assert not node.label[
-                0
-            ].isdigit(), f"spurious coeff in label: {node.label!r}"
+            assert not node.label[0].isdigit(), (
+                f"spurious coeff in label: {node.label!r}"
+            )
 
 
 # ---------------------------------------------------------------------------
@@ -933,7 +931,7 @@ class TestMixedUnitCoeff:
 class PhysCoeffModel(Model):
     """Budget where one term has a genuine physical scale factor (0.25)."""
 
-    def setup(self):  # pylint: disable=attribute-defined-outside-init
+    def setup(self):
         self.m = Variable("m", "kg", "total mass")
         m_a = Variable("m_a", 4, "kg", "component A")
         m_b = Variable("m_b", 1, "kg", "component B")
@@ -1091,7 +1089,7 @@ class TestBudgetDepth:
 
             m: Variable
 
-            def setup(self):  # pylint: disable=attribute-defined-outside-init
+            def setup(self):
                 rho = Variable("rho", 7800, "kg/m^3")
                 length = Variable("L", 0.1, "m")
                 area = Variable("A", 1e-4, "m^2")
@@ -1105,7 +1103,7 @@ class TestBudgetDepth:
             inner: Inner
             m: Variable
 
-            def setup(self):  # pylint: disable=attribute-defined-outside-init
+            def setup(self):
                 self.inner = Inner()
                 self.m = Variable("m", "kg")
                 self.cost = self.m
@@ -1151,7 +1149,7 @@ class TestBudgetDepth:
 class DimensionlessBudgetModel(Model):
     """Budget where the top-level variable is dimensionless."""
 
-    def setup(self):  # pylint: disable=attribute-defined-outside-init
+    def setup(self):
         self.f = Variable("f", "-", "total fraction")
         f_a = Variable("f_a", "-", "fraction a")
         f_b = Variable("f_b", "-", "fraction b")
@@ -1198,7 +1196,7 @@ class ScaledTermModel(Model):
     that don't match the scaled node value.
     """
 
-    def setup(self):  # pylint: disable=attribute-defined-outside-init
+    def setup(self):
         f_scale = Variable("f_scale", 0.5, "-", "scaling factor")
         self.m_sub = Variable("m_sub", "kg", "sub mass")
         m_sub_min = Variable("m_sub_min", 10, "kg")
@@ -1304,11 +1302,11 @@ class TestMultipleBudgetConstraints:
 
     def test_no_warning_for_tight_plus_slack_at_sub_budget(self):
         # Same model exercised through a parent so it lands in _attach_sub_budget.
-        class Outer(Model):  # pylint: disable=missing-class-docstring
+        class Outer(Model):
             inner: TightAndSlackBoundsOnSub
             m: Variable
 
-            def setup(self):  # pylint: disable=attribute-defined-outside-init
+            def setup(self):
                 self.inner = TightAndSlackBoundsOnSub()
                 self.m = Variable("m", "kg")
                 self.cost = self.m
@@ -1322,11 +1320,11 @@ class TestMultipleBudgetConstraints:
 
     def test_sub_budget_ambiguity_silent_leaf(self):
         # Sub-variable with two genuinely tight bounds: leaf with no children.
-        class Outer(Model):  # pylint: disable=missing-class-docstring
+        class Outer(Model):
             sub: TwoTightBoundsOnSub
             m: Variable
 
-            def setup(self):  # pylint: disable=attribute-defined-outside-init
+            def setup(self):
                 self.sub = TwoTightBoundsOnSub()
                 self.m = Variable("m", "kg")
                 self.cost = self.m

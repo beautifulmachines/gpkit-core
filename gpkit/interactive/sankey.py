@@ -1,4 +1,3 @@
-# pylint: skip-file
 "implements Sankey"
 
 import os
@@ -37,7 +36,6 @@ def cleanfilename(string):
     return re.sub(r"\\/?|\"><:\*", "_", string)  # Replace invalid with _
 
 
-# pylint: disable=too-many-instance-attributes
 class Sankey:
     "Return Jupyter diagrams of sensitivity flow"
 
@@ -102,8 +100,7 @@ class Sankey:
             total_sens += abs_var_sens
         return total_sens
 
-    # pylint: disable=too-many-branches
-    def link(self, cset, target, vk, *, labeled=False, subarray=False):
+    def link(self, cset, target, vk, *, labeled=False, subarray=False):  # noqa: PLR0912
         "adds links of a given constraint set to self.links"
         total_sens = 0
         switchedtarget = False
@@ -156,8 +153,7 @@ class Sankey:
                 if not function(s, t, v):
                     del links[(s, t)]
 
-    # pylint: disable=too-many-locals
-    def diagram(
+    def diagram(  # noqa: PLR0913
         self,
         variable=None,
         varlabel=None,
@@ -230,35 +226,35 @@ class Sankey:
         # filter if...not below the chosen top node
         if top_node is not None:
             self.filter(
-                links, lambda s, t, v: top_node in s or top_node in t, forced=True
+                links, lambda s, t, _v: top_node in s or top_node in t, forced=True
             )
         # ...below minimum sensitivity
-        self.filter(links, lambda s, t, v: abs(v) > self.minsenss, forced=True)
+        self.filter(links, lambda _s, _t, v: abs(v) > self.minsenss, forced=True)
         if not self.showconstraints:
             # ...is a constraint or subarray and we're not showing those
             self.filter(
                 links,
-                lambda s, t, v: (
+                lambda s, _t, _v: (
                     "constraint" not in self.nodes[s]
                     and "subarray" not in self.nodes[s]
                 ),
                 forced=True,
             )
         # ...is a subarray and we still have too many links
-        self.filter(links, lambda s, t, v: "subarray" not in self.nodes[s])
+        self.filter(links, lambda s, _t, _v: "subarray" not in self.nodes[s])
         # ...is an insensitive constraint and we still have too many links
         self.filter(
             links,
-            lambda s, t, v: ("constraint" not in self.nodes[s] or abs(v) > INSENSITIVE),
+            lambda s, _t, v: "constraint" not in self.nodes[s] or abs(v) > INSENSITIVE,
         )
         # ...is at culldepth, repeating up to a relative depth of 1 or 2
         culldepth = max(node.count(".") for node in self.nodes) - 1
         mindepth = 1 if not top_node else top_node.count(".") + 1
         while len(links) > self.maxlinks and culldepth > mindepth:
-            self.filter(links, lambda s, t, v: culldepth > s.count("."))
+            self.filter(links, lambda s, _t, _v: culldepth > s.count("."))
             culldepth -= 1
         # ...is a constraint and we still have too many links
-        self.filter(links, lambda s, t, v: "constraint" not in self.nodes[s])
+        self.filter(links, lambda s, _t, _v: "constraint" not in self.nodes[s])
 
         linkslist, nodes, nodeset = [], [], set()
         for (source, target), value in links.items():

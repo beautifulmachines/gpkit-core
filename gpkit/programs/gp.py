@@ -1,4 +1,3 @@
-# pylint: disable=fixme,import-outside-toplevel
 """Implement the GeometricProgram class"""
 
 import sys
@@ -31,7 +30,6 @@ DEFAULT_SOLVER_KWARGS = {"cvxopt": {"kktsolver": "ldl"}}
 SOLUTION_TOL = {"cvxopt": 1e-3, "mosek_cli": 1e-4, "mosek_conif": 1e-3}
 
 
-# pylint: disable=too-few-public-methods
 class MonoEqualityIndexes:
     "Class to hold MonoEqualityIndexes"
 
@@ -43,7 +41,7 @@ class MonoEqualityIndexes:
 def _get_solver(solver, kwargs):
     """Get the solverfn and solvername associated with solver"""
     if solver is None:
-        from ..util.globals import settings
+        from ..util.globals import settings  # noqa: PLC0415
 
         try:
             solver = settings["default_solver"]
@@ -53,13 +51,13 @@ def _get_solver(solver, kwargs):
                 " solvers must be manually specified."
             ) from err
     if solver == "cvxopt":
-        from ..solvers.cvxopt import optimize
+        from ..solvers.cvxopt import optimize  # noqa: PLC0415
     elif solver == "mosek_cli":
-        from ..solvers.mosek_cli import optimize_generator
+        from ..solvers.mosek_cli import optimize_generator  # noqa: PLC0415
 
         optimize = optimize_generator(**kwargs)
     elif solver == "mosek_conif":
-        from ..solvers.mosek_conif import optimize
+        from ..solvers.mosek_conif import optimize  # noqa: PLC0415
     elif hasattr(solver, "__call__"):
         solver, optimize = solver.__name__, solver
     else:
@@ -218,7 +216,6 @@ class CompiledGP:
 
 
 class GeometricProgram:
-    # pylint: disable=too-many-instance-attributes
     """Standard mathematical representation of a GP.
 
     Attributes with side effects
@@ -236,10 +233,11 @@ class GeometricProgram:
                         ], {})
     >>> gp.solve()
     """
+
     _result = solve_log = solver_out = model = None
     choicevaridxs = integersolve = None
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
         self,
         cost,
         constraints,
@@ -317,8 +315,7 @@ class GeometricProgram:
         self.choicevaridxs = {vk: i for i, vk in enumerate(variables) if vk.choices}
         self.data = CompiledGP.from_hmaps(self.hmaps, self.varcols)
 
-    # pylint: disable=too-many-locals,too-many-branches
-    def solve(self, solver=None, *, verbosity=1, gen_result=True, **kwargs):
+    def solve(self, solver=None, *, verbosity=1, gen_result=True, **kwargs):  # noqa: PLR0912
         """Solves a GeometricProgram and returns the solution.
 
         Arguments
@@ -400,8 +397,7 @@ class GeometricProgram:
                 return self.model.debug(solver=solver)
             # else, raise a clarifying error
             msg += (
-                " Running `.debug()` or increasing verbosity may pinpoint"
-                " the trouble."
+                " Running `.debug()` or increasing verbosity may pinpoint the trouble."
             )
             raise infeasibility.__class__(msg) from infeasibility
 
@@ -636,12 +632,12 @@ class GeometricProgram:
         """
         plus_vk = getattr(margin_obj.plus_var, "key", margin_obj.plus_var)
         minus_vk = getattr(margin_obj.minus_var, "key", margin_obj.minus_var)
-        assert (
-            not plus_vk.shape
-        ), f"MarginObjective plus_var must be scalar, got shape {plus_vk.shape!r}"
-        assert (
-            not minus_vk.shape
-        ), f"MarginObjective minus_var must be scalar, got shape {minus_vk.shape!r}"
+        assert not plus_vk.shape, (
+            f"MarginObjective plus_var must be scalar, got shape {plus_vk.shape!r}"
+        )
+        assert not minus_vk.shape, (
+            f"MarginObjective minus_var must be scalar, got shape {minus_vk.shape!r}"
+        )
 
         plus_val = float(varvals[plus_vk])
         minus_val = float(varvals[minus_vk])
@@ -792,9 +788,7 @@ class GeometricProgram:
         return warnings
 
 
-def gen_meq_bounds(
-    missingbounds, exps, meq_idxs
-):  # pylint: disable=too-many-locals,too-many-branches
+def gen_meq_bounds(missingbounds, exps, meq_idxs):  # noqa: PLR0912
     "Generate conditional monomial equality bounds"
     meq_bounds = defaultdict(set)
     for i in meq_idxs.first_half:

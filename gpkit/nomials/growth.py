@@ -16,7 +16,7 @@ _THETA = None  # singleton, lazy-initialized on first call to theta()
 
 def theta():
     "The shared theta Variable (lineage 'growth', value=1.0)."
-    global _THETA  # pylint: disable=global-statement
+    global _THETA  # noqa: PLW0603
     if _THETA is None:
         _THETA = Variable(VarKey(name="theta", lineage=_THETA_LINEAGE, value=1.0))
     return _THETA

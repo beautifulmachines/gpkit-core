@@ -15,7 +15,6 @@ w = Variable("w", "m")
 m1 = Model(A**2, [A >= w**2 + units.m**2])
 tol1 = 1e-3
 bst1 = autosweep_1d(m1, tol1, w, [1, 10], verbosity=0)
-# pylint: disable=no-member
 print(f"Solved after {bst1.nsols} passes, cost logtol +/-{bst1.tol:.3g}")
 # autosweep solution accessing
 w_vals = np.linspace(1, 10, 10)

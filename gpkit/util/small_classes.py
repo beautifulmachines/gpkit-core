@@ -13,7 +13,6 @@ Strings: TypeAlias = str
 Numbers: TypeAlias = int | float | np.number | Quantity
 
 
-# pylint: disable=too-few-public-methods
 class FixedScalarMeta(type):
     "Metaclass to implement instance checking for fixed scalars"
 
@@ -21,7 +20,6 @@ class FixedScalarMeta(type):
         return getattr(obj, "hmap", None) and len(obj.hmap) == 1 and not obj.vks
 
 
-# pylint: disable=too-few-public-methods
 class FixedScalar(metaclass=FixedScalarMeta):
     "Instances of this class are scalar Nomials with no variables"
 
@@ -48,7 +46,7 @@ def matrix_converter(name):
     return to_
 
 
-class CootMatrix:
+class CootMatrix:  # noqa: PLW1641
     "A very simple sparse matrix representation."
 
     def __init__(self, row, col, data):

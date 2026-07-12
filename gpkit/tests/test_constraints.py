@@ -238,8 +238,8 @@ class TestMonomialEquality:
     def test_vector(self):
         "Monomial Equalities with VectorVariables"
         x = VectorVariable(3, "x")
-        assert not x == 3  # pylint: disable=unnecessary-negation
-        assert x == x  # pylint: disable=comparison-with-itself
+        assert not x == 3
+        assert x == x  # noqa: PLR0124
 
     def test_inheritance(self):
         "Make sure MonomialEquality inherits from the right things"
@@ -356,7 +356,6 @@ class TestSignomialInequality:
     "Test Signomial constraints"
 
     def test_becomes_posy_sensitivities(self):
-        # pylint: disable=invalid-name
         # model from #1165
         ujet = Variable("ujet")
         PK = Variable("PK")
@@ -545,7 +544,7 @@ class TestTight:
         assert "Unexpectedly Loose Constraints" in sol.meta["warnings"]
 
 
-class TestBounded:  # pylint: disable=too-few-public-methods
+class TestBounded:
     "Test bounded constraint set"
 
     def test_substitution_issue905(self):

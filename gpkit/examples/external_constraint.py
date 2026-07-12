@@ -3,7 +3,6 @@
 from .external_function import external_code
 
 
-# pylint: disable=too-few-public-methods
 class ExternalConstraint:
     "Class for external calling"
 

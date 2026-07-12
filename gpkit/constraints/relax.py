@@ -1,4 +1,3 @@
-# pylint: disable=consider-using-f-string
 """Models for assessing primal feasibility"""
 
 from dataclasses import replace
@@ -184,7 +183,6 @@ class ConstantsRelaxed(ConstraintSet):
         can also be determined by looking at the constant's new value directly.
     """
 
-    # pylint:disable=too-many-locals
     def __init__(self, constraints, *, include_only=None, exclude=None):
         exclude = frozenset(exclude) if exclude else frozenset()
         include_only = frozenset(include_only) if include_only else frozenset()

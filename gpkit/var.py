@@ -9,7 +9,7 @@ _RESERVED_NAMES = frozenset(
 )
 
 
-class Var:  # pylint: disable=too-few-public-methods
+class Var:
     """Class-level variable declaration for Model subclasses.
 
     Usage
@@ -34,7 +34,7 @@ class Var:  # pylint: disable=too-few-public-methods
       Var descriptors automatically become N-element vector variables.
     """
 
-    def __init__(  # pylint: disable=too-many-arguments
+    def __init__(
         self,
         units: str,
         label: str = "",

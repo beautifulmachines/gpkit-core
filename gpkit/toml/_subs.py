@@ -35,9 +35,9 @@ def _lineage_path(model):
 def _val_to_float(val, vk):
     """Convert a substitution value to a plain float in the variable's units."""
     if hasattr(val, "hmap"):  # constant Monomial or future GPkitUnit wrapper (#156)
-        assert not any(
-            val.hmap.keys()
-        ), "substitution value should not contain variables"
+        assert not any(val.hmap.keys()), (
+            "substitution value should not contain variables"
+        )
         (val,) = val.hmap.to(vk.units or DIMLESS_QUANTITY).values()
     return float(val)
 

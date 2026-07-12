@@ -271,7 +271,7 @@ class VarMap(MutableMapping):
         except KeyError:
             return False
 
-    def update(self, *args, **kwargs):  # pylint: disable=arguments-differ
+    def update(self, *args, **kwargs):
         for k, v in dict(*args, **kwargs).items():
             self[k] = v
 

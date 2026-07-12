@@ -131,8 +131,7 @@ class TestSiblingsInUniqueVarkeys:
         assert "f_growth_m" in names
 
     def test_apply_subs_can_override_fraction(self):
-        # pylint: disable=import-outside-toplevel
-        from gpkit.toml import apply_subs
+        from gpkit.toml import apply_subs  # noqa: PLC0415
 
         wing = self._build_wing()
         apply_subs(wing, {"Wing": {"f_growth_m": 0.50}})
