@@ -1,8 +1,11 @@
 "Tests for the construction-context managers in gpkit.util.globals"
 
+import json
+import sys
 import threading
 
 from gpkit import NamedVariables, SignomialsEnabled, Variable, Vectorize
+from gpkit.examples import uav
 from gpkit.nomials.math import SignomialInequality
 from gpkit.util.globals import load_settings
 
@@ -84,6 +87,31 @@ def test_signomials_enabled_thread_isolation():
             barrier.wait(timeout=10)
 
     run_threads(worker, count=2)
+
+
+def test_concurrent_build_and_solve():
+    "The tradespace scenario: concurrent per-thread builds + solves, no lock."
+    results = {}
+    barrier = threading.Barrier(4)
+
+    def build_and_solve(tid):
+        barrier.wait(timeout=30)
+        model = uav.UAV()
+        ir = json.dumps(model.to_ir(), sort_keys=True, default=str)
+        results[tid] = (ir, float(model.solve(verbosity=0).cost))
+
+    # GP.solve swaps sys.stdout process-globally (SolverLog); concurrent
+    # solves can race the restore. Guard it here so a leaked SolverLog
+    # can't swallow the rest of the pytest session's output.
+    saved_stdout = sys.stdout
+    try:
+        run_threads(build_and_solve)
+    finally:
+        sys.stdout = saved_stdout
+
+    assert len(results) == 4
+    assert len({ir for ir, _ in results.values()}) == 1, "IRs differ across threads"
+    assert len({cost for _, cost in results.values()}) == 1
 
 
 def test_load_settings_toml(tmp_path):
