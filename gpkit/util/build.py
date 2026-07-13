@@ -13,9 +13,11 @@ settings = {}
 
 
 def log(*args):
-    "Print a line and append it to the log string."
+    "Print a line to stderr and append it to the log string."
     global LOGSTR  # noqa: PLW0603
-    print(*args)
+    # stderr so that an auto-build triggered inside a stdout capture (e.g.
+    # example output regeneration) doesn't pollute the captured stdout.
+    print(*args, file=sys.stderr)
     LOGSTR += " ".join(args) + "\n"
 
 

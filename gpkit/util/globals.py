@@ -1,6 +1,7 @@
 "context-local construction state and lazily-loaded settings"
 
 import os
+import sys
 import tomllib
 from collections import defaultdict
 from contextvars import ContextVar
@@ -20,11 +21,15 @@ def load_settings(path=None, trybuild=True):
     except (OSError, tomllib.TOMLDecodeError):  # pragma: no cover
         settings_ = {"installed_solvers": []}
     if not settings_["installed_solvers"] and trybuild:  # pragma: no cover
-        print("Found no installed solvers, beginning a build.")
+        # Bootstrap diagnostics go to stderr: the load can be triggered from
+        # inside stdout captures (example regeneration, StdoutCaptured) whose
+        # output must contain only the captured program's own stdout.
+        print("Found no installed solvers, beginning a build.", file=sys.stderr)
         build()
         settings_ = load_settings(path, trybuild=False)
         if settings_["installed_solvers"]:
-            print(f"""
+            print(
+                f"""
 GPkit is now installed with solver(s) {", ".join(settings_["installed_solvers"])}
 To incorporate new solvers at a later date, run `gpkit.build()`.
 
@@ -35,9 +40,12 @@ We hope you find the engineering-design models at
 https://github.com/beautifulmachines/gpkit-models/ useful for your own applications.
 
 Enjoy!
-""")
+""",
+                file=sys.stderr,
+            )
         else:
-            print("""
+            print(
+                """
 =============
 Build failed!  :(
 =============
@@ -47,7 +55,9 @@ https://github.com/beautifulmachines/gpkit-core/issues/new
 so we can prevent others from having to see this message.
 
         Thanks!  :)
-""")
+""",
+                file=sys.stderr,
+            )
     settings_.setdefault(
         "default_solver",
         settings_["installed_solvers"][0] if settings_["installed_solvers"] else "",
