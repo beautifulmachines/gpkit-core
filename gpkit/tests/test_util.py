@@ -126,6 +126,6 @@ class TestBuild:
     def test_build_reports_installed_version(self, capsys):
         """build()'s banner must report the real installed version."""
         build()
-        out = capsys.readouterr().out
-        assert "unknown" not in out
-        assert f"Building GPkit version {gpkit.__version__}" in out
+        err = capsys.readouterr().err  # build logs to stderr, not stdout
+        assert "unknown" not in err
+        assert f"Building GPkit version {gpkit.__version__}" in err
