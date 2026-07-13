@@ -35,17 +35,3 @@ from .varkey import VarKey
 from .varmap import display_names
 
 pi = Monomial(_np.pi, ast=_PiNode())
-
-if "just built!" in settings:  # pragma: no cover
-    print(f"""
-GPkit is now installed with solver(s) {settings["installed_solvers"]}
-To incorporate new solvers at a later date, run `gpkit.build()`.
-
-If you encounter any bugs or issues using GPkit, please open a new issue at
-https://github.com/beautifulmachines/gpkit-core/issues/new.
-
-We hope you find the engineering-design models at
-https://github.com/beautifulmachines/gpkit-models/ useful for your own applications.
-
-Enjoy!
-""")

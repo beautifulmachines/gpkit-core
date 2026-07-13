@@ -1,5 +1,6 @@
 "Finds solvers, sets gpkit settings, and builds gpkit"
 
+import json
 import os
 import shutil
 import subprocess
@@ -207,18 +208,17 @@ def build():
             f"Replaced found solvers ({installed_solvers}) with environment "
             f"var GPKITSOLVERS ({os.environ['GPKITSOLVERS']})"
         )
-        settings["installed_solvers"] = os.environ["GPKITSOLVERS"]
+        settings["installed_solvers"] = os.environ["GPKITSOLVERS"].split(", ")
     else:
-        settings["installed_solvers"] = ", ".join(installed_solvers)
-    log("\nFound the following solvers: " + settings["installed_solvers"])
+        settings["installed_solvers"] = installed_solvers
+    log("\nFound the following solvers: " + ", ".join(settings["installed_solvers"]))
 
-    # Write settings
+    # Write settings (JSON-encoded values are valid TOML for strings/arrays)
     envpath = "env"
     replacedir(envpath)
-    with open(pathjoin(envpath, "settings"), "w", encoding="utf-8") as f:
-        f.writelines(
-            f"{setting} : {value}\n" for setting, value in sorted(settings.items())
-        )
+    with open(pathjoin(envpath, "settings.toml"), "w", encoding="utf-8") as f:
+        for setting, value in sorted(settings.items()):
+            f.write(f"{setting} = {json.dumps(value)}\n")
     with open(pathjoin(envpath, "build.log"), "w", encoding="utf-8") as f:
         f.write(LOGSTR)
 
