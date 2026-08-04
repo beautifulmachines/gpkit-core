@@ -430,18 +430,17 @@ def _build_multi_model(models_section, dimension_overrides=None):
         vec_length = _resolve_vectorize(model_def, all_dimensions)
         vec_ctx = Vectorize(vec_length) if vec_length else nullcontext()
 
-        with vec_ctx:
-            with NamedVariables(model_id) as (lineage, _):
-                ns, subs = _build_scalar_vars(_extract_model_vars(model_def))
-                substitutions.update(subs)
-                _build_vector_vars(
-                    model_def.get("vectors", {}),
-                    all_dimensions,
-                    ns,
-                    substitutions,
-                )
-                per_model_vars[model_id] = ns
-                per_model_lineage[model_id] = lineage
+        with vec_ctx, NamedVariables(model_id) as (lineage, _):
+            ns, subs = _build_scalar_vars(_extract_model_vars(model_def))
+            substitutions.update(subs)
+            _build_vector_vars(
+                model_def.get("vectors", {}),
+                all_dimensions,
+                ns,
+                substitutions,
+            )
+            per_model_vars[model_id] = ns
+            per_model_lineage[model_id] = lineage
 
     # Build merged namespace with ambiguity detection
     namespace = _build_merged_namespace(per_model_vars, all_dimensions)
@@ -532,10 +531,12 @@ def load_toml(source, *, dimensions=None, substitutions=None):
     -------
     gpkit.Model
     """
-    if isinstance(source, Path):
-        with open(source, "rb") as f:
-            doc = tomllib.load(f)
-    elif isinstance(source, str) and "\n" not in source and Path(source).is_file():
+    if (
+        isinstance(source, Path)
+        or isinstance(source, str)
+        and "\n" not in source
+        and Path(source).is_file()
+    ):
         with open(source, "rb") as f:
             doc = tomllib.load(f)
     elif isinstance(source, str):

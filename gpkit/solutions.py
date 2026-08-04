@@ -3,8 +3,8 @@
 import json
 import pickle
 import weakref
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import List, Sequence
 
 from . import printing
 from .breakdowns import bdtable_gen
@@ -105,8 +105,10 @@ class MarginSolution:
         """
         u = f" {self.units}" if self.units else ""
         lines = [
-            f"\n{self.name}: {self.value:.4g}{u}"
-            f"  (plus={self.plus_value:.4g}{u}, minus={self.minus_value:.4g}{u})",
+            (
+                f"\n{self.name}: {self.value:.4g}{u}"
+                f"  (plus={self.plus_value:.4g}{u}, minus={self.minus_value:.4g}{u})"
+            ),
         ]
         if not self.sensitivities:
             return "\n".join(lines)
@@ -281,7 +283,7 @@ class Solution:
         return bdtable_gen("model sensitivities")(self, set())
 
 
-class SolutionSequence(List[Solution]):
+class SolutionSequence(list[Solution]):
     """
     Ordered collection of Solution objects all sharing same underlying model.
     """

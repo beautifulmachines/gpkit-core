@@ -59,9 +59,11 @@ def optimize_generator(path=None, **_):
     if tmpdir:
         path = tempfile.mkdtemp()
     filename = path + os.sep + "gpkit_mosek"
-    if "mosek_bin_dir" in settings:
-        if settings["mosek_bin_dir"] not in os.environ["PATH"]:
-            os.environ["PATH"] += ":" + settings["mosek_bin_dir"]
+    if (
+        "mosek_bin_dir" in settings
+        and settings["mosek_bin_dir"] not in os.environ["PATH"]
+    ):
+        os.environ["PATH"] += ":" + settings["mosek_bin_dir"]
 
     def optimize(prob, **_):
         """Interface to the MOSEK "mskexpopt" command line solver
@@ -158,8 +160,7 @@ def write_output_file(filename, c, A, p_idxs):
     with open(filename, "w", encoding="utf-8") as f:
         numcon = p_idxs[-1]
         numter, numvar = map(int, A.shape)
-        for n in [numcon, numvar, numter]:
-            f.write(f"{n}\n")
+        f.writelines(f"{n}\n" for n in [numcon, numvar, numter])
 
         f.write("\n*c\n")
         f.writelines([f"{x:.20e}\n" for x in c])

@@ -16,7 +16,6 @@ Usage example::
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 from .ast_nodes import ExprNode, VarNode
 from .constraints.set import flatiter
@@ -216,7 +215,7 @@ class BudgetNode:
     """
 
     label: str
-    vk: Optional[VarKey]
+    vk: VarKey | None
     value: float
     fraction: float
     slack: float
@@ -283,17 +282,21 @@ class Budget:
             lines = [
                 "| Component | Nominal | Growth | Total | Units | Fraction |",
                 "| --- | ---: | ---: | ---: | :--- | ---: |",
-                f"| **{top_label}** | **{self.cbe_total:.4g}** "
-                f"| **{self.ga_total:.4g}** | **{self.total:.4g}** "
-                f"| **[{self.units}]** | **100.0%** |",
+                (
+                    f"| **{top_label}** | **{self.cbe_total:.4g}** "
+                    f"| **{self.ga_total:.4g}** | **{self.total:.4g}** "
+                    f"| **[{self.units}]** | **100.0%** |"
+                ),
             ]
             _collect_md_rows(self.children, lines, depth=0, show_growth=True)
             return "\n".join(lines)
         lines = [
             "| Component | Value | Units | Fraction |",
             "| --- | ---: | :--- | ---: |",
-            f"| **{top_label}** | **{self.total:.4g}** "
-            f"| **[{self.units}]** | **100.0%** |",
+            (
+                f"| **{top_label}** | **{self.total:.4g}** "
+                f"| **[{self.units}]** | **100.0%** |"
+            ),
         ]
         _collect_md_rows(self.children, lines, depth=0)
         return "\n".join(lines)
@@ -377,8 +380,10 @@ def _render_growth_text(budget, top_label, header):
     lines = [
         header,
         "-" * len(header),
-        f"  {' ' * w['lbl']}  {'Nominal':>{w['cbe']}}  {'Growth':>{w['ga']}}  "
-        f"{'Total':>{w['tot']}}  {'':>{w['unt']}}  {'':>{w['pct']}}",
+        (
+            f"  {' ' * w['lbl']}  {'Nominal':>{w['cbe']}}  {'Growth':>{w['ga']}}  "
+            f"{'Total':>{w['tot']}}  {'':>{w['unt']}}  {'':>{w['pct']}}"
+        ),
     ]
     for row in rows:
         lines.append(_format_growth_row(row, w))
@@ -486,8 +491,8 @@ class _TermData:
     exp: object
     phys_coeff: float
     term_val: float
-    ast_label: Optional[str]
-    is_var_node: Optional[bool] = None  # True iff AST term is a bare VarNode
+    ast_label: str | None
+    is_var_node: bool | None = None  # True iff AST term is a bare VarNode
     term_qty: object = None  # pint Quantity from solution[mon], or None on failure
 
 

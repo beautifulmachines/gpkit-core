@@ -7,7 +7,7 @@ from ..varmap import VarSet
 
 def is_linked(val):
     "Return True if val is a linked (callable-computed) substitution value."
-    return hasattr(val, "__call__") and not hasattr(val, "key")
+    return callable(val) and not hasattr(val, "key")
 
 
 def parse_subs(varkeys, substitutions):

@@ -54,17 +54,19 @@ def call(cmd):
 
 def diff(filename, diff_dict):
     "Applies a simple diff to a file. Logs."
-    with open(filename, "r", encoding="utf-8") as a:
-        with open(filename + ".new", "w", encoding="utf-8") as b:
-            for line_number, line in enumerate(a):
-                if line[:-1].strip() in diff_dict:
-                    newline = diff_dict[line[:-1].strip()] + "\n"
-                    log(f"#\n#     Change in {filename} on line {line_number + 1}")
-                    log("#     --", line[:-1][:70])
-                    log("#     ++", newline[:70])
-                    b.write(newline)
-                else:
-                    b.write(line)
+    with (
+        open(filename, "r", encoding="utf-8") as a,
+        open(filename + ".new", "w", encoding="utf-8") as b,
+    ):
+        for line_number, line in enumerate(a):
+            if line[:-1].strip() in diff_dict:
+                newline = diff_dict[line[:-1].strip()] + "\n"
+                log(f"#\n#     Change in {filename} on line {line_number + 1}")
+                log("#     --", line[:-1][:70])
+                log("#     ++", newline[:70])
+                b.write(newline)
+            else:
+                b.write(line)
     shutil.move(filename + ".new", filename)
 
 
@@ -127,7 +129,7 @@ class MosekCLI(SolverBackend):
                 "# no version folders (e.g. '7', '8') found"
                 ' in mosek directory "{rootdir}"'
             )
-        version = sorted(possible_versions)[-1]
+        version = max(possible_versions)
         tools_dir = pathjoin(rootdir, version, "tools")
         lib_dir = pathjoin(tools_dir, "platform", mosek_platform)
         bin_dir = pathjoin(lib_dir, "bin")
@@ -142,7 +144,7 @@ class MosekCLI(SolverBackend):
         try:
             if call("mskexpopt") in (1052, 28):  # 28 for MacOSX
                 return where
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001, S110
             pass  # exception type varies by operating system
         return None
 
@@ -214,8 +216,9 @@ def build():
     envpath = "env"
     replacedir(envpath)
     with open(pathjoin(envpath, "settings"), "w", encoding="utf-8") as f:
-        for setting, value in sorted(settings.items()):
-            f.write(f"{setting} : {value}\n")
+        f.writelines(
+            f"{setting} : {value}\n" for setting, value in sorted(settings.items())
+        )
     with open(pathjoin(envpath, "build.log"), "w", encoding="utf-8") as f:
         f.write(LOGSTR)
 

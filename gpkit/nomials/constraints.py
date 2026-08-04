@@ -1,6 +1,7 @@
 "Base classes for nomial-layer constraints."
 
 from operator import eq, ge, le
+from typing import ClassVar
 
 from ..util.repr_conventions import UNICODE_EXPONENTS, ReprMixin
 from ..util.small_scripts import try_str_without
@@ -9,9 +10,9 @@ from ..util.small_scripts import try_str_without
 class SingleEquationConstraint(ReprMixin):
     "Constraint expressible in a single equation."
 
-    latex_opers = {"<=": "\\leq", ">=": "\\geq", "=": "="}
-    unicode_opers = {"<=": "≤", ">=": "≥", "=": "="}
-    func_opers = {"<=": le, ">=": ge, "=": eq}
+    latex_opers: ClassVar = {"<=": "\\leq", ">=": "\\geq", "=": "="}
+    unicode_opers: ClassVar = {"<=": "≤", ">=": "≥", "=": "="}
+    func_opers: ClassVar = {"<=": le, ">=": ge, "=": eq}
 
     def __init__(self, left, oper, right):
         self.left, self.oper, self.right = left, oper, right
@@ -28,7 +29,7 @@ class SingleEquationConstraint(ReprMixin):
             oper = self.unicode_opers[self.oper]
         else:
             oper = self.oper
-        return " ".join((leftstr, oper, rightstr))
+        return f"{leftstr} {oper} {rightstr}"
 
     def to_ir(self):
         "Serialize the common constraint structure to an IR dict."

@@ -3,9 +3,9 @@
 import sys
 import warnings as pywarnings
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from time import time
-from typing import Sequence
 
 import numpy as np
 
@@ -58,7 +58,7 @@ def _get_solver(solver, kwargs):
         optimize = optimize_generator(**kwargs)
     elif solver == "mosek_conif":
         from ..solvers.mosek_conif import optimize  # noqa: PLC0415
-    elif hasattr(solver, "__call__"):
+    elif callable(solver):
         solver, optimize = solver.__name__, solver
     else:
         raise ValueError(f"Unknown solver '{solver}'.")
@@ -476,7 +476,7 @@ class GeometricProgram:
             m_senss[lineagestr(c)] += abs(c_senss)
 
         # Handle linked sensitivities
-        for v in list(v for v in gpv_ss if self.linked_derivs.get(v)):
+        for v in [v for v in gpv_ss if self.linked_derivs.get(v)]:
             dlogcost_dlogv = gpv_ss.pop(v)
             dlogcost_dlogabsv = absv_ss.pop(v)
             val = np.array(self.substitutions[v])
@@ -488,11 +488,10 @@ class GeometricProgram:
                     absv_ss[c] = absv_ss.get(c, 0) + abs(
                         dlogcost_dlogabsv * dlogv_dlogc
                     )
-                if v in cost_senss:
-                    if c in self.cost.vks:  # TODO: seems unnecessary
-                        dlogcost_dlogv = cost_senss.pop(v)
-                        before = cost_senss.get(c, 0)
-                        cost_senss[c] = before + dlogcost_dlogv * dlogv_dlogc
+                if v in cost_senss and c in self.cost.vks:  # TODO: seems unnecessary
+                    dlogcost_dlogv = cost_senss.pop(v)
+                    before = cost_senss.get(c, 0)
+                    cost_senss[c] = before + dlogcost_dlogv * dlogv_dlogc
 
         return cost_senss, gpv_ss, absv_ss, m_senss, constraint_senss
 
@@ -575,7 +574,7 @@ class GeometricProgram:
         Pops each intermediate VarKey that has linked derivatives and
         accumulates its sensitivity into the base constants.
         """
-        for v in list(v for v in sens_dict if self.linked_derivs.get(v)):
+        for v in [v for v in sens_dict if self.linked_derivs.get(v)]:
             dsens_dlogv = sens_dict.pop(v)
             val = np.array(self.substitutions[v])
             for c, dv_dc in self.linked_derivs[v].items():
@@ -764,12 +763,14 @@ class GeometricProgram:
         if self.integersolve:
             warnings["No Dual Solution"] = [
                 (
-                    "This model has the discretized choice variables"
-                    f" {sorted(self.choicevaridxs.keys())} and hence no dual"
-                    " solution. You can fix those variables to their optimal"
-                    " values and get sensitivities to the resulting"
-                    " continuous problem by updating your model's"
-                    " substitions with `sol['choicevariables']`.",
+                    (
+                        "This model has the discretized choice variables"
+                        f" {sorted(self.choicevaridxs.keys())} and hence no dual"
+                        " solution. You can fix those variables to their optimal"
+                        " values and get sensitivities to the resulting"
+                        " continuous problem by updating your model's"
+                        " substitions with `sol['choicevariables']`."
+                    ),
                     self.choicevaridxs,
                 )
             ]
@@ -777,10 +778,12 @@ class GeometricProgram:
         if self.choicevaridxs:
             warnings["Freed Choice Variables"] = [
                 (
-                    "This model has the discretized choice variables"
-                    f" {sorted(self.choicevaridxs.keys())}, but since the "
-                    f"'{solver_out.meta['solver']}' solver doesn't support "
-                    "discretization they were treated as continuous variables.",
+                    (
+                        "This model has the discretized choice variables"
+                        f" {sorted(self.choicevaridxs.keys())}, but since the "
+                        f"'{solver_out.meta['solver']}' solver doesn't support "
+                        "discretization they were treated as continuous variables."
+                    ),
                     self.choicevaridxs,
                 )
             ]  # TODO: choicevaridxs seems unnecessary

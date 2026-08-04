@@ -2,6 +2,7 @@
 
 import os
 from collections import defaultdict
+from typing import ClassVar
 
 from .build import build
 
@@ -24,7 +25,7 @@ def load_settings(path=None, trybuild=True):
                 # flatten 1-element lists unless they're the solver list
                 if len(value) == 1 and name != "installed_solvers":
                     (settings_[name],) = value
-    except IOError:  # pragma: no cover
+    except OSError:  # pragma: no cover
         settings_ = {"installed_solvers": [""]}
     if settings_["installed_solvers"] == [""] and trybuild:  # pragma: no cover
         print("Found no installed solvers, beginning a build.")
@@ -105,8 +106,8 @@ class NamedVariables:
     """
 
     lineage = ()  # the current model nesting
-    modelnums = defaultdict(int)  # the number of models of each lineage
-    namedvars = defaultdict(list)  # variables created in the current nesting
+    modelnums: ClassVar = defaultdict(int)  # the number of models of each lineage
+    namedvars: ClassVar = defaultdict(list)  # variables created in the current nesting
 
     @classmethod
     def reset_modelnumbers(cls):

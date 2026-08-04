@@ -6,7 +6,7 @@ functions of the IR.
 """
 
 from dataclasses import dataclass, field
-from typing import Any, List, Optional, Tuple
+from typing import Any
 
 from .constraints.tight import Tight
 from .model import Model as _Model
@@ -24,7 +24,7 @@ class VarEntry:
     name: str  # display name (from VarKey.name)
     latex: str  # LaTeX rendering (from VarKey.latex())
     value: Any  # float | ndarray | None — never a pint Quantity
-    sensitivity: Optional[float]  # shadow price from solution, or None
+    sensitivity: float | None  # shadow price from solution, or None
     units: str  # unit string
     label: str  # human label (from VarKey.label or "")
     source: str = ""  # lineagestr() for cross-model referenced vars; "" for local
@@ -80,9 +80,7 @@ class ReportSection:
     objective_str: str = ""  # text representation of cost expression; "" if constant
     objective_latex: str = ""  # LaTeX representation of cost expression
     objective_label: str = ""  # variable label when expr is a single variable; else ""
-    objective_value: Optional[float] = (
-        None  # magnitude of attained cost; None if unsolved
-    )
+    objective_value: float | None = None  # magnitude of attained cost; None if unsolved
     objective_units: str = ""  # unit string for the cost expression
     objective_direction: str = "minimize"  # "minimize" or "maximize"
 
@@ -149,7 +147,7 @@ def _serialize_value(val: Any) -> Any:
         return str(val)
 
 
-def _value_units(vk, varmap: VarMap) -> Tuple[Any, str]:
+def _value_units(vk, varmap: VarMap) -> tuple[Any, str]:
     """Get (magnitude, unit_str) for vk from varmap.
 
     Both values come from the same pint Quantity returned by varmap.quantity(),
@@ -195,7 +193,7 @@ def _render_constraint(c) -> str:
 # ── Core builder helpers ──────────────────────────────────────────────────────
 
 
-def _collect_constraint_varkeys(constraint_groups: List[CGroup]) -> set:
+def _collect_constraint_varkeys(constraint_groups: list[CGroup]) -> set:
     """Collect all VarKeys appearing in local constraint groups.
 
     Note: ConstraintSet.constrained_varkeys() (set.py) does the same concept
@@ -244,7 +242,7 @@ def _is_free_vk(display_vk, solution, model) -> bool:
 
 def _build_split_var_entries(
     model, solution, extra_vks=None
-) -> Tuple[List[VarEntry], List[VarEntry]]:
+) -> tuple[list[VarEntry], list[VarEntry]]:
     """Build (free_entries, fixed_entries) from model.unique_varkeys.
 
     free_entries  — Optimized Variables: solved by the optimizer (no sens shown).
@@ -269,8 +267,8 @@ def _build_split_var_entries(
 
     lineage_map = model._name_collision_varkeys
     excluded = {":MAGIC:" + model.lineagestr()} if model.lineagestr() else set()
-    free_entries: List[VarEntry] = []
-    fixed_entries: List[VarEntry] = []
+    free_entries: list[VarEntry] = []
+    fixed_entries: list[VarEntry] = []
     seen_veckeys: set = set()
 
     with lineage_display_context(lineage_map):
@@ -335,7 +333,7 @@ def _collect_leaf_constraints(container) -> list:
     return result
 
 
-def _build_constraint_groups(model) -> List[CGroup]:
+def _build_constraint_groups(model) -> list[CGroup]:
     """Build CGroup list from model.cgroups or a single unnamed group.
 
     CGroup.constraints holds only leaf (single-equation) constraints;
@@ -621,7 +619,7 @@ def _text_cgroup_lines(constraint_groups: list, pad: str, lineage_map: dict) -> 
     return lines
 
 
-def _text_constraint_rows(constraints: list, lineage_map: dict = None) -> list:
+def _text_constraint_rows(constraints: list, lineage_map: dict | None = None) -> list:
     """Build aligned rows for a constraint group in text output.
 
     lineage_map is a _name_collision_varkeys dict; activating it makes

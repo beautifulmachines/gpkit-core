@@ -63,6 +63,4 @@ class NomialData(ReprMixin):
             return NotImplemented
         if self.hmap != other.hmap:
             return False
-        if self.units != other.units:
-            return False
-        return True
+        return self.units == other.units

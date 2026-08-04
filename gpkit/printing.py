@@ -1,8 +1,9 @@
 "printing functionality for gpkit objects"
 
 from collections import Counter, defaultdict
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, replace
-from typing import Any, Callable, Iterable, List, Sequence, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -78,14 +79,14 @@ class SectionSpec:
     def _auto_vecwidth_rowspec(self, items):
         "Return a copy of this with vec_width set automatically for items"
         if self.align_vecs and self.options.vec_width is None:
-            lengths = set(np.shape(v) for _, v in items if np.shape(v))
+            lengths = {np.shape(v) for _, v in items if np.shape(v)}
             if len(lengths) == 1:
                 width = self._max_val_width(items)
                 newopt = replace(self.options, vec_width=width)
                 return self.__class__(options=newopt)
         return self
 
-    def format(self, ctx) -> List[str]:
+    def format(self, ctx) -> list[str]:
         "Output this section's lines given a solution or solution context"
         items = [item for item in self.items_from(ctx) if self._passes_filter(item)]
         if self.group_by_model:
@@ -373,7 +374,7 @@ class SolutionSection(Constants):
         sizes = {np.asarray(v[0]).size for _, v in vec_items if np.shape(v[0])}
         if len(sizes) != 1:
             return None
-        n = min(list(sizes)[0], self.options.vecn)
+        n = min(next(iter(sizes)), self.options.vecn)
         p = self.options.precision
         widths = [0] * n
         for _, (val, sens) in vec_items:
@@ -736,7 +737,7 @@ class DiffContext:
 
 def table(
     obj: Any,  # Solution or SolutionSequence
-    tables: Tuple[str, ...] = (
+    tables: tuple[str, ...] = (
         "sweeps",
         "cost",
         "warnings",
@@ -792,7 +793,7 @@ def _format_aligned_columns(
     """
     if not rows:
         return []
-    (ncols,) = set(len(r) for r in rows) or (0,)
+    (ncols,) = {len(r) for r in rows} or (0,)
     if col_alignments is None:
         col_alignments = "<" * ncols
     assert len(col_alignments) == ncols

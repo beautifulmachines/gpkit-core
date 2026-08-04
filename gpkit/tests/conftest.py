@@ -131,7 +131,7 @@ def example(request, solver):
     """
     # Extract example name from test function (use originalname to strip params)
     test_name = request.node.originalname
-    example_name = test_name[5:] if test_name.startswith("test_") else test_name
+    example_name = test_name.removeprefix("test_")
 
     with NewDefaultSolver(solver):
         mod = _import_example(example_name)

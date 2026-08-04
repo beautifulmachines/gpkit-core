@@ -57,7 +57,7 @@ class Variable(Monomial):
                 if isinstance(arg, Strings) and "name" not in descr:
                     descr["name"] = arg
                 elif (
-                    isinstance(arg, Numbers) or hasattr(arg, "__call__")
+                    isinstance(arg, Numbers) or callable(arg)
                 ) and "value" not in descr:
                     descr["value"] = arg
                 elif isinstance(arg, Iterable) and not isinstance(arg, Strings):
@@ -148,7 +148,7 @@ class ArrayVariable(NomialArray):
     where $name is the vector's name and i is the VarKey's index.
     """
 
-    def __new__(cls, shape, *args, **descr):  # noqa: PLR0912, PLR0915
+    def __new__(cls, shape, *args, **descr):  # noqa: PLR0912
         if "idx" in descr:
             raise ValueError("the description field 'idx' is reserved")
 
@@ -165,9 +165,7 @@ class ArrayVariable(NomialArray):
                 isinstance(arg, (Numbers, Iterable))
                 and not isinstance(arg, Strings)
                 and "value" not in descr
-            ):
-                descr["value"] = arg
-            elif hasattr(arg, "__call__"):
+            ) or callable(arg):
                 descr["value"] = arg
             elif isinstance(arg, Strings) and "units" not in descr:
                 descr["units"] = arg
@@ -178,20 +176,19 @@ class ArrayVariable(NomialArray):
             descr["name"] = "\\fbox{%s}" % VarKey.unique_id()
 
         values = descr.pop("value", None)
-        if values is not None:
-            if not hasattr(values, "__call__"):
-                if Vectorize.vectorization:
-                    if not hasattr(values, "shape"):
-                        values = np.full(shape, values, np.float64)
-                    else:
-                        values = np.broadcast_to(values, reversed(shape)).T
-                elif not hasattr(values, "shape"):
-                    values = np.array(values)
-                if values.shape != shape:
-                    raise ValueError(
-                        f"value's shape {values.shape} is different from the"
-                        f" vector's {shape}."
-                    )
+        if values is not None and not callable(values):
+            if Vectorize.vectorization:
+                if not hasattr(values, "shape"):
+                    values = np.full(shape, values, np.float64)
+                else:
+                    values = np.broadcast_to(values, reversed(shape)).T
+            elif not hasattr(values, "shape"):
+                values = np.array(values)
+            if values.shape != shape:
+                raise ValueError(
+                    f"value's shape {values.shape} is different from the"
+                    f" vector's {shape}."
+                )
 
         veckeydescr = descr.copy()
         addmodelstodescr(veckeydescr)
@@ -207,7 +204,7 @@ class ArrayVariable(NomialArray):
             it.iternext()
             descr["idx"] = i
             if values is not None:
-                if hasattr(values, "__call__"):  # a vector function
+                if callable(values):  # a vector function
                     descr["value"] = veclinkedfn(values, i)
                 else:
                     descr["value"] = values[i]

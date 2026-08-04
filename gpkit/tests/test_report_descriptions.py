@@ -6,6 +6,8 @@ fields (references, front_matter, toc, objective_*), build_report_ir wiring,
 and renderer output for all new fields.
 """
 
+from typing import ClassVar
+
 import pytest
 
 from gpkit import Model, Variable
@@ -153,8 +155,8 @@ class TestBuildReportIRDescription:
         class _IRClassAttr(Model):
             """Structural model."""
 
-            assumptions = ["no buckling"]
-            references = ["Raymer 2018"]
+            assumptions: ClassVar = ["no buckling"]
+            references: ClassVar = ["Raymer 2018"]
 
             def setup(self):
                 x = Variable("x_ir_cls")

@@ -50,7 +50,7 @@ def is_power(key):
 
 def get_free_vks(posy, solution):
     "Returns all free vks of a given posynomial for a given solution"
-    return set(vk for vk in posy.vks if vk not in solution.constants)
+    return {vk for vk in posy.vks if vk not in solution.constants}
 
 
 def get_model_breakdown(solution):
@@ -224,7 +224,9 @@ def get_breakdowns(basically_fixed_variables, solution):  # noqa: PLR0912, PLR09
     return breakdowns
 
 
-def get_fixity(basically_fixed, key, bd, solution, visited=set()):
+def get_fixity(basically_fixed, key, bd, solution, visited=None):
+    if visited is None:
+        visited = set()
     lt, gt, _ = bd[key][0]
     free_vks = get_free_vks(lt, solution).union(get_free_vks(gt, solution))
     for vk in free_vks:
@@ -243,7 +245,7 @@ def get_fixity(basically_fixed, key, bd, solution, visited=set()):
 
 
 # @profile  # ~84% of total last check # TODO: remove
-def crawl(  # noqa: PLR0912, PLR0913, PLR0915
+def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
     basically_fixed_variables,
     key,
     bd,
@@ -393,7 +395,7 @@ def crawl(  # noqa: PLR0912, PLR0913, PLR0915
             )  # ~5% of total last check # TODO: remove
             # TODO: changing to str(vk) above does some odd stuff, why?
             if best_vks:
-                interesting_vks = set([best_vks[0]])
+                interesting_vks = {best_vks[0]}
         boring_vks = mon.vks - interesting_vks
 
         subkey = None
@@ -543,7 +545,7 @@ def get_spanstr(legend, length, label, leftwards, solution):  # noqa: ARG001
         return "┃" * (longside + 1) + shortname + "┃" * (shortside + 1)
 
 
-def discretize(tree, extent, solution, collapse, depth=0, justsplit=False):  # noqa: PLR0912, PLR0913, PLR0915
+def discretize(tree, extent, solution, collapse, depth=0, justsplit=False):  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
     # TODO: add vertical simplification?
     key, val, branches = tree
     if collapse:  # collapse Transforms with power 1
@@ -565,9 +567,8 @@ def discretize(tree, extent, solution, collapse, depth=0, justsplit=False):  # n
     bkey_indexs = {}
     for i, b in enumerate(branches):
         k = get_keystr(b.key, solution)
-        if isinstance(b.key, Transform):
-            if len(b.branches) == 1:
-                k = get_keystr(b.branches[0].key, solution)
+        if isinstance(b.key, Transform) and len(b.branches) == 1:
+            k = get_keystr(b.branches[0].key, solution)
         if k in bkey_indexs:
             values[bkey_indexs[k]] += values[i]
             values[i] = None
@@ -586,7 +587,7 @@ def discretize(tree, extent, solution, collapse, depth=0, justsplit=False):  # n
         _, _, branches, values = bvs
         branches = list(branches)
         values = list(values)
-    extents = [int(round(scale * v)) for v in values]
+    extents = [round(scale * v) for v in values]
     surplus = extent - sum(extents)
     for i, b in enumerate(branches):
         if isinstance(b.key, Transform):
@@ -615,7 +616,7 @@ def discretize(tree, extent, solution, collapse, depth=0, justsplit=False):  # n
                 miscval += v
         misckeys = tuple(k for _, _, k in sorted(miscvkeys))
         branches.append(Tree(misckeys, miscval, []))
-        extents.append(int(round(scale * miscval)))
+        extents.append(round(scale * miscval))
     if surplus:
         sign = int(np.sign(surplus))
         bump_priority = sorted(
@@ -725,7 +726,7 @@ def prune(tree, solution, maxlength, length=-1, prefix=""):
     )
 
 
-def simplify(tree, solution, extent, maxdepth, maxlength, collapse):  # noqa: PLR0913
+def simplify(tree, solution, extent, maxdepth, maxlength, collapse):  # noqa: PLR0913, PLR0917
     "Discretize, prune, and layer a tree to prepare for printing"
     subtree = discretize(tree, extent, solution, collapse)
     if collapse and maxlength:
@@ -956,7 +957,7 @@ def get_valstr(key, solution, into="%s"):
     return into % (valuestr + unitstr)
 
 
-class Breakdowns(object):
+class Breakdowns:
     def __init__(self, sol):
         self.sol = sol
         self.lineage_map = get_lineage_map(sol)
@@ -978,7 +979,7 @@ class Breakdowns(object):
         self.bd = get_breakdowns(self.basically_fixed_variables, self.sol)
 
     def trace(self, key, *, permissivity=2):
-        print("")  # a little padding to start
+        print()  # a little padding to start
         with lineage_display_context(self.lineage_map):
             self.get_tree(key, permissivity=permissivity, verbosity=1)
 

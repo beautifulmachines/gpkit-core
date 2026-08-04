@@ -1,5 +1,7 @@
 "wraps pint in gpkit monomials"
 
+from typing import ClassVar
+
 import pint
 
 ureg = pint.UnitRegistry()
@@ -20,9 +22,9 @@ def qty(unit):
 class GPkitUnits:
     "Return Monomials instead of Quantitites"
 
-    division_cache = {}
-    multiplication_cache = {}
-    monomial_cache = {}
+    division_cache: ClassVar = {}
+    multiplication_cache: ClassVar = {}
+    monomial_cache: ClassVar = {}
 
     def __call__(self, unity):
         "Returns a unit Monomial, caching the result for future retrievals"

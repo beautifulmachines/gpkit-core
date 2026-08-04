@@ -190,11 +190,11 @@ class VarMap(MutableMapping):
         key = self._varset.resolve(key)
         try:
             return (key, self._data[key])  # single varkey case
-        except KeyError as kerr:
+        except KeyError:
             key_arr = self._varset.by_vec(key)
             if key_arr.any():
                 return (key, _nested_lookup(key_arr, self._data))
-            raise kerr
+            raise
 
     @property
     def varset(self):
@@ -213,7 +213,7 @@ class VarMap(MutableMapping):
         if is_veckey(key):
             if key not in self._varset._by_vec:
                 raise NotImplementedError
-            if hasattr(value, "__call__"):  # a linked vector-function
+            if callable(value):  # a linked vector-function
                 fn = value
                 value = np.empty(key.shape, dtype="object")
                 it = np.nditer(value, flags=["multi_index", "refs_ok"])

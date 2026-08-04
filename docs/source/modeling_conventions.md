@@ -80,7 +80,7 @@ mutating shared classes:
 
 ```python
 class Wing(Model):
-    sparModel = CapSpar     # override in subclasses to swap spar type
+    sparModel = CapSpar  # override in subclasses to swap spar type
     fillModel = WingCore
     skinModel = WingSkin
 
@@ -91,7 +91,8 @@ class Wing(Model):
             self.foam = self.fillModel(self.planform)
         ...
 
-class SolarWing(Wing):      # solar aircraft needs different structural layup
+
+class SolarWing(Wing):  # solar aircraft needs different structural layup
     sparModel = BoxSpar
     fillModel = None
     skinModel = WingSecondStruct
@@ -110,22 +111,22 @@ depth; the solver flattens the entire constraint tree regardless of nesting leve
 class Wing(Model):
     """Wing: planform geometry + structural sub-components"""
 
-    W    = Var("lbf", "wing weight")
-    mfac = Var("-",   "wing weight margin factor", value=1.2)
+    W = Var("lbf", "wing weight")
+    mfac = Var("-", "wing weight margin factor", value=1.2)
 
-    spar_model = CapSpar     # override in subclasses to swap spar type
+    spar_model = CapSpar  # override in subclasses to swap spar type
     fill_model = WingCore
     skin_model = WingSkin
 
     def setup(self, N=5):
-        self.planform = Planform(N)          # stored as self.attr — navigable from outside
+        self.planform = Planform(N)  # stored as self.attr — navigable from outside
         self.components = []
 
         if self.skin_model:
-            self.skin = self.skin_model(self.planform)       # planform passed in
+            self.skin = self.skin_model(self.planform)  # planform passed in
             self.components.append(self.skin)
         if self.spar_model:
-            self.spar = self.spar_model(N, self.planform)    # planform passed in
+            self.spar = self.spar_model(N, self.planform)  # planform passed in
             self.components.append(self.spar)
         if self.fill_model:
             self.foam = self.fill_model(self.planform)
@@ -149,9 +150,9 @@ A Perf model receiving a composite Component navigates as deep as needed:
 ```python
 class WingAero(Model):
     def setup(self, static, state):
-        AR   = static.planform.AR     # navigate into sub-component
+        AR = static.planform.AR  # navigate into sub-component
         cmac = static.planform.cmac
-        tau  = static.planform.tau
+        tau = static.planform.tau
         ...
 ```
 
@@ -207,7 +208,7 @@ class WingAero(Model):
         self.wing = wing
         self.state = state
 
-        c = wing.c           # Variable identity is the link — no explicit linking needed
+        c = wing.c  # Variable identity is the link — no explicit linking needed
         A = wing.A
         S = wing.S
         rho = state.rho
@@ -263,9 +264,9 @@ is the common case for a single-component Perf. Some simpler Perfs need only one
 
 ```python
 class BreguetEndurance(Model):
-    def setup(self, perf):        # only needs performance outputs, not the static component
-        BSFC    = perf.engine.BSFC
-        W_end   = perf.W_end
+    def setup(self, perf):  # only needs performance outputs, not the static component
+        BSFC = perf.engine.BSFC
+        W_end = perf.W_end
         W_start = perf.W_start
         ...
 ```
@@ -276,12 +277,13 @@ evaluating one subsystem at one condition — naturally have more arguments:
 ```python
 class MarsTransitInjection(Model):
     """Couples rocket capability to payload mass — neither is 'static' vs 'state'"""
+
     def setup(self, rocket, payload):
         self.burn = Burn(rocket, self.v_p)
         return [
             self.burn.m_prop <= rocket.m_prop_max,
             self.burn.m_cutoff >= payload.m + rocket.m_dry,
-            ...
+            ...,
         ]
 ```
 
@@ -303,6 +305,7 @@ associated Perf model:
 ```python
 class Wing(Model):
     ...
+
     def perf(self, state):
         return WingAero(self, state)
 ```
@@ -325,12 +328,13 @@ become N-element arrays — almost certainly wrong.
 # CORRECT — wing used but not owned; remains scalar when WingAero is vectorized
 class WingAero(Model):
     def setup(self, wing, state):
-        return [...]    # wing not in this list
+        return [...]  # wing not in this list
+
 
 # WRONG — wing returned in constraints; gets vectorized with WingAero
 class WingAero(Model):
     def setup(self, wing, state):
-        return [wing, ...]    # anti-pattern
+        return [wing, ...]  # anti-pattern
 ```
 
 ---
@@ -353,7 +357,7 @@ class Mission(Model):
     def setup(self, aircraft):
         self.aircraft = aircraft
 
-        with Vectorize(4):         # four flight segments — all share the same aircraft
+        with Vectorize(4):  # four flight segments — all share the same aircraft
             self.fs = FlightSegment(aircraft)
 
         Wburn = self.fs.aircraftp.Wburn
@@ -397,37 +401,39 @@ live in `Mission`.
 class BeamElement(Model):
     """Loads and displacements at one cross-section — the spatial analogue of FlightState."""
 
-    q  = Var("N/m", "distributed load")
-    V  = Var("N",   "internal shear")
-    M  = Var("N*m", "bending moment")
-    th = Var("-",   "slope")
-    w  = Var("m",   "deflection")
+    q = Var("N/m", "distributed load")
+    V = Var("N", "internal shear")
+    M = Var("N*m", "bending moment")
+    th = Var("-", "slope")
+    w = Var("m", "deflection")
 
     def setup(self):
-        pass   # no intra-element constraints; integration lives in the parent
+        pass  # no intra-element constraints; integration lives in the parent
 
 
 class Beam(Model):
     """Vectorizes BeamElement — the spatial analogue of Mission."""
 
     EI = Var("N*m^2", "bending stiffness")
-    L  = Var("m",     "beam length", value=5)
+    L = Var("m", "beam length", value=5)
 
     def setup(self, N=5):
         self.dx = self.L / N
 
         with Vectorize(N):
-            self.elem = BeamElement()    # N cross-sections; all vars become shape-(N,) arrays
+            self.elem = (
+                BeamElement()
+            )  # N cross-sections; all vars become shape-(N,) arrays
 
-        e = self.elem    # shorthand
+        e = self.elem  # shorthand
 
         return [
             # Trapezoidal integration: shear and moment from tip to root
-            e.V[:-1] >= e.V[1:]  + 0.5 * self.dx * (e.q[:-1]  + e.q[1:]),
-            e.M[:-1] >= e.M[1:]  + 0.5 * self.dx * (e.V[:-1]  + e.V[1:]),
+            e.V[:-1] >= e.V[1:] + 0.5 * self.dx * (e.q[:-1] + e.q[1:]),
+            e.M[:-1] >= e.M[1:] + 0.5 * self.dx * (e.V[:-1] + e.V[1:]),
             # Slope and deflection from root to tip
-            e.th[1:] >= e.th[:-1] + 0.5 * self.dx * (e.M[1:]  + e.M[:-1]) / self.EI,
-            e.w[1:]  >= e.w[:-1]  + 0.5 * self.dx * (e.th[1:] + e.th[:-1]),
+            e.th[1:] >= e.th[:-1] + 0.5 * self.dx * (e.M[1:] + e.M[:-1]) / self.EI,
+            e.w[1:] >= e.w[:-1] + 0.5 * self.dx * (e.th[1:] + e.th[:-1]),
         ]
 ```
 
@@ -559,15 +565,15 @@ The correct access pattern inside a Perf model is to use the Component's attribu
 
 ```python
 def setup(self, wing, state):
-    c = wing.c           # correct — uses wing's Variable object
-    S = wing.S           # correct
-    V = state.V          # correct
+    c = wing.c  # correct — uses wing's Variable object
+    S = wing.S  # correct
+    V = state.V  # correct
 ```
 
 Not:
 ```python
 def setup(self, wing, state):
-    c = wing["c"]        # fragile — string key lookup
+    c = wing["c"]  # fragile — string key lookup
 ```
 
 **Submodel attribute storage is the mechanism that makes attribute access work.** Every submodel
@@ -581,6 +587,7 @@ def setup(self, aircraft):
     self.perf = aircraft.perf(self.fs)
     self.wing = aircraft.wing
     return [self.fs, self.perf]
+
 
 # WRONG — wing only in a list; prevents mission.aircraft.wing.S access later
 def setup(self, aircraft):
@@ -602,7 +609,7 @@ caller will need to reference it, assign it to `self`.
 # BAD — modifies HorizontalTail for every future use in this process
 HorizontalTail.sparModel = BoxSparGP
 HorizontalTail.fillModel = None
-TailBoom.__bases__ = (BoxSparGP,)   # replaces base class globally!
+TailBoom.__bases__ = (BoxSparGP,)  # replaces base class globally!
 ```
 
 **Fix**: create explicit subclasses that override class attributes. Do not mutate shared classes.
@@ -613,9 +620,11 @@ class SolarHTail(HorizontalTail):
     fillModel = None
     skinModel = WingSecondStruct
 
+
 class SolarTailBoom(TailBoom):
     spar_model = BoxSparGP
     secondaryWeight = True
+
 
 # Pass the subclasses where needed:
 emp = Empennage(N=5, htail_cls=SolarHTail, tailboom_cls=SolarTailBoom)
@@ -630,7 +639,7 @@ choice. See `TailBoom.spar_model` and `Wing.sparModel` for examples of this patt
 # BAD — mutates WingSP globally even though this is called per-instance
 def setup(self, sp=False):
     if sp:
-        WingSP.fillModel = None   # global side effect
+        WingSP.fillModel = None  # global side effect
         self.wing = WingSP()
 ```
 
@@ -639,6 +648,7 @@ def setup(self, sp=False):
 ```python
 class _WingSP(WingSP):
     fillModel = None
+
 
 def setup(self, sp=False):
     if sp:
@@ -650,7 +660,7 @@ def setup(self, sp=False):
 ```python
 # BAD — changes Propeller's perf class globally by setting a class attribute
 class Propulsor(Model):
-    prop_flight_model = ActuatorProp   # class-level default
+    prop_flight_model = ActuatorProp  # class-level default
 
     def setup(self):
         self.prop = Propeller()
@@ -661,11 +671,13 @@ class Propulsor(Model):
 
 ```python
 class Propulsor(Model):
-    prop_flight_model = ActuatorProp   # class-level default
+    prop_flight_model = ActuatorProp  # class-level default
 
     def setup(self, prop_flight_model=None):
         self.prop = Propeller()
-        self.prop.flight_model = prop_flight_model or type(self).prop_flight_model  # instance only
+        self.prop.flight_model = (
+            prop_flight_model or type(self).prop_flight_model
+        )  # instance only
 ```
 
 Callers that need a different perf model pass it explicitly:
@@ -732,16 +744,19 @@ region.
 ```python
 # CORRECT — set at call site, after construction, using attribute access
 model = Mission()
-model.cost = model.aircraft.MTOW       # minimize takeoff weight
+model.cost = model.aircraft.MTOW  # minimize takeoff weight
 
 # Or for a different study objective using the same model:
-model.cost = model.fs.t_flight         # maximize endurance (invert: minimize 1/t)
+model.cost = model.fs.t_flight  # maximize endurance (invert: minimize 1/t)
+
 
 # WRONG — cost baked into setup(); objective cannot be changed without modifying the class
 class Mission(Model):
     def setup(self):
         ...
-        self.cost = self["MTOW"]       # anti-pattern: string subscript + hard-coded objective
+        self.cost = self[
+            "MTOW"
+        ]  # anti-pattern: string subscript + hard-coded objective
 ```
 
 **Anti-pattern note:** The API does not prevent setting cost inside `setup()`. It is a natural
@@ -794,14 +809,18 @@ def setup(self, sp=False):
     self.fuselage = Fuselage()
     ...
 
+
 # WRONG — latitude is a parameter, not a structural choice; set as substitution instead
 class Mission(Model):
-    def setup(self, latitude=45):                       # anti-pattern
+    def setup(self, latitude=45):  # anti-pattern
         self.lat = Variable("latitude", latitude, "deg", "latitude")
+
 
 # CORRECT replacement: latitude as a substitution at the call site
 model = Mission()
-model.substitutions[model.fs.latitude] = 45            # set at call site; can change without rebuild
+model.substitutions[model.fs.latitude] = (
+    45  # set at call site; can change without rebuild
+)
 ```
 
 ---
@@ -822,7 +841,7 @@ substitutions dict.
 ```python
 # CORRECT — Variable object as key; attribute access chain is exact and rename-safe
 self.emp.substitutions[self.emp.vtail.Vv] = 0.04
-model.substitutions[model.fs.altitude] = 10000        # ft
+model.substitutions[model.fs.altitude] = 10000  # ft
 
 # WRONG — string key; first-match lookup, breaks silently on rename
 model.substitutions["Vv"] = 0.04
@@ -853,22 +872,24 @@ a double-vectorization (an N×M tensor when only an N-vector was intended).
 class FlightSegment(Model):
     def setup(self, aircraft, N=5):
         with Vectorize(N):
-            self.fs = FlightState()                    # N FlightState instances
-            self.perf = aircraft.perf(self.fs)         # N Perf instances
+            self.fs = FlightState()  # N FlightState instances
+            self.perf = aircraft.perf(self.fs)  # N Perf instances
         return [self.fs, self.perf, ...]
+
 
 # CORRECT — leaf Component: NO Vectorize inside setup()
 class Wing(Model):
-    W = Var("lbf", "weight")    # scalar Var; becomes vector automatically when Wing is
-    S = Var("ft^2", "area")     # instantiated inside an external with Vectorize(N) block
+    W = Var("lbf", "weight")  # scalar Var; becomes vector automatically when Wing is
+    S = Var("ft^2", "area")  # instantiated inside an external with Vectorize(N) block
 
     def setup(self):
-        return [self.W >= self.S * self.rho]   # no Vectorize here; parent owns N
+        return [self.W >= self.S * self.rho]  # no Vectorize here; parent owns N
+
 
 # WRONG — leaf tries to own its own vectorization (double-vectorization risk)
 class Wing(Model):
     def setup(self, N=5):
-        with Vectorize(N):                     # anti-pattern for a leaf component
+        with Vectorize(N):  # anti-pattern for a leaf component
             self.W = Variable("W", "lbf", "weight")
 ```
 
@@ -932,7 +953,7 @@ and pass it to sub-model `setup()` methods as an argument:
 
 ```python
 class Powerplant(Model):
-    P_net = Var("W", "net output power")   # a Powerplant-level design variable
+    P_net = Var("W", "net output power")  # a Powerplant-level design variable
 
     def setup(self):
         self.alternator = Alternator()
@@ -1021,6 +1042,7 @@ class Box(Model):
         self.cost = 1 / (self.h * self.w * self.d)
         return [...]
 
+
 # No default() needed — inherits Model.default() which returns cls()
 ```
 
@@ -1039,7 +1061,7 @@ class AircraftMission(Model):
     @classmethod
     def default(cls):
         m = cls()
-        m.cost = m.aircraft.W_total   # attribute access
+        m.cost = m.aircraft.W_total  # attribute access
         m.substitutions[m.aircraft.W_payload] = 500  # Variable object key
         return m
 ```
@@ -1125,14 +1147,16 @@ Returns a list of direct child Model instances in `setup()` return order:
 ```python
 class Wing(Model):
     W = Var("lbf", "wing weight")
+
     def setup(self):
         self.spar = Spar()
         self.skin = Skin()
         return [self.W >= self.spar.W + self.skin.W, self.spar, self.skin]
 
+
 wing = Wing()
-wing.submodels           # [<Spar>, <Skin>]
-wing.submodels[0].W      # Spar's weight variable
+wing.submodels  # [<Spar>, <Skin>]
+wing.submodels[0].W  # Spar's weight variable
 ```
 
 Only Models explicitly returned from `setup()` as constraints appear in
@@ -1149,6 +1173,7 @@ class Vehicle(Model):
         self.wing = Wing()
         self.fuselage = Fuselage()
         ...
+
 
 v = Vehicle()
 for m in v.walk():
@@ -1186,8 +1211,8 @@ of interest.
 Resolves a dotted path to a `Variable` object:
 
 ```python
-mission.get_var("vehicle.wing.S")   # Wing's area variable
-mission.get_var("S")                # Mission's own S (not a child's)
+mission.get_var("vehicle.wing.S")  # Wing's area variable
+mission.get_var("S")  # Mission's own S (not a child's)
 ```
 
 The path uses the attribute names set in `setup()` (`self.vehicle = Vehicle()`).

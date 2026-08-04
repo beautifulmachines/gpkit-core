@@ -509,9 +509,9 @@ class TestSP:
 
         sys.stdout = old_stdout
         assert stringout.getvalue() == (
-            f"Warning: SignomialConstraint {str(m1[0])} became the "
+            f"Warning: SignomialConstraint {m1[0]!s} became the "
             "tautological constraint 0 <= 3 + x after substitution.\n"
-            f"Warning: SignomialConstraint {str(m1[0])} became the "
+            f"Warning: SignomialConstraint {m1[0]!s} became the "
             "tautological constraint 0 <= 3 + x after substitution.\n"
         )
 
@@ -534,9 +534,9 @@ class TestSP:
 
         sys.stdout = old_stdout
         assert stringout.getvalue() == (
-            f"Warning: SignomialConstraint {str(m1[0])} became the "
+            f"Warning: SignomialConstraint {m1[0]!s} became the "
             "tautological constraint 0 <= 1 + x after substitution.\n"
-            f"Warning: SignomialConstraint {str(m2[0])} became the "
+            f"Warning: SignomialConstraint {m2[0]!s} became the "
             "tautological constraint 0 <= 1 + x after substitution.\n"
         )
 
@@ -700,9 +700,8 @@ class TestSP:
         c = Variable("c")
         y = Variable("y")
         m = Model(x, [y >= 1 + c * x, y <= 0.5], {c: -1})
-        with pytest.raises(InvalidGPConstraint):
-            with SignomialsEnabled():
-                m.gp()
+        with pytest.raises(InvalidGPConstraint), SignomialsEnabled():
+            m.gp()
         with pytest.raises(UnnecessarySGP):
             m.localsolve(solver=solver)
 
@@ -729,7 +728,7 @@ class TestSP:
         m = Model(x * y, Bounded(m, lower=0.001))
         sol = m.solve(solver, verbosity=0)
         bounds = sol.meta["boundedness"]
-        assert bounds["sensitive to lower bound of 0.001"] == set([x.key])
+        assert bounds["sensitive to lower bound of 0.001"] == {x.key}
         # end test one-sided bound
         m = Model(x * y, [x * y**1.01 >= 100])
         m = Model(x * y, Bounded(m))
