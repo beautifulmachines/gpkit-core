@@ -210,7 +210,8 @@ def build():
             f"Replaced found solvers ({installed_solvers}) with environment "
             f"var GPKITSOLVERS ({os.environ['GPKITSOLVERS']})"
         )
-        settings["installed_solvers"] = os.environ["GPKITSOLVERS"].split(", ")
+        gpkitsolvers = os.environ["GPKITSOLVERS"]
+        settings["installed_solvers"] = gpkitsolvers.split(", ") if gpkitsolvers else []
     else:
         settings["installed_solvers"] = installed_solvers
     log("\nFound the following solvers: " + ", ".join(settings["installed_solvers"]))

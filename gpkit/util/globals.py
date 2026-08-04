@@ -5,6 +5,7 @@ import sys
 import tomllib
 from collections import defaultdict
 from contextvars import ContextVar
+from threading import Lock
 
 from .build import build
 
@@ -74,10 +75,13 @@ class _Settings:
 
     def __init__(self):
         self._data = None
+        self._lock = Lock()
 
     def _load(self):
         if self._data is None:
-            self._data = load_settings()
+            with self._lock:
+                if self._data is None:  # another thread may have just loaded it
+                    self._data = load_settings()
         return self._data
 
     def __getitem__(self, key):
@@ -110,9 +114,19 @@ def _context_dict(var, factory):
     try:
         return var.get()
     except LookupError:
-        value = factory()
-        var.set(value)
-        return value
+        return _fresh_context_dict(var, factory)
+
+
+def _fresh_context_dict(var, factory):
+    """Bind and return a brand-new value for var in the current context.
+
+    Always rebinds, even if a value was inherited: asyncio.Task's
+    `copy_context()` copies var->value bindings, not the underlying dict, so
+    inherited tasks would otherwise share and mutate the same object.
+    """
+    value = factory()
+    var.set(value)
+    return value
 
 
 class SignomialsEnabledMeta(type):
@@ -196,8 +210,8 @@ class NamedVariables(metaclass=NamedVariablesMeta):
 
     @classmethod
     def reset_modelnumbers(cls):
-        "Clear all model number counters"
-        cls.modelnums.clear()
+        "Discard this context's model-number counters, starting fresh."
+        _fresh_context_dict(_modelnums, lambda: defaultdict(int))
 
     def __init__(self, name):
         self.name = name
@@ -205,6 +219,15 @@ class NamedVariables(metaclass=NamedVariablesMeta):
     def __enter__(self):
         "Enters a named environment."
         lineage = NamedVariables.lineage
+        if not lineage:
+            # Starting a root build: rebind fresh counter/namedvars dicts
+            # rather than reusing whatever this context inherited. This is
+            # what makes two independent root builds of the same class --
+            # in the same or different threads/tasks, in any order -- number
+            # identically (e.g. both get Wing0), instead of accumulating
+            # counts across a thread/task's whole lifetime.
+            _fresh_context_dict(_modelnums, lambda: defaultdict(int))
+            _fresh_context_dict(_namedvars, lambda: defaultdict(list))
         modelnums = NamedVariables.modelnums
         num = modelnums[(lineage, self.name)]
         modelnums[(lineage, self.name)] += 1

@@ -45,14 +45,19 @@ def run_threads(target, count=4):
 
 
 def test_namedvariables_thread_isolation():
-    "Each thread numbers model instances independently of other threads."
+    """Each thread numbers model instances independently of other threads.
+
+    Each `with NamedVariables("Box")` below is its own root build (nothing
+    nests them), so each independently gets num 0 -- root-build numbering is
+    reset per build, not accumulated across a thread's lifetime.
+    """
     barrier = threading.Barrier(4)
 
     def build(_):
         barrier.wait()  # maximize interleaving across threads
-        for expected_num in range(3):
+        for _ in range(3):
             with NamedVariables("Box") as (lineage, _unused):
-                assert lineage == (("Box", expected_num),)
+                assert lineage == (("Box", 0),)
 
     run_threads(build)
 
