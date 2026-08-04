@@ -1,9 +1,12 @@
 "Tests for the construction-context managers in gpkit.util.globals"
 
+import asyncio
 import json
 import sys
 import threading
+import time
 
+import gpkit.util.globals as globals_module
 from gpkit import NamedVariables, SignomialsEnabled, Variable, Vectorize
 from gpkit.examples import uav
 from gpkit.nomials.math import SignomialInequality
@@ -131,3 +134,55 @@ def test_load_settings_toml_explicit_default(tmp_path):
     )
     loaded = load_settings(path=str(settings_file), trybuild=False)
     assert loaded["default_solver"] == "mosek_conif"
+
+
+def test_namedvariables_asyncio_isolation():
+    """Concurrent asyncio tasks must number models independently of each
+    other, and must not leak counts back into the caller once they finish.
+
+    Regression test for a shared-dict leak: `modelnums`/`namedvars` were
+    bound into a ContextVar once (at first access, e.g. at import time via
+    SequentialGeometricProgram's class-body `NamedVariables("RelaxPCCP")`),
+    and every context that inherits that binding via `copy_context()`
+    (which is how asyncio.Task construction works) shares the same dict
+    object thereafter -- unlike `threading.Thread`, which starts from a
+    fresh, uninherited Context and so never observed this.
+    """
+
+    async def build_task():
+        with NamedVariables("Box") as (lineage, _unused):
+            await asyncio.sleep(0)  # yield control, maximize interleaving
+            return lineage
+
+    async def main():
+        return await asyncio.gather(*(build_task() for _ in range(4)))
+
+    lineages = asyncio.run(main())
+    assert lineages == [(("Box", 0),)] * 4, lineages
+
+    # After the tasks finish, a synchronous build in the calling context
+    # must also start fresh -- it must not inherit counts the tasks
+    # accumulated in their (buggy, shared) dict.
+    with NamedVariables("Box") as (lineage, _unused):
+        assert lineage == (("Box", 0),)
+
+
+def test_settings_lazy_load_is_thread_safe(monkeypatch):
+    "Concurrent first access to `settings` must call load_settings only once."
+    call_count = []
+
+    def slow_load_settings(*_args, **_kwargs):
+        call_count.append(1)
+        time.sleep(0.05)  # widen the check-then-set race window
+        return {"installed_solvers": [], "default_solver": ""}
+
+    monkeypatch.setattr(globals_module, "load_settings", slow_load_settings)
+    fresh_settings = globals_module._Settings()
+    barrier = threading.Barrier(8)
+
+    def access(_):
+        barrier.wait(timeout=10)  # maximize interleaving across threads
+        fresh_settings["default_solver"]
+
+    run_threads(access, count=8)
+    assert len(call_count) == 1, f"load_settings called {len(call_count)} times"
