@@ -118,11 +118,11 @@ def _context_dict(var, factory):
 
 
 def _fresh_context_dict(var, factory):
-    """Bind and return a brand-new value for var in the current context.
+    """Bind and return a fresh value for var in the current context.
 
-    Always rebinds, even if a value was inherited: asyncio.Task's
-    `copy_context()` copies var->value bindings, not the underlying dict, so
-    inherited tasks would otherwise share and mutate the same object.
+    Always rebinds, even if inherited: asyncio.Task's `copy_context()`
+    copies var->value bindings, not the dict itself, so inherited tasks
+    would otherwise share and mutate one object.
     """
     value = factory()
     var.set(value)
@@ -220,12 +220,9 @@ class NamedVariables(metaclass=NamedVariablesMeta):
         "Enters a named environment."
         lineage = NamedVariables.lineage
         if not lineage:
-            # Starting a root build: rebind fresh counter/namedvars dicts
-            # rather than reusing whatever this context inherited. This is
-            # what makes two independent root builds of the same class --
-            # in the same or different threads/tasks, in any order -- number
-            # identically (e.g. both get Wing0), instead of accumulating
-            # counts across a thread/task's whole lifetime.
+            # Root build: rebind fresh dicts instead of reusing whatever
+            # this context inherited, so independent root builds of the
+            # same class always number identically (e.g. both get Wing0).
             _fresh_context_dict(_modelnums, lambda: defaultdict(int))
             _fresh_context_dict(_namedvars, lambda: defaultdict(list))
         modelnums = NamedVariables.modelnums

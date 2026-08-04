@@ -144,16 +144,14 @@ def test_load_settings_toml_explicit_default(tmp_path):
 
 
 def test_namedvariables_asyncio_isolation():
-    """Concurrent asyncio tasks must number models independently of each
-    other, and must not leak counts back into the caller once they finish.
+    """Concurrent asyncio tasks number models independently and don't leak
+    counts back to the caller once they finish.
 
-    Regression test for a shared-dict leak: `modelnums`/`namedvars` were
-    bound into a ContextVar once (at first access, e.g. at import time via
-    SequentialGeometricProgram's class-body `NamedVariables("RelaxPCCP")`),
-    and every context that inherits that binding via `copy_context()`
-    (which is how asyncio.Task construction works) shares the same dict
-    object thereafter -- unlike `threading.Thread`, which starts from a
-    fresh, uninherited Context and so never observed this.
+    asyncio.Task's copy_context() copies var->value bindings, not the
+    underlying dict, so a ContextVar bound once (e.g. at import, via
+    SequentialGeometricProgram's class-body NamedVariables("RelaxPCCP"))
+    can end up shared across tasks -- unlike threading.Thread, which starts
+    from a fresh Context.
     """
 
     async def build_task():
@@ -167,9 +165,7 @@ def test_namedvariables_asyncio_isolation():
     lineages = asyncio.run(main())
     assert lineages == [(("Box", 0),)] * 4, lineages
 
-    # After the tasks finish, a synchronous build in the calling context
-    # must also start fresh -- it must not inherit counts the tasks
-    # accumulated in their (buggy, shared) dict.
+    # A synchronous build after the tasks finish must also start fresh.
     with NamedVariables("Box") as (lineage, _unused):
         assert lineage == (("Box", 0),)
 

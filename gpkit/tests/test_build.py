@@ -8,10 +8,8 @@ import gpkit.util.build as build_module
 def test_gpkitsolvers_empty_string_yields_no_solvers(monkeypatch, tmp_path):
     """GPKITSOLVERS="" must mean "no solvers", not [""].
 
-    build() does `os.environ["GPKITSOLVERS"].split(", ")`, and "".split(", ")
-    is `[""]`, not `[]` -- silently reintroducing the empty-sentinel bug the
-    rest of the settings refactor removed (`installed_solvers == [""]` used
-    to be the "no solvers" sentinel; downstream code now checks truthiness).
+    "".split(", ") is [""], not [] -- installed_solvers must stay empty,
+    since downstream code checks it for truthiness.
     """
     for cls in (build_module.MosekCLI, build_module.MosekConif, build_module.CVXopt):
         monkeypatch.setattr(cls, "look", lambda _self: None)
