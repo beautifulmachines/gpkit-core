@@ -257,7 +257,7 @@ def optimize(prob, **kwargs):  # noqa: PLR0912, PLR0915
             mosek.rescode.err_license_expired,
         ]:
             raise InvalidLicense() from e
-        raise e
+        raise
 
     if verbose:
         task.solutionsummary(mosek.streamtype.msg)

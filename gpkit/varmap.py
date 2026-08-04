@@ -190,11 +190,11 @@ class VarMap(MutableMapping):
         key = self._varset.resolve(key)
         try:
             return (key, self._data[key])  # single varkey case
-        except KeyError as kerr:
+        except KeyError:
             key_arr = self._varset.by_vec(key)
             if key_arr.any():
                 return (key, _nested_lookup(key_arr, self._data))
-            raise kerr
+            raise
 
     @property
     def varset(self):

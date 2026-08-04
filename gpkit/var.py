@@ -40,8 +40,8 @@ class Var:
         label: str = "",
         *,
         value=None,
-        latex: str = None,
-        growth: float = None,
+        latex: str | None = None,
+        growth: float | None = None,
     ):
         self.units = units
         self.label = label

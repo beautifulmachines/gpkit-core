@@ -587,7 +587,7 @@ def discretize(tree, extent, solution, collapse, depth=0, justsplit=False):  # n
         _, _, branches, values = bvs
         branches = list(branches)
         values = list(values)
-    extents = [int(round(scale * v)) for v in values]
+    extents = [round(scale * v) for v in values]
     surplus = extent - sum(extents)
     for i, b in enumerate(branches):
         if isinstance(b.key, Transform):
@@ -616,7 +616,7 @@ def discretize(tree, extent, solution, collapse, depth=0, justsplit=False):  # n
                 miscval += v
         misckeys = tuple(k for _, _, k in sorted(miscvkeys))
         branches.append(Tree(misckeys, miscval, []))
-        extents.append(int(round(scale * miscval)))
+        extents.append(round(scale * miscval))
     if surplus:
         sign = int(np.sign(surplus))
         bump_priority = sorted(

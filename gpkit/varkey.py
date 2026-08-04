@@ -264,7 +264,7 @@ class VarKey(ReprMixin):
         "Returns a tuple of just the names of models in self.lineage"
         if not self.lineage:
             return ()
-        return tuple(zip(*self.lineage))[0]
+        return next(zip(*self.lineage))
 
     def latex(self, excluded=()):
         "Returns latex representation."

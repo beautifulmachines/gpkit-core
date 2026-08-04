@@ -374,7 +374,7 @@ class SolutionSection(Constants):
         sizes = {np.asarray(v[0]).size for _, v in vec_items if np.shape(v[0])}
         if len(sizes) != 1:
             return None
-        n = min(list(sizes)[0], self.options.vecn)
+        n = min(next(iter(sizes)), self.options.vecn)
         p = self.options.precision
         widths = [0] * n
         for _, (val, sens) in vec_items:

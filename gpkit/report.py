@@ -619,7 +619,7 @@ def _text_cgroup_lines(constraint_groups: list, pad: str, lineage_map: dict) -> 
     return lines
 
 
-def _text_constraint_rows(constraints: list, lineage_map: dict = None) -> list:
+def _text_constraint_rows(constraints: list, lineage_map: dict | None = None) -> list:
     """Build aligned rows for a constraint group in text output.
 
     lineage_map is a _name_collision_varkeys dict; activating it makes

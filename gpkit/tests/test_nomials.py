@@ -72,7 +72,7 @@ class TestMonomial:
 
         # test label kwarg
         x = Variable("x", label="dummy variable")
-        assert list(x.exp)[0].label == "dummy variable"
+        assert next(iter(x.exp)).label == "dummy variable"
         _ = hash(m)
         _ = hash(x)
         _ = hash(Monomial(x))
