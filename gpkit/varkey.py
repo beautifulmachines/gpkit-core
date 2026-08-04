@@ -9,7 +9,8 @@ from .units import qty
 from .util.repr_conventions import ReprMixin, extract_subscript, latexify
 from .util.small_classes import Count
 
-_lineage_ctx: ContextVar[dict] = ContextVar("lineage_ctx", default={})
+_lineage_ctx: ContextVar[dict | None] = ContextVar("lineage_ctx", default=None)
+_EMPTY_LINEAGE_MAP: dict = {}  # never mutated; shared read-only fallback
 
 
 @contextmanager
@@ -22,9 +23,14 @@ def lineage_display_context(mapping):
         _lineage_ctx.reset(token)
 
 
+def _current_lineage_map():
+    "Return the active lineage-depth mapping, or an empty one if unset."
+    return _lineage_ctx.get() or _EMPTY_LINEAGE_MAP
+
+
 def necessarylineage(vk):
     """Display lineage depth for a VarKey in the current context."""
-    return _lineage_ctx.get().get(vk)
+    return _current_lineage_map().get(vk)
 
 
 def _strip_magic_prefix(namespace, excluded):
@@ -181,7 +187,7 @@ class VarKey(ReprMixin):
                     if len(to_replace) > replaced:
                         namespace.insert(0, "." * (len(to_replace) - replaced))
             if "hiddenlineage" not in excluded:
-                lineage_map = _lineage_ctx.get()
+                lineage_map = _current_lineage_map()
                 lineage_depth = lineage_map.get(self)
                 if lineage_depth is None and self.veckey:
                     lineage_depth = lineage_map.get(self.veckey)
@@ -270,9 +276,10 @@ class VarKey(ReprMixin):
         if "lineage" not in excluded and self.lineage:
             namespace = _strip_magic_prefix(list(self.lineage), excluded)
             # Respect lineage_display_context depth (mirrors str_without)
-            depth = _lineage_ctx.get().get(self)
+            lineage_map = _current_lineage_map()
+            depth = lineage_map.get(self)
             if depth is None and self.veckey:
-                depth = _lineage_ctx.get().get(self.veckey)
+                depth = lineage_map.get(self.veckey)
             if depth is not None:
                 namespace = namespace[-depth:] if depth > 0 else []
             # Merge lineage into any existing subscript (name first, lineage last)

@@ -205,7 +205,7 @@ class TestCostedConstraint:
 
     def test_vector_cost(self):
         x = VectorVariable(2, "x")
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             CostedConstraintSet(x, [])
         _ = CostedConstraintSet(np.array(x[0]), [])
 

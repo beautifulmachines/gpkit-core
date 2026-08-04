@@ -224,7 +224,9 @@ def get_breakdowns(basically_fixed_variables, solution):  # noqa: PLR0912, PLR09
     return breakdowns
 
 
-def get_fixity(basically_fixed, key, bd, solution, visited=set()):
+def get_fixity(basically_fixed, key, bd, solution, visited=None):
+    if visited is None:
+        visited = set()
     lt, gt, _ = bd[key][0]
     free_vks = get_free_vks(lt, solution).union(get_free_vks(gt, solution))
     for vk in free_vks:
