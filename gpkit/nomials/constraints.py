@@ -29,7 +29,7 @@ class SingleEquationConstraint(ReprMixin):
             oper = self.unicode_opers[self.oper]
         else:
             oper = self.oper
-        return " ".join((leftstr, oper, rightstr))
+        return f"{leftstr} {oper} {rightstr}"
 
     def to_ir(self):
         "Serialize the common constraint structure to an IR dict."

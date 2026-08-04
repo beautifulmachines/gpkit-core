@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Regenerate output files for catalog-eligible examples.
 
 Reads catalog.toml to discover which gpkit.examples.* scripts to run (no

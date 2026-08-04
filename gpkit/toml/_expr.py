@@ -294,7 +294,7 @@ def parse_objective(text, namespace):
     For ``"max: expr"``, returns ``1/expr``.
     """
     text = text.strip()
-    if text.startswith("min:") or text.startswith("max:"):
+    if text.startswith(("min:", "max:")):
         expr_str = text[4:].strip()
     else:
         raise TomlExpressionError(

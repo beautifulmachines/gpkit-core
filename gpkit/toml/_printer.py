@@ -421,7 +421,7 @@ def _emit_single_model(ir, lines):
 
     if vector_groups:
         by_shape = {}
-        for _, group in vector_groups.items():
+        for group in vector_groups.values():
             shape = group["shape"]
             if isinstance(shape, (list, tuple)):
                 shape = shape[0] if len(shape) == 1 else tuple(shape)
@@ -539,7 +539,7 @@ def _emit_model_section(  # noqa: PLR0913, PLR0917
     # Vector variables as [models.X.vectors.N] sub-tables
     if vector_groups:
         by_shape = {}
-        for _, group in vector_groups.items():
+        for group in vector_groups.values():
             shape = group["shape"]
             if isinstance(shape, (list, tuple)):
                 shape = shape[0] if len(shape) == 1 else tuple(shape)
