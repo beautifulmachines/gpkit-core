@@ -68,6 +68,8 @@ extend-select = [
 ignore = [
     "PLR2004",  # magic-value-comparison: noisy, no precedent, revisit later
     "PLW2901",  # redefined-loop-name: idiomatic here, bulk-fix risks bugs
+    "UP031",    # printf-string-formatting: 47 sites (mostly breakdowns.py,
+                # interactive/sankey.py) not yet converted to f-strings; see #220
 ]
 
 [tool.ruff.lint.per-file-ignores]
