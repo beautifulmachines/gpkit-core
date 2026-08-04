@@ -105,8 +105,10 @@ class MarginSolution:
         """
         u = f" {self.units}" if self.units else ""
         lines = [
-            f"\n{self.name}: {self.value:.4g}{u}"
-            f"  (plus={self.plus_value:.4g}{u}, minus={self.minus_value:.4g}{u})",
+            (
+                f"\n{self.name}: {self.value:.4g}{u}"
+                f"  (plus={self.plus_value:.4g}{u}, minus={self.minus_value:.4g}{u})"
+            ),
         ]
         if not self.sensitivities:
             return "\n".join(lines)

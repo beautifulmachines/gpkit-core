@@ -356,9 +356,11 @@ class UAV(Model):
     """
 
     references: ClassVar = [
-        'W. Hoburg, "Geometric Programming for Aircraft Design Optimization,"'
-        " PhD thesis, MIT/UC Berkeley, 2013."
-        " https://people.eecs.berkeley.edu/~pabbeel/papers/2013_Hoburg-phdthesis.pdf"
+        (
+            'W. Hoburg, "Geometric Programming for Aircraft Design Optimization,"'
+            " PhD thesis, MIT/UC Berkeley, 2013."
+            " https://people.eecs.berkeley.edu/~pabbeel/papers/2013_Hoburg-phdthesis.pdf"
+        )
     ]
 
     def setup(self):

@@ -763,12 +763,14 @@ class GeometricProgram:
         if self.integersolve:
             warnings["No Dual Solution"] = [
                 (
-                    "This model has the discretized choice variables"
-                    f" {sorted(self.choicevaridxs.keys())} and hence no dual"
-                    " solution. You can fix those variables to their optimal"
-                    " values and get sensitivities to the resulting"
-                    " continuous problem by updating your model's"
-                    " substitions with `sol['choicevariables']`.",
+                    (
+                        "This model has the discretized choice variables"
+                        f" {sorted(self.choicevaridxs.keys())} and hence no dual"
+                        " solution. You can fix those variables to their optimal"
+                        " values and get sensitivities to the resulting"
+                        " continuous problem by updating your model's"
+                        " substitions with `sol['choicevariables']`."
+                    ),
                     self.choicevaridxs,
                 )
             ]
@@ -776,10 +778,12 @@ class GeometricProgram:
         if self.choicevaridxs:
             warnings["Freed Choice Variables"] = [
                 (
-                    "This model has the discretized choice variables"
-                    f" {sorted(self.choicevaridxs.keys())}, but since the "
-                    f"'{solver_out.meta['solver']}' solver doesn't support "
-                    "discretization they were treated as continuous variables.",
+                    (
+                        "This model has the discretized choice variables"
+                        f" {sorted(self.choicevaridxs.keys())}, but since the "
+                        f"'{solver_out.meta['solver']}' solver doesn't support "
+                        "discretization they were treated as continuous variables."
+                    ),
                     self.choicevaridxs,
                 )
             ]  # TODO: choicevaridxs seems unnecessary
