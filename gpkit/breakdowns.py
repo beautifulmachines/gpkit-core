@@ -567,9 +567,8 @@ def discretize(tree, extent, solution, collapse, depth=0, justsplit=False):  # n
     bkey_indexs = {}
     for i, b in enumerate(branches):
         k = get_keystr(b.key, solution)
-        if isinstance(b.key, Transform):
-            if len(b.branches) == 1:
-                k = get_keystr(b.branches[0].key, solution)
+        if isinstance(b.key, Transform) and len(b.branches) == 1:
+            k = get_keystr(b.branches[0].key, solution)
         if k in bkey_indexs:
             values[bkey_indexs[k]] += values[i]
             values[i] = None

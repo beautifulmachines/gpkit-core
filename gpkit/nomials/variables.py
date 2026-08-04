@@ -176,20 +176,19 @@ class ArrayVariable(NomialArray):
             descr["name"] = "\\fbox{%s}" % VarKey.unique_id()
 
         values = descr.pop("value", None)
-        if values is not None:
-            if not callable(values):
-                if Vectorize.vectorization:
-                    if not hasattr(values, "shape"):
-                        values = np.full(shape, values, np.float64)
-                    else:
-                        values = np.broadcast_to(values, reversed(shape)).T
-                elif not hasattr(values, "shape"):
-                    values = np.array(values)
-                if values.shape != shape:
-                    raise ValueError(
-                        f"value's shape {values.shape} is different from the"
-                        f" vector's {shape}."
-                    )
+        if values is not None and not callable(values):
+            if Vectorize.vectorization:
+                if not hasattr(values, "shape"):
+                    values = np.full(shape, values, np.float64)
+                else:
+                    values = np.broadcast_to(values, reversed(shape)).T
+            elif not hasattr(values, "shape"):
+                values = np.array(values)
+            if values.shape != shape:
+                raise ValueError(
+                    f"value's shape {values.shape} is different from the"
+                    f" vector's {shape}."
+                )
 
         veckeydescr = descr.copy()
         addmodelstodescr(veckeydescr)

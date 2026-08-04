@@ -59,9 +59,11 @@ def optimize_generator(path=None, **_):
     if tmpdir:
         path = tempfile.mkdtemp()
     filename = path + os.sep + "gpkit_mosek"
-    if "mosek_bin_dir" in settings:
-        if settings["mosek_bin_dir"] not in os.environ["PATH"]:
-            os.environ["PATH"] += ":" + settings["mosek_bin_dir"]
+    if (
+        "mosek_bin_dir" in settings
+        and settings["mosek_bin_dir"] not in os.environ["PATH"]
+    ):
+        os.environ["PATH"] += ":" + settings["mosek_bin_dir"]
 
     def optimize(prob, **_):
         """Interface to the MOSEK "mskexpopt" command line solver

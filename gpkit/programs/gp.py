@@ -488,11 +488,10 @@ class GeometricProgram:
                     absv_ss[c] = absv_ss.get(c, 0) + abs(
                         dlogcost_dlogabsv * dlogv_dlogc
                     )
-                if v in cost_senss:
-                    if c in self.cost.vks:  # TODO: seems unnecessary
-                        dlogcost_dlogv = cost_senss.pop(v)
-                        before = cost_senss.get(c, 0)
-                        cost_senss[c] = before + dlogcost_dlogv * dlogv_dlogc
+                if v in cost_senss and c in self.cost.vks:  # TODO: seems unnecessary
+                    dlogcost_dlogv = cost_senss.pop(v)
+                    before = cost_senss.get(c, 0)
+                    cost_senss[c] = before + dlogcost_dlogv * dlogv_dlogc
 
         return cost_senss, gpv_ss, absv_ss, m_senss, constraint_senss
 
