@@ -3,6 +3,8 @@
 import ast
 import operator
 
+from ..units import units as _units
+
 # ---------------------------------------------------------------------------
 # Whitelist of allowed AST node types
 # ---------------------------------------------------------------------------
@@ -55,7 +57,7 @@ class TomlExpressionError(Exception):
 # ---------------------------------------------------------------------------
 
 
-_ALLOWED_FUNCTIONS = frozenset({"sum", "prod"})
+_ALLOWED_FUNCTIONS = frozenset({"sum", "prod", "units"})
 
 
 def _validate_ast(tree):
@@ -68,17 +70,24 @@ def _validate_ast(tree):
 
 
 def _validate_call(node):
-    """Restrict function calls to sum() and prod() only."""
+    """Restrict function calls to sum(), prod(), and units() only."""
     if not isinstance(node.func, ast.Name):
-        raise TomlExpressionError("Only sum() and prod() function calls are allowed")
-    if node.func.id not in _ALLOWED_FUNCTIONS:
         raise TomlExpressionError(
-            f"Function call '{node.func.id}' is not allowed. "
-            f"Only sum() and prod() are supported."
+            "Only sum(), prod(), and units() function calls are allowed"
+        )
+    name = node.func.id
+    if name not in _ALLOWED_FUNCTIONS:
+        raise TomlExpressionError(
+            f"Function call '{name}' is not allowed. "
+            f"Only sum(), prod(), and units() are supported."
         )
     if len(node.args) != 1 or node.keywords:
+        raise TomlExpressionError(f"{name}() takes exactly one positional argument")
+    if name == "units" and not (
+        isinstance(node.args[0], ast.Constant) and isinstance(node.args[0].value, str)
+    ):
         raise TomlExpressionError(
-            f"{node.func.id}() takes exactly one positional argument"
+            'units() takes a single string literal argument, e.g. units("W")'
         )
 
 
@@ -152,8 +161,11 @@ def _eval_binop(node, ns):
 
 
 def _eval_call(node, ns):
-    """Evaluate a whitelisted function call (sum or prod)."""
+    """Evaluate a whitelisted function call (sum, prod, or units)."""
     func_name = node.func.id  # validated by _validate_call
+    if func_name == "units":
+        # arg is guaranteed a string ast.Constant by _validate_call
+        return _units(node.args[0].value)
     arg = _eval_node(node.args[0], ns)
     method = getattr(arg, func_name, None)
     if method is None:

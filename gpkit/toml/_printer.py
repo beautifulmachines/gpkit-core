@@ -4,7 +4,7 @@ import re
 import sys
 import types
 
-from ..ast_nodes import ASTNode, ConstNode, ExprNode, VarNode, ast_from_ir
+from ..ast_nodes import ASTNode, ConstNode, ExprNode, UnitsNode, VarNode, ast_from_ir
 
 # ---------------------------------------------------------------------------
 # Ref string → Python variable name
@@ -61,31 +61,78 @@ def _format_number(v):
     return f"{v:.4g}"
 
 
-def ast_to_expr(node):
+def _render_var_node(node, name_fn):
+    return name_fn(node.ref)
+
+
+def _render_const_node(node, _name_fn):
+    return _format_number(node.value)
+
+
+def _render_units_node(node, _name_fn):
+    """UnitsNode is a magnitude-1 units-only leaf (e.g. `1 * units("W")`,
+    used to non-dimensionalize before a fractional power). It must
+    round-trip as a real unit literal, not be dropped: the units it carries
+    can differ in scale from a neighboring variable's declared units (e.g.
+    dividing a kW variable by a bare 1 W constant folds in a real x1000
+    conversion factor), so collapsing it to "1" would silently change the
+    model's solved values on reload, not just its cosmetic unit display.
+    """
+    # Compact ("~C") form avoids embedded spaces inside the quoted TOML
+    # string (pint's default "~" adds them, e.g. "N / m ** 2") and stays
+    # consistent with this printer's own bare "**" for pow (no spaces).
+    # Single-quoted: constraint/objective lines are themselves wrapped in
+    # double quotes for the TOML string, and this printer does not escape
+    # embedded characters, so a double-quoted literal here would corrupt
+    # the surrounding TOML string.
+    unit_str = f"{node.units.units:~C}"
+    return f"units('{unit_str}')"
+
+
+def _render_expr_node(node, name_fn):
+    return _render_op(node.op, node.children, name_fn)
+
+
+# One entry per ASTNode subtype (gpkit/ast_nodes.py). isinstance-ordered so
+# PiNode (a ConstNode subclass) still matches the ConstNode entry. Adding a
+# new ASTNode subtype means adding one row here — the previous isinstance
+# chain let a new node type (UnitsNode) go unhandled and crash to_toml()
+# instead of failing loudly at review time (see issue #218).
+_AST_RENDERERS = (
+    (VarNode, _render_var_node),
+    (ConstNode, _render_const_node),
+    (UnitsNode, _render_units_node),
+    (ExprNode, _render_expr_node),
+)
+
+
+def ast_to_expr(node, name_fn=_ref_to_name):
     """Convert a gpkit AST node to a plain expression string.
 
     Accepts VarNode, ConstNode, ExprNode (from gpkit's ast_nodes),
     IR dicts (from to_ir() JSON), or raw numbers.
 
     Produces TOML-compatible syntax: ``*`` for multiply, ``**`` for power.
+
+    name_fn : ref -> str, default _ref_to_name (bare name, no qualification).
+    Multi-model emission passes a resolver that qualifies a VarNode as
+    "Model.name" when it belongs to a different model than the one whose
+    constraint/objective is currently being rendered (see
+    _make_name_resolver) — otherwise a cross-model reference like
+    self.engine.W would print as a bare "W" indistinguishable from a local
+    variable of the same name.
     """
     # Raw numbers (e.g. exponents in pow, coefficients)
     if isinstance(node, (int, float)):
         return _format_number(node)
 
-    # IR dict — reconstruct AST nodes first, then render
+    # IR dict — reconstruct an AST node first, then dispatch on it below
     if isinstance(node, dict):
-        reconstructed = ast_from_ir(node, _RefNameRegistry())
-        return ast_to_expr(reconstructed)
+        node = ast_from_ir(node, _RefNameRegistry())
 
-    if isinstance(node, VarNode):
-        return _ref_to_name(node.ref)
-
-    if isinstance(node, ConstNode):
-        return _format_number(node.value)
-
-    if isinstance(node, ExprNode):
-        return _render_op(node.op, node.children)
+    for node_type, render in _AST_RENDERERS:
+        if isinstance(node, node_type):
+            return render(node, name_fn)
 
     # Numpy scalars etc.
     if hasattr(node, "__float__"):
@@ -107,18 +154,18 @@ class _RefNameRegistry(dict):
         return stub
 
 
-def _render_op(op, children):  # noqa: PLR0911, PLR0912
+def _render_op(op, children, name_fn):  # noqa: PLR0911, PLR0912
     """Render an AST operation to a plain expression string."""
     if op == "add":
-        left = ast_to_expr(children[0])
-        right = ast_to_expr(children[1])
+        left = ast_to_expr(children[0], name_fn)
+        right = ast_to_expr(children[1], name_fn)
         if right.startswith("-"):
             return f"{left} - {right[1:]}"
         return f"{left} + {right}"
 
     if op == "mul":
-        left = _parenthesize(ast_to_expr(children[0]), for_mul=False)
-        right = _parenthesize(ast_to_expr(children[1]), for_mul=False)
+        left = _parenthesize(ast_to_expr(children[0], name_fn), for_mul=False)
+        right = _parenthesize(ast_to_expr(children[1], name_fn), for_mul=False)
         if left == "1":
             return right
         if right == "1":
@@ -126,34 +173,38 @@ def _render_op(op, children):  # noqa: PLR0911, PLR0912
         return f"{left}*{right}"
 
     if op == "div":
-        left = _parenthesize(ast_to_expr(children[0]), for_mul=False)
-        right = _parenthesize(ast_to_expr(children[1]))
+        left = _parenthesize(ast_to_expr(children[0], name_fn), for_mul=False)
+        right = _parenthesize(ast_to_expr(children[1], name_fn))
         if right == "1":
             return left
         return f"{left}/{right}"
 
     if op == "pow":
-        left = _parenthesize(ast_to_expr(children[0]))
+        left = _parenthesize(ast_to_expr(children[0], name_fn))
         exp = children[1]
-        exp_str = ast_to_expr(exp) if isinstance(exp, ASTNode) else _format_number(exp)
+        exp_str = (
+            ast_to_expr(exp, name_fn)
+            if isinstance(exp, ASTNode)
+            else _format_number(exp)
+        )
         if left == "1":
             return "1"
         return f"{left}**{exp_str}"
 
     if op == "neg":
-        val = _parenthesize(ast_to_expr(children[0]), for_mul=False)
+        val = _parenthesize(ast_to_expr(children[0], name_fn), for_mul=False)
         return f"-{val}"
 
     if op == "sum":
-        val = _parenthesize(ast_to_expr(children[0]))
+        val = _parenthesize(ast_to_expr(children[0], name_fn))
         return f"sum({val})"
 
     if op == "prod":
-        val = _parenthesize(ast_to_expr(children[0]))
+        val = _parenthesize(ast_to_expr(children[0], name_fn))
         return f"prod({val})"
 
     if op == "index":
-        left = ast_to_expr(children[0])
+        left = ast_to_expr(children[0], name_fn)
         idx_str = _format_index(children[1])
         return f"{left}[{idx_str}]"
 
@@ -189,18 +240,18 @@ def _format_slice(s):
 _OPER_MAP = {"=": "=="}
 
 
-def constraint_to_expr(constraint_ir):
+def constraint_to_expr(constraint_ir, name_fn=_ref_to_name):
     """Convert an IR constraint dict to a TOML constraint string."""
     oper = constraint_ir["oper"]
     oper = _OPER_MAP.get(oper, oper)
 
-    left = _nomial_ir_to_expr(constraint_ir["left"])
-    right = _nomial_ir_to_expr(constraint_ir["right"])
+    left = _nomial_ir_to_expr(constraint_ir["left"], name_fn)
+    right = _nomial_ir_to_expr(constraint_ir["right"], name_fn)
 
     return f"{left} {oper} {right}"
 
 
-def _nomial_ir_to_expr(nomial_ir):
+def _nomial_ir_to_expr(nomial_ir, name_fn=_ref_to_name):
     """Render a nomial IR dict to an expression string.
 
     Uses the AST when available (for expressions built from operations).
@@ -209,7 +260,7 @@ def _nomial_ir_to_expr(nomial_ir):
     """
     ast = nomial_ir.get("ast")
     if ast is not None:
-        return ast_to_expr(ast)
+        return ast_to_expr(ast, name_fn)
 
     # Leaf cases only: bare Variable or numeric Monomial
     terms = nomial_ir["terms"]
@@ -224,7 +275,7 @@ def _nomial_ir_to_expr(nomial_ir):
             ref, exp = next(iter(exps.items()))
             if exp == 1:
                 # Bare variable reference
-                return _ref_to_name(ref)
+                return name_fn(ref)
 
     raise ValueError(
         f"Nomial IR has no AST and is not a trivial leaf node "
@@ -254,7 +305,7 @@ def _is_reciprocal(ast_dict):
     return None
 
 
-def _format_objective(cost_ir):
+def _format_objective(cost_ir, name_fn=_ref_to_name):
     """Determine objective direction and expression string.
 
     Detects the 1/expr pattern and returns ("max", expr_str) instead of
@@ -264,8 +315,8 @@ def _format_objective(cost_ir):
     if ast is not None:
         inner = _is_reciprocal(ast)
         if inner is not None:
-            return "max", ast_to_expr(inner)
-    return "min", _nomial_ir_to_expr(cost_ir)
+            return "max", ast_to_expr(inner, name_fn)
+    return "min", _nomial_ir_to_expr(cost_ir, name_fn)
 
 
 # ---------------------------------------------------------------------------
@@ -315,49 +366,93 @@ def _group_variables(variables):
     return scalar_vars, vector_groups
 
 
-def _var_model_id(ref):
-    """Extract model_id from a variable ref's lineage prefix.
+def _assign_model_ids(tree):
+    """Map each model_tree node (by id()) to a unique TOML section name.
 
-    "wing0.S|ft²" → "wing", "aircraft0.W|lbf" → "aircraft".
-    Returns None if no lineage prefix is present.
+    Usually just the node's class name. A class can be instantiated more
+    than once in the tree — e.g. AircraftPerf appears once under each of
+    Outbound, Return, and SprintCondition, gpkit's three named flight
+    conditions in the UAV example — so a bare class name isn't always
+    unique. When a class collides, every one of its instances is
+    consistently disambiguated using just enough of the node's
+    instance_id lineage to tell them apart, e.g. "Outbound_AircraftPerf",
+    "Return_AircraftPerf", "SprintCondition_AircraftPerf".
     """
-    bare = _REF_STRIP.sub("", ref)
-    if "." not in bare:
-        return None
-    prefix = bare.rsplit(".", 1)[0]
-    return re.sub(r"\d+$", "", prefix)
+    nodes = []
 
+    def collect(node):
+        segs = (
+            node["instance_id"].split(".") if node["instance_id"] else [node["class"]]
+        )
+        nodes.append((node, segs))
+        for child in node.get("children", []):
+            collect(child)
 
-def _collect_child_ids(tree):
-    """Collect all model_ids from children (recursively)."""
-    ids = set()
-    for child in tree.get("children", []):
-        ids.add(child["class"])
-        ids.update(_collect_child_ids(child))
+    collect(tree)
+
+    class_counts = {}
+    for _, segs in nodes:
+        class_counts[segs[-1]] = class_counts.get(segs[-1], 0) + 1
+
+    used = set()
+    ids = {}
+    for node, segs in nodes:
+        if class_counts[segs[-1]] == 1:
+            ids[id(node)] = segs[-1]
+            used.add(segs[-1])
+
+    # Every instance of a repeated class is disambiguated together (not just
+    # the first collision found), so named siblings read consistently.
+    for node, segs in nodes:
+        if id(node) in ids:
+            continue
+        for k in range(2, len(segs) + 1):
+            candidate = "_".join(segs[-k:])
+            if candidate not in used:
+                break
+        else:
+            # instance_id is always globally unique, so this is only reached
+            # if underscore-joining happened to collide; the dotted path
+            # (which can't collide the same way) is the guaranteed fallback.
+            candidate = node["instance_id"].replace(".", "_")
+        used.add(candidate)
+        ids[id(node)] = candidate
     return ids
 
 
-def _root_model_id(tree, all_variables):
-    """Determine the root model's ID from IR variables and model_tree.
+def _build_ref_to_model_id(tree, model_ids):
+    """Map every variable ref to the model_id (from _assign_model_ids) of
+    the node that owns it. node["variables"] is already scoped to exactly
+    that node's own instance, so this is unambiguous even when several
+    nodes share a class."""
+    mapping = {}
 
-    Uses lineage prefixes from variable refs, excluding child model_ids,
-    to find the root's unique model_id. Falls back to "main".
-    """
-    child_ids = _collect_child_ids(tree)
+    def walk(node):
+        mid = model_ids[id(node)]
+        for ref in node.get("variables", []):
+            mapping[ref] = mid
+        for child in node.get("children", []):
+            walk(child)
 
-    # Try: find a model_id that appears in variables but not in children
-    all_model_ids = {_var_model_id(ref) for ref in all_variables} - {None}
-    root_candidates = all_model_ids - child_ids
-    if len(root_candidates) == 1:
-        return root_candidates.pop()
+    walk(tree)
+    return mapping
 
-    # Fallback: check root node's own variable refs
-    for ref in tree.get("variables", []):
-        mid = _var_model_id(ref)
-        if mid and mid not in child_ids:
-            return mid
 
-    return "main"
+def _make_name_resolver(ref_to_model_id, current_model_id):
+    """Build a name_fn for ast_to_expr/constraint_to_expr: bare name for a
+    variable owned by the model currently being emitted, "Model.name" for
+    a reference to a variable owned by a different model (e.g. Aircraft's
+    constraint referencing self.engine.W) — otherwise it would print as a
+    bare "W" indistinguishable from a same-named local variable."""
+
+    def resolve(ref):
+        name = _ref_to_name(ref)
+        owner = ref_to_model_id.get(ref)
+        if owner is not None and owner != current_model_id:
+            return f"{owner}.{name}"
+        return name
+
+    return resolve
 
 
 def to_toml(source, path=None):
@@ -461,23 +556,15 @@ def _emit_multi_model(ir, lines):
     substitutions = ir.get("substitutions", {})
     constraints = ir.get("constraints", [])
 
-    # Group all variables by model_id (from lineage prefix)
-    root_id = _root_model_id(tree, variables)
-    vars_by_model = {}
-    for ref, info in variables.items():
-        mid = _var_model_id(ref) or root_id
-        vars_by_model.setdefault(mid, {})[ref] = info
+    model_ids = _assign_model_ids(tree)
+    ref_to_model_id = _build_ref_to_model_id(tree, model_ids)
 
     # Flatten tree into ordered list of (model_id, node, child_ids)
     nodes = []
 
     def flatten(node):
-        if node.get("instance_id"):
-            model_id = node["class"]
-        else:
-            model_id = root_id
-        child_ids = [c["class"] for c in node.get("children", [])]
-        nodes.append((model_id, node, child_ids))
+        child_ids = [model_ids[id(c)] for c in node.get("children", [])]
+        nodes.append((model_ids[id(node)], node, child_ids))
         for child in node.get("children", []):
             flatten(child)
 
@@ -490,10 +577,11 @@ def _emit_multi_model(ir, lines):
             model_id,
             node,
             child_ids,
-            vars_by_model,
+            variables,
             substitutions,
             constraints,
             lines,
+            ref_to_model_id,
             is_root=False,
             cost_ir=None,
         )
@@ -501,10 +589,11 @@ def _emit_multi_model(ir, lines):
         root_entry[0],
         root_entry[1],
         root_entry[2],
-        vars_by_model,
+        variables,
         substitutions,
         constraints,
         lines,
+        ref_to_model_id,
         is_root=True,
         cost_ir=ir.get("cost", {}),
     )
@@ -514,19 +603,23 @@ def _emit_model_section(  # noqa: PLR0913, PLR0917
     model_id,
     node,
     child_ids,
-    vars_by_model,
+    variables,
     substitutions,
     all_constraints,
     lines,
+    ref_to_model_id,
     *,
     is_root,
     cost_ir,
 ):
     """Emit a single [models.X] section."""
     lines.append(f"[models.{model_id}]")
+    name_fn = _make_name_resolver(ref_to_model_id, model_id)
 
-    # Variables (flat format: vars as keys in model section)
-    model_vars = vars_by_model.get(model_id, {})
+    # Variables (flat format: vars as keys in model section). node["variables"]
+    # is this node's own unique_varkeys refs — already scoped to this exact
+    # instance, so distinct instances of the same class never mix vars.
+    model_vars = {ref: variables[ref] for ref in node.get("variables", [])}
     scalar_vars, vector_groups = _group_variables(model_vars)
 
     for ref, info in scalar_vars.items():
@@ -559,7 +652,7 @@ def _emit_model_section(  # noqa: PLR0913, PLR0917
 
     # Objective (root only)
     if is_root and cost_ir:
-        direction, cost_str = _format_objective(cost_ir)
+        direction, cost_str = _format_objective(cost_ir, name_fn)
         lines.append(f'objective = "{direction}: {cost_str}"')
 
     # Submodels
@@ -572,7 +665,7 @@ def _emit_model_section(  # noqa: PLR0913, PLR0917
     if node_constraints:
         lines.append("constraints = [")
         for c in node_constraints:
-            cstr = constraint_to_expr(c)
+            cstr = constraint_to_expr(c, name_fn)
             lines.append(f'  "{cstr}",')
         lines.append("]")
 

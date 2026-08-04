@@ -492,7 +492,13 @@ constraints = ["W >= wing.W_w * 1.2"]
         assert float(sol.cost) == pytest.approx(12.0, rel=1e-3)
 
     def test_ambiguous_bare_name_raises(self):
-        """Bare name that exists in multiple models gives clear error."""
+        """Bare name ambiguous across two other models raises a clear error
+        when referenced from a model that does not declare it itself.
+
+        (A model's own local declaration always resolves a bare reference
+        within its own constraints/objective, even when the same name is
+        also declared elsewhere — see TestNamespaceBehavior.)
+        """
         with pytest.raises(TomlParseError, match="defined in multiple models"):
             load_toml("""
 [models.a]
@@ -501,9 +507,13 @@ constraints = ["W >= 1"]
 
 [models.b]
 W = "-"
-objective = "min: W"
-submodels = ["a"]
 constraints = ["W >= 1"]
+
+[models.c]
+x = "-"
+objective = "min: x"
+submodels = ["a", "b"]
+constraints = ["x >= W"]
 """)
 
     def test_qualified_resolves_ambiguity(self):
@@ -611,7 +621,12 @@ constraints = ["W >= wing.W_w * 1.2"]
         assert float(sol.cost) == pytest.approx(12.0, rel=1e-3)
 
     def test_ambiguous_name_in_constraint_raises(self):
-        """Bare name ambiguous across two models raises with clear message."""
+        """Bare name ambiguous across two other models raises a clear error
+        in the objective of a model that does not declare it itself.
+
+        (A model's own local declaration always shadows the ambiguity
+        within its own constraints/objective — see TestQualifiedAccess.)
+        """
         with pytest.raises(TomlParseError, match="defined in multiple models"):
             load_toml("""
 [models.a]
@@ -620,9 +635,11 @@ constraints = ["x >= 3"]
 
 [models.b]
 x = "-"
+constraints = ["x >= 3"]
+
+[models.c]
 objective = "min: x"
-submodels = ["a"]
-constraints = ["x >= b.x"]
+submodels = ["a", "b"]
 """)
 
     def test_qualified_resolves_same_name_in_two_models(self):
