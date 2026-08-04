@@ -58,7 +58,7 @@ def _get_solver(solver, kwargs):
         optimize = optimize_generator(**kwargs)
     elif solver == "mosek_conif":
         from ..solvers.mosek_conif import optimize  # noqa: PLC0415
-    elif hasattr(solver, "__call__"):
+    elif callable(solver):
         solver, optimize = solver.__name__, solver
     else:
         raise ValueError(f"Unknown solver '{solver}'.")

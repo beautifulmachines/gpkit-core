@@ -57,7 +57,7 @@ class Variable(Monomial):
                 if isinstance(arg, Strings) and "name" not in descr:
                     descr["name"] = arg
                 elif (
-                    isinstance(arg, Numbers) or hasattr(arg, "__call__")
+                    isinstance(arg, Numbers) or callable(arg)
                 ) and "value" not in descr:
                     descr["value"] = arg
                 elif isinstance(arg, Iterable) and not isinstance(arg, Strings):
@@ -165,7 +165,7 @@ class ArrayVariable(NomialArray):
                 isinstance(arg, (Numbers, Iterable))
                 and not isinstance(arg, Strings)
                 and "value" not in descr
-            ) or hasattr(arg, "__call__"):
+            ) or callable(arg):
                 descr["value"] = arg
             elif isinstance(arg, Strings) and "units" not in descr:
                 descr["units"] = arg
@@ -177,7 +177,7 @@ class ArrayVariable(NomialArray):
 
         values = descr.pop("value", None)
         if values is not None:
-            if not hasattr(values, "__call__"):
+            if not callable(values):
                 if Vectorize.vectorization:
                     if not hasattr(values, "shape"):
                         values = np.full(shape, values, np.float64)
@@ -205,7 +205,7 @@ class ArrayVariable(NomialArray):
             it.iternext()
             descr["idx"] = i
             if values is not None:
-                if hasattr(values, "__call__"):  # a vector function
+                if callable(values):  # a vector function
                     descr["value"] = veclinkedfn(values, i)
                 else:
                     descr["value"] = values[i]

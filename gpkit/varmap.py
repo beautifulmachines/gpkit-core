@@ -213,7 +213,7 @@ class VarMap(MutableMapping):
         if is_veckey(key):
             if key not in self._varset._by_vec:
                 raise NotImplementedError
-            if hasattr(value, "__call__"):  # a linked vector-function
+            if callable(value):  # a linked vector-function
                 fn = value
                 value = np.empty(key.shape, dtype="object")
                 it = np.nditer(value, flags=["multi_index", "refs_ok"])
