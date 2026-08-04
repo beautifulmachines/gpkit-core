@@ -20,7 +20,7 @@ from gpkit.constraints.relax import (
     ConstraintsRelaxedEqually,
 )
 from gpkit.constraints.tight import Tight
-from gpkit.exceptions import InvalidGPConstraint, PrimalInfeasible
+from gpkit.exceptions import Infeasible, InvalidGPConstraint, PrimalInfeasible
 from gpkit.nomials import MonomialEquality, PosynomialInequality, SignomialInequality
 from gpkit.nomials.substitution import parse_subs
 from gpkit.units import DimensionalityError
@@ -290,7 +290,7 @@ class TestMonomialEquality:
         d1 = Variable("d1", 2)
         d2 = Variable("d2", 3)
         m = Model(y, [x == d1, x == d2, y >= x])
-        with pytest.raises(Exception):
+        with pytest.raises(Infeasible):
             m.solve(verbosity=0)
 
     def test_duplicate_constraint_detection(self):

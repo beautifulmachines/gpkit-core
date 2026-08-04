@@ -251,7 +251,9 @@ class Sankey:
         culldepth = max(node.count(".") for node in self.nodes) - 1
         mindepth = 1 if not top_node else top_node.count(".") + 1
         while len(links) > self.maxlinks and culldepth > mindepth:
-            self.filter(links, lambda s, _t, _v: culldepth > s.count("."))
+            # filter() calls this synchronously, so culldepth is read at its
+            # current value each iteration -- no late-binding closure issue.
+            self.filter(links, lambda s, _t, _v: culldepth > s.count("."))  # noqa: B023
             culldepth -= 1
         # ...is a constraint and we still have too many links
         self.filter(links, lambda s, _t, _v: "constraint" not in self.nodes[s])

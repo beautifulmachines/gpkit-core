@@ -144,7 +144,7 @@ class MosekCLI(SolverBackend):
         try:
             if call("mskexpopt") in (1052, 28):  # 28 for MacOSX
                 return where
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001, S110
             pass  # exception type varies by operating system
         return None
 
