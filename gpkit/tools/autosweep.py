@@ -268,7 +268,7 @@ def autosweep_1d(model, logtol, sweepvar, bounds, **solvekwargs):
     return bst
 
 
-def recurse_splits(model, bst, variable, logtol, solvekwargs, sols):  # noqa: PLR0913
+def recurse_splits(model, bst, variable, logtol, solvekwargs, sols):  # noqa: PLR0913, PLR0917
     "Recursively splits a BST until logtol is reached"
     x, lb, ub = get_tol(bst.costs, bst.bounds, bst.sols, variable)
     tol = (ub - lb) / 2.0

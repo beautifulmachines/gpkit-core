@@ -1,6 +1,7 @@
 """Tests for gpkit/report.py: ReportSection IR, build_report_ir(), model.report()"""
 
 import json
+from typing import ClassVar
 
 import pytest
 
@@ -775,8 +776,8 @@ class TestModelDescription:
         class _DescAttrs(Model):
             """Aerodynamics model."""
 
-            assumptions = ["incompressible flow", "steady state"]
-            references = ["Anderson 2001"]
+            assumptions: ClassVar = ["incompressible flow", "steady state"]
+            references: ClassVar = ["Anderson 2001"]
 
             def setup(self):
                 x = Variable("x_desc_attrs")

@@ -10,6 +10,7 @@ https://people.eecs.berkeley.edu/~pabbeel/papers/2013_Hoburg-phdthesis.pdf
 """
 
 import math
+from typing import ClassVar
 
 from gpkit import Model, Var, Variable, pi, units
 
@@ -354,7 +355,7 @@ class UAV(Model):
     Submodels are accessed via attributes (aircraft.wing, mission.outbound_leg).
     """
 
-    references = [
+    references: ClassVar = [
         'W. Hoburg, "Geometric Programming for Aircraft Design Optimization,"'
         " PhD thesis, MIT/UC Berkeley, 2013."
         " https://people.eecs.berkeley.edu/~pabbeel/papers/2013_Hoburg-phdthesis.pdf"

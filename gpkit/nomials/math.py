@@ -1,6 +1,7 @@
 """Signomial, Posynomial, and Monomial classes"""
 
 from collections import defaultdict
+from typing import ClassVar
 
 import numpy as np
 
@@ -391,7 +392,8 @@ class ScalarSingleEquationConstraint(SingleEquationConstraint):
     "A SingleEquationConstraint with scalar left and right sides."
 
     generated_by = v_ss = parent = None
-    bounded = meq_bounded = {}
+    bounded: ClassVar = {}
+    meq_bounded: ClassVar = {}
 
     def __init__(self, left, oper, right):
         lr = [left, right]

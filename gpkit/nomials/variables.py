@@ -148,7 +148,7 @@ class ArrayVariable(NomialArray):
     where $name is the vector's name and i is the VarKey's index.
     """
 
-    def __new__(cls, shape, *args, **descr):  # noqa: PLR0912, PLR0915
+    def __new__(cls, shape, *args, **descr):  # noqa: PLR0912
         if "idx" in descr:
             raise ValueError("the description field 'idx' is reserved")
 
@@ -165,9 +165,7 @@ class ArrayVariable(NomialArray):
                 isinstance(arg, (Numbers, Iterable))
                 and not isinstance(arg, Strings)
                 and "value" not in descr
-            ):
-                descr["value"] = arg
-            elif hasattr(arg, "__call__"):
+            ) or hasattr(arg, "__call__"):
                 descr["value"] = arg
             elif isinstance(arg, Strings) and "units" not in descr:
                 descr["units"] = arg

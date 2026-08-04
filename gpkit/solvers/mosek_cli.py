@@ -158,8 +158,7 @@ def write_output_file(filename, c, A, p_idxs):
     with open(filename, "w", encoding="utf-8") as f:
         numcon = p_idxs[-1]
         numter, numvar = map(int, A.shape)
-        for n in [numcon, numvar, numter]:
-            f.write(f"{n}\n")
+        f.writelines(f"{n}\n" for n in [numcon, numvar, numter])
 
         f.write("\n*c\n")
         f.writelines([f"{x:.20e}\n" for x in c])

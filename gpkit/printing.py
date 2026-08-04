@@ -1,8 +1,9 @@
 "printing functionality for gpkit objects"
 
 from collections import Counter, defaultdict
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, replace
-from typing import Any, Callable, Iterable, List, Sequence, Tuple
+from typing import Any
 
 import numpy as np
 
@@ -85,7 +86,7 @@ class SectionSpec:
                 return self.__class__(options=newopt)
         return self
 
-    def format(self, ctx) -> List[str]:
+    def format(self, ctx) -> list[str]:
         "Output this section's lines given a solution or solution context"
         items = [item for item in self.items_from(ctx) if self._passes_filter(item)]
         if self.group_by_model:
@@ -736,7 +737,7 @@ class DiffContext:
 
 def table(
     obj: Any,  # Solution or SolutionSequence
-    tables: Tuple[str, ...] = (
+    tables: tuple[str, ...] = (
         "sweeps",
         "cost",
         "warnings",

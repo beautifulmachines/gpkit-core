@@ -214,8 +214,9 @@ def build():
     envpath = "env"
     replacedir(envpath)
     with open(pathjoin(envpath, "settings"), "w", encoding="utf-8") as f:
-        for setting, value in sorted(settings.items()):
-            f.write(f"{setting} : {value}\n")
+        f.writelines(
+            f"{setting} : {value}\n" for setting, value in sorted(settings.items())
+        )
     with open(pathjoin(envpath, "build.log"), "w", encoding="utf-8") as f:
         f.write(LOGSTR)
 

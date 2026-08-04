@@ -243,7 +243,7 @@ def get_fixity(basically_fixed, key, bd, solution, visited=set()):
 
 
 # @profile  # ~84% of total last check # TODO: remove
-def crawl(  # noqa: PLR0912, PLR0913, PLR0915
+def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
     basically_fixed_variables,
     key,
     bd,
@@ -543,7 +543,7 @@ def get_spanstr(legend, length, label, leftwards, solution):  # noqa: ARG001
         return "┃" * (longside + 1) + shortname + "┃" * (shortside + 1)
 
 
-def discretize(tree, extent, solution, collapse, depth=0, justsplit=False):  # noqa: PLR0912, PLR0913, PLR0915
+def discretize(tree, extent, solution, collapse, depth=0, justsplit=False):  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
     # TODO: add vertical simplification?
     key, val, branches = tree
     if collapse:  # collapse Transforms with power 1
@@ -725,7 +725,7 @@ def prune(tree, solution, maxlength, length=-1, prefix=""):
     )
 
 
-def simplify(tree, solution, extent, maxdepth, maxlength, collapse):  # noqa: PLR0913
+def simplify(tree, solution, extent, maxdepth, maxlength, collapse):  # noqa: PLR0913, PLR0917
     "Discretize, prune, and layer a tree to prepare for printing"
     subtree = discretize(tree, extent, solution, collapse)
     if collapse and maxlength:
@@ -956,7 +956,7 @@ def get_valstr(key, solution, into="%s"):
     return into % (valuestr + unitstr)
 
 
-class Breakdowns(object):
+class Breakdowns:
     def __init__(self, sol):
         self.sol = sol
         self.lineage_map = get_lineage_map(sol)
@@ -978,7 +978,7 @@ class Breakdowns(object):
         self.bd = get_breakdowns(self.basically_fixed_variables, self.sol)
 
     def trace(self, key, *, permissivity=2):
-        print("")  # a little padding to start
+        print()  # a little padding to start
         with lineage_display_context(self.lineage_map):
             self.get_tree(key, permissivity=permissivity, verbosity=1)
 

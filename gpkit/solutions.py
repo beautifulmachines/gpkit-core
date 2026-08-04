@@ -3,8 +3,8 @@
 import json
 import pickle
 import weakref
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import List, Sequence
 
 from . import printing
 from .breakdowns import bdtable_gen
@@ -281,7 +281,7 @@ class Solution:
         return bdtable_gen("model sensitivities")(self, set())
 
 
-class SolutionSequence(List[Solution]):
+class SolutionSequence(list[Solution]):
     """
     Ordered collection of Solution objects all sharing same underlying model.
     """

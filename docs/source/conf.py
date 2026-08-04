@@ -1,5 +1,4 @@
 # pylint: skip-file
-# -*- coding: utf-8 -*-
 #
 # gpkit documentation build configuration file, created by
 # sphinx-quickstart on Sun Oct 12 03:05:35 2014.

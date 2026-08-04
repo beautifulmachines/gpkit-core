@@ -510,7 +510,7 @@ def _emit_multi_model(ir, lines):
     )
 
 
-def _emit_model_section(  # noqa: PLR0913
+def _emit_model_section(  # noqa: PLR0913, PLR0917
     model_id,
     node,
     child_ids,

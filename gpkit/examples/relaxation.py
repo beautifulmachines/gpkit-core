@@ -15,7 +15,7 @@ m = Model(x, [x <= x_max, x >= x_min])
 print("Original model")
 print("==============")
 print(m)
-print("")
+print()
 # m.solve()  # raises a RuntimeWarning!
 
 print("With constraints relaxed equally")
@@ -28,7 +28,7 @@ print(mr1)
 print(mr1.solve(verbosity=0).table())  # solves with an x of 1.414
 
 Breakdowns(mr1.solution).trace("cost")
-print("")
+print()
 
 print("With constraints relaxed individually")
 print("=====================================")
@@ -42,7 +42,7 @@ mr2 = Model(
 )
 print(mr2)
 print(mr2.solve(verbosity=0).table())  # solves with an x of 1.0
-print("")
+print()
 
 print("With constants relaxed individually")
 print("===================================")
@@ -56,4 +56,4 @@ mr3 = Model(
 )
 print(mr3)
 print(mr3.solve(verbosity=0).table())  # brings x_min down to 1.0
-print("")
+print()

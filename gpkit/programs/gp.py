@@ -3,9 +3,9 @@
 import sys
 import warnings as pywarnings
 from collections import defaultdict
+from collections.abc import Sequence
 from dataclasses import dataclass
 from time import time
-from typing import Sequence
 
 import numpy as np
 
