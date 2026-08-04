@@ -185,14 +185,16 @@ class Model(CostedConstraintSet):
             yield from child.walk()
 
     def _check_lineage_collisions(self):
-        """Raise if two distinct descendant Model instances share a lineage.
+        """Raise if two distinct descendant Models share a lineage.
 
-        Two separately built instances of the same class get the same
-        lineage (root-build numbering resets per build, not per process). If
-        both end up in one tree, their VarKeys collide by ref, and merging
-        them would silently mix one instance's variables and substitutions
-        into the other's.
+        Two separately built instances of the same class get identical
+        lineages (numbering resets per root build, not per process);
+        composing both into one tree would silently merge their variables
+        and substitutions. Skips if nested -- the outermost call's walk
+        already covers this subtree.
         """
+        if NamedVariables.lineage:
+            return
         seen = {}
         for descendant in self.walk():
             lineage = getattr(descendant, "lineage", None)
