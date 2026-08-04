@@ -50,7 +50,7 @@ def is_power(key):
 
 def get_free_vks(posy, solution):
     "Returns all free vks of a given posynomial for a given solution"
-    return set(vk for vk in posy.vks if vk not in solution.constants)
+    return {vk for vk in posy.vks if vk not in solution.constants}
 
 
 def get_model_breakdown(solution):
@@ -395,7 +395,7 @@ def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
             )  # ~5% of total last check # TODO: remove
             # TODO: changing to str(vk) above does some odd stuff, why?
             if best_vks:
-                interesting_vks = set([best_vks[0]])
+                interesting_vks = {best_vks[0]}
         boring_vks = mon.vks - interesting_vks
 
         subkey = None

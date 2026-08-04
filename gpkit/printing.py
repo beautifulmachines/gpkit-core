@@ -79,7 +79,7 @@ class SectionSpec:
     def _auto_vecwidth_rowspec(self, items):
         "Return a copy of this with vec_width set automatically for items"
         if self.align_vecs and self.options.vec_width is None:
-            lengths = set(np.shape(v) for _, v in items if np.shape(v))
+            lengths = {np.shape(v) for _, v in items if np.shape(v)}
             if len(lengths) == 1:
                 width = self._max_val_width(items)
                 newopt = replace(self.options, vec_width=width)
@@ -793,7 +793,7 @@ def _format_aligned_columns(
     """
     if not rows:
         return []
-    (ncols,) = set(len(r) for r in rows) or (0,)
+    (ncols,) = {len(r) for r in rows} or (0,)
     if col_alignments is None:
         col_alignments = "<" * ncols
     assert len(col_alignments) == ncols

@@ -476,7 +476,7 @@ class GeometricProgram:
             m_senss[lineagestr(c)] += abs(c_senss)
 
         # Handle linked sensitivities
-        for v in list(v for v in gpv_ss if self.linked_derivs.get(v)):
+        for v in [v for v in gpv_ss if self.linked_derivs.get(v)]:
             dlogcost_dlogv = gpv_ss.pop(v)
             dlogcost_dlogabsv = absv_ss.pop(v)
             val = np.array(self.substitutions[v])
@@ -575,7 +575,7 @@ class GeometricProgram:
         Pops each intermediate VarKey that has linked derivatives and
         accumulates its sensitivity into the base constants.
         """
-        for v in list(v for v in sens_dict if self.linked_derivs.get(v)):
+        for v in [v for v in sens_dict if self.linked_derivs.get(v)]:
             dsens_dlogv = sens_dict.pop(v)
             val = np.array(self.substitutions[v])
             for c, dv_dc in self.linked_derivs[v].items():

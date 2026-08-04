@@ -728,7 +728,7 @@ class TestSP:
         m = Model(x * y, Bounded(m, lower=0.001))
         sol = m.solve(solver, verbosity=0)
         bounds = sol.meta["boundedness"]
-        assert bounds["sensitive to lower bound of 0.001"] == set([x.key])
+        assert bounds["sensitive to lower bound of 0.001"] == {x.key}
         # end test one-sided bound
         m = Model(x * y, [x * y**1.01 >= 100])
         m = Model(x * y, Bounded(m))

@@ -169,7 +169,7 @@ class Sankey:
         showconstraints=True,
     ):
         "creates links and an ipython widget to show them"
-        margins = dict(top=top, bottom=bottom, left=left, right=right)
+        margins = {"top": top, "bottom": bottom, "left": left, "right": right}
         self.minsenss = minsenss
         self.maxlinks = maxlinks
         self.showconstraints = showconstraints

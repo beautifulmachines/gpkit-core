@@ -390,7 +390,7 @@ class TestPosynomial:
         m, g, h, v = (VarKey(s) for s in ("m", "g", "h", "v"))
         assert all(isinstance(x, float) for x in p.cs)
         assert len(p.exps) == 2
-        assert set(p.vks) == set([m, g, h, v])
+        assert set(p.vks) == {m, g, h, v}
 
     def test_eq(self):
         """Test Posynomial __eq__"""

@@ -224,7 +224,7 @@ class TestVarMap:
         x = Variable("x", lineage=(("test", 0),))
         vm[x] = 1
         assert x in vm
-        assert set(vm) == set([x.key])
+        assert set(vm) == {x.key}
 
 
 class TestRefLookup:
