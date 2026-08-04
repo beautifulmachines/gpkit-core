@@ -6,8 +6,10 @@ import sys
 import threading
 import time
 
+import pytest
+
 import gpkit.util.globals as globals_module
-from gpkit import NamedVariables, SignomialsEnabled, Variable, Vectorize
+from gpkit import Model, NamedVariables, SignomialsEnabled, Variable, Vectorize
 from gpkit.examples import uav
 from gpkit.nomials.math import SignomialInequality
 from gpkit.util.globals import load_settings
@@ -191,3 +193,26 @@ def test_settings_lazy_load_is_thread_safe(monkeypatch):
 
     run_threads(access, count=8)
     assert len(call_count) == 1, f"load_settings called {len(call_count)} times"
+
+
+class Box(Model):
+    "A minimal model, used to check root-build numbering behavior."
+
+    def setup(self):
+        x = Variable("x", "m")
+        x_min = Variable("x_min", 1, "m")
+        self.cost = x
+        return [x >= x_min]
+
+
+def test_root_build_determinism():
+    "Two independent builds of the same class produce identical IR."
+    m1, m2 = Box(), Box()
+    assert m1.to_ir() == m2.to_ir()
+
+
+def test_composed_lineage_collision_raises():
+    "Composing two distinct, separately-built same-class instances errors."
+    b1, b2 = Box(), Box()
+    with pytest.raises(ValueError):
+        Model(b1.cost, [b1, b2])
