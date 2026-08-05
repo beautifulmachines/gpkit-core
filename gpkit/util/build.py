@@ -220,8 +220,10 @@ def build():
     envpath = "env"
     replacedir(envpath)
     with open(pathjoin(envpath, "settings.toml"), "w", encoding="utf-8") as f:
-        for setting, value in sorted(settings.items()):
-            f.write(f"{setting} = {json.dumps(value)}\n")
+        f.writelines(
+            f"{setting} = {json.dumps(value)}\n"
+            for setting, value in sorted(settings.items())
+        )
     with open(pathjoin(envpath, "build.log"), "w", encoding="utf-8") as f:
         f.write(LOGSTR)
 
