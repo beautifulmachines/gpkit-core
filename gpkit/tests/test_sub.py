@@ -320,15 +320,20 @@ class TestModelSubs:
         if not isinstance(a1.x.key.units, str):
             assert round(sol.cost - cm / ft, 5) == 0
         a1, b1 = Above(), Below()
-        assert a1.x.key.lineage == (("Above", 1),)
+        # A second, independent root build of Above -- never composed with
+        # the first (its `m` is discarded before this point) -- so it also
+        # gets num 0: root-build numbering resets per build, not per thread.
+        assert a1.x.key.lineage == (("Above", 0),)
         m = Model(b1.x, [a1, b1, b1.x == a1.x])
         sol = m.solve(verbosity=0)
         if not isinstance(b1.x.key.units, str):
             assert round(sol.cost - cm / meter, 5) == 0
         assert a1.x in sol.primal
         assert b1.x in sol.primal
-        assert a.x not in sol.primal
-        assert b.x not in sol.primal
+        # a/b and a1/b1 are independent, never-composed builds of the same
+        # classes, so they share the same VarKeys (both numbered 0).
+        assert a.x in sol.primal
+        assert b.x in sol.primal
 
     def test_getkey(self):
         class Top(Model):

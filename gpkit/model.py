@@ -147,6 +147,7 @@ class Model(CostedConstraintSet):
             self.cgroups = None
             _scan_for_children(constraints or [])
 
+        self._check_lineage_collisions()
         cost = cost or Monomial(1)
         constraints = constraints or []
         if setup_vars:
@@ -182,6 +183,33 @@ class Model(CostedConstraintSet):
         for child in self._children:
             yield child
             yield from child.walk()
+
+    def _check_lineage_collisions(self):
+        """Raise if two distinct descendant Models share a lineage.
+
+        Two separately built instances of the same class get identical
+        lineages (numbering resets per root build, not per process);
+        composing both into one tree would silently merge their variables
+        and substitutions. Skips if nested -- the outermost call's walk
+        already covers this subtree.
+        """
+        if NamedVariables.lineage:
+            return
+        seen = {}
+        for descendant in self.walk():
+            lineage = getattr(descendant, "lineage", None)
+            if not lineage:
+                continue
+            prior = seen.get(lineage)
+            if prior is not None and prior is not descendant:
+                raise ValueError(
+                    f"{type(prior).__name__} and {type(descendant).__name__} "
+                    f"are distinct instances with the same lineage {lineage!r}. "
+                    "Build differing instances as siblings inside one parent's "
+                    "setup() instead, e.g. self.left = Wing(...); "
+                    "self.right = Wing(...)."
+                )
+            seen[lineage] = descendant
 
     @classmethod
     def description(cls):

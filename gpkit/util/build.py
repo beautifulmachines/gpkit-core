@@ -1,5 +1,6 @@
 "Finds solvers, sets gpkit settings, and builds gpkit"
 
+import json
 import os
 import shutil
 import subprocess
@@ -12,9 +13,11 @@ settings = {}
 
 
 def log(*args):
-    "Print a line and append it to the log string."
+    "Print a line to stderr and append it to the log string."
     global LOGSTR  # noqa: PLW0603
-    print(*args)
+    # stderr so that an auto-build triggered inside a stdout capture (e.g.
+    # example output regeneration) doesn't pollute the captured stdout.
+    print(*args, file=sys.stderr)
     LOGSTR += " ".join(args) + "\n"
 
 
@@ -207,17 +210,19 @@ def build():
             f"Replaced found solvers ({installed_solvers}) with environment "
             f"var GPKITSOLVERS ({os.environ['GPKITSOLVERS']})"
         )
-        settings["installed_solvers"] = os.environ["GPKITSOLVERS"]
+        gpkitsolvers = os.environ["GPKITSOLVERS"]
+        settings["installed_solvers"] = gpkitsolvers.split(", ") if gpkitsolvers else []
     else:
-        settings["installed_solvers"] = ", ".join(installed_solvers)
-    log("\nFound the following solvers: " + settings["installed_solvers"])
+        settings["installed_solvers"] = installed_solvers
+    log("\nFound the following solvers: " + ", ".join(settings["installed_solvers"]))
 
-    # Write settings
+    # Write settings (JSON-encoded values are valid TOML for strings/arrays)
     envpath = "env"
     replacedir(envpath)
-    with open(pathjoin(envpath, "settings"), "w", encoding="utf-8") as f:
+    with open(pathjoin(envpath, "settings.toml"), "w", encoding="utf-8") as f:
         f.writelines(
-            f"{setting} : {value}\n" for setting, value in sorted(settings.items())
+            f"{setting} = {json.dumps(value)}\n"
+            for setting, value in sorted(settings.items())
         )
     with open(pathjoin(envpath, "build.log"), "w", encoding="utf-8") as f:
         f.write(LOGSTR)
