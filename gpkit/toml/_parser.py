@@ -452,8 +452,14 @@ def _build_multi_model(models_section, dimension_overrides=None):
     for model_id in ordered_ids:
         model_def = models_section[model_id]
 
-        # Model-specific namespace: inject submodels namespace if applicable
+        # Model-specific namespace: a name declared in this model's own
+        # [vars] is never ambiguous within its own constraints, even if the
+        # same bare name is *also* declared by an unrelated model elsewhere
+        # in the file (e.g. "W" in Wing, Engine, and each AircraftPerf
+        # instance) — local declarations take priority over the merged/
+        # ambiguous namespace, then submodels.
         constraint_ns = dict(namespace)
+        constraint_ns.update(per_model_vars[model_id])
         sub_ids = model_def.get("submodels", [])
         if sub_ids:
             constraint_ns["submodels"] = _build_submodels_namespace(
@@ -479,6 +485,7 @@ def _build_multi_model(models_section, dimension_overrides=None):
     # Parse objective with root's namespace (including its submodels namespace)
     root_def = models_section[root_id]
     objective_ns = dict(namespace)
+    objective_ns.update(per_model_vars[root_id])
     root_sub_ids = root_def.get("submodels", [])
     if root_sub_ids:
         objective_ns["submodels"] = _build_submodels_namespace(
