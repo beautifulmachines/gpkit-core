@@ -451,6 +451,147 @@ def _render_ast_node_latex(node, excluded):
     return renderer(node.children, excluded)
 
 
+# ── TOML/Python-expression AST renderers ────────────────────────────────────
+# name_fn : ref string -> display name (bare or qualified). See
+# gpkit.toml._printer.ast_to_expr for the default and multi-model resolver.
+
+
+def _toml_format_number(v):
+    "Format a number for TOML expression output."
+    if isinstance(v, int):
+        return str(v)
+    if isinstance(v, float) and v == int(v) and abs(v) < 1e15:
+        return str(int(v))
+    return f"{v:.4g}"
+
+
+def _toml_format_slice(s):
+    "Format a slice object as a string."
+    start = s.start if s.start is not None else ""
+    stop = s.stop if s.stop is not None and s.stop < sys.maxsize else ""
+    step = f":{s.step}" if s.step is not None else ""
+    return f"{start}:{stop}{step}"
+
+
+def _toml_format_index(idx):
+    "Format an index/slice for display."
+    if isinstance(idx, slice):
+        return _toml_format_slice(idx)
+    if isinstance(idx, tuple):
+        return ",".join(
+            _toml_format_slice(el) if isinstance(el, slice) else str(el) for el in idx
+        )
+    return str(idx)
+
+
+def _toml_parenthesize(s, *, for_add=True, for_mul=True):
+    "Wrap s in parens if it contains bare (un-parenthesized) operators."
+    depth = 0
+    bare = []
+    for ch in s:
+        if ch == "(":
+            depth += 1
+        elif ch == ")":
+            depth -= 1
+        elif depth == 0:
+            bare.append(ch)
+    bare_str = "".join(bare)
+    has_add = " + " in bare_str or " - " in bare_str
+    has_mul = "*" in bare_str or "/" in bare_str
+    if (for_add and has_add) or (for_mul and has_mul):
+        return f"({s})"
+    return s
+
+
+def _toml_strify(val, name_fn):
+    "Render an AST child as TOML/Python expression syntax (parallel to _latex_strify)."
+    if hasattr(val, "to_toml_expr"):
+        return val.to_toml_expr(name_fn)
+    if isinstance(val, Numbers):
+        return _toml_format_number(val)
+    return str(val)
+
+
+def _toml_render_add(children, name_fn):
+    left = _toml_strify(children[0], name_fn)
+    right = _toml_strify(children[1], name_fn)
+    if right.startswith("-"):
+        return f"{left} - {right[1:]}"
+    return f"{left} + {right}"
+
+
+def _toml_render_mul(children, name_fn):
+    left = _toml_parenthesize(_toml_strify(children[0], name_fn), for_mul=False)
+    right = _toml_parenthesize(_toml_strify(children[1], name_fn), for_mul=False)
+    if left == "1":
+        return right
+    if right == "1":
+        return left
+    return f"{left}*{right}"
+
+
+def _toml_render_div(children, name_fn):
+    left = _toml_parenthesize(_toml_strify(children[0], name_fn), for_mul=False)
+    right = _toml_parenthesize(_toml_strify(children[1], name_fn))
+    if right == "1":
+        return left
+    return f"{left}/{right}"
+
+
+def _toml_render_pow(children, name_fn):
+    left = _toml_parenthesize(_toml_strify(children[0], name_fn))
+    exp = children[1]
+    exp_str = (
+        exp.to_toml_expr(name_fn)
+        if hasattr(exp, "to_toml_expr")
+        else _toml_format_number(exp)
+    )
+    if left == "1":
+        return "1"
+    return f"{left}**{exp_str}"
+
+
+def _toml_render_neg(children, name_fn):
+    val = _toml_parenthesize(_toml_strify(children[0], name_fn), for_mul=False)
+    return f"-{val}"
+
+
+def _toml_render_sum(children, name_fn):
+    val = _toml_parenthesize(_toml_strify(children[0], name_fn))
+    return f"sum({val})"
+
+
+def _toml_render_prod(children, name_fn):
+    val = _toml_parenthesize(_toml_strify(children[0], name_fn))
+    return f"prod({val})"
+
+
+def _toml_render_index(children, name_fn):
+    left = _toml_strify(children[0], name_fn)
+    idx_str = _toml_format_index(children[1])
+    return f"{left}[{idx_str}]"
+
+
+_TOML_AST_RENDERERS = {
+    "add": _toml_render_add,
+    "mul": _toml_render_mul,
+    "div": _toml_render_div,
+    "pow": _toml_render_pow,
+    "neg": _toml_render_neg,
+    "sum": _toml_render_sum,
+    "prod": _toml_render_prod,
+    "index": _toml_render_index,
+}
+
+
+def _render_ast_node_toml(node, name_fn):
+    "Renders an ExprNode as TOML/Python expression syntax. Called by ExprNode.to_toml_expr()."
+    renderer = _TOML_AST_RENDERERS.get(node.op)
+    if renderer is None:
+        raise ValueError(f"Unknown AST op: {node.op}")
+    return renderer(node.children, name_fn)
+
+
 class ReprMixin:
     "This class combines various printing methods for easier adoption."
 
