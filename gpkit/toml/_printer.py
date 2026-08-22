@@ -1,10 +1,10 @@
 "Generate TOML model specs from gpkit Models or IR dicts."
 
 import re
-import sys
 import types
 
-from ..ast_nodes import ASTNode, ConstNode, ExprNode, UnitsNode, VarNode, ast_from_ir
+from ..ast_nodes import ast_from_ir
+from ..util.repr_conventions import _toml_format_number as _format_number
 
 # ---------------------------------------------------------------------------
 # Ref string → Python variable name
@@ -33,79 +33,6 @@ def _ref_to_name(ref):
 # ---------------------------------------------------------------------------
 
 
-def _parenthesize(s, *, for_add=True, for_mul=True):
-    """Wrap s in parens if it contains bare (un-parenthesized) operators."""
-    depth = 0
-    bare = []
-    for ch in s:
-        if ch == "(":
-            depth += 1
-        elif ch == ")":
-            depth -= 1
-        elif depth == 0:
-            bare.append(ch)
-    bare_str = "".join(bare)
-    has_add = " + " in bare_str or " - " in bare_str
-    has_mul = "*" in bare_str or "/" in bare_str
-    if (for_add and has_add) or (for_mul and has_mul):
-        return f"({s})"
-    return s
-
-
-def _format_number(v):
-    """Format a number for TOML expression output."""
-    if isinstance(v, int):
-        return str(v)
-    if isinstance(v, float) and v == int(v) and abs(v) < 1e15:
-        return str(int(v))
-    return f"{v:.4g}"
-
-
-def _render_var_node(node, name_fn):
-    return name_fn(node.ref)
-
-
-def _render_const_node(node, _name_fn):
-    return _format_number(node.value)
-
-
-def _render_units_node(node, _name_fn):
-    """UnitsNode is a magnitude-1 units-only leaf (e.g. `1 * units("W")`,
-    used to non-dimensionalize before a fractional power). It must
-    round-trip as a real unit literal, not be dropped: the units it carries
-    can differ in scale from a neighboring variable's declared units (e.g.
-    dividing a kW variable by a bare 1 W constant folds in a real x1000
-    conversion factor), so collapsing it to "1" would silently change the
-    model's solved values on reload, not just its cosmetic unit display.
-    """
-    # Compact ("~C") form avoids embedded spaces inside the quoted TOML
-    # string (pint's default "~" adds them, e.g. "N / m ** 2") and stays
-    # consistent with this printer's own bare "**" for pow (no spaces).
-    # Single-quoted: constraint/objective lines are themselves wrapped in
-    # double quotes for the TOML string, and this printer does not escape
-    # embedded characters, so a double-quoted literal here would corrupt
-    # the surrounding TOML string.
-    unit_str = f"{node.units.units:~C}"
-    return f"units('{unit_str}')"
-
-
-def _render_expr_node(node, name_fn):
-    return _render_op(node.op, node.children, name_fn)
-
-
-# One entry per ASTNode subtype (gpkit/ast_nodes.py). isinstance-ordered so
-# PiNode (a ConstNode subclass) still matches the ConstNode entry. Adding a
-# new ASTNode subtype means adding one row here — the previous isinstance
-# chain let a new node type (UnitsNode) go unhandled and crash to_toml()
-# instead of failing loudly at review time (see issue #218).
-_AST_RENDERERS = (
-    (VarNode, _render_var_node),
-    (ConstNode, _render_const_node),
-    (UnitsNode, _render_units_node),
-    (ExprNode, _render_expr_node),
-)
-
-
 def ast_to_expr(node, name_fn=_ref_to_name):
     """Convert a gpkit AST node to a plain expression string.
 
@@ -113,6 +40,9 @@ def ast_to_expr(node, name_fn=_ref_to_name):
     IR dicts (from to_ir() JSON), or raw numbers.
 
     Produces TOML-compatible syntax: ``*`` for multiply, ``**`` for power.
+    Dispatch lives on the AST node classes themselves (ASTNode.to_toml_expr,
+    gpkit/ast_nodes.py) — this just normalizes non-node inputs (raw numbers,
+    IR dicts) before delegating.
 
     name_fn : ref -> str, default _ref_to_name (bare name, no qualification).
     Multi-model emission passes a resolver that qualifies a VarNode as
@@ -130,9 +60,8 @@ def ast_to_expr(node, name_fn=_ref_to_name):
     if isinstance(node, dict):
         node = ast_from_ir(node, _RefNameRegistry())
 
-    for node_type, render in _AST_RENDERERS:
-        if isinstance(node, node_type):
-            return render(node, name_fn)
+    if hasattr(node, "to_toml_expr"):
+        return node.to_toml_expr(name_fn)
 
     # Numpy scalars etc.
     if hasattr(node, "__float__"):
@@ -152,82 +81,6 @@ class _RefNameRegistry(dict):
         stub = types.SimpleNamespace(ref=ref)
         self[ref] = stub
         return stub
-
-
-def _render_op(op, children, name_fn):  # noqa: PLR0911, PLR0912
-    """Render an AST operation to a plain expression string."""
-    if op == "add":
-        left = ast_to_expr(children[0], name_fn)
-        right = ast_to_expr(children[1], name_fn)
-        if right.startswith("-"):
-            return f"{left} - {right[1:]}"
-        return f"{left} + {right}"
-
-    if op == "mul":
-        left = _parenthesize(ast_to_expr(children[0], name_fn), for_mul=False)
-        right = _parenthesize(ast_to_expr(children[1], name_fn), for_mul=False)
-        if left == "1":
-            return right
-        if right == "1":
-            return left
-        return f"{left}*{right}"
-
-    if op == "div":
-        left = _parenthesize(ast_to_expr(children[0], name_fn), for_mul=False)
-        right = _parenthesize(ast_to_expr(children[1], name_fn))
-        if right == "1":
-            return left
-        return f"{left}/{right}"
-
-    if op == "pow":
-        left = _parenthesize(ast_to_expr(children[0], name_fn))
-        exp = children[1]
-        exp_str = (
-            ast_to_expr(exp, name_fn)
-            if isinstance(exp, ASTNode)
-            else _format_number(exp)
-        )
-        if left == "1":
-            return "1"
-        return f"{left}**{exp_str}"
-
-    if op == "neg":
-        val = _parenthesize(ast_to_expr(children[0], name_fn), for_mul=False)
-        return f"-{val}"
-
-    if op == "sum":
-        val = _parenthesize(ast_to_expr(children[0], name_fn))
-        return f"sum({val})"
-
-    if op == "prod":
-        val = _parenthesize(ast_to_expr(children[0], name_fn))
-        return f"prod({val})"
-
-    if op == "index":
-        left = ast_to_expr(children[0], name_fn)
-        idx_str = _format_index(children[1])
-        return f"{left}[{idx_str}]"
-
-    raise ValueError(f"Unknown AST op: {op}")
-
-
-def _format_index(idx):
-    """Format an index/slice for display."""
-    if isinstance(idx, slice):
-        return _format_slice(idx)
-    if isinstance(idx, tuple):
-        return ",".join(
-            _format_slice(el) if isinstance(el, slice) else str(el) for el in idx
-        )
-    return str(idx)
-
-
-def _format_slice(s):
-    """Format a slice object as a string."""
-    start = s.start if s.start is not None else ""
-    stop = s.stop if s.stop is not None and s.stop < sys.maxsize else ""
-    step = f":{s.step}" if s.step is not None else ""
-    return f"{start}:{stop}{step}"
 
 
 # ---------------------------------------------------------------------------

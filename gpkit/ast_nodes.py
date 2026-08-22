@@ -13,6 +13,8 @@ from .util.repr_conventions import (
     PI_STR,
     _render_ast_node,
     _render_ast_node_latex,
+    _render_ast_node_toml,
+    _toml_format_number,
     latex_unitstr,
     unitstr,
 )
@@ -52,6 +54,10 @@ class VarNode(ASTNode):
         "Render this variable node as a LaTeX string."
         return self.varkey.latex(excluded)
 
+    def to_toml_expr(self, name_fn):
+        "Render this variable node as TOML/Python expression syntax."
+        return name_fn(self.ref)
+
     def to_ir(self):
         return {"node": "var", "ref": self.ref}
 
@@ -68,6 +74,10 @@ class ConstNode(ASTNode):
     def latex(self, _excluded=()):
         "Render this constant as a LaTeX string."
         return f"{self.value:.4g}"
+
+    def to_toml_expr(self, _name_fn):
+        "Render this constant as TOML/Python expression syntax."
+        return _toml_format_number(self.value)
 
     def to_ir(self):
         return {"node": "const", "value": self.value}
@@ -118,6 +128,21 @@ class UnitsNode(ASTNode):
             return ""
         return latex_unitstr(self.units).lstrip("~")
 
+    def to_toml_expr(self, _name_fn):
+        """Render this units node as TOML/Python expression syntax.
+
+        Must round-trip as a real unit literal, not be dropped: the units
+        it carries can differ in scale from a neighboring variable's
+        declared units (e.g. dividing a kW variable by a bare 1 W constant
+        folds in a real x1000 conversion factor), so collapsing it to "1"
+        would silently change the model's solved values on reload, not
+        just its cosmetic unit display. Compact ("~C") form avoids
+        embedded spaces inside the quoted TOML string; single-quoted since
+        the surrounding constraint/objective line is itself double-quoted.
+        """
+        unit_str = f"{self.units.units:~C}"
+        return f"units('{unit_str}')"
+
     def to_ir(self):
         return {"node": "units", "units": str(self.units)}
 
@@ -144,6 +169,10 @@ class ExprNode(ASTNode):
     def latex(self, excluded=()):
         "Render this expression node as a LaTeX string."
         return _render_ast_node_latex(self, excluded)
+
+    def to_toml_expr(self, name_fn):
+        "Render this expression node as TOML/Python expression syntax."
+        return _render_ast_node_toml(self, name_fn)
 
     def to_ir(self):
         return {
