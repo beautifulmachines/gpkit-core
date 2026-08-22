@@ -5,7 +5,13 @@ import pytest
 
 from gpkit import Variable, VectorVariable, ureg
 from gpkit.varkey import VarKey
-from gpkit.varmap import VarMap, VarSet, _compute_collision_depths, display_names
+from gpkit.varmap import (
+    VarMap,
+    VarSet,
+    _collision_depths,
+    _compute_collision_depths,
+    display_names,
+)
 
 
 @pytest.fixture(name="vm")
@@ -334,3 +340,47 @@ class TestComputeCollisionDepths:
         assert display_str(vk_short, result[vk_short]) != display_str(
             vk_long, result[vk_long]
         )
+
+
+class TestCollisionDepths:
+    """Tests for _collision_depths in varmap.py.
+
+    Regression coverage added while investigating gpkit-core#222: an earlier
+    manual repro looked up a depth map with a Variable object instead of its
+    .key VarKey and got a missing/None result, which looked like a bug in
+    _collision_depths itself. It wasn't — see test_variable_is_not_its_varkey
+    below. These tests instead pin the real, correct contract: every VarKey
+    passed in gets a depth entry, including keys with no name collision at
+    all (which must not be silently dropped by the backfill pass).
+    """
+
+    def test_every_key_gets_an_entry(self):
+        """No VarKey in the input varset is missing from the result, colliding or not."""
+        vk_unique = VarKey("F_tip", lineage=(("Wing", 0), ("Structure", 0)))
+        vk_a = VarKey("eta", lineage=(("Motor", 0),))
+        vk_b = VarKey("eta", lineage=(("Actuator", 0),))
+        varset = VarSet([vk_unique, vk_a, vk_b])
+
+        result = _collision_depths(varset)
+
+        assert vk_unique in result
+        assert result[vk_unique] == 0, "globally-unique name needs no lineage at all"
+        assert vk_a in result
+        assert vk_b in result
+        assert result[vk_a] > 0, (
+            "colliding name must get a nonzero disambiguating depth"
+        )
+        assert result[vk_a] == result[vk_b]
+
+    def test_variable_is_not_its_varkey(self):
+        """A Variable and its own .key VarKey do not hash/compare equal.
+
+        Looking up a VarKey-keyed dict (e.g. a _collision_depths result) with
+        the Variable wrapper instead of variable.key silently misses, rather
+        than raising — easy to get wrong when reading display-depth maps.
+        """
+        x = Variable("x")
+        assert hash(x) != hash(x.key)
+        d = {x.key: 0}
+        assert x.key in d
+        assert x not in d
