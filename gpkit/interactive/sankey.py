@@ -66,7 +66,7 @@ class Sankey:
         "adds fixedvariable links as if they were (array)constraints"
         fixedvecs = {}
         total_sens = 0
-        for vk in sorted(cset.unique_varkeys, key=str):
+        for vk in sorted(cset.own_varkeys, key=str):
             if vk not in self.solution["constants"]:
                 continue
             if vk.veckey and vk.veckey not in fixedvecs:

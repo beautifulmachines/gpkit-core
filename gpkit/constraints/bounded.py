@@ -63,9 +63,9 @@ class Bounded(ConstraintSet):
             constraints = ConstraintSet(constraints)
         self.lowerbound = lower or eps
         self.upperbound = upper or 1 / eps
-        constrained_varkeys = constraints.constrained_varkeys()
+        problem_varkeys = constraints.problem_varkeys()
         self.bound_varkeys = frozenset(
-            vk for vk in constrained_varkeys if vk not in constraints.substitutions
+            vk for vk in problem_varkeys if vk not in constraints.substitutions
         )
         bounding_constraints = varkey_bounds(
             self.bound_varkeys, self.lowerbound, self.upperbound

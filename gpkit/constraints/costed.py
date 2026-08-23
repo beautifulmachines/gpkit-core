@@ -57,11 +57,11 @@ class CostedConstraintSet(ConstraintSet):
             subs.update(substitutions)
         ConstraintSet.__init__(self, constraints, subs, bonusvks=self.cost.vks)
 
-    def constrained_varkeys(self):
+    def problem_varkeys(self):
         "Return all varkeys in the cost and non-ConstraintSet constraints"
-        constrained_varkeys = ConstraintSet.constrained_varkeys(self)
-        constrained_varkeys.update(self.cost.vks)
-        return constrained_varkeys
+        problem_varkeys = ConstraintSet.problem_varkeys(self)
+        problem_varkeys.update(self.cost.vks)
+        return problem_varkeys
 
     def _rootlines(self, excluded=()):
         "String showing cost, to be used when this is the top constraint"

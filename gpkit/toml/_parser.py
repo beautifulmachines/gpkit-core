@@ -477,7 +477,7 @@ def _build_multi_model(models_section, dimension_overrides=None):
         else:
             cs = ConstraintSet(constraints)
             cs.lineage = per_model_lineage[model_id]
-            cs.unique_varkeys = frozenset(
+            cs.own_varkeys = frozenset(
                 v.key for v in per_model_vars[model_id].values() if hasattr(v, "key")
             )
             submodel_sets[model_id] = cs

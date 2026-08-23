@@ -8,6 +8,7 @@ functions of the IR.
 from dataclasses import dataclass, field
 from typing import Any
 
+from .constraints.set import ConstraintSet, constraint_varkeys
 from .constraints.tight import Tight
 from .model import Model as _Model
 from .printing import _format_aligned_columns
@@ -193,26 +194,6 @@ def _render_constraint(c) -> str:
 # ── Core builder helpers ──────────────────────────────────────────────────────
 
 
-def _collect_constraint_varkeys(constraint_groups: list[CGroup]) -> set:
-    """Collect all VarKeys appearing in local constraint groups.
-
-    Note: ConstraintSet.constrained_varkeys() (set.py) does the same concept
-    but operates over model.vks, which aggregates the entire subtree including
-    child models. Here we only touch the leaf constraints already filtered by
-    _build_constraint_groups, giving us just this level's own equations.
-    ConstraintSet has unique_varkeys as a class attribute, so hasattr() returns
-    True for all ConstraintSet/Model instances — _build_constraint_groups
-    already excluded them, leaving only leaf ScalarSingleEquationConstraints
-    whose .vks is exactly the variables in that one equation.
-    """
-    vkeys: set = set()
-    for cg in constraint_groups:
-        for c in cg.constraints:
-            if hasattr(c, "vks"):
-                vkeys.update(c.vks)
-    return vkeys
-
-
 def _make_var_entry(
     display_vk, excluded, get_val_units, solution, source=""
 ) -> VarEntry:
@@ -243,7 +224,7 @@ def _is_free_vk(display_vk, solution, model) -> bool:
 def _build_split_var_entries(
     model, solution, extra_vks=None
 ) -> tuple[list[VarEntry], list[VarEntry]]:
-    """Build (free_entries, fixed_entries) from model.unique_varkeys.
+    """Build (free_entries, fixed_entries) from model.own_varkeys.
 
     free_entries  — Optimized Variables: solved by the optimizer (no sens shown).
     fixed_entries — Fixed Variables: prescribed constants with sensitivities.
@@ -272,7 +253,7 @@ def _build_split_var_entries(
     seen_veckeys: set = set()
 
     with lineage_display_context(lineage_map):
-        for vk in sorted(model.unique_varkeys, key=lambda v: v.name):
+        for vk in sorted(model.own_varkeys, key=lambda v: v.name):
             if vk.veckey is not None:
                 if vk.veckey in seen_veckeys:
                     continue
@@ -287,7 +268,7 @@ def _build_split_var_entries(
                 fixed_entries.append(entry)
 
     if extra_vks:
-        owned_display = {(vk.veckey or vk) for vk in model.unique_varkeys}
+        owned_display = {(vk.veckey or vk) for vk in model.own_varkeys}
         cross_seen: set = set()
         with lineage_display_context(lineage_map):
             for vk in sorted(extra_vks, key=lambda v: v.name):
@@ -313,8 +294,8 @@ def _build_split_var_entries(
 def _collect_leaf_constraints(container) -> list:
     """Recursively collect single-equation leaf constraints from a container.
 
-    Unwraps Tight; skips other ConstraintSet subclasses and Models (identified
-    by unique_varkeys); flattens lists and tuples.
+    Unwraps Tight; skips child Models and other ConstraintSet subclasses;
+    flattens lists and tuples.
 
     Known limitation: only Tight is unwrapped. Other transparent wrappers
     (Loose, Bounded, SignomialEquality, ConstraintsRelaxed*) are silently
@@ -324,7 +305,7 @@ def _collect_leaf_constraints(container) -> list:
     for item in container:
         if isinstance(item, Tight):
             result.extend(_collect_leaf_constraints(item))
-        elif hasattr(item, "unique_varkeys"):
+        elif isinstance(item, ConstraintSet):
             pass  # skip child Models and other ConstraintSet subclasses
         elif isinstance(item, (list, tuple)):
             result.extend(_collect_leaf_constraints(item))
@@ -451,7 +432,8 @@ def build_report_ir(
     free_vars, fixed_vars = _build_split_var_entries(
         model,
         solution,
-        extra_vks=_collect_constraint_varkeys(cgroups) - model.unique_varkeys,
+        extra_vks=constraint_varkeys(c for cg in cgroups for c in cg.constraints)
+        - model.own_varkeys,
     )
     if is_anon:
         desc = {"summary": "", "assumptions": [], "references": []}

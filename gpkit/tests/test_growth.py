@@ -100,10 +100,10 @@ class TestThetaSingleton:
 
 
 class TestSiblingsInUniqueVarkeys:
-    """Auto-generated siblings must appear in model.unique_varkeys.
+    """Auto-generated siblings must appear in model.own_varkeys.
 
     Tools like gpkit.toml.apply_subs look variables up by name in
-    unique_varkeys; siblings absent from that set are silently skipped.
+    own_varkeys; siblings absent from that set are silently skipped.
     """
 
     def _build_wing(self):
@@ -120,14 +120,14 @@ class TestSiblingsInUniqueVarkeys:
 
         return Wing()
 
-    def test_growth_sibling_in_unique_varkeys(self):
+    def test_growth_sibling_in_own_varkeys(self):
         wing = self._build_wing()
-        names = {vk.name for vk in wing.unique_varkeys}
+        names = {vk.name for vk in wing.own_varkeys}
         assert "m_growth" in names
 
-    def test_fraction_sibling_in_unique_varkeys(self):
+    def test_fraction_sibling_in_own_varkeys(self):
         wing = self._build_wing()
-        names = {vk.name for vk in wing.unique_varkeys}
+        names = {vk.name for vk in wing.own_varkeys}
         assert "f_growth_m" in names
 
     def test_apply_subs_can_override_fraction(self):

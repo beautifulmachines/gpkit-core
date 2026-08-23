@@ -31,7 +31,7 @@ from .varmap import VarMap
 
 
 class Model(CostedConstraintSet):
-    # Model carries GP state (cost, lineage, unique_varkeys, computed),
+    # Model carries GP state (cost, lineage, own_varkeys, computed),
     # tree state (_children, _child_attrs), and report state (cgroups,
     # vectorized_block). Tracked in github.com/beautifulmachines/gpkit-core/issues/172.
     """Symbolic representation of an optimization problem.
@@ -153,7 +153,7 @@ class Model(CostedConstraintSet):
         if setup_vars:
             # add all the vars created in .setup to the Model's varkeys
             # even if they aren't used in any constraints
-            self.unique_varkeys = frozenset(v.key for v in setup_vars)
+            self.own_varkeys = frozenset(v.key for v in setup_vars)
         CostedConstraintSet.__init__(self, cost, constraints, substitutions)
         self.computed = {}  # {VarKey: fn(solution)} for post-solve computation
 
@@ -246,33 +246,33 @@ class Model(CostedConstraintSet):
         VariableNotFound
             If no child matches the first segment, or no variable matches the leaf.
         AmbiguousVariable
-            If multiple variables match the leaf name in this model's unique_varkeys.
+            If multiple variables match the leaf name in this model's own_varkeys.
         """
         parts = path.split(".")
         if len(parts) == 1:
-            # Leaf: resolve in this model's own unique_varkeys only
+            # Leaf: resolve in this model's own own_varkeys only
             name = parts[0]
-            matches = self.varkeys.by_name(name) & self.unique_varkeys
+            matches = self.varkeys.by_name(name) & self.own_varkeys
             if not matches:
                 # VectorVariable fallback: varkeys.by_name(name) returns the
                 # veckey (not element keys), so the intersection with
-                # unique_varkeys (which contains only element keys) is empty.
+                # own_varkeys (which contains only element keys) is empty.
                 # Collect all element VarKeys whose veckey shares the name.
                 vec_element_matches = {
                     vk
-                    for vk in self.unique_varkeys
+                    for vk in self.own_varkeys
                     if getattr(getattr(vk, "veckey", None), "name", None) == name
                 }
                 if vec_element_matches:
                     # Delegate to _choosevar which handles NomialArray assembly.
-                    # Use vec_element_matches (scoped to unique_varkeys) rather
+                    # Use vec_element_matches (scoped to own_varkeys) rather
                     # than varkeys.keys(name) which would include child models.
                     return self._choosevar(name, list(vec_element_matches))
             if not matches:
                 cls = self.__class__.__name__
                 raise VariableNotFound(
                     f"No variable '{name}' in {cls}. "
-                    f"Variables: {sorted(vk.name for vk in self.unique_varkeys)}"
+                    f"Variables: {sorted(vk.name for vk in self.own_varkeys)}"
                 )
             if len(matches) > 1:
                 cls = self.__class__.__name__
