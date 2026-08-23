@@ -74,7 +74,7 @@ def save_subs(model, path=None):
         path_str = _lineage_path(m)
 
         var_lines = []
-        for vk in sorted(m.unique_varkeys, key=lambda k: k.name):
+        for vk in sorted(m.own_varkeys, key=lambda k: k.name):
             if vk not in m.substitutions:
                 continue
             val = m.substitutions[vk]
@@ -193,7 +193,7 @@ def apply_subs(model, path_or_dict):
             continue
 
         for var_name, value in var_dict.items():
-            matches = [vk for vk in m.unique_varkeys if vk.name == var_name]
+            matches = [vk for vk in m.own_varkeys if vk.name == var_name]
             if len(matches) == 1:
                 model.substitutions[matches[0]] = value
             elif len(matches) == 0:

@@ -470,7 +470,7 @@ def _emit_model_section(  # noqa: PLR0913, PLR0917
     name_fn = _make_name_resolver(ref_to_model_id, model_id)
 
     # Variables (flat format: vars as keys in model section). node["variables"]
-    # is this node's own unique_varkeys refs — already scoped to this exact
+    # is this node's own own_varkeys refs — already scoped to this exact
     # instance, so distinct instances of the same class never mix vars.
     model_vars = {ref: variables[ref] for ref in node.get("variables", [])}
     scalar_vars, vector_groups = _group_variables(model_vars)

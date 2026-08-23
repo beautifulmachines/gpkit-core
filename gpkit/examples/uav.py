@@ -215,7 +215,7 @@ class AircraftPerf(Model):
     """Full aircraft performance: lift balance, total drag, thrust.
 
     Includes the flight state so that V, rho, mu appear in this model's
-    unique_varkeys — useful for condition table comparisons.
+    own_varkeys — useful for condition table comparisons.
     """
 
     T = Var("N", "thrust force")

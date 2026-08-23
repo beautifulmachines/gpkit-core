@@ -252,7 +252,7 @@ class TestBuildReportIR:
         m = _RSPrettyUnits()
         ir = build_report_ir(m)
         ve = _all_vars(ir)[0]
-        area_vk = next(vk for vk in m.unique_varkeys if vk.name == "S_pu")
+        area_vk = next(vk for vk in m.own_varkeys if vk.name == "S_pu")
         assert ve.units == unitstr(area_vk)
 
 

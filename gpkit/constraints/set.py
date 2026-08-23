@@ -48,10 +48,23 @@ def flatiter(iterable, yield_if_hasattr=None):
                 yield from flatiter(constraint, yield_if_hasattr)
 
 
+def constraint_varkeys(constraints) -> set:
+    """VarKeys appearing in the given constraints.
+
+    Includes variables declared in other models; subtract a model's
+    own_varkeys to get only those.
+    """
+    vkeys: set = set()
+    for c in constraints:
+        if hasattr(c, "vks"):
+            vkeys.update(c.vks)
+    return vkeys
+
+
 class ConstraintSet(list, ReprMixin):
     "Recursive container for ConstraintSets and Inequalities"
 
-    unique_varkeys, idxlookup = frozenset(), {}
+    own_varkeys, idxlookup = frozenset(), {}
     _varkeys = None
 
     def __init__(self, constraints, substitutions=None, *, bonusvks=None):  # noqa: PLR0912
@@ -61,9 +74,9 @@ class ConstraintSet(list, ReprMixin):
         elif isinstance(constraints, ConstraintSet):
             constraints = [constraints]  # put it one level down
         list.__init__(self, constraints)
-        self.vks = VarSet(self.unique_varkeys)
+        self.vks = VarSet(self.own_varkeys)
         self.substitutions = VarMap(
-            {k: k.value for k in self.unique_varkeys if k.value is not None}
+            {k: k.value for k in self.own_varkeys if k.value is not None}
         )
         self.substitutions.register_keys(self.vks)
         self.bounded, self.meq_bounded = set(), defaultdict(set)
@@ -89,7 +102,7 @@ class ConstraintSet(list, ReprMixin):
         for key in self.vks:
             if key not in self.substitutions:
                 continue
-            if key.lineage and key not in self.unique_varkeys:
+            if key.lineage and key not in self.own_varkeys:
                 continue  # substitution inherited from another model
             self.bounded.add((key, "upper"))
             self.bounded.add((key, "lower"))
@@ -132,7 +145,7 @@ class ConstraintSet(list, ReprMixin):
             if not othervars:
                 return Variable(firstvar)
             # prefer this model's own variables over submodel variables
-            own = [v for v in variables if v in self.unique_varkeys]
+            own = [v for v in variables if v in self.own_varkeys]
             if len(own) == 1:
                 return Variable(own[0])
             raise ValueError(
@@ -153,9 +166,12 @@ class ConstraintSet(list, ReprMixin):
             self._varkeys = VarSet(self.vks)
         return self._varkeys
 
-    def constrained_varkeys(self):
-        "Return all varkeys in non-ConstraintSet constraints"
-        return self.vks - self.unique_varkeys
+    def problem_varkeys(self):
+        """VarKeys appearing in at least one constraint in this subtree.
+
+        CostedConstraintSet also includes the cost's varkeys.
+        """
+        return constraint_varkeys(self.flat())
 
     flat = flatiter
 
@@ -290,9 +306,7 @@ def build_model_tree(model):
         model_children = getattr(cset, "_children", [])
         _collect(cset, constraint_indices, children, model_children)
 
-        owned_vars = sorted(
-            vk.ref for vk in getattr(cset, "unique_varkeys", frozenset())
-        )
+        owned_vars = sorted(vk.ref for vk in getattr(cset, "own_varkeys", frozenset()))
         all_claimed_vars.update(owned_vars)
 
         return {
@@ -344,7 +358,7 @@ def build_model_tree(model):
     tree = _walk(model)
 
     # Assign unclaimed variables to the root node (handles flat models
-    # without setup() where unique_varkeys is empty)
+    # without setup() where own_varkeys is empty)
     unclaimed = sorted(vk.ref for vk in model.vks if vk.ref not in all_claimed_vars)
     if unclaimed:
         tree["variables"] = sorted(set(tree["variables"]) | set(unclaimed))

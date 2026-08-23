@@ -218,7 +218,7 @@ class TestApplySubs:
 
     def _aircraft_weight_vk(self, model):
         """Return the VarKey for W in the Aircraft section."""
-        return next(vk for vk in model.unique_varkeys if vk.name == "W")
+        return next(vk for vk in model.own_varkeys if vk.name == "W")
 
     def test_apply_subs_roundtrip(self):
         """save → load → apply leaves the model substitutions unchanged."""
@@ -297,5 +297,5 @@ class TestApplySubs:
             apply_subs(model_new, old_subs)
 
         # W (which still exists) must be applied
-        weight_vk = next(vk for vk in model_new.unique_varkeys if vk.name == "W")
+        weight_vk = next(vk for vk in model_new.own_varkeys if vk.name == "W")
         assert float(model_new.substitutions[weight_vk]) == pytest.approx(5000.0)

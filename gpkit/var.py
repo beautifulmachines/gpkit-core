@@ -5,7 +5,7 @@ from typing import overload
 from .nomials.variables import Variable
 
 _RESERVED_NAMES = frozenset(
-    {"cost", "lineage", "setup", "substitutions", "unique_varkeys", "vks"}
+    {"cost", "lineage", "setup", "substitutions", "own_varkeys", "vks"}
 )
 
 
@@ -25,7 +25,7 @@ class Var:
     Notes
     -----
     - Lineage is correct because create() runs inside NamedVariables context.
-    - Reserved names (cost, lineage, setup, substitutions, unique_varkeys, vks)
+    - Reserved names (cost, lineage, setup, substitutions, own_varkeys, vks)
       and names starting with '_var_' cannot be used.
     - For vector variables whose length comes from a setup() argument, use
       Vectorize inside setup() with Variable() directly.

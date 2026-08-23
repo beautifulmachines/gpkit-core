@@ -168,7 +168,7 @@ class TestExamples:
         model = example.PS
         # Direct attribute access for variables stored by setup()
         _ = model.E
-        # get_var resolves own variables (PowerSystem.m is in unique_varkeys)
+        # get_var resolves own variables (PowerSystem.m is in own_varkeys)
         own_m = model.get_var("m")
         assert own_m.key == model.m.key
         # all variables named "m" are still accessible via varkeys

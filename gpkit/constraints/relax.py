@@ -196,9 +196,9 @@ class ConstantsRelaxed(ConstraintSet):
         linked = parse_linked(constraints.vks, substitutions)
         if linked:
             kdc = VarMap(constants)
-            constrained_varkeys = constraints.constrained_varkeys()
+            problem_varkeys = constraints.problem_varkeys()
             constants.update(
-                {k: f(kdc) for k, f in linked.items() if k in constrained_varkeys}
+                {k: f(kdc) for k, f in linked.items() if k in problem_varkeys}
             )
 
         self._derelax_map = {}

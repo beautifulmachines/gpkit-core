@@ -560,3 +560,29 @@ class TestBounded:
         bm = Model(m.cost, Bounded(m, upper=1e10))
         sol = bm.solve(verbosity=0)
         assert sol.cost == pytest.approx(1.0)
+
+    def test_bounds_root_level_variables(self):
+        """Bounded must bound a root model's own constrained variables.
+
+        problem_varkeys() was vks - own_varkeys, which stripped the root
+        model's declared variables even when they appeared in constraints,
+        so only submodel (and cost) variables were ever bounded.
+        """
+
+        class Inner(Model):
+            def setup(self):
+                self.t = Variable("t")
+                return [self.t >= 1]
+
+        class Outer(Model):
+            def setup(self):
+                self.inner = Inner()
+                w = Variable("w")
+                s = Variable("s")
+                self.cost = w
+                return [self.inner, w >= self.inner.t + s, s >= 1]
+
+        m = Outer()
+        names = {vk.name for vk in m.problem_varkeys()}
+        assert {"w", "s", "t"} <= names, f"missing root-level vars: {names}"
+        assert m.varkeys.by_name("s") <= Bounded(m).bound_varkeys
