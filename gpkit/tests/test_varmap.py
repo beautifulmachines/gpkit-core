@@ -362,6 +362,8 @@ class TestCollisionDepths:
         varset = VarSet([vk_unique, vk_a, vk_b])
 
         result = _collision_depths(varset)
+        # result is lineage needed to make name unique *in this set*
+        # different than "what should this variable be called here", which depends on DisplayScope
 
         assert vk_unique in result
         assert result[vk_unique] == 0, "globally-unique name needs no lineage at all"
