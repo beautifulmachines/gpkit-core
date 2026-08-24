@@ -16,6 +16,9 @@ examples:  # Regenerate catalog example output files for docs
 test:  # Run all tests
 	uv run pytest gpkit/tests -v
 
+check-downstream:  # Run sibling model repos' tests against this working copy
+	uv run python scripts/check_downstream.py
+
 coverage:  # Run tests with coverage reporting
 	uv run pytest gpkit/tests --cov=gpkit --cov-report=term-missing
 

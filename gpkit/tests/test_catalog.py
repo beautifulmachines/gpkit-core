@@ -1,9 +1,13 @@
 """Catalog smoke test: every registered model must build, solve, and match cost.
 
 Public API (importable by other repos):
-  load_catalog(start)       — load models list from catalog.toml nearest to `start`
-  catalog_ids(models)       — generate pytest parametrize IDs
-  run_catalog_test(entry)   — the shared test body
+  load_catalog(start)          — load models list from catalog.toml nearest to `start`
+  catalog_ids(models)          — generate pytest parametrize IDs
+  run_catalog_test(entry)      — the shared test body
+  run_catalog_snapshots(entry, start)
+                               — write structure and solution snapshots for one
+                                 entry into <start's dir>/snapshots/; drift shows
+                                 up as a git diff, like docs/source/examples
 """
 
 import importlib
@@ -85,6 +89,58 @@ def run_catalog_test(model_entry):
     )
 
 
+def structure_digest(model) -> str:
+    """Line-per-item rendering of a model's variable names and constraints.
+
+    Built from an unsolved report, so it holds no values and needs no solver:
+    it changes only when naming or structure changes.  One line per item keeps
+    diffs minimal.
+    """
+    lines: list[str] = []
+
+    def walk(section):
+        lines.append(f"[{section['lineage_path'] or section['title']}]")
+        for v in section["free_variables"]:
+            lines.append(f"  free  {v['name']}")
+        for v in section["fixed_variables"]:
+            lines.append(f"  fixed {v['name']}")
+        for group in section["constraint_groups"]:
+            label = f" ({group['label']})" if group["label"] else ""
+            for c in group["constraints"]:
+                lines.append(f"  cons{label}  {c}")
+        for child in section["children"]:
+            walk(child)
+
+    walk(model.report(fmt="dict"))
+    return "\n".join(lines) + "\n"
+
+
+def _write_snapshot(path: Path, content: str):
+    "Write content to path, creating parent dirs. Drift surfaces as a git diff."
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(content, encoding="utf-8")
+
+
+def run_catalog_snapshots(model_entry, start):
+    """Write structure and solution snapshots for one catalog entry.
+
+    Snapshots land in <start's directory>/snapshots/.  Following the
+    docs/source/examples convention, these are regenerated rather than
+    asserted — a change shows up as a git diff to review, so deliberate
+    improvements are as easy to land as regressions are to spot.
+    """
+    mod = importlib.import_module(model_entry["module"])
+    cls = getattr(mod, model_entry["class"])
+    entry_id = model_entry.get("id", cls.__name__)
+    outdir = Path(start).resolve().parent / "snapshots"
+
+    m = cls.default()
+    _write_snapshot(outdir / f"{entry_id}.structure.txt", structure_digest(m))
+
+    sol = m.solve(verbosity=0) if m.is_gp() else m.localsolve(verbosity=0)
+    _write_snapshot(outdir / f"{entry_id}.solution.txt", sol.table())
+
+
 try:
     _CATALOG = load_catalog(__file__)
 except FileNotFoundError:
@@ -95,3 +151,9 @@ except FileNotFoundError:
 def test_catalog_model(model_entry):
     """Each catalog entry must: import, build, and solve. Assert cost if provided."""
     run_catalog_test(model_entry)
+
+
+@pytest.mark.parametrize("model_entry", _CATALOG, ids=catalog_ids(_CATALOG))
+def test_catalog_snapshots(model_entry):
+    """Regenerate each catalog entry's snapshots; drift shows as a git diff."""
+    run_catalog_snapshots(model_entry, __file__)

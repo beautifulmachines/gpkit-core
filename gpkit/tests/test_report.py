@@ -787,3 +787,35 @@ class TestModelDescription:
         assert d["summary"] == "Aerodynamics model."
         assert d["assumptions"] == ["incompressible flow", "steady state"]
         assert d["references"] == ["Anderson 2001"]
+
+
+class TestDisplayOrderStability:
+    "Variable ordering in a report must not depend on set iteration order."
+
+    def test_same_named_foreign_vars_sort_by_ref(self):
+        """Foreign variables sharing a short name get a deterministic order.
+
+        Sorting by v.name alone left ties to be broken by the iteration order
+        of the extra_vks set, which varies between interpreter runs, so
+        report output was not reproducible.
+        """
+
+        class Leg(Model):
+            def setup(self):
+                self.W = Variable("W", "N")
+                return [self.W >= 1 * gpkit.ureg.N]
+
+        class Rig(Model):
+            def setup(self):
+                self.left = Leg()
+                self.right = Leg()
+                total = Variable("total", "N")
+                self.cost = total
+                return [self.left, self.right, total >= self.left.W + self.right.W]
+
+        ir = build_report_ir(Rig())
+        foreign = [v.name for v in ir.free_variables if "." in v.name]
+        assert foreign == sorted(foreign, key=lambda n: n), (
+            f"foreign vars not in a stable order: {foreign}"
+        )
+        assert len(foreign) == 2, f"expected two same-named foreign vars, got {foreign}"

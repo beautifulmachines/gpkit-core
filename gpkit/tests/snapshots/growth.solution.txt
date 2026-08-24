@@ -1,0 +1,108 @@
+
+          ┃┓                   ┓          ┓
+          ┃┃                   ┃          ┃
+          ┃┃                   ┃          ┃
+          ┃┃                   ┃          ┃
+          ┃┃                   ┣╸Spar.m   ┣╸Spar.A·Spar.rho·Spar.t
+          ┃┃                   ┃ (16.2kg) ┃ (13.5kg, fixed)
+          ┃┃                   ┃          ┃
+          ┃┃                   ┃          ┛
+          ┃┃                   ┛          ┣╸Spar.m_growth╶⎨
+     Cost╺┫┃                   ┓          ┓
+ (35.6kg) ┃┣╸GrowthAllowance.m ┃          ┃
+          ┃┃ (35.6kg)          ┃          ┃
+          ┃┃                   ┃          ┃
+          ┃┃                   ┣╸Spar1.m  ┣╸Spar1.A·Spar1.rho·Spar1.t
+          ┃┃                   ┃ (16.2kg) ┃ (13.5kg, fixed)
+          ┃┃                   ┃          ┃
+          ┃┃                   ┃          ┛
+          ┃┃                   ┛          ┣╸Spar1.m_growth╶⎨
+          ┃┃                   ┣╸GrowthAllowance.m_growth╶⎨
+          ┃┛                   ┛ (3.24kg)
+
+
+
+                 ┃┓
+                 ┃┃
+                 ┃┃
+                 ┃┃
+                 ┃┣╸m ≥ Spar.m + Spar1.m + m_growth
+                 ┃┃
+                 ┃┃
+                 ┃┃
+                 ┃┛
+ GrowthAllowance╺┫┓      ┓
+                 ┃┃      ┃
+                 ┃┣╸Spar ┣╸m ≥ rho·t·A + m_growth
+                 ┃┃      ┛
+                 ┃┛      ┣╸m_growth ≥ theta·f_growth_m·rho·t·A
+                 ┃┓       ┓
+                 ┃┃       ┃
+                 ┃┣╸Spar1 ┣╸m ≥ rho·t·A + m_growth
+                 ┃┃       ┛
+                 ┃┛       ┣╸m_growth ≥ theta·f_growth_m·rho·t·A
+                 ┃┣╸m_growth ≥ theta·f_growth_m·(Spar.m + Spar1.m)
+
+
+
+
+mass margin: 4.36 kg  (plus=40 kg, minus=35.64 kg)
+  ∂(mass margin)/∂c [most negative first]:
+    Spar.t                -3564 kg/m
+    Spar1.t               -3564 kg/m
+    GrowthAllowance.f_growth_m  -32.4 kg
+    Spar.A                -17.82 kg/m²
+    Spar1.A               -17.82 kg/m²
+    Spar.f_growth_m       -14.85 kg
+    Spar1.f_growth_m      -14.85 kg
+    theta                 -9.18 kg
+    Spar.rho              -0.0066 kg/(kg/m³)
+    Spar1.rho             -0.0066 kg/(kg/m³)
+    m_budget              +1 kg/kgOptimal Cost
+------------
+GrowthAllowance.m : 35.64 [kg]
+
+Solution
+--------
+GrowthAllowance
+         m : 35.64 [kg]            wing mass
+  m_growth : 3.24  [kg]
+...constants
+f_growth_m : 0.1        (+0.09091)
+  m_budget : 40    [kg] (~0)       mass budget
+
+GrowthAllowance.Spar
+         m : 16.2  [kg]               spar mass
+  m_growth : 2.7   [kg]
+...constants
+         A : 1     [m²]    (+0.5)     spar wetted area
+       rho : 2700  [kg/m³] (+0.5)     spar density
+         t : 0.005 [m]     (+0.5)     spar wall thickness
+f_growth_m : 0.2           (+0.08333)
+
+GrowthAllowance.Spar1
+         m : 16.2  [kg]               spar mass
+  m_growth : 2.7   [kg]
+...constants
+         A : 1     [m²]    (+0.5)     spar wetted area
+       rho : 2700  [kg/m³] (+0.5)     spar density
+         t : 0.005 [m]     (+0.5)     spar wall thickness
+f_growth_m : 0.2           (+0.08333)
+
+growth
+...constants
+theta : 1  (+0.2576)
+
+Most Sensitive Constraints
+--------------------------
+GrowthAllowance
++1       : m ≥ m + m + m_growth
++0.09091 : m_growth ≥ theta·f_growth_m·(m + m)
+
+GrowthAllowance.Spar
++0.5     : m ≥ rho·t·A + m_growth
++0.08333 : m_growth ≥ theta·f_growth_m·rho·t·A
+
+GrowthAllowance.Spar1
++0.5     : m ≥ rho·t·A + m_growth
++0.08333 : m_growth ≥ theta·f_growth_m·rho·t·A
