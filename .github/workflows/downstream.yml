@@ -1,0 +1,42 @@
+# Runs the model repos' test suites against this repo's main, so a gpkit-core
+# change that breaks a downstream model surfaces here rather than in their CI.
+#
+# Nightly rather than per-PR on purpose: the suites take minutes (gassolar
+# dominates), and a downstream main that is red for unrelated reasons should
+# not block work in gpkit-core.
+#
+# lunar is deliberately absent — it is a private repo, so this public workflow
+# cannot clone it. Run `make check-downstream` locally to include it.
+
+name: Downstream
+
+on:
+  schedule:
+    - cron: '0 3 * * *'  # nightly, staggered after the Tests workflow
+  workflow_dispatch:      # and on demand, before a risky change
+
+jobs:
+  downstream:
+    runs-on: ubuntu-latest
+
+    steps:
+    # Checked out into a subdirectory so the model repos can sit beside it:
+    # their [tool.uv.sources] and check_downstream.py both expect siblings.
+    - uses: actions/checkout@v4
+      with:
+        path: gpkit-core
+        fetch-tags: true  # hatch-vcs resolves the version from git tags
+
+    - name: Check out sibling model repos
+      run: |
+        git clone --depth 1 https://github.com/beautifulmachines/gpkit-models.git
+        git clone --depth 1 https://github.com/beautifulmachines/gassolar.git
+
+    - name: Set up uv
+      uses: astral-sh/setup-uv@v4
+      with:
+        python-version: "3.11"
+
+    - name: Run downstream suites against this gpkit-core
+      working-directory: gpkit-core
+      run: uv run python scripts/check_downstream.py

@@ -1,0 +1,16 @@
+[Box]
+  free  d
+  free  h
+  free  w
+  fixed A_floor
+  fixed A_wall
+  fixed alpha
+  fixed beta
+  fixed delta
+  fixed gamma
+  cons  A_wall ≥ 2·h·w + 2·h·d
+  cons  A_floor ≥ w·d
+  cons  alpha ≤ h/w
+  cons  beta ≥ h/w
+  cons  gamma ≤ d/w
+  cons  delta ≥ d/w

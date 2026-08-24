@@ -1,0 +1,9 @@
+[WaterTank]
+  free  A
+  free  V
+  free  d[:]
+  fixed M
+  fixed rho
+  cons  A ≥ 2·(d[0]·d[1] + d[0]·d[2] + d[1]·d[2])
+  cons  V = d[0]·d[1]·d[2]
+  cons  M = V·rho

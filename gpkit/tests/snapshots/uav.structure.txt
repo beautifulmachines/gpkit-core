@@ -1,0 +1,254 @@
+[UAV]
+[UAV.Aircraft]
+  free  W_mto
+  free  W_tilde
+  free  W_zfw
+  free  Engine.W
+  free  Wing.W
+  fixed CDA0
+  fixed W_fixed
+  fixed W_pay
+  cons  W_tilde ≥ W_fixed + W_pay + Engine.W
+  cons  W_zfw ≥ W_tilde + Wing.W
+[UAV.Aircraft.Wing]
+  free  A
+  free  I_cap
+  free  M_rbar
+  free  S
+  free  W_cap
+  free  W_web
+  free  W
+  free  nu
+  free  p
+  free  q
+  free  t_cap
+  free  t_web
+  free  tau
+  free  W_tilde
+  fixed C_Lmax
+  fixed EI_ref
+  fixed N_lift
+  fixed W_ref
+  fixed e
+  fixed f_wadd
+  fixed k_shear
+  fixed r_h
+  fixed rho_alum
+  fixed sigma_max_shear
+  fixed sigma_max
+  fixed w
+  fixed g
+  cons (Geometry)  2·q ≥ 1 + p
+  cons (Geometry)  p ≥ 1.9
+  cons (Geometry)  tau ≤ 0.15
+  cons (Geometry)  nu^3.94 ≥ 0.86·p^-2.38 + 0.14·p^0.56
+  cons (Root bending stress)  M_rbar ≥ W_tilde·A·p/(24·W_ref)
+  cons (Root bending stress)  0.423·w·tau²·t_cap ≥ I_cap·k_shear + 0.92·w·tau·t_cap²
+  cons (Root bending stress)  N_lift·M_rbar·A·q²·tau·EI_ref/(S·I_cap·sigma_max) ≤ 8
+  cons (Root bending stress)  A·W_tilde·N_lift·q²/(tau·S·t_web·sigma_max_shear) ≤ 12
+  cons (Weight rollup)  W_cap ≥ 8·rho_alum·g·w·t_cap·S^1.5·nu/(3·A^0.5)
+  cons (Weight rollup)  W_web ≥ 8·rho_alum·g·r_h·tau·t_web·S^1.5·nu/(3·A^0.5)
+  cons (Weight rollup)  W/f_wadd ≥ W_cap + W_web
+[UAV.Aircraft.Engine]
+  free  P_max
+  free  W
+  fixed A_prop
+  fixed W_eng_coeff
+  fixed eta_eng
+  fixed eta_v
+  fixed h_fuel
+  cons  W ≥ W_eng_coeff·P_max^0.803
+[UAV.Mission]
+  free  R
+  free  W_fuel
+  free  W_mto
+  free  W_zfw
+  free  Outbound.AircraftPerf.W
+  free  Outbound.W_fuel
+  free  Return.AircraftPerf.W
+  free  Return.W_fuel
+  free  SprintCondition.AircraftPerf.W
+  fixed R_min
+  cons  R ≥ R_min
+  cons  Outbound.AircraftPerf.W ≥ W_zfw + Return.W_fuel
+  cons  Return.AircraftPerf.W ≥ W_zfw
+  cons  SprintCondition.AircraftPerf.W = Outbound.AircraftPerf.W
+  cons  W_fuel ≥ Outbound.W_fuel + Return.W_fuel
+  cons  W_mto ≥ W_zfw + W_fuel
+[UAV.Mission.Outbound]
+  free  W_fuel
+  free  z_bre
+  free  eta_0
+  free  T
+  free  W
+  free  R
+  fixed h_fuel
+  fixed g
+  cons  z_bre ≥ g·R·T/(h_fuel·eta_0·W)
+  cons  W_fuel/W ≥ z_bre^1 + z_bre²/2 + z_bre³/6 + z_bre⁴/24
+[UAV.Mission.Outbound.AircraftPerf]
+  free  C_D
+  free  C_Di
+  free  T
+  free  W
+  free  A
+  free  S
+  free  C_Dp
+  free  C_L
+  free  V
+  fixed CDA0
+  fixed e
+  fixed rho
+  cons  W ≤ 0.5·rho·C_L·S·V²
+  cons  T ≥ 0.5·rho·C_D·S·V²
+  cons  C_Di ≥ C_L²/(π·e·A)
+  cons  C_D ≥ CDA0/S + C_Dp + C_Di
+[UAV.Mission.Outbound.FlightState]
+  free  V
+  fixed mu
+  fixed rho
+[UAV.Mission.Outbound.AircraftPerf.WingAero]
+  free  C_Dp
+  free  C_L
+  free  Re
+  free  A
+  free  S
+  free  tau
+  free  V
+  fixed mu
+  fixed rho
+  cons  Re = rho/mu·V·(S/A)^0.5
+  cons  2.56·C_L^5.881/(Re^1.541·tau^3.319·C_Dp^2.617) + 3.82e-09·tau^6.229/(C_L^0.914·Re^1.379·C_Dp^9.57) + 0.00215·Re^0.1441·tau^0.03325/(C_L^0.0079·C_Dp^0.7337) + 1.19e+04·C_L^9.783·tau^1.764/(Re^0.998·C_Dp^0.909) + 6.14e-06·C_L^6.535/(Re^0.995·tau^0.521·C_Dp^5.192) ≤ 1
+[UAV.Mission.Outbound.AircraftPerf.PropulsionPerf]
+  free  eta_0
+  free  eta_i
+  free  eta_prop
+  free  T
+  free  V
+  fixed A_prop
+  fixed eta_eng
+  fixed eta_v
+  fixed rho
+  cons  eta_0 ≤ eta_eng·eta_prop
+  cons  eta_prop ≤ eta_i·eta_v
+  cons  4·eta_i + T·eta_i²/(0.5·rho·V²·A_prop) ≤ 4
+[UAV.Mission.Return]
+  free  W_fuel
+  free  z_bre
+  free  eta_0
+  free  T
+  free  W
+  free  R
+  fixed h_fuel
+  fixed g
+  cons  z_bre ≥ g·R·T/(h_fuel·eta_0·W)
+  cons  W_fuel/W ≥ z_bre^1 + z_bre²/2 + z_bre³/6 + z_bre⁴/24
+[UAV.Mission.Return.AircraftPerf]
+  free  C_D
+  free  C_Di
+  free  T
+  free  W
+  free  A
+  free  S
+  free  C_Dp
+  free  C_L
+  free  V
+  fixed CDA0
+  fixed e
+  fixed rho
+  cons  W ≤ 0.5·rho·C_L·S·V²
+  cons  T ≥ 0.5·rho·C_D·S·V²
+  cons  C_Di ≥ C_L²/(π·e·A)
+  cons  C_D ≥ CDA0/S + C_Dp + C_Di
+[UAV.Mission.Return.FlightState]
+  free  V
+  fixed mu
+  fixed rho
+[UAV.Mission.Return.AircraftPerf.WingAero]
+  free  C_Dp
+  free  C_L
+  free  Re
+  free  A
+  free  S
+  free  tau
+  free  V
+  fixed mu
+  fixed rho
+  cons  Re = rho/mu·V·(S/A)^0.5
+  cons  2.56·C_L^5.881/(Re^1.541·tau^3.319·C_Dp^2.617) + 3.82e-09·tau^6.229/(C_L^0.914·Re^1.379·C_Dp^9.57) + 0.00215·Re^0.1441·tau^0.03325/(C_L^0.0079·C_Dp^0.7337) + 1.19e+04·C_L^9.783·tau^1.764/(Re^0.998·C_Dp^0.909) + 6.14e-06·C_L^6.535/(Re^0.995·tau^0.521·C_Dp^5.192) ≤ 1
+[UAV.Mission.Return.AircraftPerf.PropulsionPerf]
+  free  eta_0
+  free  eta_i
+  free  eta_prop
+  free  T
+  free  V
+  fixed A_prop
+  fixed eta_eng
+  fixed eta_v
+  fixed rho
+  cons  eta_0 ≤ eta_eng·eta_prop
+  cons  eta_prop ≤ eta_i·eta_v
+  cons  4·eta_i + T·eta_i²/(0.5·rho·V²·A_prop) ≤ 4
+[UAV.Mission.SprintCondition]
+  free  P_max
+  free  eta_0
+  free  T
+  free  V
+  fixed V_reqt
+  cons  P_max ≥ T·V/eta_0
+  cons  V ≥ V_reqt
+[UAV.Mission.SprintCondition.AircraftPerf]
+  free  C_D
+  free  C_Di
+  free  T
+  free  W
+  free  A
+  free  S
+  free  C_Dp
+  free  C_L
+  free  V
+  fixed CDA0
+  fixed e
+  fixed rho
+  cons  W ≤ 0.5·rho·C_L·S·V²
+  cons  T ≥ 0.5·rho·C_D·S·V²
+  cons  C_Di ≥ C_L²/(π·e·A)
+  cons  C_D ≥ CDA0/S + C_Dp + C_Di
+[UAV.Mission.SprintCondition.FlightState]
+  free  V
+  fixed mu
+  fixed rho
+[UAV.Mission.SprintCondition.AircraftPerf.WingAero]
+  free  C_Dp
+  free  C_L
+  free  Re
+  free  A
+  free  S
+  free  tau
+  free  V
+  fixed mu
+  fixed rho
+  cons  Re = rho/mu·V·(S/A)^0.5
+  cons  2.56·C_L^5.881/(Re^1.541·tau^3.319·C_Dp^2.617) + 3.82e-09·tau^6.229/(C_L^0.914·Re^1.379·C_Dp^9.57) + 0.00215·Re^0.1441·tau^0.03325/(C_L^0.0079·C_Dp^0.7337) + 1.19e+04·C_L^9.783·tau^1.764/(Re^0.998·C_Dp^0.909) + 6.14e-06·C_L^6.535/(Re^0.995·tau^0.521·C_Dp^5.192) ≤ 1
+[UAV.Mission.SprintCondition.AircraftPerf.PropulsionPerf]
+  free  eta_0
+  free  eta_i
+  free  eta_prop
+  free  T
+  free  V
+  fixed A_prop
+  fixed eta_eng
+  fixed eta_v
+  fixed rho
+  cons  eta_0 ≤ eta_eng·eta_prop
+  cons  eta_prop ≤ eta_i·eta_v
+  cons  4·eta_i + T·eta_i²/(0.5·rho·V²·A_prop) ≤ 4
+[UAV.HeavyLandingCase]
+  free  V_stall
+  free  W_mto
+  free  S
+  fixed V_stallmax
+  fixed rho_sl
+  fixed C_Lmax
+  cons  W_mto ≤ 0.5·rho_sl·V_stall²·C_Lmax·S
+  cons  V_stall ≤ V_stallmax

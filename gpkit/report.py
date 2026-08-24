@@ -253,7 +253,7 @@ def _build_split_var_entries(
     seen_veckeys: set = set()
 
     with lineage_display_context(lineage_map):
-        for vk in sorted(model.own_varkeys, key=lambda v: v.name):
+        for vk in sorted(model.own_varkeys, key=lambda v: v.ref):
             if vk.veckey is not None:
                 if vk.veckey in seen_veckeys:
                     continue
@@ -271,7 +271,7 @@ def _build_split_var_entries(
         owned_display = {(vk.veckey or vk) for vk in model.own_varkeys}
         cross_seen: set = set()
         with lineage_display_context(lineage_map):
-            for vk in sorted(extra_vks, key=lambda v: v.name):
+            for vk in sorted(extra_vks, key=lambda v: v.ref):
                 display_vk = vk.veckey if vk.veckey is not None else vk
                 if display_vk in owned_display or display_vk in cross_seen:
                     continue

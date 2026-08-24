@@ -1,0 +1,60 @@
+[BEMTHover]
+  free  A
+  free  Delta_r[:]
+  free  Omega
+  free  P
+  free  R
+  free  V_i[:]
+  free  dC_P[:]
+  free  dC_T[:]
+  free  dP[:]
+  free  r[:]
+  fixed Omega_max
+  fixed Omega_min
+  fixed R_max
+  fixed R_min
+  fixed dr_min
+  fixed rho
+  fixed xi[:]
+  cons  A = 3.14·R²
+  cons  R ≤ R_max
+  cons  R ≥ R_min
+  cons  Omega ≤ Omega_max
+  cons  Omega ≥ Omega_min
+  cons  Delta_r[0] ≥ dr_min
+  cons  Delta_r[1] ≥ dr_min
+  cons  Delta_r[2] ≥ dr_min
+  cons  Delta_r[3] ≥ dr_min
+  cons  Delta_r[4] ≥ dr_min
+  cons  r[0] = Delta_r[0]/2
+  cons  r[1] ≥ Delta_r[:1].sum()
+  cons  r[2] ≥ Delta_r[:2].sum()
+  cons  r[3] ≥ Delta_r[:3].sum()
+  cons  r[4] ≥ Delta_r[:4].sum()
+  cons  r[1] ≥ r[0] + 0.5·Delta_r[0] + 0.5·Delta_r[1]
+  cons  r[2] ≥ r[1] + 0.5·Delta_r[1] + 0.5·Delta_r[2]
+  cons  r[3] ≥ r[2] + 0.5·Delta_r[2] + 0.5·Delta_r[3]
+  cons  r[4] ≥ r[3] + 0.5·Delta_r[3] + 0.5·Delta_r[4]
+  cons  r[4] ≤ 1
+  cons  Delta_r[:].sum() ≤ 1
+  cons  xi[0] = rho·A·(Omega·R)²·dC_T[0]
+  cons  xi[1] = rho·A·(Omega·R)²·dC_T[1]
+  cons  xi[2] = rho·A·(Omega·R)²·dC_T[2]
+  cons  xi[3] = rho·A·(Omega·R)²·dC_T[3]
+  cons  xi[4] = rho·A·(Omega·R)²·dC_T[4]
+  cons  V_i[0]²·r[0]·Delta_r[0]/(dC_T[0]·(Omega·R)²) = 0.25
+  cons  V_i[1]²·r[1]·Delta_r[1]/(dC_T[1]·(Omega·R)²) = 0.25
+  cons  V_i[2]²·r[2]·Delta_r[2]/(dC_T[2]·(Omega·R)²) = 0.25
+  cons  V_i[3]²·r[3]·Delta_r[3]/(dC_T[3]·(Omega·R)²) = 0.25
+  cons  V_i[4]²·r[4]·Delta_r[4]/(dC_T[4]·(Omega·R)²) = 0.25
+  cons  V_i[0]³·r[0]·Delta_r[0]/(dC_P[0]·(Omega·R)³) = 0.25
+  cons  V_i[1]³·r[1]·Delta_r[1]/(dC_P[1]·(Omega·R)³) = 0.25
+  cons  V_i[2]³·r[2]·Delta_r[2]/(dC_P[2]·(Omega·R)³) = 0.25
+  cons  V_i[3]³·r[3]·Delta_r[3]/(dC_P[3]·(Omega·R)³) = 0.25
+  cons  V_i[4]³·r[4]·Delta_r[4]/(dC_P[4]·(Omega·R)³) = 0.25
+  cons  dP[0] = rho·A·(Omega·R)³·dC_P[0]
+  cons  dP[1] = rho·A·(Omega·R)³·dC_P[1]
+  cons  dP[2] = rho·A·(Omega·R)³·dC_P[2]
+  cons  dP[3] = rho·A·(Omega·R)³·dC_P[3]
+  cons  dP[4] = rho·A·(Omega·R)³·dC_P[4]
+  cons  P ≥ dP[:].sum()
