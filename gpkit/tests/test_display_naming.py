@@ -262,7 +262,7 @@ class TestFormatFlags:
 
     def test_modelnums_flag_drops_instance_numbers(self):
         vk = VarKey("x", lineage=(("Aircraft", 0), ("Wing", 2)))
-        shown = [vk]
+        shown = [vk, VarKey("x", lineage=FUSELAGE)]  # collide, so a segment shows
         assert DisplayScope(anchor=AIRCRAFT, shown=shown).name(vk) == "Wing2.x"
         assert (
             DisplayScope(anchor=AIRCRAFT, shown=shown, excluded={"modelnums"}).name(vk)
@@ -317,7 +317,8 @@ class TestVarKeyComposition:
         """Index follows the name in latex just as it does in text."""
         veckey = VarKey("c", lineage=SPAR, shape=(3,))
         el = VarKey("c", lineage=SPAR, shape=(3,), idx=(1,), veckey=veckey)
-        scope = DisplayScope(anchor=WING, shown=[el])
+        other = VarKey("c", lineage=WING + (("Skin", 0),))  # collide, so Spar shows
+        scope = DisplayScope(anchor=WING, shown=[el, other])
         assert el.latex(scope) == r"{c}_{\text{spar}}[1]"
 
     def test_latex_and_text_agree_on_ordering(self):
