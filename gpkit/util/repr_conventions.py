@@ -148,6 +148,15 @@ def extract_subscript(name: str):
     return None
 
 
+def merge_subscript(name: str, sub: str) -> str:
+    "Append sub to name's existing LaTeX subscript, or give it a new one."
+    extracted = extract_subscript(name)
+    if extracted is not None:
+        base_name, existing = extracted
+        return "%s_{%s,%s}" % (base_name, existing, sub)
+    return "{%s}_{%s}" % (name, sub)
+
+
 def latexify(name: str) -> str:
     """Convert a variable name to a LaTeX base string.
 
