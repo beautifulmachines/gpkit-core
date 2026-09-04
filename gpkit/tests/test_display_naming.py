@@ -3,6 +3,7 @@
 import pytest
 
 from gpkit.display import DisplayScope
+from gpkit.util.repr_conventions import also_excluding
 from gpkit.varkey import VarKey
 
 AIRCRAFT = (("Aircraft", 0),)
@@ -77,7 +78,7 @@ class TestAscendingPaths:
         assert scope.name(W) == "...W"
 
     def test_globally_unique_foreign_name_still_qualified(self):
-        """Finding 6: uniqueness does not license rendering a foreign var bare.
+        """Uniqueness does not license rendering a foreign variable bare.
 
         `eta` collides with nothing anywhere, but it does not live under the
         anchor, so a bare `eta` would tell the reader it is the anchor's own.
@@ -191,7 +192,7 @@ class TestLatex:
 
 
 class TestScopeIdentity:
-    """Scopes are cheap values: hashable and comparable (trace R4)."""
+    """Scopes are cheap values: hashable and comparable."""
 
     def test_equal_scopes_compare_and_hash_equal(self):
         S = VarKey("S", lineage=WING)
@@ -230,3 +231,99 @@ def test_relative_path_rendering(anchor, lineage, expected):
     """The path rule alone, with nothing to shorten against."""
     x = VarKey("x", lineage=lineage)
     assert DisplayScope(anchor=anchor).name(x) == expected
+
+
+class TestFormatFlags:
+    """A scope carries format flags and goes where a bare flag set went."""
+
+    def test_membership_and_iteration(self):
+        scope = DisplayScope(excluded={"units", "idx"})
+        assert "units" in scope
+        assert "vec" not in scope
+        assert set(scope) == {"units", "idx"}
+
+    def test_also_excluding_preserves_the_scope(self):
+        S = VarKey("S", lineage=WING)
+        scope = DisplayScope(anchor=WING, shown=[S], excluded={"units"})
+        narrowed = scope.also_excluding("ast_units")
+        assert narrowed.excluded == {"units", "ast_units"}
+        assert narrowed.anchor == scope.anchor
+        assert narrowed.shown == scope.shown
+
+    def test_also_excluding_a_bare_set(self):
+        """Callers that never build a scope keep getting a plain flag set."""
+        assert also_excluding({"units"}, "root") == frozenset({"units", "root"})
+
+    def test_lineage_flag_suppresses_the_path(self):
+        m = VarKey("m", lineage=TANK)
+        scope = DisplayScope(anchor=WING, shown=[m], excluded={"lineage"})
+        assert scope.name(m) == "m"
+        assert scope.latex(m) == "m"
+
+    def test_modelnums_flag_drops_instance_numbers(self):
+        vk = VarKey("x", lineage=(("Aircraft", 0), ("Wing", 2)))
+        shown = [vk]
+        assert DisplayScope(anchor=AIRCRAFT, shown=shown).name(vk) == "Wing2.x"
+        assert (
+            DisplayScope(anchor=AIRCRAFT, shown=shown, excluded={"modelnums"}).name(vk)
+            == "Wing.x"
+        )
+
+    def test_scope_is_hashable_for_render_caches(self):
+        """parse_ast caches rendered strings keyed on the threaded context."""
+        S = VarKey("S", lineage=WING)
+        scope = DisplayScope(anchor=WING, shown=[S], excluded={"units"})
+        assert {scope: 1}[scope] == 1
+
+
+class TestVarKeyComposition:
+    """VarKey.str_without/latex accept a scope and compose path + name + idx."""
+
+    def test_str_without_uses_the_scope(self):
+        t = VarKey("t", lineage=SPAR)
+        scope = DisplayScope(anchor=WING, shown=[t])
+        assert t.str_without(scope) == "t"
+        assert t.str_without({"units"}) == "Aircraft.Wing.Spar.t"
+
+    def test_vector_parent_gets_a_slice_suffix(self):
+        c = VarKey("c", lineage=SPAR, shape=(3,))
+        scope = DisplayScope(anchor=WING, shown=[c])
+        assert c.str_without(scope) == "c[:]"
+
+    def test_vector_element_gets_its_index(self):
+        veckey = VarKey("c", lineage=SPAR, shape=(3,))
+        el = VarKey("c", lineage=SPAR, shape=(3,), idx=(1,), veckey=veckey)
+        scope = DisplayScope(anchor=WING, shown=[el])
+        assert el.str_without(scope) == "c[1]"
+
+    def test_idx_flag_suppresses_the_suffix(self):
+        veckey = VarKey("c", lineage=SPAR, shape=(3,))
+        el = VarKey("c", lineage=SPAR, shape=(3,), idx=(1,), veckey=veckey)
+        scope = DisplayScope(anchor=WING, shown=[el], excluded={"idx"})
+        assert el.str_without(scope) == "c"
+
+    def test_latex_puts_the_path_in_the_subscript(self):
+        spar_t = VarKey("t", lineage=SPAR)
+        skin_t = VarKey("t", lineage=WING + (("Skin", 0),))
+        scope = DisplayScope(anchor=WING, shown=[spar_t, skin_t])
+        assert spar_t.latex(scope) == r"{t}_{\text{spar}}"
+
+    def test_latex_vector_parent_wears_the_arrow(self):
+        c = VarKey("c", lineage=SPAR, shape=(3,))
+        scope = DisplayScope(anchor=SPAR, shown=[c])
+        assert c.latex(scope) == r"\vec{c}"
+
+    def test_latex_element_uses_brackets_not_a_subscript(self):
+        """Index follows the name in latex just as it does in text."""
+        veckey = VarKey("c", lineage=SPAR, shape=(3,))
+        el = VarKey("c", lineage=SPAR, shape=(3,), idx=(1,), veckey=veckey)
+        scope = DisplayScope(anchor=WING, shown=[el])
+        assert el.latex(scope) == r"{c}_{\text{spar}}[1]"
+
+    def test_latex_and_text_agree_on_ordering(self):
+        """Both formats read path, then name, then index."""
+        veckey = VarKey("c", lineage=TANK, shape=(2,))
+        el = VarKey("c", lineage=TANK, shape=(2,), idx=(0,), veckey=veckey)
+        scope = DisplayScope(anchor=WING, shown=[el])
+        assert el.str_without(scope) == "..Fuselage.Tank.c[0]"
+        assert el.latex(scope) == r"{c}_{\text{..},\text{fuselage},\text{tank}}[0]"

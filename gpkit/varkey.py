@@ -5,6 +5,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from typing import Any
 
+from .display.naming import DisplayScope
 from .units import qty
 from .util.repr_conventions import ReprMixin, latexify, merge_subscript
 from .util.small_classes import Count
@@ -160,6 +161,8 @@ class VarKey(ReprMixin):
 
     def str_without(self, excluded=()):  # noqa: PLR0912
         "Returns string without certain fields (such as 'lineage')."
+        if isinstance(excluded, DisplayScope):
+            return self._decorate(excluded.name(self), excluded)
         name = self.name
         if "lineage" not in excluded and self.lineage:
             namespace = self.lineagestr("modelnums" not in excluded).split(".")
@@ -189,11 +192,16 @@ class VarKey(ReprMixin):
                         namespace = None
             if namespace:
                 name = ".".join(namespace) + "." + name
-        if "idx" not in excluded:
-            if self.idx:
-                name += f"[{','.join(map(str, self.idx))}]"
-            elif "vec" not in excluded and self.shape:
-                name += "[:]"
+        return self._decorate(name, excluded)
+
+    def _decorate(self, name, excluded):
+        "Append the index suffix a vector element or vector parent displays."
+        if "idx" in excluded:
+            return name
+        if self.idx:
+            return name + f"[{','.join(map(str, self.idx))}]"
+        if "vec" not in excluded and self.shape:
+            return name + "[:]"
         return name
 
     __repr__ = str_without
@@ -259,6 +267,8 @@ class VarKey(ReprMixin):
 
     def latex(self, excluded=()):
         "Returns latex representation."
+        if isinstance(excluded, DisplayScope):
+            return self._latex_scoped(excluded)
         name = latexify(self.name)
         if "vec" not in excluded and "idx" not in excluded and self.shape:
             name = "\\vec{%s}" % name
@@ -279,6 +289,28 @@ class VarKey(ReprMixin):
                     r"\text{" + n.lower() + "}" for n, _ in namespace
                 )
                 name = merge_subscript(name, lineage_sub)
+        return name
+
+    def _latex_scoped(self, scope):
+        """Latex name composed in the same order as str_without.
+
+        The scope's path takes the subscript, latex's prefix slot, and the
+        index follows in brackets.  A whole vector wears the arrow that "[:]"
+        stands for in text; an element is identified by its brackets instead.
+        """
+        name = latexify(self.name)
+        if (
+            self.shape
+            and not self.idx
+            and "vec" not in scope.excluded
+            and "idx" not in scope.excluded
+        ):
+            name = "\\vec{%s}" % name
+        sub = scope.latex_path(self)
+        if sub:
+            name = merge_subscript(name, sub)
+        if self.idx and "idx" not in scope.excluded:
+            name += f"[{','.join(map(str, self.idx))}]"
         return name
 
     def __eq__(self, other):
