@@ -126,7 +126,7 @@ class TestReportDataclasses:
         assert d["constraint_groups"][0]["constraints"] == ["('x', '>=', '1')"]
 
     def test_to_dict_constraint_names_abbreviated_by_lineage(self):
-        """to_dict() abbreviates variable names via magic_prefix like text renderer."""
+        """to_dict() names variables via the section's scope, like the text renderer."""
 
         class _AbbrParent(Model):
             def setup(self):

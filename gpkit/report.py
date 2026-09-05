@@ -10,11 +10,11 @@ from typing import Any
 
 from .constraints.set import ConstraintSet, constraint_varkeys
 from .constraints.tight import Tight
+from .display import DisplayScope
 from .model import Model as _Model
 from .printing import _format_aligned_columns
 from .util.repr_conventions import unitstr
 from .util.small_classes import Quantity
-from .varkey import lineage_display_context
 from .varmap import VarMap
 
 
@@ -55,9 +55,9 @@ class CGroup:
 class ReportSection:
     """Format-independent intermediate representation for model reports.
 
-    lineage_map is a rendering hint (VarKey→display-depth) that allows
-    the text renderer to use section-local variable name abbreviations in
-    constraints. It is not semantic data and is excluded from to_dict().
+    scope names variables the way this section shows them: anchored at the
+    model, resolved against the variables the section displays. It is a
+    rendering concern, not semantic data, and is excluded from to_dict().
     """
 
     title: str
@@ -67,12 +67,9 @@ class ReportSection:
     fixed_variables: list  # list of VarEntry — prescribed constants
     constraint_groups: list  # list of CGroup
     lineage_path: str = ""  # dotted path e.g. "Aircraft.Wing"
-    magic_prefix: str = (
-        ""  # model.lineagestr() — stripped from variable names in renderers
-    )
     is_anonymous: bool = False  # True for bare Model(...) instances (no subclass name)
     children: list = field(default_factory=list)  # list of ReportSection
-    lineage_map: dict = field(default_factory=dict)  # NOT in to_dict
+    scope: DisplayScope = field(default_factory=DisplayScope)  # NOT in to_dict
     references: list = field(default_factory=list)  # list of str
     front_matter: str = ""  # raw text/MD prepended at root only
     toc: bool = (
@@ -86,28 +83,24 @@ class ReportSection:
     objective_direction: str = "minimize"  # "minimize" or "maximize"
 
     def _render_constraint_groups(self) -> list:
-        """Render constraint groups using the same lineage context as the text path."""
-        excluded = {"units"}
-        if self.magic_prefix:
-            excluded.add(":MAGIC:" + self.magic_prefix)
-        with lineage_display_context(self.lineage_map):
-            return [
-                {
-                    "label": cg.label,
-                    "constraints": [
-                        c.str_without(excluded) if hasattr(c, "str_without") else str(c)
-                        for c in cg.constraints
-                    ],
-                }
-                for cg in self.constraint_groups
-            ]
+        """Render constraint groups the same way the text path does."""
+        scope = self.scope.also_excluding("units")
+        return [
+            {
+                "label": cg.label,
+                "constraints": [
+                    c.str_without(scope) if hasattr(c, "str_without") else str(c)
+                    for c in cg.constraints
+                ],
+            }
+            for cg in self.constraint_groups
+        ]
 
     def to_dict(self) -> dict:
         """JSON-serializable dict (for format='dict' and future API)."""
         return {
             "title": self.title,
             "lineage_path": self.lineage_path,
-            "magic_prefix": self.magic_prefix,
             "objective_direction": self.objective_direction,
             "objective_label": self.objective_label,
             "is_anonymous": self.is_anonymous,
@@ -183,10 +176,10 @@ def _resolve_sensitivity(vk, solution=None):
 # ── Constraint rendering ──────────────────────────────────────────────────────
 
 
-def _render_constraint(c) -> str:
-    """Render a constraint, stripping units but respecting active lineage context."""
+def _render_constraint(c, scope) -> str:
+    "Render a constraint, naming its variables as scope says to."
     try:
-        return c.str_without({"units"})
+        return c.str_without(scope)
     except AttributeError:
         return str(c)
 
@@ -194,14 +187,12 @@ def _render_constraint(c) -> str:
 # ── Core builder helpers ──────────────────────────────────────────────────────
 
 
-def _make_var_entry(
-    display_vk, excluded, get_val_units, solution, source=""
-) -> VarEntry:
+def _make_var_entry(display_vk, scope, get_val_units, solution, source="") -> VarEntry:
     "Build a VarEntry for display_vk using the provided value-lookup callable."
     value, units_str = get_val_units(display_vk)
     return VarEntry(
-        name=display_vk.str_without(excluded),
-        latex=display_vk.latex(excluded),
+        name=display_vk.str_without(scope),
+        latex=display_vk.latex(scope),
         value=value,
         sensitivity=_resolve_sensitivity(display_vk, solution=solution),
         units=units_str,
@@ -222,19 +213,19 @@ def _is_free_vk(display_vk, solution, model) -> bool:
 
 
 def _build_split_var_entries(
-    model, solution, extra_vks=None
+    model, solution, scope, extra_vks=None
 ) -> tuple[list[VarEntry], list[VarEntry]]:
     """Build (free_entries, fixed_entries) from model.own_varkeys.
 
     free_entries  — Optimized Variables: solved by the optimizer (no sens shown).
     fixed_entries — Fixed Variables: prescribed constants with sensitivities.
 
-    Local variables: names disambiguated within the section scope using
-    _name_collision_varkeys; model's own lineage stripped so only sub-model
-    context is shown. Vector variables collapsed to a single VarEntry.
+    Names come from scope, so a variable this model owns shows only the context
+    below it and one owned elsewhere shows its path relative to here. Vector
+    variables collapse to a single VarEntry.
 
-    Cross-model variables (extra_vks): full dotted name stored in
-    VarEntry.source for display in brackets.
+    Cross-model variables (extra_vks) additionally store their absolute dotted
+    name in VarEntry.source, for display in brackets.
     """
     display_map: VarMap = (
         solution.variables if solution is not None else model.substitutions
@@ -246,47 +237,43 @@ def _build_split_var_entries(
         except KeyError:
             return None, unitstr(vk) or "-"
 
-    lineage_map = model._name_collision_varkeys
-    excluded = {":MAGIC:" + model.lineagestr()} if model.lineagestr() else set()
     free_entries: list[VarEntry] = []
     fixed_entries: list[VarEntry] = []
     seen_veckeys: set = set()
 
-    with lineage_display_context(lineage_map):
-        for vk in sorted(model.own_varkeys, key=lambda v: v.ref):
-            if vk.veckey is not None:
-                if vk.veckey in seen_veckeys:
-                    continue
-                seen_veckeys.add(vk.veckey)
-                display_vk = vk.veckey
-            else:
-                display_vk = vk
-            entry = _make_var_entry(display_vk, excluded, _get_value_units, solution)
-            if _is_free_vk(display_vk, solution, model):
-                free_entries.append(entry)
-            else:
-                fixed_entries.append(entry)
+    for vk in sorted(model.own_varkeys, key=lambda v: v.ref):
+        if vk.veckey is not None:
+            if vk.veckey in seen_veckeys:
+                continue
+            seen_veckeys.add(vk.veckey)
+            display_vk = vk.veckey
+        else:
+            display_vk = vk
+        entry = _make_var_entry(display_vk, scope, _get_value_units, solution)
+        if _is_free_vk(display_vk, solution, model):
+            free_entries.append(entry)
+        else:
+            fixed_entries.append(entry)
 
     if extra_vks:
         owned_display = {(vk.veckey or vk) for vk in model.own_varkeys}
         cross_seen: set = set()
-        with lineage_display_context(lineage_map):
-            for vk in sorted(extra_vks, key=lambda v: v.ref):
-                display_vk = vk.veckey if vk.veckey is not None else vk
-                if display_vk in owned_display or display_vk in cross_seen:
-                    continue
-                cross_seen.add(display_vk)
-                entry = _make_var_entry(
-                    display_vk,
-                    excluded,
-                    _get_value_units,
-                    solution,
-                    source=display_vk.lineagestr(),
-                )
-                if _is_free_vk(display_vk, solution, model):
-                    free_entries.append(entry)
-                else:
-                    fixed_entries.append(entry)
+        for vk in sorted(extra_vks, key=lambda v: v.ref):
+            display_vk = vk.veckey if vk.veckey is not None else vk
+            if display_vk in owned_display or display_vk in cross_seen:
+                continue
+            cross_seen.add(display_vk)
+            entry = _make_var_entry(
+                display_vk,
+                scope,
+                _get_value_units,
+                solution,
+                source=display_vk.lineagestr(),
+            )
+            if _is_free_vk(display_vk, solution, model):
+                free_entries.append(entry)
+            else:
+                fixed_entries.append(entry)
 
     return free_entries, fixed_entries
 
@@ -427,13 +414,16 @@ def build_report_ir(
     is_anon = type(model) is _Model
     own_name = "" if is_anon else type(model).__name__
     lineage_path = model.lineagestr() if own_name else _parent_path
-    lineage_map = model._name_collision_varkeys
     cgroups = _build_constraint_groups(model)
+    extra_vks = (
+        constraint_varkeys(c for cg in cgroups for c in cg.constraints)
+        - model.own_varkeys
+    )
+    # One set feeds both what the section shows and how much lineage each name
+    # needs, so the two cannot disagree.
+    scope = DisplayScope(anchor=model.lineage, shown=model.own_varkeys | extra_vks)
     free_vars, fixed_vars = _build_split_var_entries(
-        model,
-        solution,
-        extra_vks=constraint_varkeys(c for cg in cgroups for c in cg.constraints)
-        - model.own_varkeys,
+        model, solution, scope, extra_vks=extra_vks
     )
     if is_anon:
         desc = {"summary": "", "assumptions": [], "references": []}
@@ -453,12 +443,11 @@ def build_report_ir(
         assumptions=desc["assumptions"],
         references=desc["references"],
         lineage_path=lineage_path,
-        magic_prefix=model.lineagestr(),
         is_anonymous=is_anon,
         free_variables=free_vars,
         fixed_variables=fixed_vars,
         constraint_groups=cgroups,
-        lineage_map=lineage_map,
+        scope=scope,
         front_matter=section_fm,
         toc=toc,
         **_build_objective(model, solution),
@@ -588,28 +577,27 @@ def _text_var_rows(
     return _format_aligned_columns(rows, align, "  ")
 
 
-def _text_cgroup_lines(constraint_groups: list, pad: str, lineage_map: dict) -> list:
+def _text_cgroup_lines(constraint_groups: list, pad: str, scope) -> list:
     "Build text lines for all constraint groups in a section."
     lines = []
     for cg in constraint_groups:
         group_header = f"Constraints ({cg.label})" if cg.label else "Constraints"
         lines.append(f"{pad}  {group_header}")
         if cg.constraints:
-            for row_line in _text_constraint_rows(cg.constraints, lineage_map):
+            for row_line in _text_constraint_rows(cg.constraints, scope):
                 lines.append(f"{pad}    {row_line}")
         lines.append("")
     return lines
 
 
-def _text_constraint_rows(constraints: list, lineage_map: dict | None = None) -> list:
+def _text_constraint_rows(constraints: list, scope=None) -> list:
     """Build aligned rows for a constraint group in text output.
 
-    lineage_map is a _name_collision_varkeys dict; activating it makes
-    variable names in constraints use section-local abbreviations.
+    scope names variables as the enclosing section shows them; without one,
+    names carry their full lineage.
     """
-    ctx = lineage_display_context(lineage_map or {})
-    with ctx:
-        c_rows = [_split_constraint_str(_render_constraint(c)) for c in constraints]
+    scope = (scope or DisplayScope()).also_excluding("units")
+    c_rows = [_split_constraint_str(_render_constraint(c, scope)) for c in constraints]
     return _format_aligned_columns(c_rows, "<<", "  ")
 
 
@@ -664,7 +652,7 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
     lines.extend(_text_prose_lines(ir, pad))
 
     # Constraint groups
-    lines.extend(_text_cgroup_lines(ir.constraint_groups, pad, ir.lineage_map))
+    lines.extend(_text_cgroup_lines(ir.constraint_groups, pad, ir.scope))
 
     # Optimized Variables table (primal — no sensitivity column)
     if ir.free_variables:
@@ -787,21 +775,20 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
     lines.extend(_md_prose_lines(ir))
 
     # Constraint groups
-    excluded = ("units", ":MAGIC:" + ir.magic_prefix) if ir.magic_prefix else ("units",)
+    scope = ir.scope.also_excluding("units")
     for cg in ir.constraint_groups:
         group_header = f"**Constraints: {cg.label}**" if cg.label else "**Constraints**"
         lines.append(group_header)
         lines.append("")
-        with lineage_display_context(ir.lineage_map):
-            lines.append("$$\\begin{aligned}")
-            for c in cg.constraints:
-                if hasattr(c, "latex"):
-                    c_latex = c.latex(excluded, aligned=True)
-                else:
-                    c_latex = str(c)
-                lines.append(f"{c_latex} \\\\")
-            lines.append("\\end{aligned}$$")
-            lines.append("")
+        lines.append("$$\\begin{aligned}")
+        for c in cg.constraints:
+            if hasattr(c, "latex"):
+                c_latex = c.latex(scope, aligned=True)
+            else:
+                c_latex = str(c)
+            lines.append(f"{c_latex} \\\\")
+        lines.append("\\end{aligned}$$")
+        lines.append("")
 
     # Optimized Variables pipe table (no sensitivity column)
     if ir.free_variables:

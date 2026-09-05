@@ -14,11 +14,11 @@
 
 
 
-     ┃┓         ┓          ┓
-     ┃┃         ┃          ┣╸AircraftPerf╶⎨
-     ┃┃         ┣╸Outbound ┛
-     ┃┃         ┃          ┣╸z_bre ≥ g·R·T/(h_fuel·eta_0·W)
-     ┃┃         ┛          ┣╸W_fuel/W ≥ z_bre^1 + z_bre²/2 + z_bre³/6 + z_bre⁴/24
+     ┃┓         ┓
+     ┃┃         ┃
+     ┃┃         ┣╸Outbound╶⎨
+     ┃┃         ┃
+     ┃┃         ┛
      ┃┃         ┓        ┓
      ┃┣╸Mission ┃        ┣╸AircraftPerf╶⎨
      ┃┃         ┣╸Return ┛

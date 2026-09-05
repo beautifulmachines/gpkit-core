@@ -55,27 +55,28 @@ class TestDescendants:
         assert scope.name(b) == "Ply.t"
 
 
-class TestAscendingPaths:
-    """Variables outside the anchor render as relative paths, never bare."""
+class TestForeignVariables:
+    """Variables the anchor does not contain get a full path, never a bare name."""
 
-    def test_sibling_branch_gets_up_marker(self):
-        """The `..` case: up to the common ancestor, then down the sibling."""
+    def test_sibling_branch_gets_a_full_path(self):
+        """A variable in a sibling branch is named by its full path."""
         m = VarKey("m", lineage=TANK)
         scope = DisplayScope(anchor=WING, shown=[m])
-        assert scope.name(m) == "..Fuselage.Tank.m"
+        assert scope.name(m) == "Aircraft.Fuselage.Tank.m"
         assert not scope.owns(m)
 
     def test_ancestor_variable(self):
-        """A variable owned by a parent model ascends with no descent."""
+        """A parent's variable is not below the anchor, so it gets a full path."""
         W = VarKey("W", lineage=AIRCRAFT)
         scope = DisplayScope(anchor=WING, shown=[W])
-        assert scope.name(W) == "..W"
+        assert scope.name(W) == "Aircraft.W"
 
-    def test_ascent_depth_shows_in_marker(self):
-        """N levels up is a run of N+1 dots."""
-        W = VarKey("W", lineage=AIRCRAFT)
-        scope = DisplayScope(anchor=SPAR, shown=[W])
-        assert scope.name(W) == "...W"
+    def test_name_does_not_depend_on_anchor_depth(self):
+        """The same foreign variable reads the same in every section."""
+        m = VarKey("m", lineage=TANK)
+        shallow = DisplayScope(anchor=WING, shown=[m])
+        deep = DisplayScope(anchor=SPAR, shown=[m])
+        assert shallow.name(m) == deep.name(m) == "Aircraft.Fuselage.Tank.m"
 
     def test_globally_unique_foreign_name_still_qualified(self):
         """Uniqueness does not license rendering a foreign variable bare.
@@ -86,21 +87,60 @@ class TestAscendingPaths:
         eta = VarKey("eta", lineage=(("Motor", 0),))
         S = VarKey("S", lineage=WING)
         scope = DisplayScope(anchor=WING, shown=[eta, S])
-        assert scope.name(eta) == "...Motor.eta"
+        assert scope.name(eta) == "Motor.eta"
 
-    def test_ascending_path_is_not_shortened(self):
-        """Ascending paths stay full-length even with nothing to collide with."""
+    def test_foreign_path_is_not_shortened(self):
+        """Foreign paths stay full-length even with nothing to collide with."""
         m = VarKey("m", lineage=TANK)
         scope = DisplayScope(anchor=WING, shown=[m])
-        assert scope.name(m) == "..Fuselage.Tank.m"
+        assert scope.name(m) == "Aircraft.Fuselage.Tank.m"
 
-    def test_descendant_widens_around_a_foreign_name(self):
-        """A fixed ascending name is still an obstacle descendants widen past."""
+    def test_descendant_shortens_past_a_foreign_name(self):
+        """A foreign full path does not force a local name to widen."""
         foreign = VarKey("t", lineage=(("Motor", 0),))
         spar_t = VarKey("t", lineage=SPAR)
         scope = DisplayScope(anchor=WING, shown=[foreign, spar_t])
-        assert scope.name(foreign) == "...Motor.t"
+        assert scope.name(foreign) == "Motor.t"
         assert scope.name(spar_t) == "t"
+
+
+class TestAbbreviate:
+    """With a legend published alongside, foreign names shorten too."""
+
+    def test_foreign_names_shorten(self):
+        m = VarKey("m", lineage=TANK)
+        S = VarKey("S", lineage=WING)
+        scope = DisplayScope(anchor=WING, shown=[m, S], abbreviate=True)
+        assert scope.name(m) == "m"
+        assert scope.name(S) == "S"
+
+    def test_legend_locates_what_was_shortened(self):
+        m = VarKey("m", lineage=TANK)
+        S = VarKey("S", lineage=WING)
+        scope = DisplayScope(anchor=WING, shown=[m, S], abbreviate=True)
+        assert scope.legend() == {"m": "Aircraft.Fuselage.Tank.m"}
+
+    def test_legend_keys_are_the_names_actually_shown(self):
+        """Names and legend come from one resolution, so they cannot disagree."""
+        foreign = [VarKey("m", lineage=TANK), VarKey("m", lineage=(("Motor", 0),))]
+        scope = DisplayScope(anchor=WING, shown=foreign, abbreviate=True)
+        legend = scope.legend()
+        assert set(legend) == {scope.name(vk) for vk in foreign}
+        assert legend == {"Tank.m": "Aircraft.Fuselage.Tank.m", "Motor.m": "Motor.m"}
+
+    def test_legend_covers_foreign_names_without_abbreviating(self):
+        """Full paths are still worth a legend when they are long."""
+        m = VarKey("m", lineage=TANK)
+        scope = DisplayScope(anchor=WING, shown=[m])
+        assert scope.legend() == {
+            "Aircraft.Fuselage.Tank.m": "Aircraft.Fuselage.Tank.m"
+        }
+
+    def test_locals_are_not_in_the_legend(self):
+        """The section heading already says where its own variables live."""
+        S = VarKey("S", lineage=WING)
+        t = VarKey("t", lineage=SPAR)
+        assert DisplayScope(anchor=WING, shown=[S, t]).legend() == {}
 
 
 class TestDegenerateCases:
@@ -121,24 +161,24 @@ class TestDegenerateCases:
         assert scope.name(c) == "F_tip"
 
     def test_empty_scope(self):
-        """An empty scope still names keys, at full relative path."""
+        """An empty scope still names keys, unshortened."""
         x = VarKey("x", lineage=WING)
         scope = DisplayScope(anchor=AIRCRAFT)
         assert scope.name(x) == "Wing.x"
 
 
 class TestUnshownKeys:
-    """Keys the scope was not told about get their full relative path."""
+    """Keys the scope was not told about are never shortened."""
 
     def test_unshown_descendant_is_not_shortened(self):
         t = VarKey("t", lineage=SPAR)
         scope = DisplayScope(anchor=WING, shown=[VarKey("S", lineage=WING)])
         assert scope.name(t) == "Spar.t"
 
-    def test_unshown_foreign_key_still_ascends(self):
+    def test_unshown_foreign_key_gets_a_full_path(self):
         m = VarKey("m", lineage=TANK)
         scope = DisplayScope(anchor=WING, shown=[VarKey("S", lineage=WING)])
-        assert scope.name(m) == "..Fuselage.Tank.m"
+        assert scope.name(m) == "Aircraft.Fuselage.Tank.m"
 
 
 class TestVectors:
@@ -179,10 +219,11 @@ class TestLatex:
         scope = DisplayScope(anchor=WING, shown=[spar_t, skin_t])
         assert scope.latex(spar_t) == r"{t}_{\text{spar}}"
 
-    def test_ascending_path_marks_the_ascent(self):
+    def test_foreign_path_fills_the_subscript(self):
         m = VarKey("m", lineage=TANK)
         scope = DisplayScope(anchor=WING, shown=[m])
-        assert scope.latex(m) == r"{m}_{\text{..},\text{fuselage},\text{tank}}"
+        expected = r"{m}_{\text{aircraft},\text{fuselage},\text{tank}}"
+        assert scope.latex(m) == expected
 
     def test_merges_into_an_existing_subscript(self):
         """A name that latexifies to a subscript keeps it, path appended."""
@@ -222,12 +263,12 @@ class TestScopeIdentity:
         ((), WING, "Aircraft.Wing.x"),
         (AIRCRAFT, WING, "Wing.x"),
         (WING, WING, "x"),
-        (WING, AIRCRAFT, "..x"),
-        (WING, FUSELAGE, "..Fuselage.x"),
-        (SPAR, FUSELAGE, "...Fuselage.x"),
+        (WING, AIRCRAFT, "Aircraft.x"),
+        (WING, FUSELAGE, "Aircraft.Fuselage.x"),
+        (SPAR, FUSELAGE, "Aircraft.Fuselage.x"),
     ],
 )
-def test_relative_path_rendering(anchor, lineage, expected):
+def test_path_rendering(anchor, lineage, expected):
     """The path rule alone, with nothing to shorten against."""
     x = VarKey("x", lineage=lineage)
     assert DisplayScope(anchor=anchor).name(x) == expected
@@ -326,5 +367,6 @@ class TestVarKeyComposition:
         veckey = VarKey("c", lineage=TANK, shape=(2,))
         el = VarKey("c", lineage=TANK, shape=(2,), idx=(0,), veckey=veckey)
         scope = DisplayScope(anchor=WING, shown=[el])
-        assert el.str_without(scope) == "..Fuselage.Tank.c[0]"
-        assert el.latex(scope) == r"{c}_{\text{..},\text{fuselage},\text{tank}}[0]"
+        assert el.str_without(scope) == "Aircraft.Fuselage.Tank.c[0]"
+        expected = r"{c}_{\text{aircraft},\text{fuselage},\text{tank}}[0]"
+        assert el.latex(scope) == expected
