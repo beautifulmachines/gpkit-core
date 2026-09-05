@@ -374,13 +374,13 @@ class TestVarKeyComposition:
         scope = DisplayScope(anchor=SPAR, shown=[c])
         assert c.latex(scope) == r"\vec{c}"
 
-    def test_latex_element_uses_brackets_not_a_subscript(self):
-        """Index follows the name in latex just as it does in text."""
+    def test_latex_element_index_ends_the_subscript(self):
+        """Index follows the path in latex, as it follows the name in text."""
         veckey = VarKey("c", lineage=SPAR, shape=(3,))
         el = VarKey("c", lineage=SPAR, shape=(3,), idx=(1,), veckey=veckey)
         other = VarKey("c", lineage=WING + (("Skin", 0),))  # collide, so Spar shows
         scope = DisplayScope(anchor=WING, shown=[el, other])
-        assert el.latex(scope) == r"{c}_{\text{spar}}[1]"
+        assert el.latex(scope) == r"{c}_{\text{spar},1}"
 
     def test_latex_and_text_agree_on_ordering(self):
         """Both formats read path, then name, then index."""
@@ -388,5 +388,5 @@ class TestVarKeyComposition:
         el = VarKey("c", lineage=TANK, shape=(2,), idx=(0,), veckey=veckey)
         scope = DisplayScope(anchor=WING, shown=[el])
         assert el.str_without(scope) == "Aircraft.Fuselage.Tank.c[0]"
-        expected = r"{c}_{\text{aircraft},\text{fuselage},\text{tank}}[0]"
+        expected = r"{c}_{\text{aircraft},\text{fuselage},\text{tank},0}"
         assert el.latex(scope) == expected

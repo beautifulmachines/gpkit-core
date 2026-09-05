@@ -292,11 +292,12 @@ class VarKey(ReprMixin):
         return name
 
     def _latex_scoped(self, scope):
-        """Latex name composed in the same order as str_without.
+        """Latex name composed in the same order str_without uses.
 
-        The scope's path takes the subscript, latex's prefix slot, and the
-        index follows in brackets.  A whole vector wears the arrow that "[:]"
-        stands for in text; an element is identified by its brackets instead.
+        Both parts share the subscript, latex's prefix slot, in the order text
+        writes them: path first, then index -- so `Spar.c[1]` sets as
+        {c}_{spar,1}.  A whole vector wears the arrow that "[:]" stands for in
+        text; an element is identified by its index instead.
         """
         name = latexify(self.name)
         if (
@@ -306,12 +307,10 @@ class VarKey(ReprMixin):
             and "idx" not in scope.excluded
         ):
             name = "\\vec{%s}" % name
-        sub = scope.latex_path(self)
-        if sub:
-            name = merge_subscript(name, sub)
+        parts = [p for p in (scope.latex_path(self),) if p]
         if self.idx and "idx" not in scope.excluded:
-            name += f"[{','.join(map(str, self.idx))}]"
-        return name
+            parts.append(",".join(map(str, self.idx)))
+        return merge_subscript(name, ",".join(parts)) if parts else name
 
     def __eq__(self, other):
         if isinstance(other, str):
