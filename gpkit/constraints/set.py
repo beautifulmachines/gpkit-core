@@ -7,7 +7,7 @@ from functools import cached_property
 import numpy as np
 
 from ..nomials import NomialArray, Variable
-from ..util.repr_conventions import ReprMixin, lineagestr
+from ..util.repr_conventions import ReprMixin, also_excluding, lineagestr
 from ..util.small_scripts import try_str_without
 from ..varkey import lineage_display_context
 from ..varmap import VarMap, VarSet, _collision_depths
@@ -231,10 +231,9 @@ class ConstraintSet(list, ReprMixin):
 
     def lines_without(self, excluded):
         "Lines representation of a ConstraintSet."
-        excluded = frozenset(excluded)
         root, rootlines = "root" not in excluded, []
         if root:
-            excluded = {"root"}.union(excluded)
+            excluded = also_excluding(excluded, "root")
             ctx = lineage_display_context(self._name_collision_varkeys)
         else:
             ctx = nullcontext()
@@ -254,7 +253,7 @@ class ConstraintSet(list, ReprMixin):
         lines = []
         root = "root" not in excluded
         if root:
-            excluded += ("root",)
+            excluded = also_excluding(excluded, "root")
             lines.append("\\begin{array}{ll} \\text{}")
             if hasattr(self, "_rootlatex"):
                 lines.append(self._rootlatex(excluded))

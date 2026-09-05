@@ -6,21 +6,24 @@ relative to some node of that tree.  ``DisplayScope`` is that node plus the set
 of variables being displayed alongside it, and it answers the single question:
 *given this variable and this place I am showing it, what do I call it?*
 
-One rule::
+One rule: a variable below the anchor is named by its path down from the
+anchor, shortened until unambiguous among `shown`; any other variable is named
+by its full path.  So a section anchored at ``Aircraft.Wing`` calls its own
+``S`` just ``S``, a sub-model's variable ``Spar.t``, and one owned elsewhere
+``Aircraft.Fuselage.Tank.m`` -- never a bare name, which would imply it was
+local.
 
-    render vk's path relative to `anchor`, then shorten it to the shortest
-    form that stays unambiguous among `shown`
+``abbreviate`` shortens the foreign names too, for renderers that publish
+``legend()`` alongside to say where they live.
 
-A variable at or below the anchor renders as a suffix of its descent path
-(``t``, ``Spar.t``).  A variable outside the anchor renders as an ascending
-relative path (``..Fuselage.Tank.m``), which is never shortened: a shortened
-suffix still resolves under the anchor, but an ascending path with segments
-removed denotes a different node.  So a foreign variable never renders as a
-bare name, however unique that name happens to be.
+A scope also carries ``excluded``, the format flags saying which parts to show.
+Naming and formatting stay separate concerns, but share one lifetime and one
+call path, so a scope is what gets threaded through rendering.
 """
 
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass, replace
+from functools import lru_cache
 
 from ..util.repr_conventions import latexify, merge_subscript
 
@@ -34,21 +37,66 @@ def _segments(lineage: Lineage, modelnums: bool = True) -> list[str]:
     ]
 
 
-def _kept(descent: Lineage, depth: int) -> Lineage:
-    "The last `depth` segments of a descent path."
-    return descent[len(descent) - depth :] if depth else ()
+def _kept(path: Lineage, depth: int) -> Lineage:
+    "The last `depth` segments of a path."
+    return path[len(path) - depth :] if depth else ()
 
 
-def _render(ascent: int, descent: list[str], name: str) -> str:
-    """Join an ascent count, descent segments, and a variable name into a path.
+def _contains(anchor: Lineage, lineage: Lineage) -> bool:
+    "Whether `lineage` names a node at or below `anchor`."
+    return lineage[: len(anchor)] == anchor
 
-    An ascent of N is written as a segment of N dots, so joining on "." yields
-    the familiar relative-path prefix: one level up is "..name".
+
+@lru_cache(maxsize=256)
+def _resolve(anchor: Lineage, shown: frozenset, abbreviate: bool) -> dict:
+    """Displayed path for every key in `shown`, as {canonical key: lineage}.
+
+    Vector elements resolve through their parent veckey, so siblings share one
+    name and never count as colliding with each other.  Memoized because a
+    section renders many constraints against one scope.
     """
-    parts = ["." * ascent] if ascent else []
-    parts.extend(descent)
-    parts.append(name)
-    return ".".join(parts)
+    # Names shorten against the full lineage, not the part below the anchor, so
+    # one sitting at the anchor can still grow a path when it has to share a
+    # name with a variable declared outside any model.
+    paths, shortenable = {}, {}
+    for vk in shown:
+        key = vk.veckey or vk
+        if key in paths:
+            continue
+        paths[key] = key.lineage or ()
+        shortenable[key] = abbreviate or _contains(anchor, paths[key])
+
+    resolved = {k: v for k, v in paths.items() if not shortenable[k]}
+    depths = dict.fromkeys((k for k in paths if shortenable[k]), 0)
+    # How far a name may grow before it starts naming models the section is
+    # already inside: those segments say nothing a reader does not know.
+    inside = {
+        key: len(paths[key]) - len(anchor) * _contains(anchor, paths[key])
+        for key in depths
+    }
+
+    while True:
+        groups = defaultdict(list)
+        for key, depth in depths.items():
+            shown_as = _segments(_kept(paths[key], depth)) + [key.name]
+            groups[tuple(shown_as)].append(key)
+        widened = False
+        for keys in groups.values():
+            if len(keys) == 1:
+                continue
+            # Widen every member that still has section-local path to give;
+            # only when none has do names reach outside the section.
+            movers = [k for k in keys if depths[k] < inside[k]]
+            for key in movers or keys:
+                if depths[key] < len(paths[key]):
+                    depths[key] += 1
+                    widened = True
+        if not widened:
+            break
+
+    for key, depth in depths.items():
+        resolved[key] = _kept(paths[key], depth)
+    return resolved
 
 
 @dataclass(frozen=True)
@@ -58,115 +106,96 @@ class DisplayScope:
     Arguments
     ---------
     anchor : tuple
-        Lineage tuple of the model-tree node this display context sits at.
-        Paths are rendered relative to it.  ``()`` (the default) anchors at the
-        root, reducing the rule to "shortest unambiguous suffix".
+        Lineage of the model-tree node this display sits at.  ``()`` contains
+        everything, reducing the rule to "shortest unambiguous suffix".
     shown : iterable of VarKey
-        The VarKeys displayed together here; determines how much of each path
+        The VarKeys displayed together here, which set how much of each path
         is needed to stay unambiguous.
+    excluded : iterable of str
+        Format flags ("units", "idx", "vec", "lineage", "modelnums", ...).  A
+        scope goes anywhere a bare set of these does, and supports ``in``.
+    abbreviate : bool
+        Shorten variables the anchor does not contain.  Set only when
+        rendering ``legend()`` nearby, which says where they live.
 
-    Whether a variable is *owned* by this context is derived, not passed: it is
-    owned exactly when its lineage is at or below ``anchor``.  Keeping that
-    derived is what makes a display-set/collision-scope mismatch unrepresentable.
+    Ownership is derived from `anchor`, not passed, so it cannot disagree with
+    the shortening about what this section contains.
     """
 
     anchor: Lineage = ()
     shown: frozenset = frozenset()
-
-    _paths: dict = field(
-        default_factory=dict, init=False, repr=False, compare=False, hash=False
-    )
+    excluded: frozenset = frozenset()
+    abbreviate: bool = False
 
     def __post_init__(self):
         object.__setattr__(self, "anchor", tuple(self.anchor or ()))
         object.__setattr__(self, "shown", frozenset(self.shown or ()))
-        object.__setattr__(self, "_paths", self._resolve())
+        object.__setattr__(self, "excluded", frozenset(self.excluded or ()))
+
+    # -- format-flag protocol, so a scope goes wherever a flag set went ------
+
+    def __contains__(self, flag) -> bool:
+        return flag in self.excluded
+
+    def __iter__(self):
+        return iter(self.excluded)
+
+    def also_excluding(self, *flags) -> "DisplayScope":
+        "This scope with additional format flags set."
+        return replace(self, excluded=self.excluded.union(flags))
 
     # -- the naming rule ---------------------------------------------------
 
-    def _relative(self, vk) -> tuple[int, Lineage]:
-        "Path of vk relative to the anchor, as (ascent, descent lineage)."
-        lineage = vk.lineage or ()
-        shared = 0
-        while (
-            shared < len(self.anchor)
-            and shared < len(lineage)
-            and self.anchor[shared] == lineage[shared]
-        ):
-            shared += 1
-        return len(self.anchor) - shared, lineage[shared:]
-
     def owns(self, vk) -> bool:
         "Whether vk lives at or below this scope's anchor."
-        return self._relative(vk)[0] == 0
+        return _contains(self.anchor, vk.lineage or ())
 
-    def _resolve(self) -> dict:
-        """Shortest unambiguous path for every key in `shown`.
+    def path(self, vk) -> Lineage:
+        "Lineage segments shown before vk's name; unshown keys get a full path."
+        key = vk.veckey or vk
+        resolved = _resolve(self.anchor, self.shown, self.abbreviate).get(key)
+        if resolved is not None:
+            return resolved
+        lineage = key.lineage or ()
+        return lineage[len(self.anchor) :] if self.owns(key) else lineage
 
-        Returns {canonical key: (ascent, kept descent lineage)} so that text and
-        latex render the same resolved path rather than re-deriving it.  Vector
-        elements resolve through their parent veckey, so siblings share one name
-        and never count as colliding with each other.
-        """
-        full = {}  # canonical key -> (ascent, descent lineage)
+    def legend(self) -> dict:
+        "{display name: full dotted path} for variables the anchor lacks."
+        entries = {}
         for vk in self.shown:
             key = vk.veckey or vk
-            if key not in full:
-                full[key] = self._relative(key)
-
-        # Ascending paths are fixed at full length; only descendants shorten.
-        # They cannot collide with each other: an ascending name starts with a
-        # dot and a descendant's never does.
-        resolved = {key: path for key, path in full.items() if path[0]}
-        descents = {key: full[key][1] for key in full if key not in resolved}
-        depths = dict.fromkeys(descents, 0)
-
-        while True:
-            groups = defaultdict(list)
-            for key, depth in depths.items():
-                shown_as = _segments(_kept(descents[key], depth)) + [key.name]
-                groups[tuple(shown_as)].append(key)
-            widened = False
-            for keys in groups.values():
-                if len(keys) == 1:
-                    continue
-                for key in keys:  # widen every member, not just one
-                    if depths[key] < len(descents[key]):
-                        depths[key] += 1
-                        widened = True
-            if not widened:
-                break
-
-        for key, depth in depths.items():
-            resolved[key] = (0, _kept(descents[key], depth))
-        return resolved
+            if self.owns(key):
+                continue
+            entries[self.name(key)] = ".".join(
+                _segments(key.lineage or ()) + [key.name]
+            )
+        return entries
 
     # -- the name-resolver protocol ----------------------------------------
 
     def name(self, vk) -> str:
-        """Display name for vk: its path relative to the anchor, shortened.
-
-        Keys outside `shown` get their full relative path — nothing local
-        licenses shortening a name this scope was not told about.
-        """
+        "Display name for vk; index decoration is the caller's to append."
         key = vk.veckey or vk
-        ascent, descent = self._paths.get(key) or self._relative(key)
-        return _render(ascent, _segments(descent), key.name)
+        if "lineage" in self.excluded:
+            return key.name
+        segments = _segments(self.path(key), "modelnums" not in self.excluded)
+        return ".".join(segments + [key.name])
+
+    def latex_path(self, vk) -> str:
+        'vk\'s resolved path as latex subscript content, or "" if it has none.'
+        key = vk.veckey or vk
+        if "lineage" in self.excluded:
+            return ""
+        segments = _segments(self.path(key), modelnums=False)
+        return ",".join(r"\text{" + seg.lower() + "}" for seg in segments)
 
     def latex(self, vk) -> str:
-        """Latex name for vk, with its relative path as a subscript.
+        """Latex name for vk, path in the subscript.
 
-        Mirrors ``VarKey.latex``: model numbers are dropped and segments are
-        lowercased.  An ascent of N renders as a run of N+1 dots, matching the
-        leading ".." of the text form.
+        The subscript is latex's prefix slot, so this composes in ``name``'s
+        order: path, name, then the index the caller appends.
         """
         key = vk.veckey or vk
-        ascent, descent = self._paths.get(key) or self._relative(key)
         name = latexify(key.name)
-        if not ascent and not descent:
-            return name
-        sub = [r"\text{" + "." * (ascent + 1) + "}"] if ascent else []
-        sub += [
-            r"\text{" + seg.lower() + "}" for seg in _segments(descent, modelnums=False)
-        ]
-        return merge_subscript(name, ",".join(sub))
+        sub = self.latex_path(key)
+        return merge_subscript(name, sub) if sub else name

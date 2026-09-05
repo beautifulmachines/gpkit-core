@@ -1,6 +1,6 @@
 "The shared non-mathematical backbone of all Nomials"
 
-from ..util.repr_conventions import MUL, UNICODE_EXPONENTS
+from ..util.repr_conventions import MUL, UNICODE_EXPONENTS, also_excluding
 from ..util.small_classes import FixedScalar, Numbers
 from .data import NomialData
 
@@ -97,7 +97,7 @@ class Nomial(NomialData):
                 return self.ast.latex(excluded)
             # Suppress UnitsNode via "ast_units" sentinel so it doesn't appear
             # alongside the Monomial unitstr we append below (avoids double units).
-            excluded_inner = frozenset({"ast_units"}.union(excluded))
+            excluded_inner = also_excluding(excluded, "ast_units")
             ast_latex = self.ast.latex(excluded_inner)
             units = self.unitstr(r"\mathrm{~\left[ %s \right]}", ":L~")
             units_tf = units.replace("frac", "tfrac").replace(r"\cdot", r"\cdot ")

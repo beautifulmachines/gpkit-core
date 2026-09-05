@@ -6,7 +6,7 @@ from typing import ClassVar
 import pytest
 
 import gpkit
-from gpkit import Model, Variable
+from gpkit import Model, Variable, VectorVariable
 from gpkit.constraints.tight import Tight
 from gpkit.report import (
     CGroup,
@@ -126,7 +126,7 @@ class TestReportDataclasses:
         assert d["constraint_groups"][0]["constraints"] == ["('x', '>=', '1')"]
 
     def test_to_dict_constraint_names_abbreviated_by_lineage(self):
-        """to_dict() abbreviates variable names via magic_prefix like text renderer."""
+        """to_dict() names variables via the section's scope, like the text renderer."""
 
         class _AbbrParent(Model):
             def setup(self):
@@ -819,3 +819,36 @@ class TestDisplayOrderStability:
             f"foreign vars not in a stable order: {foreign}"
         )
         assert len(foreign) == 2, f"expected two same-named foreign vars, got {foreign}"
+
+
+class TestVectorRendering:
+    """Vector variables in constraints, across text and latex."""
+
+    @staticmethod
+    def _model():
+        class Spar(Model):
+            def setup(self):
+                self.c = VectorVariable(3, "c", "m", "chord")
+                self.t = Variable("t", "m")
+                return [self.t >= 0.1 * self.c[0], self.c[1] >= self.c[2]]
+
+        return Spar()
+
+    def test_text_indexes_with_brackets(self):
+        text = self._model().report(fmt="text")
+        assert "t ≥ 0.1·c[0]" in text
+        assert "c[1] ≥ c[2]" in text
+
+    def test_whole_vector_shows_a_slice_in_its_table_row(self):
+        entries = build_report_ir(self._model()).free_variables
+        assert [v.name for v in entries if v.name.startswith("c")] == ["c[:]"]
+
+    def test_latex_element_index_ends_the_subscript(self):
+        """An element sets as {c}_{1}, not as a bracketed index in math mode."""
+        md = self._model().report(fmt="md")
+        assert r"{c}_{1} &\geq {c}_{2}" in md
+        assert "c[1]" not in md, "raw brackets leaked into latex"
+
+    def test_latex_whole_vector_wears_the_arrow(self):
+        md = self._model().report(fmt="md")
+        assert r"$\vec{c}$" in md
