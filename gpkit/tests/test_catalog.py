@@ -100,10 +100,12 @@ def structure_digest(model) -> str:
 
     def walk(section):
         lines.append(f"[{section['lineage_path'] or section['title']}]")
-        for v in section["free_variables"]:
-            lines.append(f"  free  {v['name']}")
-        for v in section["fixed_variables"]:
-            lines.append(f"  fixed {v['name']}")
+        for kind in ("free", "fixed"):
+            for v in section[f"{kind}_variables"]:
+                # source locates variables owned elsewhere, whose displayed
+                # names are shortened against this section
+                src = f"  [{v['source']}]" if v["source"] else ""
+                lines.append(f"  {kind:5} {v['name']}{src}")
         for group in section["constraint_groups"]:
             label = f" ({group['label']})" if group["label"] else ""
             for c in group["constraints"]:

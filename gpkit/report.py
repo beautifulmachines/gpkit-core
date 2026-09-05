@@ -263,12 +263,15 @@ def _build_split_var_entries(
             if display_vk in owned_display or display_vk in cross_seen:
                 continue
             cross_seen.add(display_vk)
+            # Annotate exactly what the scope could not locate by name -- the
+            # same keys legend() covers. A variable under this model shows its
+            # path already, so a source column would only repeat it.
             entry = _make_var_entry(
                 display_vk,
                 scope,
                 _get_value_units,
                 solution,
-                source=display_vk.lineagestr(),
+                source="" if scope.owns(display_vk) else display_vk.lineagestr(),
             )
             if _is_free_vk(display_vk, solution, model):
                 free_entries.append(entry)
@@ -421,7 +424,13 @@ def build_report_ir(
     )
     # One set feeds both what the section shows and how much lineage each name
     # needs, so the two cannot disagree.
-    scope = DisplayScope(anchor=model.lineage, shown=model.own_varkeys | extra_vks)
+    # abbreviate: the variable tables below list every foreign key with its
+    # owning model in VarEntry.source, so they are the legend short names need.
+    scope = DisplayScope(
+        anchor=model.lineage,
+        shown=model.own_varkeys | extra_vks,
+        abbreviate=True,
+    )
     free_vars, fixed_vars = _build_split_var_entries(
         model, solution, scope, extra_vks=extra_vks
     )

@@ -136,6 +136,26 @@ class TestAbbreviate:
             "Aircraft.Fuselage.Tank.m": "Aircraft.Fuselage.Tank.m"
         }
 
+    def test_shortened_names_still_deconflict(self):
+        """Abbreviating changes which names may shorten, never whether they clash."""
+        local = VarKey("m", lineage=SPAR)
+        foreign = VarKey("m", lineage=TANK)
+        scope = DisplayScope(anchor=WING, shown=[local, foreign], abbreviate=True)
+        assert scope.name(local) == "Spar.m"
+        assert scope.name(foreign) == "Tank.m"
+
+    def test_names_are_unique_across_everything_shown(self):
+        """A clash inside an equation would be silent corruption, so pin it."""
+        keys = [
+            VarKey("m", lineage=SPAR),
+            VarKey("m", lineage=TANK),
+            VarKey("m", lineage=AIRCRAFT),
+            VarKey("m", lineage=WING),
+            VarKey("m"),
+        ]
+        scope = DisplayScope(anchor=WING, shown=keys, abbreviate=True)
+        assert len({scope.name(vk) for vk in keys}) == len(keys)
+
     def test_locals_are_not_in_the_legend(self):
         """The section heading already says where its own variables live."""
         S = VarKey("S", lineage=WING)

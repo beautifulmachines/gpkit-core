@@ -5,8 +5,8 @@
   free  Spar1.m
   fixed f_growth_m
   fixed m_budget
-  fixed growth.theta
-  cons  m_growth ≥ growth.theta·f_growth_m·(Spar.m + Spar1.m)
+  fixed theta  [growth]
+  cons  m_growth ≥ theta·f_growth_m·(Spar.m + Spar1.m)
   cons  m ≥ Spar.m + Spar1.m + m_growth
   cons  m ≤ m_budget
 [GrowthAllowance.Spar]
@@ -16,8 +16,8 @@
   fixed f_growth_m
   fixed rho
   fixed t
-  fixed growth.theta
-  cons  m_growth ≥ growth.theta·f_growth_m·rho·t·A
+  fixed theta  [growth]
+  cons  m_growth ≥ theta·f_growth_m·rho·t·A
   cons  m ≥ rho·t·A + m_growth
 [GrowthAllowance.Spar1]
   free  m_growth
@@ -26,6 +26,6 @@
   fixed f_growth_m
   fixed rho
   fixed t
-  fixed growth.theta
-  cons  m_growth ≥ growth.theta·f_growth_m·rho·t·A
+  fixed theta  [growth]
+  cons  m_growth ≥ theta·f_growth_m·rho·t·A
   cons  m ≥ rho·t·A + m_growth

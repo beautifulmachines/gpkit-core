@@ -55,21 +55,25 @@ def _resolve(anchor: Lineage, shown: frozenset, abbreviate: bool) -> dict:
     name and never count as colliding with each other.  Memoized because a
     section renders many constraints against one scope.
     """
+    # Names shorten against the full lineage, not the part below the anchor, so
+    # one sitting at the anchor can still grow a path when it has to share a
+    # name with a variable declared outside any model.
     paths, shortenable = {}, {}
     for vk in shown:
         key = vk.veckey or vk
         if key in paths:
             continue
-        lineage = key.lineage or ()
-        if _contains(anchor, lineage):
-            paths[key] = lineage[len(anchor) :]
-            shortenable[key] = True
-        else:
-            paths[key] = lineage
-            shortenable[key] = abbreviate
+        paths[key] = key.lineage or ()
+        shortenable[key] = abbreviate or _contains(anchor, paths[key])
 
     resolved = {k: v for k, v in paths.items() if not shortenable[k]}
     depths = dict.fromkeys((k for k in paths if shortenable[k]), 0)
+    # How far a name may grow before it starts naming models the section is
+    # already inside: those segments say nothing a reader does not know.
+    inside = {
+        key: len(paths[key]) - len(anchor) * _contains(anchor, paths[key])
+        for key in depths
+    }
 
     while True:
         groups = defaultdict(list)
@@ -80,7 +84,10 @@ def _resolve(anchor: Lineage, shown: frozenset, abbreviate: bool) -> dict:
         for keys in groups.values():
             if len(keys) == 1:
                 continue
-            for key in keys:  # widen every member, not just one
+            # Widen every member that still has section-local path to give;
+            # only when none has do names reach outside the section.
+            movers = [k for k in keys if depths[k] < inside[k]]
+            for key in movers or keys:
                 if depths[key] < len(paths[key]):
                     depths[key] += 1
                     widened = True
