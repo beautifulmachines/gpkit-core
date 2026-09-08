@@ -30,7 +30,7 @@ def find_siblings(names=()):
 
 
 def run_one(repo: Path) -> bool:
-    "Run repo's tests against local gpkit-core. Returns True if they passed."
+    "Run repo's tests against local gpkit-core. Returns True if they passed and left a clean tree."
     result = subprocess.run(
         ["uv", "run", "--with-editable", str(REPO), "pytest", "tests/", "-q"],
         cwd=repo,
@@ -45,7 +45,27 @@ def run_one(repo: Path) -> bool:
         # A suite that only skips is green without checking anything; say so
         # rather than letting it read as coverage.
         print("  NOTE: nothing actually ran here — every test skipped")
-    return result.returncode == 0
+    if result.returncode != 0:
+        return False
+
+    # Catalog snapshot tests (test_catalog_snapshots) regenerate rather than
+    # assert, so a display regression against this local gpkit-core shows up
+    # only as an uncommitted diff, never as a failing test.
+    status = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=repo,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if status.stdout.strip():
+        print("  snapshot drift detected against local gpkit-core:")
+        diff = subprocess.run(
+            ["git", "diff"], cwd=repo, capture_output=True, text=True, check=False
+        )
+        print("  " + "\n  ".join(diff.stdout.splitlines()))
+        return False
+    return True
 
 
 def main():
