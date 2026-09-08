@@ -108,12 +108,14 @@ reflects whatever tag is checked out:
 To cut a release:
 
 1. Make sure `main` is green.
-2. Create a GitHub Release with a new tag, e.g.:
+2. Run:
    ```bash
-   gh release create v0.4.0 --generate-notes
+   make release VERSION=vX.Y.Z
    ```
-   (or via the GitHub UI: Releases → Draft a new release → tag `vX.Y.Z` → Generate
-   release notes → Publish.)
+   This checks that your working directory is clean and up to date with
+   `origin/main`, then creates a GitHub Release with the given tag (equivalent to
+   `gh release create vX.Y.Z --generate-notes`, or via the GitHub UI: Releases →
+   Draft a new release → tag `vX.Y.Z` → Generate release notes → Publish).
 3. That's it — publishing the release triggers `.github/workflows/publish.yml`,
    which builds the package (version read straight from the new tag) and uploads it
    to PyPI.
