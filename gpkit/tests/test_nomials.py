@@ -97,6 +97,18 @@ class TestMonomial:
             assert "\u00b2" in p2_str  # Unicode superscript ²
             assert p2_str == "(x\u00b3 + x + 5)\u00b2"
 
+    def test_pow_ast_exponent_rounds_like_base(self):
+        """A pow's exponent should round for display, same as its base does.
+
+        Real-world exponents come from curve fits and carry 15+ significant
+        digits (e.g. from a CSV-loaded regression coefficient); last-ULP
+        differences between environments (numpy/pandas versions) shouldn't
+        leak into human-facing constraint strings.
+        """
+        x = Variable("x")
+        s = str(x**2.7130075007872931)
+        assert s == "x^2.713"
+
     def test_latex(self):
         "Test latex string creation"
         x = Variable("x")
