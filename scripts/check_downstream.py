@@ -48,9 +48,8 @@ def run_one(repo: Path) -> bool:
     if result.returncode != 0:
         return False
 
-    # Catalog snapshot tests (test_catalog_snapshots) regenerate rather than
-    # assert, so a display regression against this local gpkit-core shows up
-    # only as an uncommitted diff, never as a failing test.
+    # Snapshot tests overwrite files instead of asserting, so a passing pytest
+    # run can still hide a display regression -- check for a resulting diff.
     status = subprocess.run(
         ["git", "status", "--porcelain"],
         cwd=repo,
