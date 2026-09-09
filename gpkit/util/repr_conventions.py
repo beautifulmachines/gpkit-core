@@ -269,6 +269,8 @@ def _render_pow(children, excluded):
         if x in (2, 3):
             return f"{left}{chr(176 + x)}"
         return f"{left}{chr(8304 + x)}"
+    if isinstance(x, Numbers):
+        x = f"{x:.4g}"
     return f"{left}^{x}"
 
 
