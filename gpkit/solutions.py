@@ -5,6 +5,7 @@ import pickle
 import weakref
 from collections.abc import Sequence
 from dataclasses import dataclass
+from enum import StrEnum
 
 from . import printing
 from .breakdowns import bdtable_gen
@@ -12,6 +13,13 @@ from .budgets import build_budget
 from .units import Quantity
 from .varkey import VarKey
 from .varmap import VarMap, display_names
+
+
+class SolveStatus(StrEnum):
+    "Possible values of Solution.meta['status']. Members compare equal to their string value."
+
+    OPTIMAL = "optimal"
+    OPTIMAL_WITH_WARNINGS = "optimal_with_warnings"
 
 
 class _WeakModelRef:

@@ -23,6 +23,7 @@ from gpkit.constraints.tight import Tight
 from gpkit.exceptions import Infeasible, InvalidGPConstraint, PrimalInfeasible
 from gpkit.nomials import MonomialEquality, PosynomialInequality, SignomialInequality
 from gpkit.nomials.substitution import parse_subs
+from gpkit.solutions import SolveStatus
 from gpkit.units import DimensionalityError
 from gpkit.util.globals import NamedVariables
 
@@ -466,6 +467,7 @@ class TestLoose:
         warndata = sol.meta["warnings"]["Unexpectedly Tight Constraints"][0][1]
         assert warndata[-1] is m[0][0]
         assert warndata[0] == pytest.approx(+1, abs=1e-3)
+        assert sol.meta["status"] == SolveStatus.OPTIMAL_WITH_WARNINGS
         m.substitutions[x_min] = 0.5
         assert m.solve(verbosity=0).cost == pytest.approx(1)
 
@@ -484,6 +486,14 @@ class TestLoose:
         m.substitutions[x_min] = 2
         m.substitutions[y_min] = 1
         assert m.localsolve(verbosity=0).cost == pytest.approx(2.5, abs=1e-5)
+
+
+def test_solution_status_clean():
+    "A solve with no warnings reports a plain 'optimal' status"
+    x = Variable("x")
+    sol = Model(x, [x >= 1]).solve(verbosity=0)
+    assert sol.meta["warnings"] == {}
+    assert sol.meta["status"] == SolveStatus.OPTIMAL
 
 
 class TestTight:
