@@ -4,6 +4,7 @@ import numpy as np
 from adce import adnumber
 
 from ..nomials.substitution import parse_linked, parse_subs
+from ..solutions import SolveStatus
 from ..util.globals import SignomialsEnabled
 from ..util.small_classes import FixedScalar
 from ..util.small_scripts import maybe_flatten
@@ -107,6 +108,11 @@ def solvify(genfunction):
         result = progsolve(solver, verbosity=verbosity, **kwargs)
         if kwargs.get("process_result", True):
             self.process_result(result)
+        result.meta["status"] = (
+            SolveStatus.OPTIMAL_WITH_WARNINGS
+            if result.meta.get("warnings")
+            else SolveStatus.OPTIMAL
+        )
         self.solution = result
         self.solution.meta["modelstr"] = str(self)
         return result
