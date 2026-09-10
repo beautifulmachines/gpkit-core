@@ -388,14 +388,6 @@ class GeometricProgram:
                 )
             else:
                 raise ValueError("Unexpected infeasibility {infeasibility}")
-            soltime = time() - starttime
-            if verbosity > 0 and soltime < 1 and self.model:
-                print(
-                    msg + "\nSince the model solved in less than a second,"
-                    " let's run `.debug()` to analyze what happened.\n"
-                )
-                return self.model.debug(solver=solver)
-            # else, raise a clarifying error
             msg += (
                 " Running `.debug()` or increasing verbosity may pinpoint the trouble."
             )

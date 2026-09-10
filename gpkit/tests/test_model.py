@@ -178,6 +178,21 @@ class TestGP:
         with pytest.raises(DualInfeasible):
             gp.solve(solver=solver, verbosity=0)
 
+    def test_infeasible_raises_even_with_verbosity(self, solver):
+        """GP.solve() should raise on infeasibility regardless of verbosity.
+
+        Previously, at verbosity > 0, a fast (< 1s) infeasible solve would
+        silently call self.model.debug() and return whatever it produced --
+        a Solution for a *different*, relaxed problem -- instead of raising.
+        Callers who want a debug breakdown should call .debug() themselves.
+        """
+        x = Variable("x", 1)
+        x_min = Variable("x_{min}", 2)
+        intermediary = Variable("intermediary")
+        m = Model(x, [x >= intermediary, intermediary >= x_min])
+        with pytest.raises((PrimalInfeasible, UnknownInfeasible)):
+            m.solve(solver=solver, verbosity=1)
+
     def test_simple_united_gp(self, solver):
         R = Variable("R", "nautical_miles")
         a0 = Variable("a0", 340.29, "m/s")
