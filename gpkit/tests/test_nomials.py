@@ -85,7 +85,7 @@ class TestMonomial:
         r = repr(m)
         assert isinstance(r, str)
         if sys.platform[:3] != "win":
-            assert r == "gpkit.Monomial(5·x²/y)"
+            assert r == "gpkit.Monomial(5⋅x²/y)"
 
     def test_pow_ast_exponent(self):
         "Signomial.__pow__ should record the correct exponent in the AST"

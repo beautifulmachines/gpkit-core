@@ -14,7 +14,7 @@ if sys.platform[:3] == "win":  # pragma: no cover
     UNICODE_EXPONENTS = False
     UNIT_FORMATTING = ":~"
 else:  # pragma: no cover
-    MUL = "·"
+    MUL = "\u22c5"  # DOT OPERATOR (U+22C5)
     PI_STR = "π"
     UNICODE_EXPONENTS = True
     UNIT_FORMATTING = ":P~"
@@ -55,6 +55,11 @@ def unitstr(units, into="%s", options=UNIT_FORMATTING, dimless=""):
         rawstr = str(units.units)  # otherwise it'll be a capital Omega
     else:
         rawstr = ("{%s}" % options).format(units.units)
+    # pint's Pretty formatter used MIDDLE DOT (\u00b7) as its product
+    # separator before pint 0.26, and switched to DOT OPERATOR (\u22c5,
+    # our MUL) from 0.26 on. Normalize the old glyph so unit strings are
+    # stable regardless of which pint version is installed.
+    rawstr = rawstr.replace("\u00b7", MUL)
     units = rawstr.replace(" ", "").replace("dimensionless", dimless)
     return into % units if units else dimless
 
@@ -217,7 +222,7 @@ def parenthesize(string, addi=True, mult=True):
     "Parenthesizes a string if it needs it and isn't already."
     parensless = string if "(" not in string else INSIDE_PARENS.sub("", string)
     bare_addi = " + " in parensless or " - " in parensless
-    bare_mult = "·" in parensless or "/" in parensless
+    bare_mult = MUL in parensless or "/" in parensless
     if parensless and (addi and bare_addi) or (mult and bare_mult):
         return f"({string})"
     return string

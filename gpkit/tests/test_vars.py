@@ -61,21 +61,21 @@ class TestVarKey:
         z = VectorVariable(3, "z")
         a = VectorVariable((3, 2), "a")
 
-        assert str(3 * (x + y) * z) == "3·(x[:] + y[:])·z[:]"
+        assert str(3 * (x + y) * z) == "3⋅(x[:] + y[:])⋅z[:]"
         nni = 3
         ii = np.tile(np.arange(1, nni + 1), a.shape[1:] + (1,)).T
-        assert str(w * NomialArray(ii) / nni)[:4] == "w·[["
+        assert str(w * NomialArray(ii) / nni)[:4] == "w⋅[["
         assert str(w * NomialArray(ii) / nni)[-4:] == "]]/3"
         assert str(NomialArray(ii) * w / nni)[:2] == "[["
-        assert str(NomialArray(ii) * w / nni)[-6:] == "]]·w/3"
-        assert str(w * ii / nni)[:4] == "w·[["
+        assert str(NomialArray(ii) * w / nni)[-6:] == "]]⋅w/3"
+        assert str(w * ii / nni)[:4] == "w⋅[["
         assert str(w * ii / nni)[-4:] == "]]/3"
-        assert str(w * (ii / nni))[:4] == "w·[["
+        assert str(w * (ii / nni))[:4] == "w⋅[["
         assert str(w * (ii / nni))[-2:] == "]]"
-        assert str(w >= (x[0] * t + x[1] * u) / v) == "w ≥ (x[0]·t + x[1]·u)/v"
+        assert str(w >= (x[0] * t + x[1] * u) / v) == "w ≥ (x[0]⋅t + x[1]⋅u)/v"
         assert str(x) == "x[:]"
-        assert str(x * 2) == "x[:]·2"
-        assert str(2 * x) == "2·x[:]"
+        assert str(x * 2) == "x[:]⋅2"
+        assert str(2 * x) == "2⋅x[:]"
         assert str(x + 2) == "x[:] + 2"
         assert str(2 + x) == "2 + x[:]"
         assert str(x / 2) == "x[:]/2"
@@ -89,8 +89,8 @@ class TestVarKey:
         assert str(x[:2]) == "x[:2]"
         assert str(x[:]) == "x[:]"
         assert str(x[1:]) == "x[1:]"
-        assert str(y * [1, 2, 3]) == "y[:]·[1, 2, 3]"
-        assert str(x[:2] == (y * [1, 2, 3])[:2]) == "x[:2] = (y[:]·[1, 2, 3])[:2]"
+        assert str(y * [1, 2, 3]) == "y[:]⋅[1, 2, 3]"
+        assert str(x[:2] == (y * [1, 2, 3])[:2]) == "x[:2] = (y[:]⋅[1, 2, 3])[:2]"
         assert str(y + [1, 2, 3]) == "y[:] + [1, 2, 3]"
         assert str(x == y + [1, 2, 3]) == "x[:] = y[:] + [1, 2, 3]"
         assert str(x >= y + [1, 2, 3]) == "x[:] ≥ y[:] + [1, 2, 3]"
@@ -105,7 +105,7 @@ class TestVarKey:
         cstr = str(2 * a >= a + np.ones((3, 2)) / 2)
         assert (
             cstr
-            == """2·a[:] ≥ a[:] + [[0.5 0.5]
+            == """2⋅a[:] ≥ a[:] + [[0.5 0.5]
            [0.5 0.5]
            [0.5 0.5]]"""
         )

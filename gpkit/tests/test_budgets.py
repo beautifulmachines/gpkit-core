@@ -806,7 +806,7 @@ class TestBudgetUnitMismatchCoeff:
         struct_node = next(
             n for n in b.children if n.vk is not None and "m_struct" in n.label
         )
-        # label should not start with a numeric coefficient like "0.001·m_struct"
+        # label should not start with a numeric coefficient like "0.001⋅m_struct"
         assert not struct_node.label[0].isdigit()
 
 
@@ -916,7 +916,7 @@ class TestMixedUnitCoeff:
         sol, _ = solve(model)
         b = build_budget(sol, model, model.m)
         # m_a and m_b each appear with coefficient 1 in the original expression —
-        # neither label should start with a digit (no spurious "0.4536·m_a")
+        # neither label should start with a digit (no spurious "0.4536⋅m_a")
         for node in b.children:
             assert not node.label[0].isdigit(), (
                 f"spurious coeff in label: {node.label!r}"

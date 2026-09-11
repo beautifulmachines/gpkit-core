@@ -18,20 +18,20 @@ SINGLE
        ┃┛
        ┃┓
        ┃┃
-       ┃┣╸C_D ≥ (CDA0)/S + k·C_f·(\frac{S}{S_{wet}}) + C_L²/(π·A·e)
+       ┃┣╸C_D ≥ (CDA0)/S + k⋅C_f⋅(\frac{S}{S_{wet}}) + C_L²/(π⋅A⋅e)
        ┃┛
        ┃┓
  Model╺┫┃
-       ┃┣╸D ≥ 0.5·\rho·S·C_D·V²
+       ┃┣╸D ≥ 0.5⋅\rho⋅S⋅C_D⋅V²
        ┃┛
        ┃┓
-       ┃┣╸W ≤ 0.5·\rho·S·C_L·V²
+       ┃┣╸W ≤ 0.5⋅\rho⋅S⋅C_L⋅V²
        ┃┛
        ┃┣╸C_f ≥ 0.074/Re^0.2
        ┃┛
-       ┃┣╸W_w ≥ W_{W_{coeff2}}·S + W_{W_{coeff1}}·N_{ult}·A^1.5·(W_0·W·S)^0.…
+       ┃┣╸W_w ≥ W_{W_{coeff2}}⋅S + W_{W_{coeff1}}⋅N_{ult}⋅A^1.5⋅(W_0⋅W⋅S)^0.…
        ┃┛
-       ┃┣╸W ≤ 0.5·\rho·S·C_{L,max}·V_{min}²
+       ┃┣╸W ≤ 0.5⋅\rho⋅S⋅C_{L,max}⋅V_{min}²
 
 
 Optimal Cost

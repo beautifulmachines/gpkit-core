@@ -3,7 +3,7 @@
           ┃┃                   ┃          ┃
           ┃┃                   ┃          ┃
           ┃┃                   ┃          ┃
-          ┃┃                   ┣╸Spar.m   ┣╸Spar.A·Spar.rho·Spar.t
+          ┃┃                   ┣╸Spar.m   ┣╸Spar.A⋅Spar.rho⋅Spar.t
           ┃┃                   ┃ (16.2kg) ┃ (13.5kg, fixed)
           ┃┃                   ┃          ┃
           ┃┃                   ┃          ┛
@@ -12,7 +12,7 @@
  (35.6kg) ┃┣╸GrowthAllowance.m ┃          ┃
           ┃┃ (35.6kg)          ┃          ┃
           ┃┃                   ┃          ┃
-          ┃┃                   ┣╸Spar1.m  ┣╸Spar1.A·Spar1.rho·Spar1.t
+          ┃┃                   ┣╸Spar1.m  ┣╸Spar1.A⋅Spar1.rho⋅Spar1.t
           ┃┃                   ┃ (16.2kg) ┃ (13.5kg, fixed)
           ┃┃                   ┃          ┃
           ┃┃                   ┃          ┛
@@ -33,15 +33,15 @@
                  ┃┛
  GrowthAllowance╺┫┓      ┓
                  ┃┃      ┃
-                 ┃┣╸Spar ┣╸m ≥ rho·t·A + m_growth
+                 ┃┣╸Spar ┣╸m ≥ rho⋅t⋅A + m_growth
                  ┃┃      ┛
-                 ┃┛      ┣╸m_growth ≥ theta·f_growth_m·rho·t·A
+                 ┃┛      ┣╸m_growth ≥ theta⋅f_growth_m⋅rho⋅t⋅A
                  ┃┓       ┓
                  ┃┃       ┃
-                 ┃┣╸Spar1 ┣╸m ≥ rho·t·A + m_growth
+                 ┃┣╸Spar1 ┣╸m ≥ rho⋅t⋅A + m_growth
                  ┃┃       ┛
-                 ┃┛       ┣╸m_growth ≥ theta·f_growth_m·rho·t·A
-                 ┃┣╸m_growth ≥ theta·f_growth_m·(Spar.m + Spar1.m)
+                 ┃┛       ┣╸m_growth ≥ theta⋅f_growth_m⋅rho⋅t⋅A
+                 ┃┣╸m_growth ≥ theta⋅f_growth_m⋅(Spar.m + Spar1.m)
 
 
 
@@ -97,12 +97,12 @@ Most Sensitive Constraints
 --------------------------
 GrowthAllowance
 +1       : m ≥ m + m + m_growth
-+0.09091 : m_growth ≥ theta·f_growth_m·(m + m)
++0.09091 : m_growth ≥ theta⋅f_growth_m⋅(m + m)
 
 GrowthAllowance.Spar
-+0.5     : m ≥ rho·t·A + m_growth
-+0.08333 : m_growth ≥ theta·f_growth_m·rho·t·A
++0.5     : m ≥ rho⋅t⋅A + m_growth
++0.08333 : m_growth ≥ theta⋅f_growth_m⋅rho⋅t⋅A
 
 GrowthAllowance.Spar1
-+0.5     : m ≥ rho·t·A + m_growth
-+0.08333 : m_growth ≥ theta·f_growth_m·rho·t·A
++0.5     : m ≥ rho⋅t⋅A + m_growth
++0.08333 : m_growth ≥ theta⋅f_growth_m⋅rho⋅t⋅A
