@@ -445,6 +445,22 @@ class TestSignomialInequality:
             m = Model(x, [x >= y - eps, y >= 2 * eps])
         m.localsolve(verbosity=0)  # must not raise DimensionalityError
 
+    def test_signomial_v_ss_propagates_to_original_constraint(self):
+        """Sensitivity computed on an SGP-approximated constraint propagates
+        back to the original SignomialInequality via .generated_by. This is
+        the extraction capability gpkit/interactive/{sankey,references}.py
+        read today; validate it directly since that module is slated for
+        retirement (see workspace CLAUDE.md) and tradespace will need the
+        same capability independent of it."""
+        x = Variable("x")
+        y = Variable("y")
+        with SignomialsEnabled():
+            sig_constraint = x + y >= 3.5
+        m = Model(x * y, [sig_constraint, x >= 1, y >= 1])
+        m.localsolve(verbosity=0)
+        assert sig_constraint.v_ss
+        assert {x.key, y.key} <= set(sig_constraint.v_ss)
+
 
 class TestLoose:
     "Test loose constraint set"

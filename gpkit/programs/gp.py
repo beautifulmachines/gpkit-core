@@ -20,7 +20,6 @@ from ..exceptions import (
     UnboundedGP,
     UnknownInfeasible,
 )
-from ..nomials.map import NomialMap
 from ..solutions import MarginSolution, Sensitivities, Solution, _WeakModelRef
 from ..util.repr_conventions import lineagestr
 from ..util.small_classes import CootMatrix, FixedScalar, Numbers, SolverLog
@@ -463,17 +462,25 @@ class GeometricProgram:
         constraint_senss = {}
         absv_ss = {vk: abs(x) for vk, x in cost_senss.items()}
 
-        for las, nus, c in zip(la[1:], nu_by_posy[1:], self.hmaps[1:]):
+        # Group each hmap's (la, nu) by the root constraint that owns it --
+        # a constraint owning more than one hmap (e.g. MonomialEquality's
+        # l_over_r/r_over_l) gets a single, pure sens_from_dual call with
+        # all of its duals passed together, rather than one call per hmap.
+        roots = {}
+        for las, nus, hmap in zip(la[1:], nu_by_posy[1:], self.hmaps[1:]):
+            c = hmap
             while getattr(c, "parent", None) is not None:
-                if not isinstance(c, NomialMap):
-                    c.parent.child = c
                 c = c.parent  # parents get their sens_from_dual used...
-            v_ss, c_senss = c.sens_from_dual(las, nus, varvals)
+            las_list, nus_list = roots.setdefault(c, ([], []))
+            las_list.append(las)
+            nus_list.append(nus)
+
+        for c, (las_list, nus_list) in roots.items():
+            v_ss, c_senss = c.sens_from_dual(las_list, nus_list, varvals)
             for vk, x in v_ss.items():
                 gpv_ss[vk] = x + gpv_ss.get(vk, 0)
                 absv_ss[vk] = abs(x) + absv_ss.get(vk, 0)
-            while getattr(c, "generated_by", None):
-                c.generated_by.generated = c
+            while getattr(c, "generated_by", None) is not None:
                 c = c.generated_by  # ...while generated_bys are just labels
             constraint_senss[c] = c_senss
             m_senss[lineagestr(c)] += abs(c_senss)
@@ -590,10 +597,9 @@ class GeometricProgram:
         """Accumulate ∂(A−B)/∂log(c_m) contributions from one PosynomialInequality."""
         if not hasattr(c, "pmap"):
             raise RuntimeError(
-                f"Constraint {c!r} is missing pmap.  "
-                "_compute_margin_sensitivity must be called before "
-                "_calculate_sensitivities (which deletes pmap).  "
-                "See issue #200."
+                f"Constraint {c!r} is missing pmap, which should be set "
+                "unconditionally in as_hmapslt1() during GeometricProgram."
+                "__init__ and never deleted. This should not be reachable."
             )
         for k, qnu_j in enumerate(hmap_qnu):
             for presub_idx, fraction in c.pmap[k].items():
@@ -615,9 +621,6 @@ class GeometricProgram:
 
     def _compute_margin_sensitivity(self, nu, varvals, margin_obj):
         """Compute ∂(A−B)/∂c for every constant c via one batched adjoint solve.
-
-        Must be called BEFORE _calculate_sensitivities() because pmap is deleted
-        there.  See GitHub issue #200 for the pmap mutation discussion.
 
         Parameters
         ----------
@@ -729,8 +732,6 @@ class GeometricProgram:
         if self.integersolve or self.choicevaridxs:
             warnings.update(self._handle_choicevars(solver_out))
 
-        # Compute margin sensitivity BEFORE _calculate_sensitivities(), which deletes
-        # pmap on each constraint.  See issue #200 for the pmap mutation discussion.
         margin_obj = getattr(self.model, "margin_objective", None)
         derived = None
         if margin_obj is not None:

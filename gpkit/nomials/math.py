@@ -391,7 +391,7 @@ class Monomial(Posynomial):
 class ScalarSingleEquationConstraint(SingleEquationConstraint):
     "A SingleEquationConstraint with scalar left and right sides."
 
-    generated_by = v_ss = parent = None
+    generated_by = v_ss = parent = child = generated = None
     bounded: ClassVar = {}
     meq_bounded: ClassVar = {}
 
@@ -541,24 +541,22 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
             constraint.lineage = tuple(tuple(pair) for pair in ir_dict["lineage"])
         return constraint
 
-    def sens_from_dual(self, la, nu, _):
+    def sens_from_dual(self, las, nus, _):
         "Returns the variable/constraint sensitivities from lambda/nu"
+        (la,) = las
+        (nu,) = nus
         (presub,) = self.unsubbed
         if hasattr(self, "pmap"):
             nu_ = np.zeros(len(presub.hmap))
             for i, mmap in enumerate(self.pmap):
                 for idx, percentage in mmap.items():
                     nu_[idx] += percentage * nu[i]
-            del self.pmap  # not needed after dual has been derived
             if hasattr(self, "const_mmap"):
                 scale = (1 - self.const_coeff) / self.const_coeff
                 for idx, percentage in self.const_mmap.items():
                     nu_[idx] += percentage * la * scale
-                del self.const_mmap  # not needed after dual has been derived
             nu = nu_
         self.v_ss = HashVector()
-        if self.parent:
-            self.parent.v_ss = self.v_ss
         if self.generated_by:
             self.generated_by.v_ss = self.v_ss
         for nu_i, exp in zip(nu, presub.hmap):
@@ -577,7 +575,6 @@ class MonomialEquality(PosynomialInequality):
         self.unsubbed = self._gen_unsubbed(self.left, self.right)
         self.bounded = set()
         self.meq_bounded = {}
-        self._las = []
         if self.unsubbed and len(self.vks) > 1:
             (exp,) = self.unsubbed[0].hmap
             for key, e in exp.items():
@@ -623,13 +620,10 @@ class MonomialEquality(PosynomialInequality):
         'A constraint not guaranteed to be satisfied evaluates as "False".'
         return bool(self.left.c == self.right.c and self.left.exp == self.right.exp)
 
-    def sens_from_dual(self, la, nu, _):  # noqa: ARG002
+    def sens_from_dual(self, las, nus, _):  # noqa: ARG002
         "Returns the variable/constraint sensitivities from lambda/nu"
-        self._las.append(la)
-        if len(self._las) == 1:
-            return {}, 0
-        la = self._las[0] - self._las[1]
-        self._las = []
+        la_lr, la_rl = las  # l_over_r, r_over_l -- see _gen_unsubbed
+        la = la_lr - la_rl
         (exp,) = self.unsubbed[0].hmap
         self.v_ss = exp * la
         return self.v_ss, la
@@ -692,6 +686,7 @@ class SignomialInequality(ScalarSingleEquationConstraint):
         # all but one of the negy terms becomes compatible with the posy
         p_ineq = PosynomialInequality(posy, "<=", negy)
         p_ineq.parent = self
+        self.child = p_ineq
         (siglt0_us,) = self.unsubbed
         siglt0_hmap = siglt0_us.hmap.sub(substitutions, siglt0_us.vks)
         negy_hmap = NomialMap()
@@ -715,7 +710,7 @@ class SignomialInequality(ScalarSingleEquationConstraint):
         }
         return p_ineq.as_hmapslt1(substitutions)
 
-    def sens_from_dual(self, la, nu, varvals):
+    def sens_from_dual(self, las, nus, varvals):
         """We want to do the following chain:
            dlog(Obj)/dlog(monomial[i])    = nu[i]
            * dlog(monomial)/d(monomial)   = 1/(monomial value)
@@ -736,6 +731,8 @@ class SignomialInequality(ScalarSingleEquationConstraint):
             assert not key  # constant
             return value
 
+        (la,) = las
+        (nu,) = nus
         self.v_ss = {}
         invnegy_val = 1 / subval(self._negysig)
         for i, nu_i in enumerate(nu):
@@ -760,6 +757,7 @@ class SignomialInequality(ScalarSingleEquationConstraint):
         x0 = {vk: x0.get(vk, 1) for vk in negy.vks}
         pconstr = PosynomialInequality(posy, "<=", negy.mono_lower_bound(x0))
         pconstr.generated_by = self
+        self.generated = pconstr
         return pconstr
 
 
@@ -794,6 +792,7 @@ class SingleSignomialEquality(SignomialInequality):
         x0 = {vk: x0.get(vk, 1) for vk in siglt0.vks}
         mec = posy.mono_lower_bound(x0) == negy.mono_lower_bound(x0)
         mec.generated_by = self
+        self.generated = mec
         return mec
 
 

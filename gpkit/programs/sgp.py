@@ -92,6 +92,7 @@ class SequentialGeometricProgram:
                 for hmaplt1 in cs.as_gpconstr(x0).as_hmapslt1({}):
                     constraint = Posynomial(hmaplt1) <= self.slack
                     constraint.generated_by = cs
+                    cs.generated = constraint
                     self.approxconstraints.append(constraint)
                     self.sgpvks.update(constraint.vks)
         if not self.sgpconstraints:
