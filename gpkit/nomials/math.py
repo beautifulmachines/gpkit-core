@@ -541,8 +541,10 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
             constraint.lineage = tuple(tuple(pair) for pair in ir_dict["lineage"])
         return constraint
 
-    def sens_from_dual(self, la, nu, _):
+    def sens_from_dual(self, las, nus, _):
         "Returns the variable/constraint sensitivities from lambda/nu"
+        (la,) = las
+        (nu,) = nus
         (presub,) = self.unsubbed
         if hasattr(self, "pmap"):
             nu_ = np.zeros(len(presub.hmap))
@@ -555,8 +557,6 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
                     nu_[idx] += percentage * la * scale
             nu = nu_
         self.v_ss = HashVector()
-        if self.parent:
-            self.parent.v_ss = self.v_ss
         if self.generated_by:
             self.generated_by.v_ss = self.v_ss
         for nu_i, exp in zip(nu, presub.hmap):
@@ -575,7 +575,6 @@ class MonomialEquality(PosynomialInequality):
         self.unsubbed = self._gen_unsubbed(self.left, self.right)
         self.bounded = set()
         self.meq_bounded = {}
-        self._las = []
         if self.unsubbed and len(self.vks) > 1:
             (exp,) = self.unsubbed[0].hmap
             for key, e in exp.items():
@@ -621,13 +620,10 @@ class MonomialEquality(PosynomialInequality):
         'A constraint not guaranteed to be satisfied evaluates as "False".'
         return bool(self.left.c == self.right.c and self.left.exp == self.right.exp)
 
-    def sens_from_dual(self, la, nu, _):  # noqa: ARG002
+    def sens_from_dual(self, las, nus, _):  # noqa: ARG002
         "Returns the variable/constraint sensitivities from lambda/nu"
-        self._las.append(la)
-        if len(self._las) == 1:
-            return {}, 0
-        la = self._las[0] - self._las[1]
-        self._las = []
+        la_lr, la_rl = las  # l_over_r, r_over_l -- see _gen_unsubbed
+        la = la_lr - la_rl
         (exp,) = self.unsubbed[0].hmap
         self.v_ss = exp * la
         return self.v_ss, la
@@ -714,7 +710,7 @@ class SignomialInequality(ScalarSingleEquationConstraint):
         }
         return p_ineq.as_hmapslt1(substitutions)
 
-    def sens_from_dual(self, la, nu, varvals):
+    def sens_from_dual(self, las, nus, varvals):
         """We want to do the following chain:
            dlog(Obj)/dlog(monomial[i])    = nu[i]
            * dlog(monomial)/d(monomial)   = 1/(monomial value)
@@ -735,6 +731,8 @@ class SignomialInequality(ScalarSingleEquationConstraint):
             assert not key  # constant
             return value
 
+        (la,) = las
+        (nu,) = nus
         self.v_ss = {}
         invnegy_val = 1 / subval(self._negysig)
         for i, nu_i in enumerate(nu):

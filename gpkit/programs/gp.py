@@ -462,10 +462,21 @@ class GeometricProgram:
         constraint_senss = {}
         absv_ss = {vk: abs(x) for vk, x in cost_senss.items()}
 
-        for las, nus, c in zip(la[1:], nu_by_posy[1:], self.hmaps[1:]):
+        # Group each hmap's (la, nu) by the root constraint that owns it --
+        # a constraint owning more than one hmap (e.g. MonomialEquality's
+        # l_over_r/r_over_l) gets a single, pure sens_from_dual call with
+        # all of its duals passed together, rather than one call per hmap.
+        roots = {}
+        for las, nus, hmap in zip(la[1:], nu_by_posy[1:], self.hmaps[1:]):
+            c = hmap
             while getattr(c, "parent", None) is not None:
                 c = c.parent  # parents get their sens_from_dual used...
-            v_ss, c_senss = c.sens_from_dual(las, nus, varvals)
+            las_list, nus_list = roots.setdefault(c, ([], []))
+            las_list.append(las)
+            nus_list.append(nus)
+
+        for c, (las_list, nus_list) in roots.items():
+            v_ss, c_senss = c.sens_from_dual(las_list, nus_list, varvals)
             for vk, x in v_ss.items():
                 gpv_ss[vk] = x + gpv_ss.get(vk, 0)
                 absv_ss[vk] = abs(x) + absv_ss.get(vk, 0)
