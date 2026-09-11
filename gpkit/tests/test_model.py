@@ -390,6 +390,18 @@ class TestGPSensitivities:
         assert senss[fuel_per_nm] == pytest.approx(0.41, abs=0.01)
         assert senss[W_payload] == pytest.approx(0.39, abs=0.01)
 
+    def test_sens_constants_is_filtered_view(self, solver):
+        "sens.constants is exactly sens.variables restricted to fixed VarKeys."
+        x = Variable("x")
+        c = Variable("c", 2.0, "-")
+        m = Model(x, [x >= c])
+        sol = m.solve(solver=solver, verbosity=0)
+        assert set(sol.sens.constants) == set(sol.constants)
+        assert c.key in sol.sens.constants
+        assert x.key not in sol.sens.constants
+        for vk, sens in sol.sens.constants.items():
+            assert sens == sol.sens.variables[vk]
+
     def test_model_sens_is_sum_of_lambdas(self, solver):
         # sens.models[lineage] should equal sum(|lambda_i|) for constraints
         # owned by that lineage — not inflated by fixed-variable sensitivities.

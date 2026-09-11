@@ -752,6 +752,9 @@ class GeometricProgram:
                 models=dict(m_senss),
                 variables=VarMap(gpv_ss),
                 variablerisk=VarMap(absv_ss),
+                constants=VarMap(
+                    {vk: v for vk, v in gpv_ss.items() if vk in self.substitutions}
+                ),
             ),
             meta={"soltime": solver_out.meta["soltime"], "warnings": warnings},
             derived=derived,
