@@ -12,6 +12,7 @@ import gpkit.util.globals as globals_module
 from gpkit import Model, NamedVariables, SignomialsEnabled, Variable, Vectorize
 from gpkit.examples import uav
 from gpkit.nomials.math import SignomialInequality
+from gpkit.solvers.cvxopt import optimize as cvxopt_optimize
 from gpkit.util.globals import load_settings
 
 
@@ -110,18 +111,41 @@ def test_concurrent_build_and_solve():
         ir = json.dumps(model.to_ir(), sort_keys=True, default=str)
         results[tid] = (ir, float(model.solve(verbosity=0).cost))
 
-    # GP.solve swaps sys.stdout process-globally (SolverLog); concurrent
-    # solves can race the restore. Guard it here so a leaked SolverLog
-    # can't swallow the rest of the pytest session's output.
-    saved_stdout = sys.stdout
-    try:
-        run_threads(build_and_solve)
-    finally:
-        sys.stdout = saved_stdout
+    run_threads(build_and_solve)
 
     assert len(results) == 4
     assert len({ir for ir, _ in results.values()}) == 1, "IRs differ across threads"
     assert len({cost for _, cost in results.values()}) == 1
+
+
+def test_concurrent_solves_dont_corrupt_stdout():
+    """Overlapping solves must not race the sys.stdout save/restore.
+
+    GP.solve() captures solver output by swapping sys.stdout out and back in;
+    without a lock, one thread's restore can stomp a second thread's swapped-
+    in SolverLog, leaving it permanently installed as sys.stdout. A slow
+    solverfn widens the window so four threads reliably overlap.
+    """
+
+    def slow_optimize(prob, meq_idxs, **kwargs):
+        time.sleep(0.05)
+        return cvxopt_optimize(prob, meq_idxs, **kwargs)
+
+    x = Variable("x")
+    barrier = threading.Barrier(4)
+
+    def worker(_):
+        barrier.wait(timeout=10)
+        Model(x, [x >= 1]).gp().solve(solver=slow_optimize, verbosity=1)
+
+    real_stdout = sys.stdout
+    try:
+        run_threads(worker)
+    finally:
+        leaked = sys.stdout is not real_stdout
+        if leaked:
+            sys.stdout = real_stdout  # don't swallow the rest of the session
+    assert not leaked, "sys.stdout was not restored after concurrent solves"
 
 
 def test_load_settings_toml(tmp_path):

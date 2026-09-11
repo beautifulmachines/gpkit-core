@@ -1,6 +1,7 @@
 """Implement the GeometricProgram class"""
 
 import sys
+import threading
 import warnings as pywarnings
 from collections import defaultdict
 from collections.abc import Sequence
@@ -28,6 +29,14 @@ from ..varmap import VarMap
 
 DEFAULT_SOLVER_KWARGS = {"cvxopt": {"kktsolver": "ldl"}}
 SOLUTION_TOL = {"cvxopt": 1e-3, "mosek_cli": 1e-4, "mosek_conif": 1e-3}
+
+# Solver libraries (e.g. cvxopt) print progress directly to sys.stdout rather
+# than accepting a stream argument, so capturing their output means swapping
+# sys.stdout out and back in -- a process-global mutation. This lock makes
+# that swap/solve/restore atomic across threads; without it, one solve's
+# restore can race and stomp another's, leaking a SolverLog into sys.stdout
+# for the rest of the process.
+_STDOUT_SWAP_LOCK = threading.Lock()
 
 
 class MonoEqualityIndexes:
@@ -348,25 +357,27 @@ class GeometricProgram:
             solverargs["choicevaridxs"] = self.choicevaridxs
             self.integersolve = True
         starttime = time()
-        solver_out, infeasibility, original_stdout = {}, None, sys.stdout
-        try:
-            sys.stdout = SolverLog(original_stdout, verbosity=verbosity - 2)
-            solver_out = solverfn(self.data, meq_idxs=self.meq_idxs, **solverargs)
-            solver_out.meta["soltime"] = time() - starttime
-            if verbosity > 0:
-                print(f"Solving took {solver_out.meta['soltime']:.3g} seconds.")
-        except Infeasible as e:
-            infeasibility = e
-        except InvalidLicense as e:
-            raise InvalidLicense(
-                f'license for solver "{solvername}" is invalid.'
-            ) from e
-        except Exception as e:
-            raise UnknownInfeasible("Something unexpected went wrong.") from e
-        finally:
-            self.solve_log = sys.stdout
-            sys.stdout = original_stdout
-            self.solver_out = solver_out
+        solver_out, infeasibility = {}, None
+        with _STDOUT_SWAP_LOCK:
+            original_stdout = sys.stdout
+            try:
+                sys.stdout = SolverLog(original_stdout, verbosity=verbosity - 2)
+                solver_out = solverfn(self.data, meq_idxs=self.meq_idxs, **solverargs)
+                solver_out.meta["soltime"] = time() - starttime
+                if verbosity > 0:
+                    print(f"Solving took {solver_out.meta['soltime']:.3g} seconds.")
+            except Infeasible as e:
+                infeasibility = e
+            except InvalidLicense as e:
+                raise InvalidLicense(
+                    f'license for solver "{solvername}" is invalid.'
+                ) from e
+            except Exception as e:
+                raise UnknownInfeasible("Something unexpected went wrong.") from e
+            finally:
+                self.solve_log = sys.stdout
+                sys.stdout = original_stdout
+                self.solver_out = solver_out
 
         if infeasibility:
             if isinstance(infeasibility, PrimalInfeasible):
