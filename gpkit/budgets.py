@@ -20,6 +20,7 @@ from dataclasses import dataclass, field
 from .ast_nodes import ExprNode, VarNode
 from .constraints.set import flatiter
 from .units import DimensionalityError, qty
+from .util.repr_conventions import MUL
 from .varkey import VarKey
 
 # ---------------------------------------------------------------------------
@@ -43,7 +44,7 @@ def _get_gt_lt(constraint):
 def _format_term_label(exp, coeff, strip_prefix=None):
     """Format a monomial term's exponent dict + coefficient as a string.
 
-    Example: coeff=0.1, exp={m: 1, f: 1} → "0.1·m·f"
+    Example: coeff=0.1, exp={m: 1, f: 1} → "0.1⋅m⋅f"
 
     If ``strip_prefix`` is given (a lineagestr of the parent model), that
     prefix is removed from variable names so only the relative path is shown.
@@ -57,7 +58,7 @@ def _format_term_label(exp, coeff, strip_prefix=None):
         else:
             name = vk.str_without(["lineage"])
         parts.append(name if pow_ == 1 else f"{name}^{pow_:.4g}")
-    return "·".join(parts) if parts else f"{coeff:.4g}"
+    return MUL.join(parts) if parts else f"{coeff:.4g}"
 
 
 def _collect_sum_terms(node):

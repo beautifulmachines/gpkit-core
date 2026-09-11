@@ -360,13 +360,13 @@ class TestObjective:
             free_variables=[],
             fixed_variables=[],
             constraint_groups=[],
-            objective_str="1/(h·w·d)",
+            objective_str="1/(h⋅w⋅d)",
             objective_latex=r"\frac{1}{h w d}",
             objective_value=3.67e-3,
             objective_units="1/m³",
         )
         d = ir.to_dict()
-        assert d["objective_str"] == "1/(h·w·d)"
+        assert d["objective_str"] == "1/(h⋅w⋅d)"
         assert d["objective_latex"] == r"\frac{1}{h w d}"
         assert pytest.approx(d["objective_value"]) == 3.67e-3
         assert d["objective_units"] == "1/m³"

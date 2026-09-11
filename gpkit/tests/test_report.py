@@ -836,7 +836,7 @@ class TestVectorRendering:
 
     def test_text_indexes_with_brackets(self):
         text = self._model().report(fmt="text")
-        assert "t ≥ 0.1·c[0]" in text
+        assert "t ≥ 0.1⋅c[0]" in text
         assert "c[1] ≥ c[2]" in text
 
     def test_whole_vector_shows_a_slice_in_its_table_row(self):

@@ -27,11 +27,11 @@
            ┃┣╸R ≤ R_max
            ┃┛
            ┃┣╸r[4] ≤ 1
-           ┃┣╸A = 3.14·R²
+           ┃┣╸A = 3.14⋅R²
            ┃┣╸Delta_r[:].sum() ≤ 1
-           ┃┣╸r[4] ≥ r[3] + 0.5·Delta_r[3] + 0.5·Delta_r[4]
-           ┃┣╸V_i[0]²·r[0]·Delta_r[0]/(dC_T[0]·(Omega·R)²) = 0.25
- BEMTHover╺┫┣╸xi[0] = rho·A·(Omega·R)²·dC_T[0]
+           ┃┣╸r[4] ≥ r[3] + 0.5⋅Delta_r[3] + 0.5⋅Delta_r[4]
+           ┃┣╸V_i[0]²⋅r[0]⋅Delta_r[0]/(dC_T[0]⋅(Omega⋅R)²) = 0.25
+ BEMTHover╺┫┣╸xi[0] = rho⋅A⋅(Omega⋅R)²⋅dC_T[0]
            ┃┓
            ┃┃
            ┃┃
@@ -77,29 +77,29 @@ BEMTHover
 +1      : P ≥ dP[:].sum()
 +1      : R ≤ R_max
 +0.5134 : r[4] ≤ 1
-+0.5    : A = 3.14·R²
++0.5    : A = 3.14⋅R²
 +0.4866 : Delta_r[:].sum() ≤ 1
-+0.4228 : r[4] ≥ r[3] + 0.5·Delta_r[3] + 0.5·Delta_r[4]
--0.3179 : V_i[0]²·r[0]·Delta_r[0]/(dC_T[0]·(Omega·R)²) = 0.25
-+0.3179 : xi[0] = rho·A·(Omega·R)²·dC_T[0]
--0.3035 : V_i[1]²·r[1]·Delta_r[1]/(dC_T[1]·(Omega·R)²) = 0.25
-+0.3035 : xi[1] = rho·A·(Omega·R)²·dC_T[1]
--0.3035 : V_i[2]²·r[2]·Delta_r[2]/(dC_T[2]·(Omega·R)²) = 0.25
-+0.3035 : xi[2] = rho·A·(Omega·R)²·dC_T[2]
--0.3035 : V_i[3]²·r[3]·Delta_r[3]/(dC_T[3]·(Omega·R)²) = 0.25
-+0.3035 : xi[3] = rho·A·(Omega·R)²·dC_T[3]
--0.2717 : V_i[4]²·r[4]·Delta_r[4]/(dC_T[4]·(Omega·R)²) = 0.25
-+0.2717 : xi[4] = rho·A·(Omega·R)²·dC_T[4]
-+0.2691 : r[3] ≥ r[2] + 0.5·Delta_r[2] + 0.5·Delta_r[3]
-+0.2119 : V_i[0]³·r[0]·Delta_r[0]/(dC_P[0]·(Omega·R)³) = 0.25
--0.2119 : dP[0] = rho·A·(Omega·R)³·dC_P[0]
-+0.2023 : V_i[1]³·r[1]·Delta_r[1]/(dC_P[1]·(Omega·R)³) = 0.25
--0.2023 : dP[1] = rho·A·(Omega·R)³·dC_P[1]
-+0.2023 : V_i[2]³·r[2]·Delta_r[2]/(dC_P[2]·(Omega·R)³) = 0.25
--0.2023 : dP[2] = rho·A·(Omega·R)³·dC_P[2]
-+0.2023 : V_i[3]³·r[3]·Delta_r[3]/(dC_P[3]·(Omega·R)³) = 0.25
--0.2023 : dP[3] = rho·A·(Omega·R)³·dC_P[3]
-+0.1811 : V_i[4]³·r[4]·Delta_r[4]/(dC_P[4]·(Omega·R)³) = 0.25
--0.1811 : dP[4] = rho·A·(Omega·R)³·dC_P[4]
-+0.1283 : r[2] ≥ r[1] + 0.5·Delta_r[1] + 0.5·Delta_r[2]
++0.4228 : r[4] ≥ r[3] + 0.5⋅Delta_r[3] + 0.5⋅Delta_r[4]
+-0.3179 : V_i[0]²⋅r[0]⋅Delta_r[0]/(dC_T[0]⋅(Omega⋅R)²) = 0.25
++0.3179 : xi[0] = rho⋅A⋅(Omega⋅R)²⋅dC_T[0]
+-0.3035 : V_i[1]²⋅r[1]⋅Delta_r[1]/(dC_T[1]⋅(Omega⋅R)²) = 0.25
++0.3035 : xi[1] = rho⋅A⋅(Omega⋅R)²⋅dC_T[1]
+-0.3035 : V_i[2]²⋅r[2]⋅Delta_r[2]/(dC_T[2]⋅(Omega⋅R)²) = 0.25
++0.3035 : xi[2] = rho⋅A⋅(Omega⋅R)²⋅dC_T[2]
+-0.3035 : V_i[3]²⋅r[3]⋅Delta_r[3]/(dC_T[3]⋅(Omega⋅R)²) = 0.25
++0.3035 : xi[3] = rho⋅A⋅(Omega⋅R)²⋅dC_T[3]
+-0.2717 : V_i[4]²⋅r[4]⋅Delta_r[4]/(dC_T[4]⋅(Omega⋅R)²) = 0.25
++0.2717 : xi[4] = rho⋅A⋅(Omega⋅R)²⋅dC_T[4]
++0.2691 : r[3] ≥ r[2] + 0.5⋅Delta_r[2] + 0.5⋅Delta_r[3]
++0.2119 : V_i[0]³⋅r[0]⋅Delta_r[0]/(dC_P[0]⋅(Omega⋅R)³) = 0.25
+-0.2119 : dP[0] = rho⋅A⋅(Omega⋅R)³⋅dC_P[0]
++0.2023 : V_i[1]³⋅r[1]⋅Delta_r[1]/(dC_P[1]⋅(Omega⋅R)³) = 0.25
+-0.2023 : dP[1] = rho⋅A⋅(Omega⋅R)³⋅dC_P[1]
++0.2023 : V_i[2]³⋅r[2]⋅Delta_r[2]/(dC_P[2]⋅(Omega⋅R)³) = 0.25
+-0.2023 : dP[2] = rho⋅A⋅(Omega⋅R)³⋅dC_P[2]
++0.2023 : V_i[3]³⋅r[3]⋅Delta_r[3]/(dC_P[3]⋅(Omega⋅R)³) = 0.25
+-0.2023 : dP[3] = rho⋅A⋅(Omega⋅R)³⋅dC_P[3]
++0.1811 : V_i[4]³⋅r[4]⋅Delta_r[4]/(dC_P[4]⋅(Omega⋅R)³) = 0.25
+-0.1811 : dP[4] = rho⋅A⋅(Omega⋅R)³⋅dC_P[4]
++0.1283 : r[2] ≥ r[1] + 0.5⋅Delta_r[1] + 0.5⋅Delta_r[2]
 +0.106  : r[0] = Delta_r[0]/2

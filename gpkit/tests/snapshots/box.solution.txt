@@ -9,7 +9,7 @@
      ┃┓
      ┃┃
      ┃┃
- Box╺┫┣╸A_wall ≥ 2·h·w + 2·h·d
+ Box╺┫┣╸A_wall ≥ 2⋅h⋅w + 2⋅h⋅d
      ┃┃
      ┃┛
      ┃┣╸alpha ≤ h/w
@@ -18,7 +18,7 @@
 
 Optimal Cost
 ------------
-1/(Box.h·Box.w·Box.d) : 0.003674 [1/m³]
+1/(Box.h⋅Box.w⋅Box.d) : 0.003674 [1/m³]
 
 Solution
 --------
@@ -37,5 +37,5 @@ A_floor : 50    [m²] (~0)         upper limit, floor area
 Most Sensitive Constraints
 --------------------------
 Box
-+1.5 : A_wall ≥ 2·h·w + 2·h·d
++1.5 : A_wall ≥ 2⋅h⋅w + 2⋅h⋅d
 +0.5 : alpha ≤ h/w
