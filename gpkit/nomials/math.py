@@ -391,7 +391,7 @@ class Monomial(Posynomial):
 class ScalarSingleEquationConstraint(SingleEquationConstraint):
     "A SingleEquationConstraint with scalar left and right sides."
 
-    generated_by = v_ss = parent = None
+    generated_by = v_ss = parent = child = generated = None
     bounded: ClassVar = {}
     meq_bounded: ClassVar = {}
 
@@ -549,12 +549,10 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
             for i, mmap in enumerate(self.pmap):
                 for idx, percentage in mmap.items():
                     nu_[idx] += percentage * nu[i]
-            del self.pmap  # not needed after dual has been derived
             if hasattr(self, "const_mmap"):
                 scale = (1 - self.const_coeff) / self.const_coeff
                 for idx, percentage in self.const_mmap.items():
                     nu_[idx] += percentage * la * scale
-                del self.const_mmap  # not needed after dual has been derived
             nu = nu_
         self.v_ss = HashVector()
         if self.parent:
@@ -692,6 +690,7 @@ class SignomialInequality(ScalarSingleEquationConstraint):
         # all but one of the negy terms becomes compatible with the posy
         p_ineq = PosynomialInequality(posy, "<=", negy)
         p_ineq.parent = self
+        self.child = p_ineq
         (siglt0_us,) = self.unsubbed
         siglt0_hmap = siglt0_us.hmap.sub(substitutions, siglt0_us.vks)
         negy_hmap = NomialMap()
@@ -760,6 +759,7 @@ class SignomialInequality(ScalarSingleEquationConstraint):
         x0 = {vk: x0.get(vk, 1) for vk in negy.vks}
         pconstr = PosynomialInequality(posy, "<=", negy.mono_lower_bound(x0))
         pconstr.generated_by = self
+        self.generated = pconstr
         return pconstr
 
 
@@ -794,6 +794,7 @@ class SingleSignomialEquality(SignomialInequality):
         x0 = {vk: x0.get(vk, 1) for vk in siglt0.vks}
         mec = posy.mono_lower_bound(x0) == negy.mono_lower_bound(x0)
         mec.generated_by = self
+        self.generated = mec
         return mec
 
 

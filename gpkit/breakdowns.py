@@ -113,9 +113,9 @@ def get_breakdowns(basically_fixed_variables, solution):  # noqa: PLR0912, PLR09
         solution.sens.constraints.items(),
         key=lambda kv: (-abs(float("%.2g" % kv[1])), str(kv[0])),
     ):
-        while getattr(constraint, "child", None):
+        while getattr(constraint, "child", None) is not None:
             constraint = constraint.child
-        while getattr(constraint, "generated", None):
+        while getattr(constraint, "generated", None) is not None:
             constraint = constraint.generated
         if abs(senss) <= 1e-5:  # only tight-ish ones
             continue
@@ -143,9 +143,9 @@ def get_breakdowns(basically_fixed_variables, solution):  # noqa: PLR0912, PLR09
             pos_gtvks &= get_free_vks(gt, solution)  # remove constants
         if len(pos_gtvks) == 1:
             (chosenvk,) = pos_gtvks
-            while getattr(constraint, "parent", None):
+            while getattr(constraint, "parent", None) is not None:
                 constraint = constraint.parent
-            while getattr(constraint, "generated_by", None):
+            while getattr(constraint, "generated_by", None) is not None:
                 constraint = constraint.generated_by
             breakdowns[chosenvk].append((lt, gt, constraint))
     for constraint, senss in sorted(
@@ -154,9 +154,9 @@ def get_breakdowns(basically_fixed_variables, solution):  # noqa: PLR0912, PLR09
     ):
         if abs(senss) <= 1e-5:  # only tight-ish ones
             continue
-        while getattr(constraint, "child", None):
+        while getattr(constraint, "child", None) is not None:
             constraint = constraint.child
-        while getattr(constraint, "generated", None):
+        while getattr(constraint, "generated", None) is not None:
             constraint = constraint.generated
         if constraint.oper == ">=":
             gt, lt = (constraint.left, constraint.right)
@@ -208,9 +208,9 @@ def get_breakdowns(basically_fixed_variables, solution):  # noqa: PLR0912, PLR09
                 for vk, pow in gt.exp.items():
                     if vk is not chosenvk:
                         lt, gt = divide_out_vk(vk, pow, lt, gt)
-                while getattr(constraint, "parent", None):
+                while getattr(constraint, "parent", None) is not None:
                     constraint = constraint.parent
-                while getattr(constraint, "generated_by", None):
+                while getattr(constraint, "generated_by", None) is not None:
                     constraint = constraint.generated_by
                 breakdowns[chosenvk].append((lt, gt, constraint))
     breakdowns = dict(breakdowns)  # remove the defaultdict-ness

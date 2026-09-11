@@ -1,7 +1,11 @@
 "Tests for MarginObjective and MarginSolution"
 
+import numpy as np
+import pytest
+
 from gpkit import MarginObjective, Model, Variable
 from gpkit.examples.growth_allowance import GrowthAllowance
+from gpkit.varmap import VarMap
 
 # ---------------------------------------------------------------------------
 # Simple models used across multiple tests
@@ -58,6 +62,24 @@ class ConstMapModel(Model):
             minus_var=p_prop,
         )
         return [p_prop + p_avionics <= p_max]
+
+
+class MonomialEqualityMarginModel(Model):
+    """B == c * A_allow (equality), cost = B/A, margin = A_allow - B.
+
+    Exercises the from_meq branch of _compute_margin_sensitivity — no
+    existing FD margin test uses an equality (MonomialEquality) constraint.
+    """
+
+    def setup(self):
+        a = Variable("A_allow", 100.0, "kg", "Allowable mass")
+        b = Variable("B_mass", "kg", "System mass")
+        c = Variable("c_frac", 0.8, "", "Mass fraction")
+        self.cost = b / a
+        self.margin_objective = MarginObjective(
+            name="mass margin", plus_var=a, minus_var=b
+        )
+        return [b == c * a]
 
 
 # ---------------------------------------------------------------------------
@@ -263,3 +285,52 @@ def test_from_ir_preserves_margin_objective():
     assert sol.derived is not None
     assert sol.derived.name == "mass margin"
     assert abs(sol.derived.value - 20.0) < 1e-4
+
+
+def test_margin_and_sensitivities_are_order_independent():
+    """_compute_margin_sensitivity and _calculate_sensitivities may be called
+    in either order on the same GeometricProgram instance.
+
+    Regression test: _calculate_sensitivities used to delete pmap/const_mmap
+    off each constraint, so calling it before _compute_margin_sensitivity
+    raised RuntimeError (see historical issue #200). This asserts both orders
+    now produce identical margin sensitivities.
+    """
+
+    def _solve_raw(model):
+        gp = model.gp()
+        solver_out = gp.solve(verbosity=0, gen_result=False)
+        varvals = VarMap(zip(gp.vars, np.exp(solver_out.x)))
+        varvals.update(gp.substitutions)
+        return gp, solver_out, varvals
+
+    model = SimpleMarginModel()
+
+    gp1, out1, varvals1 = _solve_raw(model)
+    derived_first = gp1._compute_margin_sensitivity(
+        out1.nu, varvals1, model.margin_objective
+    )
+    gp1._calculate_sensitivities(out1.la, out1.nu, varvals1)  # normal order
+
+    gp2, out2, varvals2 = _solve_raw(model)
+    gp2._calculate_sensitivities(out2.la, out2.nu, varvals2)  # reversed order
+    derived_second = gp2._compute_margin_sensitivity(
+        out2.nu, varvals2, model.margin_objective
+    )
+
+    assert derived_first.sensitivities.keys() == derived_second.sensitivities.keys()
+    for vk, sens in derived_first.sensitivities.items():
+        assert sens == pytest.approx(derived_second.sensitivities[vk], rel=1e-9)
+
+
+def test_monomial_equality_margin_fd():
+    """FD cross-check for a margin model whose binding constraint is a
+    MonomialEquality."""
+    sol = MonomialEqualityMarginModel().solve(verbosity=0)
+    assert sol.derived is not None
+    assert abs(sol.derived.value - 20.0) < 1e-4
+    for vk, sens in sol.derived.sensitivities.items():
+        fd = _fd_margin_sens(MonomialEqualityMarginModel, vk.name)
+        assert abs(sens - fd) / max(abs(sens), 1e-10) < 1e-3, (
+            f"FD check failed for {vk.name}: computed={sens:.4g}, fd={fd:.4g}"
+        )
