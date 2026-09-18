@@ -145,28 +145,29 @@ class WorkSleep(Model):
 # ---------------------------------------------------------------------------
 # Solve all five and expose individual solutions for testing
 # ---------------------------------------------------------------------------
-m1 = BoxTransport()
-sol1 = m1.solve(verbosity=0)
+if __name__ == "__main__":
+    m1 = BoxTransport()
+    sol1 = m1.solve(verbosity=0)
 
-m2 = FencePlot()
-sol2 = m2.solve(verbosity=0)
+    m2 = FencePlot()
+    sol2 = m2.solve(verbosity=0)
 
-m3 = BeamCrossSection()
-sol3 = m3.solve(verbosity=0)
+    m3 = BeamCrossSection()
+    sol3 = m3.solve(verbosity=0)
 
-m4 = BoxFromSheet()
-sol4 = m4.solve(verbosity=0)
+    m4 = BoxFromSheet()
+    sol4 = m4.solve(verbosity=0)
 
-m5 = WorkSleep()
-sol5 = m5.solve(verbosity=0)
+    m5 = WorkSleep()
+    sol5 = m5.solve(verbosity=0)
 
-print("=== 1. Box Transport ===")
-print(sol1.summary())
-print("\n=== 2. Fence Plot ===")
-print(sol2.summary())
-print("\n=== 3. Beam Cross-Section ===")
-print(sol3.summary())
-print("\n=== 4. Box from Sheet ===")
-print(sol4.summary())
-print("\n=== 5. Work/Sleep Allocation ===")
-print(sol5.summary())
+    print("=== 1. Box Transport ===")
+    print(sol1.summary())
+    print("\n=== 2. Fence Plot ===")
+    print(sol2.summary())
+    print("\n=== 3. Beam Cross-Section ===")
+    print(sol3.summary())
+    print("\n=== 4. Box from Sheet ===")
+    print(sol4.summary())
+    print("\n=== 5. Work/Sleep Allocation ===")
+    print(sol5.summary())
