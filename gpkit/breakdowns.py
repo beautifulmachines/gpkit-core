@@ -35,7 +35,7 @@ def bdtable_gen(key):
         finally:
             lines = sys.stdout.lines()
             sys.stdout = original_stdout
-        return lines
+        return lines if any(lines) else []  # an empty capture yields [""]
 
     return bdtable
 
@@ -747,6 +747,11 @@ def graph(  # noqa: PLR0912, PLR0913, PLR0915
     showlegend=False,
 ):
     "Prints breakdown"
+    if tree.value == 0:
+        # A breakdown apportions a total among its parts; a zero total has no
+        # shares to lay out, and scaling by it would divide by zero. Happens
+        # for the model-sensitivity tree of a model with no constraints.
+        return
     collapse = not showlegend
     # TODO: set to True while showlegend is True for first approx of receipts;
     # TODO: autoinclude with trace?
