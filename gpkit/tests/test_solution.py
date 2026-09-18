@@ -114,6 +114,19 @@ class TestSolution:
         assert sol[x] / 3.0 == pytest.approx(1.0, abs=1e-3)
 
 
+def test_tables_for_a_model_with_no_constraints():
+    """Unconstrained posynomial minimization is a classical GP, and its
+    solution must print: with no constraints there are no sensitivities to
+    attribute, so the model-sensitivity breakdown has nothing to lay out."""
+    x, y = Variable("x"), Variable("y")
+    sol = Model(x + 1 / x + y + 1 / y, []).solve(verbosity=0)
+    assert sol.cost == pytest.approx(4, rel=1e-4)
+    assert not sol.sens.constraints
+    assert not sol.model_sens_breakdown()
+    assert sol.table()
+    assert sol.summary()
+
+
 def test_printing_table_backward_compat():
     """printing.table(sol) still works and returns a string."""
     x = Variable("x_st", "m", "free variable")
