@@ -1,8 +1,13 @@
 """Tests for DisplayScope, the lineage-display naming rule."""
 
+import inspect
+
 import pytest
 
+from gpkit.constraints.set import ConstraintSet
 from gpkit.display import DisplayScope
+from gpkit.nomials.constraints import SingleEquationConstraint
+from gpkit.nomials.core import Nomial
 from gpkit.util.repr_conventions import also_excluding
 from gpkit.varkey import VarKey
 
@@ -329,6 +334,28 @@ class TestFormatFlags:
             DisplayScope(anchor=AIRCRAFT, shown=shown, excluded={"modelnums"}).name(vk)
             == "Wing.x"
         )
+
+    @pytest.mark.parametrize(
+        "method",
+        [
+            SingleEquationConstraint.str_without,
+            SingleEquationConstraint.latex,
+            ConstraintSet.str_without,
+            ConstraintSet.latex,
+            Nomial.str_without,
+            Nomial.latex,
+            VarKey.str_without,
+            VarKey.latex,
+        ],
+    )
+    def test_default_excluded_is_a_flag_collection(self, method):
+        """`excluded` holds whole flags, so a bare string is never a valid value:
+        iterating one yields characters, not flags.  A string default survives
+        `"units" in excluded` only by substring accident, and is shredded the
+        moment it reaches also_excluding()."""
+        default = inspect.signature(method).parameters["excluded"].default
+        assert not isinstance(default, str)
+        assert set(default) <= set(also_excluding(default, "ast_units"))
 
     def test_scope_is_hashable_for_render_caches(self):
         """parse_ast caches rendered strings keyed on the threaded context."""

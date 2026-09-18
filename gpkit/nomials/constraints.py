@@ -17,7 +17,7 @@ class SingleEquationConstraint(ReprMixin):
     def __init__(self, left, oper, right):
         self.left, self.oper, self.right = left, oper, right
 
-    def str_without(self, excluded="units"):
+    def str_without(self, excluded=("units",)):
         "String representation without attributes in excluded list"
         leftstr = try_str_without(self.left, excluded)
         rightstr = try_str_without(self.right, excluded)
