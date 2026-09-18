@@ -13,6 +13,7 @@ from gpkit import Model, NamedVariables, SignomialsEnabled, Variable, Vectorize
 from gpkit.examples import uav
 from gpkit.nomials.math import SignomialInequality
 from gpkit.solvers.cvxopt import optimize as cvxopt_optimize
+from gpkit.tests.conftest import run_threads
 from gpkit.util.globals import load_settings
 
 
@@ -26,25 +27,6 @@ def test_signomials_enabled_is_reentrant():
         assert bool(SignomialsEnabled)
         constr = x >= 1 - y
         assert isinstance(constr, SignomialInequality)
-
-
-def run_threads(target, count=4):
-    "Run target(thread_index) in count threads; re-raise any thread's error."
-    errors = []
-
-    def wrapped(i):
-        try:
-            target(i)
-        except Exception as exc:  # noqa: BLE001
-            errors.append(exc)
-
-    threads = [threading.Thread(target=wrapped, args=(i,)) for i in range(count)]
-    for t in threads:
-        t.start()
-    for t in threads:
-        t.join()
-    if errors:
-        raise errors[0]
 
 
 def test_namedvariables_thread_isolation():

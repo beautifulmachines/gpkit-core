@@ -5,13 +5,14 @@ import os
 import numpy as np
 import pytest
 
-from gpkit import Model, Variable, settings, ureg
+from gpkit import Model, Variable, ureg
 from gpkit.exceptions import (
     DualInfeasible,
     PrimalInfeasible,
     UnboundedGP,
     UnknownInfeasible,
 )
+from gpkit.solvers import default_solver
 from gpkit.tests.conftest import assert_logtol
 from gpkit.util.small_classes import Quantity
 from gpkit.util.small_scripts import mag
@@ -100,7 +101,7 @@ class TestExamples:
 
     def test_migp(self, example):
         solx = [sol[example.x] for sol in example.sols]
-        if settings["default_solver"] == "mosek_conif":
+        if default_solver() == "mosek_conif":
             assert_logtol(solx, [1] * 3 + [2] * 6 + [3] * 2)
         else:
             num = example.num
@@ -217,7 +218,7 @@ class TestExamples:
         assert sol[2].cost == pytest.approx(7362.77, abs=0.01)
 
     def test_boundschecking(self, example):  # pragma: no cover
-        if "mosek_cli" in settings["default_solver"]:
+        if "mosek_cli" in default_solver():
             with pytest.raises(UnknownInfeasible):
                 example.gp.solve(verbosity=0)
         else:
@@ -229,21 +230,21 @@ class TestExamples:
 
     def test_primal_infeasible_ex1(self, example):
         primal_or_unknown = PrimalInfeasible
-        if "cvxopt" in settings["default_solver"]:  # pragma: no cover
+        if "cvxopt" in default_solver():  # pragma: no cover
             primal_or_unknown = UnknownInfeasible
         with pytest.raises(primal_or_unknown):
             example.m.solve(verbosity=0)
 
     def test_primal_infeasible_ex2(self, example):
         primal_or_unknown = PrimalInfeasible
-        if "cvxopt" in settings["default_solver"]:  # pragma: no cover
+        if "cvxopt" in default_solver():  # pragma: no cover
             primal_or_unknown = UnknownInfeasible
         with pytest.raises(primal_or_unknown):
             example.m.solve(verbosity=0)
 
     def test_debug(self, example):
         dual_or_primal = DualInfeasible
-        if "mosek_conif" == settings["default_solver"]:  # pragma: no cover
+        if "mosek_conif" == default_solver():  # pragma: no cover
             dual_or_primal = PrimalInfeasible
         with pytest.raises(UnboundedGP):
             example.m.gp()
@@ -252,7 +253,7 @@ class TestExamples:
             gp.solve(verbosity=0)
 
         primal_or_unknown = PrimalInfeasible
-        if "cvxopt" == settings["default_solver"]:  # pragma: no cover
+        if "cvxopt" == default_solver():  # pragma: no cover
             primal_or_unknown = UnknownInfeasible
         with pytest.raises(primal_or_unknown):
             example.m2.solve(verbosity=0)

@@ -21,6 +21,7 @@ from ..exceptions import (
     UnknownInfeasible,
 )
 from ..solutions import MarginSolution, Sensitivities, Solution, _WeakModelRef
+from ..solvers import default_solver
 from ..util.repr_conventions import lineagestr
 from ..util.small_classes import CootMatrix, FixedScalar, Numbers, SolverLog
 from ..util.small_scripts import appendsolwarning, initsolwarning
@@ -47,17 +48,11 @@ class MonoEqualityIndexes:
 
 
 def _get_solver(solver, kwargs):
-    """Get the solverfn and solvername associated with solver"""
-    if solver is None:
-        from ..util.globals import settings  # noqa: PLC0415
+    """Map a solver name (or callable) to its name and optimize function.
 
-        try:
-            solver = settings["default_solver"]
-        except KeyError as err:
-            raise ValueError(
-                "No default solver was set during build, so"
-                " solvers must be manually specified."
-            ) from err
+    Solver modules are imported here rather than at module scope because
+    mosek need not be installed to use cvxopt, or vice versa.
+    """
     if solver == "cvxopt":
         from ..solvers.cvxopt import optimize  # noqa: PLC0415
     elif solver == "mosek_cli":
@@ -344,7 +339,7 @@ class GeometricProgram:
         -------
         Solution (or RawSolution if gen_result is False)
         """
-        solvername, solverfn = _get_solver(solver, kwargs)
+        solvername, solverfn = _get_solver(solver or default_solver(), kwargs)
         if verbosity > 0:
             print(f"Using solver '{solvername}'")
             print(f" for {len(self.vars)} free variables")

@@ -82,6 +82,17 @@ When solving the model you can change the level of information that gets printed
 .. literalinclude:: examples/gettingstarted.py
     :lines: 63
 
+A model is solved with whichever solver was found when GPkit was installed. To use a different one, name it::
+
+    sol = m.solve(solver="mosek_conif")
+
+To choose the solver for code that doesn't name one — running an existing script or model under a different solver, say — use the ``DefaultSolver`` context manager::
+
+    from gpkit import DefaultSolver
+
+    with DefaultSolver("mosek_conif"):
+        sol = m.solve()
+
 Printing Results
 ================
 

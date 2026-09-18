@@ -27,6 +27,7 @@ from .nomials import (
 )
 from .programs.gp import GeometricProgram
 from .programs.sgp import SequentialGeometricProgram
+from .solvers import DefaultSolver, default_solver
 from .units import DimensionalityError, units, ureg
 from .util.build import build
 from .util.globals import NamedVariables, SignomialsEnabled, Vectorize, settings
