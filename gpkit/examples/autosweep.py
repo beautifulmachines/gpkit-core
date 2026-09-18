@@ -4,8 +4,8 @@ import pickle
 
 import numpy as np
 
-import gpkit
 from gpkit import Model, Variable, units
+from gpkit.solvers import default_solver
 from gpkit.tools.autosweep import autosweep_1d
 from gpkit.util.small_scripts import mag
 
@@ -41,9 +41,7 @@ with open("autosweep.pkl", "rb") as fil:
 
 # this problem is two intersecting lines in logspace
 m2 = Model(A**2, [A >= (w / 3) ** 2, A >= (w / 3) ** 0.5 * units.m**1.5])
-tol2 = {"mosek_cli": 1e-6, "mosek_conif": 1e-6, "cvxopt": 1e-7}[
-    gpkit.settings["default_solver"]
-]
+tol2 = {"mosek_cli": 1e-6, "mosek_conif": 1e-6, "cvxopt": 1e-7}[default_solver()]
 # test Model method
 sol2 = m2.autosweep({w: [1, 10]}, tol2, verbosity=0)
 bst2 = sol2.bst

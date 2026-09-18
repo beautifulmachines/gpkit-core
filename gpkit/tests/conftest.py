@@ -4,12 +4,14 @@ import importlib
 import io
 import os
 import sys
+import threading
 
 import numpy as np
 import pytest
 
 import gpkit
 from gpkit import settings
+from gpkit.solvers import DefaultSolver
 from gpkit.util.small_scripts import mag
 
 
@@ -20,21 +22,23 @@ def assert_logtol(first, second, logtol=1e-6):
     )
 
 
-class NewDefaultSolver:
-    "Creates an environment with a different default solver"
+def run_threads(target, count=4):
+    "Run target(thread_index) in count threads; re-raise any thread's error."
+    errors = []
 
-    def __init__(self, solver):
-        self.solver = solver
-        self.prev_default_solver = None
+    def wrapped(i):
+        try:
+            target(i)
+        except Exception as exc:  # noqa: BLE001
+            errors.append(exc)
 
-    def __enter__(self):
-        "Change default solver."
-        self.prev_default_solver = gpkit.settings["default_solver"]
-        gpkit.settings["default_solver"] = self.solver
-
-    def __exit__(self, *args):
-        "Reset default solver."
-        gpkit.settings["default_solver"] = self.prev_default_solver
+    threads = [threading.Thread(target=wrapped, args=(i,)) for i in range(count)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
+    if errors:
+        raise errors[0]
 
 
 class StdoutCaptured:
@@ -133,7 +137,7 @@ def example(request, solver):
     test_name = request.node.originalname
     example_name = test_name.removeprefix("test_")
 
-    with NewDefaultSolver(solver):
+    with DefaultSolver(solver):
         mod = _import_example(example_name)
         yield mod
 
