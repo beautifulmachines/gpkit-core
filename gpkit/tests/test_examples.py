@@ -41,9 +41,11 @@ class TestExamples:
               assert example.sol["cost"] == pytest.approx(3.121)
     """
 
-    # skip test breakdowns -- failing due to pint errors in old pkl files
-    # def test_breakdowns(self, example):
-    #     pass
+    def test_breakdowns(self, example):
+        # the example solves a live model, so its breakdowns track the code
+        assert example.sol.cost == pytest.approx(7105.40, rel=1e-2)
+        tree = example.bds.get_tree("cost")
+        assert tree, "cost breakdown produced no tree"
 
     def test_issue_1513(self, example):
         assert example.sol[0].cost == pytest.approx(20.0, rel=1e-2)
