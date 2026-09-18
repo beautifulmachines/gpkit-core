@@ -1,210 +1,187 @@
 Cost breakdown (as seen in solution tables)
 ==============
 
-          ┃┓          ┓           ┓
-          ┃┃          ┃           ┃
-          ┃┃          ┃           ┃
-          ┃┃          ┃           ┃
-          ┃┃          ┃           ┃
-          ┃┃          ┣╸Battery.W ┣╸Battery.E╶⎨
-          ┃┃          ┃ (370lbf)  ┃ (165,913kJ)
-          ┃┃          ┃           ┃
-          ┃┃          ┃           ┃
-     Cost╺┫┃          ┃           ┃
- (699lbf) ┃┣╸Wtotal   ┛           ┛
-          ┃┃ (699lbf) ┓          ┓
-          ┃┃          ┃          ┣╸Wing.BoxSpar.W╶⎨
-          ┃┃          ┣╸Wing.W   ┛ (96.1lbf)
-          ┃┃          ┛ (139lbf) ┣╸Wing.WingSecondStruct.W╶⎨
-          ┃┃          ┣╸Motor.W╶⎨
-          ┃┃          ┣╸SolarCells.W╶⎨
-          ┃┃          ┣╸Empennage.W
-          ┃┃          ┣╸Wavn
-          ┃┛          ┣╸[6 terms]
+          ┃┓                 ┓
+          ┃┃                 ┃
+          ┃┃                 ┃
+          ┃┣╸Outbound.W_fuel ┣╸Outbound.AircraftPerf.W╶⎨
+          ┃┃ (3,731N)        ┃ (34,888N)
+     Cost╺┫┛                 ┛
+ (7,105N) ┃┓               ┓           ┓
+          ┃┃               ┃           ┃
+          ┃┃               ┃           ┣╸W_tilde╶⎨
+          ┃┣╸Return.W_fuel ┣╸W_zfw     ┛ (22,549N)
+          ┃┃ (3,374N)      ┃ (31,514N) ┣╸Wing.W╶⎨
+          ┃┛               ┛           ┛ (8,965N)
 
 Variable breakdowns (note the two methods of access)
 ===================
 
-                                 ┃┓                 ┓             ┓
-                                 ┃┃                 ┃             ┃
-                                 ┃┃                 ┃             ┃
-                                 ┃┃                 ┃             ┃
-                                 ┃┃                 ┃             ┃
-                                 ┃┃                 ┃             ┃
-                                 ┃┃                 ┃             ┣╸MotorPerf.Q╶⎨
- AircraftPerf.AircraftDrag.Poper╺┫┣╸MotorPerf.Pelec ┣╸MotorPerf.i ┃ (4.8N·m)
-                        (3,194W) ┃┃ (0.685kW)       ┃ (36.8A)     ┃
-                                 ┃┃                 ┃             ┃
-                                 ┃┃                 ┃             ┃
-                                 ┃┃                 ┃             ┛
-                                 ┃┃                 ┃             ┣╸i0
-                                 ┃┛                 ┛             ┛ (4.5A, fixed)
-                                 ┃┣╸Pavn
-                                 ┃┣╸Ppay
+                           ┃┓           ┓
+                           ┃┃           ┃
+                           ┃┣╸C_Di      ┣╸WingAero.C_L²/A
+                           ┃┃ (0.00565) ┃ (0.0169)
+                           ┃┛           ┛
+ Outbound.AircraftPerf.C_D╺┫┓
+                  (0.0129) ┃┃
+                           ┃┣╸WingAero.C_Dp
+                           ┃┃ (0.00555)
+                           ┃┛
+                           ┃/┣╸S      ┣╸I_cap/t_cap
+                           ┃/┛ (29m²) ┛ (0.00447m⁴)
 
 
-                                       ┃┓
- AircraftPerf.AircraftDrag.MotorPerf.Q╺┫┃
-                              (4.8N·m) ┃┣╸..ActuatorProp.CP
-                                       ┃┛ (0.00291)
+          ┃┓
+   Wing.W╺┫┃
+ (8,965N) ┃┣╸I_cap/t_cap
+          ┃┛ (0.00447m⁴)
 
 Combining the two above by increasing maxwidth
 ----------------------------------------------
 
-                                 ┃┓                 ┓             ┓             ┓
-                                 ┃┃                 ┃             ┃             ┃
-                                 ┃┃                 ┃             ┃             ┃
-                                 ┃┃                 ┃             ┃             ┃
-                                 ┃┃                 ┃             ┃             ┃
-                                 ┃┃                 ┃             ┃             ┃
-                                 ┃┃                 ┃             ┣╸MotorPerf.Q ┣╸ActuatorProp.CP
- AircraftPerf.AircraftDrag.Poper╺┫┣╸MotorPerf.Pelec ┣╸MotorPerf.i ┃ (4.8N·m)    ┃ (0.00291)
-                        (3,194W) ┃┃ (0.685kW)       ┃ (36.8A)     ┃             ┃
-                                 ┃┃                 ┃             ┃             ┃
-                                 ┃┃                 ┃             ┃             ┃
-                                 ┃┃                 ┃             ┛             ┛
-                                 ┃┃                 ┃             ┣╸i0
-                                 ┃┛                 ┛             ┛ (4.5A, fixed)
-                                 ┃┣╸Pavn
-                                 ┃┣╸Ppay
+                           ┃┓           ┓
+                           ┃┃           ┃
+                           ┃┣╸C_Di      ┣╸WingAero.C_L²/A
+                           ┃┃ (0.00565) ┃ (0.0169)
+                           ┃┛           ┛
+ Outbound.AircraftPerf.C_D╺┫┓
+                  (0.0129) ┃┃
+                           ┃┣╸WingAero.C_Dp
+                           ┃┃ (0.00555)
+                           ┃┛
+                           ┃/┣╸S      ┣╸I_cap/t_cap
+                           ┃/┛ (29m²) ┛ (0.00447m⁴)
 
 Model sensitivity breakdowns (note the two methods of access)
 ============================
 
-       ┃┓         ┓               ┓              ┓              ┓
-       ┃┃         ┃               ┃              ┃              ┃
-       ┃┃         ┃               ┃              ┃              ┣╸ActuatorProp╶⎨
-       ┃┃         ┃               ┃              ┃              ┛
-       ┃┃         ┃               ┣╸AircraftPerf ┣╸AircraftDrag ┣╸MotorPerf╶⎨
-       ┃┃         ┃               ┃              ┃              ┓
-       ┃┣╸Mission ┣╸FlightSegment ┃              ┃              ┣╸[17 terms]
-       ┃┃         ┃               ┛              ┛              ┛
-       ┃┃         ┃               ┣╸FlightState╶⎨
- Model╺┫┃         ┃               ┣╸GustL╶⎨
-       ┃┃         ┃               ┣╸SteadyLevelFlight╶⎨
-       ┃┃         ┛               ┣╸[49 terms]
-       ┃┛         ┣╸Climb╶⎨
-       ┃┓
-       ┃┃
-       ┃┃
-       ┃┣╸Aircraft╶⎨
-       ┃┃
-       ┃┛
-       ┃┣╸g = 9.81m/s²
+     ┃┓         ┓
+     ┃┃         ┃
+     ┃┃         ┣╸Outbound╶⎨
+     ┃┃         ┃
+     ┃┃         ┛
+     ┃┃         ┓        ┓
+     ┃┣╸Mission ┃        ┣╸AircraftPerf╶⎨
+     ┃┃         ┣╸Return ┛
+     ┃┃         ┛        ┣╸[2 terms]
+ UAV╺┫┃         ┣╸SprintCondition╶⎨
+     ┃┃         ┣╸R ≥ R_min
+     ┃┃         ┣╸Outbound.AircraftPerf.W ≥ W_zfw + Return.W_fuel
+     ┃┛         ┣╸Return.AircraftPerf.W ≥ W_zfw
+     ┃┓          ┓
+     ┃┃          ┃
+     ┃┃          ┣╸Wing╶⎨
+     ┃┣╸Aircraft ┛
+     ┃┃          ┣╸W_tilde ≥ W_fixed + W_pay + Engine.W
+     ┃┛          ┣╸W_zfw ≥ W_tilde + Wing.W
+     ┃┣╸HeavyLandingCase╶⎨
 
 
-          ┃┓         ┣╸etadischarge = 0.98
-          ┃┃         ┛
-          ┃┃         ┣╸W ≥ E·minSOC/hbatt/etaRTE/etapack·g
-          ┃┃         ┣╸etaRTE = 0.95
-          ┃┣╸Battery ┣╸etapack = 0.85
-          ┃┃         ┣╸hbatt = 350W·hr/kg
-          ┃┃         ┣╸minSOC = 1.03
-          ┃┛         ┛
+          ┃┓      ┓
+          ┃┃      ┣╸p ≥ 1.9
+          ┃┃      ┛
+          ┃┃      ┣╸2⋅q ≥ 1 + p
+          ┃┃      ┛
+          ┃┣╸Wing ┣╸0.423⋅w⋅tau²⋅t_cap ≥ I_cap⋅k_shear + 0.92⋅w⋅tau⋅t_cap²
+          ┃┃      ┣╸M_rbar ≥ W_tilde⋅A⋅p/(24⋅W_ref)
+          ┃┃      ┣╸N_lift⋅M_rbar⋅A⋅q²⋅tau⋅EI_ref/(S⋅I_cap⋅sigma_max) ≤ 8
+          ┃┃      ┣╸W/f_wadd ≥ W_cap + W_web
+ Aircraft╺┫┃      ┣╸W_cap ≥ 8⋅rho_alum⋅g⋅w⋅t_cap⋅S^1.5⋅nu/(3⋅A^0.5)
+          ┃┛      ┣╸[4 terms]
           ┃┓
- Aircraft╺┫┃
-          ┃┣╸Wing╶⎨
           ┃┃
+          ┃┣╸W_tilde ≥ W_fixed + W_pay + Engine.W
           ┃┛
-          ┃┣╸Wtotal/mfac ≥ Fuselage.W[0,0] + Fuselage.W[1,0] + Fuselage.W[2,0] …
+          ┃┓
+          ┃┃
+          ┃┣╸W_zfw ≥ W_tilde + Wing.W
           ┃┛
-          ┃┣╸mfac = 1.05
-          ┃┛
-          ┃┣╸Empennage╶⎨
-          ┃┣╸[23 terms]
-          ┃┛
+          ┃┣╸Engine╶⎨
 
 Exhaustive variable breakdown traces (and configuration arguments)
 ====================================
 
-                                 ┃┓                 ┓             ┓
-                                 ┃┃                 ┃             ┃
-                                 ┃┃                 ┃             ┃
-                                 ┃┃                 ┃             ┃
-                                 ┃┃                 ┃             ┃
- AircraftPerf.AircraftDrag.Poper╺┫┣╸MotorPerf.Pelec ┣╸MotorPerf.i ┣╸MotorPerf.Q╶⎨
-                        (3,194W) ┃┃ (0.685kW)       ┃ (36.8A)     ┃ (4.8N·m)
-                                 ┃┃                 ┃             ┃
-                                 ┃┃                 ┃             ┃
-                                 ┃┃                 ┃             ┛
-                                 ┃┛                 ┛             ┣╸i0
-                                 ┃┣╸Pavn
+          ┃┓        ┓
+          ┃┃        ┃
+          ┃┃        ┃
+          ┃┃        ┃
+          ┃┃        ┃
+   Wing.W╺┫┃        ┣╸I_cap/t_cap
+ (8,965N) ┃┣╸tau    ┃ (0.00447m⁴)
+          ┃┃ (0.15) ┃
+          ┃┃        ┃
+          ┃┃        ┃
+          ┃┃        ┛
+          ┃┛        ┣╸t_cap
 
 
-                                 ┃╤╤┯╤┯╤┯┯╤┓
-                                 ┃╎╎│╎│╎││╎┃
-                                 ┃╎╎│╎│╎││╎┃
-                                 ┃╎╎│╎│╎││╎┃
-                                 ┃╎╎│╎│╎││╎┃
-                                 ┃╎╎│╎│╎││╎┃
-                                 ┃╎╎│╎│DCBA┣╸ActuatorProp.CP
- AircraftPerf.AircraftDrag.Poper╺┫╎HGFE╎││╎┃ (0.00291)
-                        (3,194W) ┃J╎│╎│╎││╎┃
-                                 ┃╎╎│╎│╎││╎┃
-                                 ┃╎╎│╎│╎││╎┃
-                                 ┃╎╎│╎│╧┷┷╧┛
-                                 ┃╎╎│╎│┣╸i0 (4.5A, fixed)
-                                 ┃╎╧┷╧┷┛
-                                 ┃╎┣╸Pavn (200W, fixed)
-                                 ┃╧┣╸Ppay (100W, fixed)
+          ┃╤┯╤^┯╤╤┯╤^╤┓
+   Wing.W╺┫╎│╎ │╎╎│╎ ╎┃
+ (8,965N) ┃MKJHGFEDCBA┣╸I_cap/t_cap
+          ┃╧┷╧^┷╧╧┷╧^╧┛ (0.00447m⁴)
 
- A   4.53e-05·FlightState.rho·ActuatorProp.omega²·Propeller.R⁵   ×1,653N·m     [free factor]
- B   ActuatorProp.Q                                             = 4.8N·m
- C   MotorPerf.Q                                                = 4.8N·m
- D   Kv                                                          ×64.2rpm/V    [free factor]
- E   MotorPerf.i                                                = 36.8A
- F   MotorPerf.v                                                 ×18.6V        [free factor]
- G   MotorPerf.Pelec                                            = 0.685kW
- H   Nprop                                                       ×4, fixed
- J   mpower                                                      ×1.05, fixed
+ A   k_shear/w                                         ×2/m⁴, fixed
+ B                                                     ^0.5
+ C                                                     ×1.54
+ D   tau                                              = 0.15
+ E   1e-06⋅A⋅EI_ref⋅M_rbar⋅N_lift⋅q²/I_cap/sigma_max   ×1,546m²       [free factor]
+ F                                                     ×0.125
+ G   S                                                = 29m²
+ H                                                     ^1.5
+ J   2.67⋅g⋅nu⋅rho_alum⋅t_cap⋅w/A^0.5                  ×27.8kg/m²/s²  [free factor]
+ K   W_cap                                            = 4,347N
+ M   f_wadd                                            ×2, fixed
 
 Permissivity = 2 (the default)
 ----------------
 
-AircraftPerf.AircraftDrag.Poper (3,194W)
-  which in: Poper/mpower ≥ Pavn + Ppay + Pelec·Nprop (sensitivity +5.6)
-  { through a factor of AircraftPerf.AircraftDrag.mpower (1.05, fixed) }
-  breaks down into 3 monomials:
-    1) forming 90% of the RHS and 90% of the total:
-      { through a factor of Nprop (4, fixed) }
-      AircraftPerf.AircraftDrag.MotorPerf.Pelec (0.685kW)
-        which in: Pelec = v·i (sensitivity -5.1)
+Wing.W (8,965N)
+  which in: W/f_wadd ≥ W_cap + W_web (sensitivity +0.33)
+  { through a factor of f_wadd (2, fixed) }
+  breaks down into 2 monomials:
+    1) forming 96% of the RHS and 96% of the total:
+      W_cap (4,347N)
+        which in: W_cap ≥ 8⋅rho_alum⋅g⋅w⋅t_cap⋅S^1.5⋅nu/(3⋅A^0.5) (sensitivity +0.32)
         breaks down into:
-          { through a factor of AircraftPerf.AircraftDrag.MotorPerf.v (18.6V) }
-          AircraftPerf.AircraftDrag.MotorPerf.i (36.8A)
-            which in: i ≥ Q·Kv + i0 (sensitivity +5.4)
-            breaks down into 2 monomials:
-              1) forming 87% of the RHS and 79% of the total:
-                { through a factor of Kv (64.2rpm/V) }
-                AircraftPerf.AircraftDrag.MotorPerf.Q (4.8N·m)
-                  which in: Q = Q (sensitivity -4.7)
-                  breaks down into:
-                    AircraftPerf.AircraftDrag.ActuatorProp.Q (4.8N·m)
-                      which in: CP ≤ Q·omega/(0.5·rho·(omega·R)³·π·R²) (sensitivity +4.7)
-                      { through a factor of 4.53e-05·FlightState.rho·AircraftPerf.AircraftDrag.ActuatorProp.omega²·Propeller.R⁵ (1,653N·m) }
-                      breaks down into:
-                        AircraftPerf.AircraftDrag.ActuatorProp.CP (0.00291)
-              2) forming 12% of the RHS and 11% of the total:
-                i0 (4.5A, fixed)
-    2) forming 6% of the RHS and 6% of the total:
-      AircraftPerf.AircraftDrag.Pavn (200W, fixed)
-    3) forming 3% of the RHS and 3% of the total:
-      AircraftPerf.AircraftDrag.Ppay (100W, fixed)
+          { through a factor of 2.67⋅g⋅nu⋅rho_alum⋅t_cap⋅w/A^0.5 (27.8kg/m²/s²) }
+          { through a power of 1.5 }
+          S (29m²)
+            which in: N_lift⋅M_rbar⋅A⋅q²⋅tau⋅EI_ref/(S⋅I_cap⋅sigma_max) ≤ 8 (sensitivity +0.35)
+            { through a factor of 0.125 (0.125) }
+            breaks down into:
+              { through a factor of 1e-06⋅A⋅EI_ref⋅M_rbar⋅N_lift⋅q²/I_cap/sigma_max (1,546m²) }
+              tau (0.15)
+                which in: 0.423⋅w⋅tau²⋅t_cap ≥ I_cap⋅k_shear + 0.92⋅w⋅tau⋅t_cap² (sensitivity +0.37)
+                { through a factor of 1.54 (1.54) }
+                { through a power of 2 }
+                breaks down into 2 monomials:
+                  1) forming 93% of the RHS and 90% of the total:
+                    { through a factor of k_shear/w (2/m⁴, fixed) }
+                    I_cap/t_cap (0.00447m⁴)
+                  2) forming 6% of the RHS and 6% of the total:
+                    { through a factor of 0.92⋅tau (0.138) }
+                    t_cap (0.00427)
+    2) forming 3% of the RHS and 3% of the total:
+      W_web (135N)
 
-Permissivity = 1 (stops at Pelec = v·i)
+Permissivity = 1 (stops at M_rbar⋅tau instead of splitting it)
 ----------------
 
-AircraftPerf.AircraftDrag.Poper (3,194W)
-  which in: Poper/mpower ≥ Pavn + Ppay + Pelec·Nprop (sensitivity +5.6)
-  { through a factor of AircraftPerf.AircraftDrag.mpower (1.05, fixed) }
-  breaks down into 3 monomials:
-    1) forming 90% of the RHS and 90% of the total:
-      { through a factor of Nprop (4, fixed) }
-      AircraftPerf.AircraftDrag.MotorPerf.Pelec (0.685kW)
-        which in: Pelec = v·i (sensitivity -5.1)
+Wing.W (8,965N)
+  which in: W/f_wadd ≥ W_cap + W_web (sensitivity +0.33)
+  { through a factor of f_wadd (2, fixed) }
+  breaks down into 2 monomials:
+    1) forming 96% of the RHS and 96% of the total:
+      W_cap (4,347N)
+        which in: W_cap ≥ 8⋅rho_alum⋅g⋅w⋅t_cap⋅S^1.5⋅nu/(3⋅A^0.5) (sensitivity +0.32)
         breaks down into:
-          AircraftPerf.AircraftDrag.MotorPerf.i·AircraftPerf.AircraftDrag.MotorPerf.v (685A·V)
-    2) forming 6% of the RHS and 6% of the total:
-      AircraftPerf.AircraftDrag.Pavn (200W, fixed)
-    3) forming 3% of the RHS and 3% of the total:
-      AircraftPerf.AircraftDrag.Ppay (100W, fixed)
+          { through a factor of 2.67⋅g⋅nu⋅rho_alum⋅t_cap⋅w/A^0.5 (27.8kg/m²/s²) }
+          { through a power of 1.5 }
+          S (29m²)
+            which in: N_lift⋅M_rbar⋅A⋅q²⋅tau⋅EI_ref/(S⋅I_cap⋅sigma_max) ≤ 8 (sensitivity +0.35)
+            { through a factor of 0.125 (0.125) }
+            breaks down into:
+              { through a factor of 1e-06⋅A⋅EI_ref⋅N_lift⋅q²/I_cap/sigma_max (0.0479m²) }
+              M_rbar⋅tau (4,846)
+    2) forming 3% of the RHS and 3% of the total:
+      W_web (135N)
