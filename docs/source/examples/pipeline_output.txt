@@ -9,7 +9,7 @@
            ┃┃           ┣╸W          /┣╸Q[1]
            ┃┃           ┃ (29,347kg)  ┃ (0.18m³/s, fixed)
       Cost╺┫┃           ┃             ┃
- (234,504) ┃┣╸C         ┃             ┃
+ (234,504) ┃┣╸LCC       ┃             ┃
            ┃┃ (234,504) ┃             ┃
            ┃┃           ┃             ┃
            ┃┃           ┃             ┃
@@ -30,7 +30,7 @@
           ┃┛          ┛
           ┃┓
           ┃┃
-          ┃┣╸C ≥ c_mat⋅W + c_pump⋅P_rated + c_nrg⋅(P[:]⋅hours[:]).sum()
+          ┃┣╸LCC ≥ c_mat⋅W + c_pump⋅P_rated + c_nrg⋅(P[:]⋅hours[:]).sum()
  Pipeline╺┫┃
           ┃┛
           ┃┓      ┓
@@ -46,12 +46,12 @@
 
 Optimal Cost
 ------------
-Pipeline.C : 2.345e+05
+Pipeline.LCC : 2.345e+05
 
 Solution
 --------
 Pipeline
-      C : 2.345e+05                    material + pump + lifetime energy cost
+    LCC : 2.345e+05                    life-cycle cost: material + pump capital + lifetime energy
 P_rated : 25.17     [kW]               pump rating, set by the peak condition
 ...constants
       L : 1000      [m]      (+1)      pipe run length
@@ -97,7 +97,7 @@ L_span : 12        [m]   (+0.6118) support spacing
 Most Sensitive Constraints
 --------------------------
 Pipeline
-+1      : C ≥ c_mat⋅W + c_pump⋅P_rated + c_nrg⋅(P[:]⋅hours[:]).sum()
++1      : LCC ≥ c_mat⋅W + c_pump⋅P_rated + c_nrg⋅(P[:]⋅hours[:]).sum()
 +0.8022 : sigma ≥ p_sys⋅D/(2⋅t) + 4⋅M/(3.14⋅D²⋅t)
 +0.0966 : P[2] ≤ P_rated
 
