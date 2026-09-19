@@ -2,8 +2,14 @@
 
 import pytest
 
-from gpkit import Model, Variable
+from gpkit import Model, SignomialEquality, SignomialsEnabled, Variable
+from gpkit.constraints.bounded import Bounded
+from gpkit.constraints.loose import Loose
+from gpkit.constraints.set import build_model_tree
+from gpkit.constraints.tight import Tight
+from gpkit.examples.uav import UAV
 from gpkit.exceptions import AmbiguousVariable, VariableNotFound
+from gpkit.report import _build_constraint_groups
 
 
 class TestModelGraph:
@@ -359,3 +365,97 @@ class TestGetVar:
         x1 = t.get_var("sub1.x")
         x2 = t.get_var("sub2.x")
         assert x1.key != x2.key  # different VarKeys from different lineage contexts
+
+
+class _WrappedSub(Model):
+    "A submodel whose constraints sit inside wrappers."
+
+    def setup(self):
+        a, b = Variable("a"), Variable("b")
+        return [Tight([a >= b]), Bounded([b >= 0.1]), a <= 100]
+
+
+class _WrappedTop(Model):
+    "Wrappers and a submodel at the same level, to mix both walk branches."
+
+    sub: "_WrappedSub"
+
+    def setup(self):
+        x, y = Variable("x"), Variable("y")
+        z = Variable("z", 2)
+        self.sub = _WrappedSub()
+        self.cost = x
+        with SignomialsEnabled():
+            return [
+                self.sub,
+                Loose([y >= 0.5]),
+                SignomialEquality(x + y, z),
+                y <= 4,
+            ]
+
+
+class TestConstraintWalk:
+    """One walk answers what the model tree, the IR and the report each ask."""
+
+    def test_wrapped_constraints_reach_the_report(self):
+        """Every constraint in the model is a constraint in its report.
+
+        Tight, Loose, Bounded and SignomialEquality are containers, but the
+        constraints inside them belong to the model that holds them -- they go
+        to the solver and carry sensitivities like any other.
+        """
+        x, y = Variable("x"), Variable("y")
+        z = Variable("z", 2)
+        with SignomialsEnabled():
+            m = Model(
+                x,
+                [
+                    Tight([x >= y]),
+                    Loose([y >= 0.5]),
+                    SignomialEquality(x + y, z),
+                    y <= 4,
+                ],
+            )
+        shown = [c for cg in _build_constraint_groups(m) for c in cg.constraints]
+        assert len(shown) == len(list(m.flat()))
+        assert all(any(c is s for s in shown) for c in m.flat())
+
+    @pytest.mark.parametrize("build", [UAV, _WrappedTop])
+    def test_report_and_model_tree_index_the_same_walk(self, build):
+        """A node's report constraints are the ones its indices point at.
+
+        constraint_indices index into to_ir()'s flat constraint list, and the
+        report shows each node's own constraints; both come from one walk, so
+        node by node they must name the same constraints.
+        """
+        m = build()
+        flat = list(m.flat())
+        tree = build_model_tree(m)
+
+        def check(node, model):
+            shown = [
+                c for cg in _build_constraint_groups(model) for c in cg.constraints
+            ]
+            at_indices = [flat[i] for i in node["constraint_indices"]]
+            assert len(shown) == len(at_indices)
+            assert all(a is b for a, b in zip(shown, at_indices))
+            for child_node, child in zip(node["children"], model.submodels):
+                check(child_node, child)
+
+        check(tree, m)
+
+    @pytest.mark.parametrize("build", [UAV, _WrappedTop])
+    def test_every_constraint_is_owned_exactly_once(self, build):
+        "The walk partitions the flat list across the model tree."
+        m = build()
+        tree = build_model_tree(m)
+        seen = []
+
+        def collect(node):
+            seen.extend(node["constraint_indices"])
+            for child in node["children"]:
+                collect(child)
+
+        collect(tree)
+        assert sorted(seen) == list(range(len(list(m.flat()))))
+        assert len(seen) == len(set(seen))
