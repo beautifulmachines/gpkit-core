@@ -1,10 +1,21 @@
 """Tests for Solution class"""
 
+import sys
+import threading
+
 import numpy as np
 import pytest
 
 import gpkit
-from gpkit import Model, SignomialsEnabled, Variable, VectorVariable, printing
+from gpkit import (
+    Model,
+    SignomialsEnabled,
+    Variable,
+    VectorVariable,
+    breakdowns,
+    printing,
+)
+from gpkit.tests.conftest import run_threads
 from gpkit.util.small_classes import Quantity, Strings
 
 
@@ -125,6 +136,41 @@ def test_tables_for_a_model_with_no_constraints():
     assert not sol.model_sens_breakdown()
     assert sol.table()
     assert sol.summary()
+
+
+def test_concurrent_tables_dont_corrupt_stdout(monkeypatch):
+    """Building a table must leave sys.stdout alone.
+
+    The breakdown sections used to be rendered by printing them and capturing
+    the output, which meant swapping sys.stdout -- a process-wide mutation. Two
+    threads doing that at once traded streams: one restored the other's capture
+    as "the original", leaving it installed for the rest of the process, and a
+    thread still mid-capture read .lines() off whatever was there. Syncing once
+    inside the breakdown puts all four threads there at the same moment.
+    """
+    x, y = Variable("x"), Variable("y")
+    sol = Model(x + y, [x >= 2, y >= 3 * x]).solve(verbosity=0)
+
+    real_graph = breakdowns.graph
+    barrier = threading.Barrier(4)
+    once = threading.local()
+
+    def synced_graph(*args, **kwargs):
+        if not getattr(once, "synced", False):
+            once.synced = True
+            barrier.wait(timeout=10)
+        return real_graph(*args, **kwargs)
+
+    monkeypatch.setattr(breakdowns, "graph", synced_graph)
+
+    real_stdout = sys.stdout
+    try:
+        run_threads(lambda _: sol.table())
+    finally:
+        leaked = sys.stdout is not real_stdout
+        if leaked:
+            sys.stdout = real_stdout  # don't swallow the rest of the session
+    assert not leaked, "sys.stdout was not restored after concurrent tables"
 
 
 def test_printing_table_backward_compat():

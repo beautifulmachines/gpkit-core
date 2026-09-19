@@ -1,7 +1,6 @@
 # TODO: cleanup weird conditionals
 
 import string
-import sys
 from collections import defaultdict, namedtuple
 
 import numpy as np
@@ -11,7 +10,7 @@ from gpkit.nomials.map import NomialMap
 from gpkit.units import DimensionalityError
 from gpkit.util.repr_conventions import lineagestr
 from gpkit.util.repr_conventions import unitstr as get_unitstr
-from gpkit.util.small_classes import FixedScalar, HashVector, SolverLog
+from gpkit.util.small_classes import FixedScalar, HashVector
 from gpkit.util.small_scripts import mag, try_str_without
 from gpkit.varkey import VarKey, lineage_display_context, necessarylineage
 from gpkit.varmap import get_lineage_map
@@ -27,15 +26,8 @@ def bdtable_gen(key):
         "Cost breakdown plot"
         lineage_map = get_lineage_map(self)
         bds = Breakdowns(self)
-        original_stdout = sys.stdout
-        try:
-            sys.stdout = SolverLog(original_stdout, verbosity=0)
-            with lineage_display_context(lineage_map):
-                bds.plot(key)
-        finally:
-            lines = sys.stdout.lines()
-            sys.stdout = original_stdout
-        return lines if any(lines) else []  # an empty capture yields [""]
+        with lineage_display_context(lineage_map):
+            return bds.lines(key)
 
     return bdtable
 
@@ -746,12 +738,16 @@ def graph(  # noqa: PLR0912, PLR0913, PLR0915
     maxwidth=81,
     showlegend=False,
 ):
-    "Prints breakdown"
+    """Returns the breakdown as lines of text.
+
+    The block is framed by blank lines and ends with a newline, so the first
+    and last lines are empty and joining with "\\n" gives back the text.
+    """
     if tree.value == 0:
         # A breakdown apportions a total among its parts; a zero total has no
         # shares to lay out, and scaling by it would divide by zero. Happens
         # for the model-sensitivity tree of a model with no constraints.
-        return
+        return []
     collapse = not showlegend
     # TODO: set to True while showlegend is True for first approx of receipts;
     # TODO: autoinclude with trace?
@@ -872,11 +868,11 @@ def graph(  # noqa: PLR0912, PLR0913, PLR0915
             ):
                 keystr = keystr + "╶⎨"
             chararray[depth, pos] = fmt.format(linkstr + keystr)
-    # Rotate and print
+    # Rotate
     rowstrs = ["".join(row).rstrip() for row in chararray.T.tolist()]
-    print("\n" + "\n".join(rowstrs) + "\n")
+    lines = ["", *rowstrs, ""]
 
-    if showlegend:  # create and print legend
+    if showlegend:  # create legend
         legend_lines = []
         for key, shortname in sorted(legend.items(), key=lambda kv: kv[1]):
             legend_lines.append(
@@ -890,7 +886,10 @@ def graph(  # noqa: PLR0912, PLR0913, PLR0915
             line = "".join(
                 fmt.format(cell) for fmt, cell in zip(fmts, line) if cell
             ).rstrip()
-            print(" " + line)
+            lines.append(" " + line)
+
+    lines.append("")
+    return lines
 
 
 def legend_entry(key, shortname, solution, prefix, basically_fixed_variables):
@@ -1023,11 +1022,12 @@ class Breakdowns:
             )
         return tree, kind
 
-    def plot(self, key, *, height=None, permissivity=2, showlegend=False, maxwidth=85):
+    def lines(self, key, *, height=None, permissivity=2, showlegend=False, maxwidth=85):
+        "Returns the breakdown of key as lines of text"
         with lineage_display_context(self.lineage_map):
             tree, kind = self.get_tree(key, permissivity=permissivity)
             lookup = self.bd if kind == "variable" else self.mlookup
-            graph(
+            return graph(
                 tree,
                 lookup,
                 self.sol,
@@ -1036,3 +1036,14 @@ class Breakdowns:
                 showlegend=showlegend,
                 maxwidth=maxwidth,
             )
+
+    def plot(self, key, *, height=None, permissivity=2, showlegend=False, maxwidth=85):
+        "Prints the breakdown of key"
+        lines = self.lines(
+            key,
+            height=height,
+            permissivity=permissivity,
+            showlegend=showlegend,
+            maxwidth=maxwidth,
+        )
+        print("\n".join(lines), end="")
