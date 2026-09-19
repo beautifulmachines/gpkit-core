@@ -1037,7 +1037,7 @@ class Breakdowns:
                 maxwidth=maxwidth,
             )
 
-    def plot(self, key, *, height=None, permissivity=2, showlegend=False, maxwidth=85):
+    def show(self, key, *, height=None, permissivity=2, showlegend=False, maxwidth=85):
         "Prints the breakdown of key"
         lines = self.lines(
             key,
