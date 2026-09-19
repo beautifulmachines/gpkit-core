@@ -213,6 +213,27 @@ class TestExamples:
         # rho is the same in all three conditions — must be suppressed
         assert "rho" not in table_str
 
+    def test_pipeline(self, example):
+        """Properties the example claims to demonstrate.
+
+        Values are covered by the catalog cost check and the snapshots; these
+        assert the structure those numbers are supposed to have.
+        """
+        m = example.Pipeline.default()
+        sol = m.solve(verbosity=0)
+
+        # the pump is sized by the peak condition, not the long-running one
+        # (P_rated is declared in kW and P in W, so compare unit-aware)
+        assert sol[m.P_rated].to("W").magnitude == pytest.approx(
+            mag(sol[m.flow.P])[-1], rel=1e-6
+        )
+
+        # the friction fit is only valid to Re ~1e6
+        assert mag(sol[m.flow.Re]).max() < 1e6
+
+        # wall above minimum gauge, so the stress constraint is live
+        assert sol[m.pipe.t] > sol[m.pipe.t_min]
+
     def test_sp_to_gp_sweep(self, example):
         sol = example.sol
         assert sol[0].cost == pytest.approx(4628.21, abs=0.01)

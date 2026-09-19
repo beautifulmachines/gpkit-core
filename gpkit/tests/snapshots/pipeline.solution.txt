@@ -1,0 +1,125 @@
+
+           ┃┓           ┓            /┓
+           ┃┃           ┃             ┃
+           ┃┃           ┃             ┃
+           ┃┃           ┃             ┃
+           ┃┃           ┃             ┃
+           ┃┃           ┃             ┃
+           ┃┃           ┃             ┃
+           ┃┃           ┣╸W          /┣╸Q[1]
+           ┃┃           ┃ (29,347kg)  ┃ (0.18m³/s, fixed)
+      Cost╺┫┃           ┃             ┃
+ (234,504) ┃┣╸LCC       ┃             ┃
+           ┃┃ (234,504) ┃             ┃
+           ┃┃           ┃             ┃
+           ┃┃           ┃             ┃
+           ┃┃           ┛            /┛
+           ┃┃           ┣╸P_rated  ┣╸Q[1]
+           ┃┃           ┛ (25.2kW) ┛
+           ┃┃           ┣╸P[1]╶⎨
+           ┃┃           ┣╸P[2]╶⎨
+           ┃┛           ┣╸P[0]
+
+
+
+          ┃┓          ┣╸Q[2] ≤ V[2]⋅A
+          ┃┃          ┣╸P[2] ≥ dp[2]⋅Q[2]/eta_pump[2]
+          ┃┃          ┣╸dp[2] ≥ f[2]⋅L/D⋅rho⋅V[2]²/2
+          ┃┣╸PipeFlow ┓
+          ┃┃          ┣╸[12 terms]
+          ┃┛          ┛
+          ┃┓
+          ┃┃
+          ┃┣╸LCC ≥ c_mat⋅W + c_pump⋅P_rated + c_nrg⋅(P[:]⋅hours[:]).sum()
+ Pipeline╺┫┃
+          ┃┛
+          ┃┓      ┓
+          ┃┃      ┣╸W ≥ rho_m⋅3.14⋅D⋅t⋅L
+          ┃┣╸Pipe ┛
+          ┃┛      ┣╸A = 0.785⋅D²
+          ┃┓
+          ┃┃
+          ┃┣╸sigma ≥ p_sys⋅D/(2⋅t) + 4⋅M/(3.14⋅D²⋅t)
+          ┃┛
+          ┃┣╸SpanLoading╶⎨
+
+
+Optimal Cost
+------------
+Pipeline.LCC : 2.345e+05
+
+Solution
+--------
+Pipeline
+    LCC : 2.345e+05                    life-cycle cost: material + pump capital + lifetime energy
+P_rated : 25.17     [kW]               pump rating, set by the peak condition
+...constants
+      L : 1000      [m]      (+1)      pipe run length
+  c_mat : 6         [1/kg]   (+0.7509) installed material cost
+  p_sys : 16        [bar]    (+0.4963) system pressure rating
+  c_nrg : 0.1       [1/h/kW] (+0.1525) energy price
+ c_pump : 900       [1/kW]   (+0.0966) pump capital cost per rated kW
+
+Pipeline.Fluid
+...constants
+rho : 1000  [kg/m³] (+0.4538)  density
+ mu : 0.001 [Pa⋅s]  (+0.04983) dynamic viscosity
+
+Pipeline.Pipe
+    A : 0.1455    [m²]              flow area
+    D : 0.4304    [m]               inner diameter
+    W : 2.935e+04 [kg]              mass
+    t : 0.002783  [m]               wall thickness
+...constants
+rho_m : 7800      [kg/m³] (+0.8022) wall material density
+sigma : 200       [MPa]   (-0.8022) allowable stress
+t_min : 2         [mm]    (~0)      minimum gauge
+
+Pipeline.PipeFlow
+       P[:] : [ 1.16e+03  6.02e+03  2.52e+04 ] [W]    pumping power
+      Re[:] : [ 2.96e+05  5.32e+05  8.87e+05 ]        Reynolds number
+       V[:] : [ 0.687     1.24      2.06     ] [m/s]  bulk velocity
+      dp[:] : [ 8.13e+03  2.34e+04  5.87e+04 ] [Pa]   pressure drop
+       f[:] : [ 0.0148    0.0132    0.0119   ]        Darcy friction factor
+...constants
+       Q[:] : [ 0.1      0.18     0.3     ] [m³/s] flow demand
+         sens ( +0.0971  +0.18    +0.421  )
+eta_pump[:] : [ 0.7      0.7      0.7     ]        pump efficiency
+         sens ( -0.0347  -0.0642  -0.15   )
+   hours[:] : [ 7e+04    2.5e+04  5e+03   ] [h]    lifetime operating hours at this condition
+         sens ( +0.0347  +0.0642  +0.0537 )
+
+Pipeline.SpanLoading
+     M : 3.087e+04 [m⋅N]           midspan bending moment
+...constants
+L_span : 12        [m]   (+0.6118) support spacing
+
+Most Sensitive Constraints
+--------------------------
+Pipeline
++1      : LCC ≥ c_mat⋅W + c_pump⋅P_rated + c_nrg⋅(P[:]⋅hours[:]).sum()
++0.8022 : sigma ≥ p_sys⋅D/(2⋅t) + 4⋅M/(3.14⋅D²⋅t)
++0.0966 : P[2] ≤ P_rated
+
+Pipeline.Pipe
++0.7509 : W ≥ rho_m⋅3.14⋅D⋅t⋅L
++0.1939 : A = 0.785⋅D²
+
+Pipeline.PipeFlow
++0.2705  : Q[2] ≤ V[2]⋅A
++0.1503  : P[2] ≥ dp[2]⋅Q[2]/eta_pump[2]
++0.1503  : dp[2] ≥ f[2]⋅L/D⋅rho⋅V[2]²/2
++0.1503  : f[2] ≥ Re[2]^-0.2⋅0.184
++0.1156  : Q[1] ≤ V[1]⋅A
++0.0642  : P[1] ≥ dp[1]⋅Q[1]/eta_pump[1]
++0.0642  : dp[1] ≥ f[1]⋅L/D⋅rho⋅V[1]²/2
++0.0642  : f[1] ≥ Re[1]^-0.2⋅0.184
++0.0624  : Q[0] ≤ V[0]⋅A
++0.03467 : P[0] ≥ dp[0]⋅Q[0]/eta_pump[0]
++0.03467 : dp[0] ≥ f[0]⋅L/D⋅rho⋅V[0]²/2
++0.03467 : f[0] ≥ Re[0]^-0.2⋅0.184
++0.03005 : Re[2] ≤ rho⋅V[2]⋅D/mu
++0.01284 : Re[1] ≤ rho⋅V[1]⋅D/mu
+
+Pipeline.SpanLoading
++0.3059 : M ≥ (rho_m⋅3.14⋅D⋅t⋅9.81 + rho⋅A⋅9.81)⋅L_span²/8

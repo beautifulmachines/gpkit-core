@@ -18,6 +18,11 @@ module = "gpkit.examples.beam"
 class = "Beam"
 
 [[models]]
+id = "pipeline"
+module = "gpkit.examples.pipeline"
+class = "Pipeline"
+
+[[models]]
 id = "uav"
 module = "gpkit.examples.uav"
 class = "UAV"
@@ -33,3 +38,4 @@ budget_vars = ["m"]
 id = "bemt_hover"
 module = "gpkit.examples.bemt_hover"
 class = "BEMTHover"
+
