@@ -9,29 +9,29 @@ bds = Breakdowns(sol)
 
 print("Cost breakdown (as seen in solution tables)")
 print("==============")
-bds.plot("cost")
+bds.show("cost")
 
 print("Variable breakdowns (note the two methods of access)")
 print("===================")
 (varkey,) = m.varkeys.keys("UAV.Mission.Outbound.AircraftPerf.C_D")
-bds.plot(varkey)
-bds.plot("Wing.W")
+bds.show(varkey)
+bds.show("Wing.W")
 
 print("Combining the two above by increasing maxwidth")
 print("----------------------------------------------")
-bds.plot("Outbound.AircraftPerf.C_D", maxwidth=105)
+bds.show("Outbound.AircraftPerf.C_D", maxwidth=105)
 
 print("Model sensitivity breakdowns (note the two methods of access)")
 print("============================")
-bds.plot("model sensitivities")
-bds.plot("Aircraft")
+bds.show("model sensitivities")
+bds.show("Aircraft")
 
 print("Exhaustive variable breakdown traces (and configuration arguments)")
 print("====================================")
 # often useful as a reference point when reading traces
-bds.plot("Wing.W", height=12)
+bds.show("Wing.W", height=12)
 # includes factors, can be useful for reading traces as well
-bds.plot("Wing.W", showlegend=True)
+bds.show("Wing.W", showlegend=True)
 print("\nPermissivity = 2 (the default)")
 print("----------------")
 bds.trace("Wing.W")
