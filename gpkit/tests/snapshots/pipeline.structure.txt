@@ -1,5 +1,5 @@
 [Pipeline]
-  free  C
+  free  LCC
   free  P_rated
   free  D
   free  W
@@ -17,7 +17,7 @@
   cons  P[0] ≤ P_rated
   cons  P[1] ≤ P_rated
   cons  P[2] ≤ P_rated
-  cons  C ≥ c_mat⋅W + c_pump⋅P_rated + c_nrg⋅(P[:]⋅hours[:]).sum()
+  cons  LCC ≥ c_mat⋅W + c_pump⋅P_rated + c_nrg⋅(P[:]⋅hours[:]).sum()
 [Pipeline.Fluid]
   fixed mu
   fixed rho

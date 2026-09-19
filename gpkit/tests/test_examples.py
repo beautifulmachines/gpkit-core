@@ -223,7 +223,10 @@ class TestExamples:
         sol = m.solve(verbosity=0)
 
         # the pump is sized by the peak condition, not the long-running one
-        assert mag(sol[m.P_rated]) == pytest.approx(mag(sol[m.flow.P])[-1], rel=1e-6)
+        # (P_rated is declared in kW and P in W, so compare unit-aware)
+        assert sol[m.P_rated].to("W").magnitude == pytest.approx(
+            mag(sol[m.flow.P])[-1], rel=1e-6
+        )
 
         # the friction fit is only valid to Re ~1e6
         assert mag(sol[m.flow.Re]).max() < 1e6
