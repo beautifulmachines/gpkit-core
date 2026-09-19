@@ -51,10 +51,9 @@ def flatiter(iterable, yield_if_hasattr=None):
 def walk_owned(cset):
     """Yield (owner, constraint) for every leaf constraint, in canonical order.
 
-    The owner is the innermost Model holding the constraint.  Containers that
-    are not models -- Tight, Loose, Bounded, SignomialEquality, the relaxation
-    wrappers, lists, arrays -- are descended through, because the constraints
-    inside them belong to the model that holds the container.
+    Ownership changes only at a model's _children; every other container is
+    descended through, so what sits inside a wrapper or a list is owned by the
+    model holding it.
 
     This is the one definition of constraint order.  The IR's flat constraint
     list is this walk's enumeration, model_tree's constraint_indices are it
@@ -88,11 +87,9 @@ def own_constraints(model, items=None):
     a walk of model's own subtree, so asking it of every node in a tree is
     linear in constraints times depth, not in constraints times nodes.
     """
-    return [
-        c
-        for who, c in _walk_owned(model if items is None else items, model)
-        if who is model
-    ]
+    if items is None:
+        items = model
+    return [c for who, c in _walk_owned(items, model) if who is model]
 
 
 def constraint_varkeys(constraints) -> set:
