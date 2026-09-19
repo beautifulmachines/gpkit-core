@@ -48,6 +48,53 @@ def flatiter(iterable, yield_if_hasattr=None):
                 yield from flatiter(constraint, yield_if_hasattr)
 
 
+def walk_owned(cset):
+    """Yield (owner, constraint) for every leaf constraint, in canonical order.
+
+    The owner is the innermost Model holding the constraint.  Containers that
+    are not models -- Tight, Loose, Bounded, SignomialEquality, the relaxation
+    wrappers, lists, arrays -- are descended through, because the constraints
+    inside them belong to the model that holds the container.
+
+    This is the one definition of constraint order.  The IR's flat constraint
+    list is this walk's enumeration, model_tree's constraint_indices are it
+    grouped by owner, and a report section's constraints are it filtered by
+    owner, so the three cannot drift apart.
+    """
+    yield from _walk_owned(cset, cset)
+
+
+def _walk_owned(items, owner):
+    "walk_owned's recursion: items belong to owner until a child model starts."
+    children = getattr(owner, "_children", ())
+    if isinstance(items, dict):
+        items = items.values()
+    for item in items:
+        if any(item is child for child in children):
+            yield from _walk_owned(item, item)
+        elif not hasattr(item, "__iter__"):
+            yield owner, item
+        elif isinstance(item, np.ndarray):
+            yield from _walk_owned(item.flat, owner)
+        else:
+            yield from _walk_owned(item, owner)
+
+
+def own_constraints(model, items=None):
+    """The leaf constraints model holds itself, in canonical order.
+
+    Its child models' constraints are theirs, not its own.  Pass *items* to ask
+    the same of one named group's contents rather than the whole model.  Costs
+    a walk of model's own subtree, so asking it of every node in a tree is
+    linear in constraints times depth, not in constraints times nodes.
+    """
+    return [
+        c
+        for who, c in _walk_owned(model if items is None else items, model)
+        if who is model
+    ]
+
+
 def constraint_varkeys(constraints) -> set:
     """VarKeys appearing in the given constraints.
 
@@ -271,8 +318,8 @@ def build_model_tree(model):
     """Build model_tree structure from a Model's explicit _children graph.
 
     Uses model._children (populated during __init__) as the authoritative
-    source for child detection. Constraint indices are still derived by
-    walking the flat constraint list in flatiter order.
+    source for child detection.  Constraint indices come from walk_owned:
+    they are its enumeration, grouped by the owner it reports.
 
     Parameters
     ----------
@@ -285,7 +332,9 @@ def build_model_tree(model):
         model_tree with class, instance_id, variables, constraint_indices,
         and children for each model node.
     """
-    counter = 0  # flat constraint index
+    indices: dict = {}  # id(owner) -> its constraint indices, in canonical order
+    for i, (owner, _) in enumerate(walk_owned(model)):
+        indices.setdefault(id(owner), []).append(i)
     all_claimed_vars = set()  # vars claimed by any node
 
     def _walk(cset):
@@ -299,12 +348,6 @@ def build_model_tree(model):
             class_name = type(cset).__name__
             instance_id = ""
 
-        constraint_indices = []
-        children = []
-
-        model_children = getattr(cset, "_children", [])
-        _collect(cset, constraint_indices, children, model_children)
-
         owned_vars = sorted(vk.ref for vk in getattr(cset, "own_varkeys", frozenset()))
         all_claimed_vars.update(owned_vars)
 
@@ -312,47 +355,9 @@ def build_model_tree(model):
             "class": class_name,
             "instance_id": instance_id,
             "variables": owned_vars,
-            "constraint_indices": constraint_indices,
-            "children": children,
+            "constraint_indices": indices.get(id(cset), []),
+            "children": [_walk(child) for child in getattr(cset, "_children", ())],
         }
-
-    def _collect(iterable, constraint_indices, children, model_children):
-        """Walk items, mirroring flatiter's traversal order.
-
-        model_children is the frozenset of direct child Models for the model
-        currently being walked. It is passed through recursive calls so that
-        children nested inside plain lists are still detected correctly.
-        """
-        nonlocal counter
-        if isinstance(iterable, dict):
-            iterable = iterable.values()
-
-        for item in iterable:
-            if isinstance(item, ConstraintSet) and item in model_children:
-                # Sub-model detected via _children: create child node
-                children.append(_walk(item))
-            elif not hasattr(item, "__iter__"):
-                # Leaf constraint (non-iterable)
-                constraint_indices.append(counter)
-                counter += 1
-            else:
-                # Iterable: numpy array, list, ArrayConstraint, or
-                # ConstraintSet without lineage. Pass model_children through
-                # so children inside nested lists are still found.
-                try:
-                    flat_items = item.flat
-                    if callable(flat_items):
-                        # ConstraintSet.flat is flatiter (a bound method);
-                        # recurse into the ConstraintSet's items directly
-                        _collect(item, constraint_indices, children, model_children)
-                    else:
-                        # numpy flatiter: process each element
-                        _collect(
-                            flat_items, constraint_indices, children, model_children
-                        )
-                except AttributeError:
-                    # list, dict, ArrayConstraint, etc.
-                    _collect(item, constraint_indices, children, model_children)
 
     tree = _walk(model)
 
