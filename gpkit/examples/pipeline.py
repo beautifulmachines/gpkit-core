@@ -53,20 +53,20 @@ class Pipe(Model):
 
     C = Var("-", "installed cost")
 
+    L = Var("m", "run length", value=1000)
     rho_m = Var("kg/m^3", "wall material density", value=7800)
     sigma = Var("MPa", "allowable stress", value=200)
     t_min = Var("mm", "minimum gauge", value=2)
     c_mat = Var("1/kg", "installed material cost", value=6.0)
 
-    def setup(self, L):
-        self.L = L
+    def setup(self):
         return {
             "Geometry": [
                 self.A == pi / 4 * self.D**2,
                 self.t >= self.t_min,
             ],
             "Mass": [
-                self.W >= self.rho_m * pi * self.D * self.t * L,
+                self.W >= self.rho_m * pi * self.D * self.t * self.L,
             ],
             "Cost": [
                 self.C >= self.c_mat * self.W,
@@ -177,7 +177,6 @@ class Pipeline(Model):
         ),
     ]
 
-    L = Var("m", "pipe run length", value=1000)
     p_sys = Var("bar", "system pressure rating", value=16)
     LCC = Var("-", "life-cycle cost: pipe + pump + lifetime energy")
     C_nrg = Var("-", "lifetime energy cost")
@@ -186,7 +185,7 @@ class Pipeline(Model):
 
     def setup(self, n_conditions=3):
         self.fluid = Fluid()
-        self.pipe = Pipe(self.L)
+        self.pipe = Pipe()
         self.pump = Pump()
         with Vectorize(n_conditions):
             self.flow = PipeFlow(self.pipe, self.pump, self.fluid)

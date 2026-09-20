@@ -40,6 +40,7 @@ class Wing(Model):
     W_cap = Var("N", "spar cap weight")
     W_web = Var("N", "shear web weight")
     W = Var("N", "wing weight")
+    W_carried = Var("N", "weight this wing must carry, excluding itself")
     # Wing structural constants
     N_lift = Var("-", "wing loading multiplier", value=6.0)
     sigma_max = Var("MPa", "allowable stress, 6061-T6", value=250)
@@ -55,7 +56,8 @@ class Wing(Model):
     EI_ref = Var("Pa*m^6", "structural normalization stiffness", value=1)
     k_shear = Var("m^-4", "structural normalization shear factor", value=1)
 
-    def setup(self, W_tilde):
+    def setup(self):
+        W_tilde = self.W_carried
         S, A, tau = self.S, self.A, self.tau
         I_cap, M_rbar = self.I_cap, self.M_rbar
         nu, p, q = self.nu, self.p, self.q
@@ -144,12 +146,13 @@ class Aircraft(Model):
     CDA0 = Var("m^2", "fuselage zero-lift drag area", value=0.05)
 
     def setup(self):
-        self.wing = Wing(self.W_tilde)
+        self.wing = Wing()
         self.engine = Engine()
         return [
             self.wing,
             self.engine,
             self.W_tilde >= self.W_fixed + self.W_pay + self.engine.W,
+            self.wing.W_carried >= self.W_tilde,
             self.W_zfw >= self.W_tilde + self.wing.W,
         ]
 

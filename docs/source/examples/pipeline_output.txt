@@ -46,7 +46,6 @@ Pipeline
 C_nrg : 3.577e+04                    lifetime energy cost
   LCC : 2.345e+05                    life-cycle cost: pipe + pump + lifetime energy
 ...constants
-    L : 1000      [m]      (+1)      pipe run length
 p_sys : 16        [bar]    (+0.4963) system pressure rating
 c_nrg : 0.1       [1/h/kW] (+0.1525) energy price
 
@@ -62,6 +61,7 @@ Pipeline.Pipe
     W : 2.935e+04 [kg]              mass
     t : 0.002783  [m]               wall thickness
 ...constants
+    L : 1000      [m]     (+1)      run length
 rho_m : 7800      [kg/m³] (+0.8022) wall material density
 sigma : 200       [MPa]   (-0.8022) allowable stress
 c_mat : 6         [1/kg]  (+0.7509) installed material cost
