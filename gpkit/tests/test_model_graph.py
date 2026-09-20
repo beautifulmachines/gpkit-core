@@ -9,7 +9,7 @@ from gpkit.constraints.set import build_model_tree
 from gpkit.constraints.tight import Tight
 from gpkit.examples.uav import UAV
 from gpkit.exceptions import AmbiguousVariable, VariableNotFound
-from gpkit.report import _build_constraint_groups
+from gpkit.report import build_report_ir
 
 
 class TestModelGraph:
@@ -394,6 +394,13 @@ class _WrappedTop(Model):
             ]
 
 
+def _shown(model):
+    "The leaf constraints model's own report section shows."
+    return [
+        c for cg in build_report_ir(model).constraint_groups for c in cg.constraints
+    ]
+
+
 class TestConstraintWalk:
     """One walk answers what the model tree, the IR and the report each ask."""
 
@@ -416,7 +423,7 @@ class TestConstraintWalk:
                     y <= 4,
                 ],
             )
-        shown = [c for cg in _build_constraint_groups(m) for c in cg.constraints]
+        shown = _shown(m)
         assert len(shown) == len(list(m.flat()))
         assert all(any(c is s for s in shown) for c in m.flat())
 
@@ -433,9 +440,7 @@ class TestConstraintWalk:
         tree = build_model_tree(m)
 
         def check(node, model):
-            shown = [
-                c for cg in _build_constraint_groups(model) for c in cg.constraints
-            ]
+            shown = _shown(model)
             at_indices = [flat[i] for i in node["constraint_indices"]]
             assert len(shown) == len(at_indices)
             assert all(a is b for a, b in zip(shown, at_indices))

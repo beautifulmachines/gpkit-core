@@ -129,8 +129,13 @@ class Model(CostedConstraintSet):
             cost = self.cost
             # Named constraint groups from dict setup(); None for list setup().
             # Use `is None` checks — empty dict is a valid groups map.
+            # Values are normalized to lists. Exact type, not isinstance: a
+            # Model is a list subclass, but one handed to a group is one item.
             if isinstance(constraints, dict):
-                self.cgroups = dict(constraints)
+                self.cgroups = {
+                    label: list(items) if type(items) in (list, tuple) else [items]
+                    for label, items in constraints.items()
+                }
             else:
                 self.cgroups = None
             _scan_for_children(constraints)

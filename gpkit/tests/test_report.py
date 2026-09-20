@@ -6,12 +6,20 @@ from typing import ClassVar
 import pytest
 
 import gpkit
-from gpkit import Model, Variable, VectorVariable
+from gpkit import (
+    Model,
+    SignomialEquality,
+    SignomialsEnabled,
+    Var,
+    Variable,
+    VectorVariable,
+)
 from gpkit.constraints.tight import Tight
 from gpkit.report import (
     CGroup,
     ReportSection,
     VarEntry,
+    _build_constraint_groups,
     _fmt_value,
     _md_escape,
     _md_var_table,
@@ -27,6 +35,49 @@ from gpkit.util.small_classes import Quantity
 def _all_vars(ir):
     """All VarEntry objects in an IR section (free + fixed)."""
     return ir.free_variables + ir.fixed_variables
+
+
+def _sections(d):
+    "A report dict and every section below it."
+    yield d
+    for child in d["children"]:
+        yield from _sections(child)
+
+
+def _constraints(d):
+    "Every constraint entry in a report dict, root first."
+    return [
+        c
+        for s in _sections(d)
+        for g in s["constraint_groups"]
+        for c in g["constraints"]
+    ]
+
+
+class _IdChild(Model):
+    y_id = Var("-")
+
+    def setup(self):
+        return [self.y_id >= 2]
+
+
+class _IdParent(Model):
+    def setup(self):
+        x = Variable("x_id")
+        self.child = _IdChild()
+        return {
+            "Sizing": [x >= self.child.y_id],
+            "Limits": [x <= 10],
+            "Components": [self.child],
+        }
+
+
+class _BareGroupParent(Model):
+    "A group whose whole value is one child model, not a list holding it."
+
+    def setup(self):
+        self.child = _IdChild()
+        return {"Components": self.child}
 
 
 # ── Dataclass structure ───────────────────────────────────────────────────────
@@ -56,7 +107,7 @@ class TestReportDataclasses:
         """CGroup holds raw constraint objects, not pre-rendered strings."""
         x = Variable("x_cg_test_raw")
         c = x >= 1
-        cg = CGroup(label="Drag", constraints=[c])
+        cg = CGroup(label="Drag", constraints=[c], ids=[0])
         assert cg.label == "Drag"
         assert len(cg.constraints) == 1
         assert not isinstance(cg.constraints[0], str)
@@ -66,7 +117,7 @@ class TestReportDataclasses:
         ve = VarEntry(
             name="x", latex="x", value=1.0, sensitivity=None, units="-", label=""
         )
-        cg = CGroup(label="", constraints=[])
+        cg = CGroup(label="", constraints=[], ids=[])
         rs = ReportSection(
             title="Wing",
             description="Wing structural model",
@@ -90,7 +141,7 @@ class TestReportDataclasses:
             name="x", latex="x", value=2.0, sensitivity=0.1, units="m", label="span"
         )
         x_test = Variable("x_to_dict_test")
-        cg = CGroup(label="Aero", constraints=[x_test >= 1])
+        cg = CGroup(label="Aero", constraints=[x_test >= 1], ids=[0])
         rs = ReportSection(
             title="Fuselage",
             description="fuselage drag model",
@@ -112,7 +163,7 @@ class TestReportDataclasses:
 
     def test_to_dict_non_constraint_object_in_cgroup(self):
         """to_dict() falls back to str() for objects without str_without()."""
-        cg = CGroup(label="Raw", constraints=[("x", ">=", "1")])
+        cg = CGroup(label="Raw", constraints=[("x", ">=", "1")], ids=[0])
         rs = ReportSection(
             title="T",
             description="",
@@ -123,7 +174,8 @@ class TestReportDataclasses:
             children=[],
         )
         d = rs.to_dict()
-        assert d["constraint_groups"][0]["constraints"] == ["('x', '>=', '1')"]
+        entry = d["constraint_groups"][0]["constraints"][0]
+        assert entry["str"] == "('x', '>=', '1')"
 
     def test_to_dict_constraint_names_abbreviated_by_lineage(self):
         """to_dict() names variables via the section's scope, like the text renderer."""
@@ -144,7 +196,90 @@ class TestReportDataclasses:
         d = child_ir.to_dict()
         cg = d["constraint_groups"][0]
         # Variable name should not carry the child's own prefix
-        assert all("_AbbrChild" not in s for s in cg["constraints"])
+        assert all("_AbbrChild" not in c["str"] for c in cg["constraints"])
+
+
+class TestConstraintEntries:
+    """A constraint in the report dict is an object: print it, typeset it, join it."""
+
+    def test_constraint_entry_fields(self):
+        "Each constraint carries its text, its math, its id, and what it is."
+        d = _IdParent().report(fmt="dict")
+        entry = d["constraint_groups"][0]["constraints"][0]
+        assert set(entry) == {"str", "latex", "id", "type"}
+        assert entry["str"] and entry["latex"]
+        assert isinstance(entry["id"], int)
+        assert entry["type"] == "PosynomialInequality"
+        json.dumps(d)
+
+    def test_ids_index_the_flat_constraint_list(self):
+        "A constraint's id is its position in the model's one constraint walk."
+        m = _IdParent()
+        flat = list(m.flat())
+        ir = build_report_ir(m)
+        seen = []
+
+        def check(section):
+            for cg in section.constraint_groups:
+                for c, i in zip(cg.constraints, cg.ids, strict=True):
+                    assert flat[i] is c
+                    seen.append(i)
+            for child in section.children:
+                check(child)
+
+        check(ir)
+        assert sorted(seen) == list(range(len(flat)))
+
+    def test_ids_join_against_constraint_sensitivities(self):
+        "The id a consumer reads indexes that solve's per-constraint sensitivities."
+        m = _IdParent()
+        sol = m.solve(verbosity=0)
+        sens = list(sol.sens.constraints)
+        ir = build_report_ir(m, solution=sol)
+        for cg in ir.constraint_groups:
+            for c, i in zip(cg.constraints, cg.ids, strict=True):
+                assert sens[i] is c
+
+    def test_latex_names_variables_like_str(self):
+        "Both forms come from the section's scope, so they name variables alike."
+        m = _IdParent()
+        child_ir = build_report_ir(m).children[0]
+        raw = [c.latex() for cg in child_ir.constraint_groups for c in cg.constraints]
+        entries = _constraints(m.report(fmt="dict")["children"][0])
+        for entry, unscoped in zip(entries, raw, strict=True):
+            assert "\\geq" in entry["latex"]  # the LaTeX form, not the text one
+            assert "idchild" in unscoped  # unscoped, the name carries its lineage
+            assert "idchild" not in entry["latex"]  # scoped, it does not
+            assert "IdChild" not in entry["str"]
+
+    def test_type_is_the_one_the_ir_records(self):
+        "A constraint's type names its class, the vocabulary to_ir() already uses."
+        x, y = Variable("x_sig"), Variable("y_sig")
+        z = Variable("z_sig", 2)
+        with SignomialsEnabled():
+            m = Model(x, [SignomialEquality(x + y, z), x * y >= 1])
+        entries = _constraints(m.report(fmt="dict"))
+        assert [e["type"] for e in entries] == [
+            "SingleSignomialEquality",
+            "PosynomialInequality",
+        ]
+        ir_types = [c["type"] for c in m.to_ir()["constraints"]]
+        for entry in entries:
+            assert entry["type"] == ir_types[entry["id"]]
+
+    def test_a_bare_child_model_in_a_group_stays_the_childs(self):
+        """A child model is one item in a group, not a container to walk into.
+
+        Model subclasses list, so a child handed to a group unwrapped used to be
+        iterated as a bunch of constraints and counted as the parent's own --
+        once here and again in the child's own section.
+        """
+        m = _BareGroupParent()
+        own = [c for cg in _build_constraint_groups(m, []) for c in cg.constraints]
+        assert own == []
+        entries = _constraints(m.report(fmt="dict"))
+        assert len(entries) == len(list(m.flat()))
+        assert sorted(e["id"] for e in entries) == list(range(len(entries)))
 
 
 # ── build_report_ir() ────────────────────────────────────────────────────────
@@ -471,7 +606,7 @@ class TestRenderText:
         ve = VarEntry(
             name="x", latex="x", value=1.0, sensitivity=None, units="m", label="span"
         )
-        cg = CGroup(label="Load", constraints=[])
+        cg = CGroup(label="Load", constraints=[], ids=[])
         ir = ReportSection(
             title="Wing",
             description="Wing model",
@@ -587,7 +722,7 @@ class TestRenderMarkdown:
         ve = VarEntry(
             name="x", latex="x", value=2.0, sensitivity=0.5, units="m", label="span"
         )
-        cg = CGroup(label="Aero", constraints=[])
+        cg = CGroup(label="Aero", constraints=[], ids=[])
         ir = ReportSection(
             title="Fuselage",
             description="Fuselage drag model",
