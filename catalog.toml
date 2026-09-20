@@ -21,6 +21,7 @@ class = "Beam"
 id = "pipeline"
 module = "gpkit.examples.pipeline"
 class = "Pipeline"
+budget_vars = ["LCC"]
 
 [[models]]
 id = "uav"
