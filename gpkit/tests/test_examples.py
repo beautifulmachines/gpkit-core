@@ -224,9 +224,13 @@ class TestExamples:
 
         # the pump is sized by the peak condition, not the long-running one
         # (P_rated is declared in kW and P in W, so compare unit-aware)
-        assert sol[m.P_rated].to("W").magnitude == pytest.approx(
+        assert sol[m.pump.P_rated].to("W").magnitude == pytest.approx(
             mag(sol[m.flow.P])[-1], rel=1e-6
         )
+
+        # cost is a rollup: the components' contributions account for all of it
+        parts = sol[m.pipe.C] + sol[m.pump.C] + sol[m.C_nrg]
+        assert mag(parts) == pytest.approx(mag(sol[m.LCC]), rel=1e-6)
 
         # the friction fit is only valid to Re ~1e6
         assert mag(sol[m.flow.Re]).max() < 1e6

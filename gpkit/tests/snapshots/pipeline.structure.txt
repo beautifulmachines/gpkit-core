@@ -1,15 +1,15 @@
 [Pipeline]
+  free  C_nrg
   free  LCC
-  free  P_rated
+  free  Pipe.C
   free  D
-  free  W
   free  t
   free  P[:]
+  free  Pump.C
+  free  P_rated
   free  M
   fixed L
-  fixed c_mat
   fixed c_nrg
-  fixed c_pump
   fixed p_sys
   fixed sigma
   fixed hours[:]
@@ -17,15 +17,18 @@
   cons  P[0] ≤ P_rated
   cons  P[1] ≤ P_rated
   cons  P[2] ≤ P_rated
-  cons  LCC ≥ c_mat⋅W + c_pump⋅P_rated + c_nrg⋅(P[:]⋅hours[:]).sum()
+  cons  C_nrg ≥ c_nrg⋅(P[:]⋅hours[:]).sum()
+  cons  LCC ≥ Pipe.C + Pump.C + C_nrg
 [Pipeline.Fluid]
   fixed mu
   fixed rho
 [Pipeline.Pipe]
   free  A
+  free  C
   free  D
   free  W
   free  t
+  fixed c_mat
   fixed rho_m
   fixed sigma
   fixed t_min
@@ -33,6 +36,13 @@
   cons (Geometry)  A = 0.785⋅D²
   cons (Geometry)  t ≥ t_min
   cons (Mass)  W ≥ rho_m⋅3.14⋅D⋅t⋅L
+  cons (Cost)  C ≥ c_mat⋅W
+[Pipeline.Pump]
+  free  C
+  free  P_rated
+  fixed c_unit
+  fixed eta
+  cons (Cost)  C ≥ c_unit⋅P_rated
 [Pipeline.PipeFlow]
   free  P[:]
   free  Q[:]
@@ -43,10 +53,10 @@
   free  hours[:]
   free  A  [Pipeline.Pipe]
   free  D  [Pipeline.Pipe]
-  fixed eta_pump[:]
   fixed mu  [Pipeline.Fluid]
   fixed rho  [Pipeline.Fluid]
   fixed L  [Pipeline]
+  fixed eta  [Pipeline.Pump]
   cons (Continuity)  Q[0] ≤ V[0]⋅A
   cons (Continuity)  Q[1] ≤ V[1]⋅A
   cons (Continuity)  Q[2] ≤ V[2]⋅A
@@ -59,9 +69,9 @@
   cons (Pressure drop)  dp[0] ≥ f[0]⋅L/D⋅rho⋅V[0]²/2
   cons (Pressure drop)  dp[1] ≥ f[1]⋅L/D⋅rho⋅V[1]²/2
   cons (Pressure drop)  dp[2] ≥ f[2]⋅L/D⋅rho⋅V[2]²/2
-  cons (Pressure drop)  P[0] ≥ dp[0]⋅Q[0]/eta_pump[0]
-  cons (Pressure drop)  P[1] ≥ dp[1]⋅Q[1]/eta_pump[1]
-  cons (Pressure drop)  P[2] ≥ dp[2]⋅Q[2]/eta_pump[2]
+  cons (Pressure drop)  P[0] ≥ dp[0]⋅Q[0]/eta
+  cons (Pressure drop)  P[1] ≥ dp[1]⋅Q[1]/eta
+  cons (Pressure drop)  P[2] ≥ dp[2]⋅Q[2]/eta
 [Pipeline.SpanLoading]
   free  M
   free  A  [Pipeline.Pipe]

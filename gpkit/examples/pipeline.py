@@ -12,7 +12,9 @@ Demonstrates:
     than counting equally
   * two ways to treat a quantity that varies across conditions: share one
     variable when the system really has one value (``p_sys``), or take an
-    envelope when the peak sizes hardware (``P_rated``)
+    envelope when the peak sizes hardware (``Pump.P_rated``)
+  * cost as a rollup: each component owns its own contribution, so ``LCC``
+    breaks down by component rather than arriving as one opaque expression
 """
 
 from typing import ClassVar
@@ -26,7 +28,7 @@ g = 9.81 * units("m/s^2")
 
 
 class Fluid(Model):
-    """The pumped substance."""
+    """The pumped substance. Defaults describe water at about 20 C."""
 
     assumptions: ClassVar = [
         "incompressible, Newtonian, constant properties along the run",
@@ -49,9 +51,12 @@ class Pipe(Model):
     A = Var("m^2", "flow area")
     W = Var("kg", "mass")
 
+    C = Var("-", "installed cost")
+
     rho_m = Var("kg/m^3", "wall material density", value=7800)
     sigma = Var("MPa", "allowable stress", value=200)
     t_min = Var("mm", "minimum gauge", value=2)
+    c_mat = Var("1/kg", "installed material cost", value=6.0)
 
     def setup(self, L):
         self.L = L
@@ -62,6 +67,33 @@ class Pipe(Model):
             ],
             "Mass": [
                 self.W >= self.rho_m * pi * self.D * self.t * L,
+            ],
+            "Cost": [
+                self.C >= self.c_mat * self.W,
+            ],
+        }
+
+
+class Pump(Model):
+    """The pump: rating, efficiency and capital cost."""
+
+    assumptions: ClassVar = [
+        (
+            "one efficiency across every condition; a real pump peaks at its"
+            " best-efficiency point and falls off either side"
+        ),
+    ]
+
+    P_rated = Var("kW", "rating, set by the peak condition")
+    C = Var("-", "capital cost")
+
+    eta = Var("-", "efficiency", value=0.7)
+    c_unit = Var("1/kW", "capital cost per rated kW", value=900.0)
+
+    def setup(self):
+        return {
+            "Cost": [
+                self.C >= self.c_unit * self.P_rated,
             ],
         }
 
@@ -86,9 +118,8 @@ class PipeFlow(Model):
     P = Var("W", "pumping power")
 
     hours = Var("hr", "lifetime operating hours at this condition")
-    eta_pump = Var("-", "pump efficiency", value=0.7)
 
-    def setup(self, pipe, fluid):
+    def setup(self, pipe, pump, fluid):
         rho, mu = fluid.rho, fluid.mu
         return {
             "Continuity": [
@@ -100,7 +131,7 @@ class PipeFlow(Model):
             ],
             "Pressure drop": [
                 self.dp >= self.f * (pipe.L / pipe.D) * rho * self.V**2 / 2,
-                self.P >= self.dp * self.Q / self.eta_pump,
+                self.P >= self.dp * self.Q / pump.eta,
             ],
         }
 
@@ -148,21 +179,20 @@ class Pipeline(Model):
 
     L = Var("m", "pipe run length", value=1000)
     p_sys = Var("bar", "system pressure rating", value=16)
-    P_rated = Var("kW", "pump rating, set by the peak condition")
-    LCC = Var("-", "life-cycle cost: material + pump capital + lifetime energy")
+    LCC = Var("-", "life-cycle cost: pipe + pump + lifetime energy")
+    C_nrg = Var("-", "lifetime energy cost")
 
-    c_mat = Var("1/kg", "installed material cost", value=6.0)
-    c_pump = Var("1/kW", "pump capital cost per rated kW", value=900.0)
     c_nrg = Var("1/(kW*hr)", "energy price", value=0.10)
 
     def setup(self, n_conditions=3):
         self.fluid = Fluid()
         self.pipe = Pipe(self.L)
+        self.pump = Pump()
         with Vectorize(n_conditions):
-            self.flow = PipeFlow(self.pipe, self.fluid)
+            self.flow = PipeFlow(self.pipe, self.pump, self.fluid)
         self.span = SpanLoading(self.pipe, self.fluid)
 
-        pipe, flow, span = self.pipe, self.flow, self.span
+        pipe, pump, flow, span = self.pipe, self.pump, self.flow, self.span
         self.cost = self.LCC
         sigma_hoop = self.p_sys * pipe.D / (2 * pipe.t)
         sigma_bend = 4 * span.M / (pi * pipe.D**2 * pipe.t)
@@ -170,17 +200,14 @@ class Pipeline(Model):
         return [
             self.fluid,
             pipe,
+            pump,
             flow,
             span,
             pipe.sigma >= sigma_hoop + sigma_bend,
             # the peak condition sizes the pump; every condition burns energy
-            self.P_rated >= flow.P,
-            self.LCC
-            >= (
-                self.c_mat * pipe.W
-                + self.c_pump * self.P_rated
-                + self.c_nrg * (flow.P * flow.hours).sum()
-            ),
+            pump.P_rated >= flow.P,
+            self.C_nrg >= self.c_nrg * (flow.P * flow.hours).sum(),
+            self.LCC >= pipe.C + pump.C + self.C_nrg,
         ]
 
     @classmethod
