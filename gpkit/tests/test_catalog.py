@@ -110,7 +110,7 @@ def structure_digest(model) -> str:
         for group in section["constraint_groups"]:
             label = f" ({group['label']})" if group["label"] else ""
             for c in group["constraints"]:
-                lines.append(f"  cons{label}  {c}")
+                lines.append(f"  cons{label}  {c['str']}")
         for child in section["children"]:
             walk(child)
 
