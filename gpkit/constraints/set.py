@@ -79,6 +79,20 @@ def _walk_owned(items, owner):
             yield from _walk_owned(item, owner)
 
 
+def constraint_indices(model) -> dict:
+    """Map id(owner) -> the flat constraint indices that owner holds.
+
+    The index is the constraint's position in walk_owned, which is what
+    to_ir()'s flat list is enumerated by, so it addresses a constraint in the
+    IR, in model_tree, in a report section and in a solve's sensitivities
+    alike.  Keyed by id() because Models are unhashable.
+    """
+    indices: dict = {}
+    for i, (owner, _) in enumerate(walk_owned(model)):
+        indices.setdefault(id(owner), []).append(i)
+    return indices
+
+
 def own_constraints(model, items=None):
     """The leaf constraints model holds itself, in canonical order.
 
@@ -329,9 +343,7 @@ def build_model_tree(model):
         model_tree with class, instance_id, variables, constraint_indices,
         and children for each model node.
     """
-    indices: dict = {}  # id(owner) -> its constraint indices, in canonical order
-    for i, (owner, _) in enumerate(walk_owned(model)):
-        indices.setdefault(id(owner), []).append(i)
+    indices = constraint_indices(model)
     all_claimed_vars = set()  # vars claimed by any node
 
     def _walk(cset):

@@ -8,7 +8,7 @@ functions of the IR.
 from dataclasses import dataclass, field
 from typing import Any
 
-from .constraints.set import constraint_varkeys, own_constraints, walk_owned
+from .constraints.set import constraint_indices, constraint_varkeys, own_constraints
 from .display import DisplayScope
 from .model import Model as _Model
 from .printing import _format_aligned_columns
@@ -429,9 +429,7 @@ def build_report_ir(
     own_name = "" if is_anon else type(model).__name__
     lineage_path = model.lineagestr() if own_name else _parent_path
     if _ids is None:  # one walk of the root model numbers the whole tree
-        _ids = {}
-        for i, (owner, _) in enumerate(walk_owned(model)):
-            _ids.setdefault(id(owner), []).append(i)
+        _ids = constraint_indices(model)
     cgroups = _build_constraint_groups(model, _ids.get(id(model), []))
     extra_vks = (
         constraint_varkeys(c for cg in cgroups for c in cg.constraints)
