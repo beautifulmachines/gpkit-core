@@ -23,8 +23,8 @@ g = Variable("g", "m/s^2", "gravitational constant", value=9.8)
 class Wing(Model):
     """Wing structure: spar geometry, sizing constraints, and wing weight.
 
-    Receives W_tilde from Aircraft for structural sizing; the spar
-    bending and shear constraints depend on the load the wing must carry.
+    Sized against W_design, the weight it is rated to carry: the spar bending
+    and shear constraints scale with it. Aircraft sets that rating.
     """
 
     S = Var("m^2", "wing area")
@@ -40,6 +40,7 @@ class Wing(Model):
     W_cap = Var("N", "spar cap weight")
     W_web = Var("N", "shear web weight")
     W = Var("N", "wing weight")
+    W_design = Var("N", "rated carried weight, excluding the wing")
     # Wing structural constants
     N_lift = Var("-", "wing loading multiplier", value=6.0)
     sigma_max = Var("MPa", "allowable stress, 6061-T6", value=250)
@@ -55,7 +56,8 @@ class Wing(Model):
     EI_ref = Var("Pa*m^6", "structural normalization stiffness", value=1)
     k_shear = Var("m^-4", "structural normalization shear factor", value=1)
 
-    def setup(self, W_tilde):
+    def setup(self):
+        W_design = self.W_design
         S, A, tau = self.S, self.A, self.tau
         I_cap, M_rbar = self.I_cap, self.M_rbar
         nu, p, q = self.nu, self.p, self.q
@@ -69,7 +71,7 @@ class Wing(Model):
                 nu**3.94 >= 0.86 * p**-2.38 + 0.14 * p**0.56,
             ],
             "Root bending stress": [
-                M_rbar >= W_tilde * A * p / (24 * self.W_ref),
+                M_rbar >= W_design * A * p / (24 * self.W_ref),
                 (
                     0.92**2 / 2 * w * tau**2 * t_cap
                     >= I_cap * self.k_shear + 0.92 * w * tau * t_cap**2
@@ -84,7 +86,7 @@ class Wing(Model):
                 / (S * I_cap * self.sigma_max),
                 12
                 >= A
-                * W_tilde
+                * W_design
                 * self.N_lift
                 * q**2
                 / (tau * S * t_web * self.sigma_max_shear),
@@ -144,12 +146,13 @@ class Aircraft(Model):
     CDA0 = Var("m^2", "fuselage zero-lift drag area", value=0.05)
 
     def setup(self):
-        self.wing = Wing(self.W_tilde)
+        self.wing = Wing()
         self.engine = Engine()
         return [
             self.wing,
             self.engine,
             self.W_tilde >= self.W_fixed + self.W_pay + self.engine.W,
+            self.wing.W_design >= self.W_tilde,
             self.W_zfw >= self.W_tilde + self.wing.W,
         ]
 

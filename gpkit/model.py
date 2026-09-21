@@ -7,7 +7,7 @@ from time import time
 import numpy as np
 
 from .constraints.costed import CostedConstraintSet
-from .constraints.set import build_model_tree, flatiter
+from .constraints.set import build_model_tree, walk_owned
 from .exceptions import (
     AmbiguousVariable,
     Infeasible,
@@ -309,8 +309,8 @@ class Model(CostedConstraintSet):
         # Serialize cost
         cost_ir = self.cost.to_ir()
 
-        # Collect flat constraint list
-        constraints_ir = [c.to_ir() for c in flatiter(self)]
+        # walk_owned, so this list and model_tree's indices are one enumeration
+        constraints_ir = [c.to_ir() for _, c in walk_owned(self)]
 
         # Serialize substitutions; linked (callable-computed) vars get null
         subs_ir = {}

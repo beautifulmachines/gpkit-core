@@ -5,7 +5,7 @@ import pytest
 from gpkit import Model, SignomialEquality, SignomialsEnabled, Variable
 from gpkit.constraints.bounded import Bounded
 from gpkit.constraints.loose import Loose
-from gpkit.constraints.set import build_model_tree
+from gpkit.constraints.set import build_model_tree, walk_owned
 from gpkit.constraints.tight import Tight
 from gpkit.examples.uav import UAV
 from gpkit.exceptions import AmbiguousVariable, VariableNotFound
@@ -464,3 +464,20 @@ class TestConstraintWalk:
         collect(tree)
         assert sorted(seen) == list(range(len(list(m.flat()))))
         assert len(seen) == len(set(seen))
+
+    @pytest.mark.parametrize("build", [UAV, _WrappedTop])
+    def test_flat_and_walk_owned_stay_in_step(self, build):
+        """.flat() and walk_owned enumerate the same constraints in the same order.
+
+        They are separate recursions answering different questions -- .flat()
+        can stop early at a container implementing a protocol, walk_owned tags
+        each leaf with its owner.  to_ir()'s constraint list and its indices
+        come from walk_owned while a user iterates .flat(), so the two agreeing
+        is what lets an index mean the same thing to both.
+        """
+        m = build()
+        walked = [c for _, c in walk_owned(m)]
+        flat = list(m.flat())
+        assert len(walked) == len(flat)
+        assert all(a is b for a, b in zip(walked, flat))
+        assert not any(hasattr(c, "__iter__") for c in walked)

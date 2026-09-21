@@ -8,7 +8,6 @@
   free  Pump.C
   free  P_rated
   free  M
-  fixed L
   fixed c_nrg
   fixed p_sys
   fixed sigma
@@ -28,11 +27,11 @@
   free  D
   free  W
   free  t
+  fixed L
   fixed c_mat
   fixed rho_m
   fixed sigma
   fixed t_min
-  fixed L  [Pipeline]
   cons (Geometry)  A = 0.785⋅D²
   cons (Geometry)  t ≥ t_min
   cons (Mass)  W ≥ rho_m⋅3.14⋅D⋅t⋅L
@@ -55,7 +54,7 @@
   free  D  [Pipeline.Pipe]
   fixed mu  [Pipeline.Fluid]
   fixed rho  [Pipeline.Fluid]
-  fixed L  [Pipeline]
+  fixed L  [Pipeline.Pipe]
   fixed eta  [Pipeline.Pump]
   cons (Continuity)  Q[0] ≤ V[0]⋅A
   cons (Continuity)  Q[1] ≤ V[1]⋅A
