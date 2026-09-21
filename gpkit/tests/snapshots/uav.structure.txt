@@ -4,13 +4,13 @@
   free  W_tilde
   free  W_zfw
   free  Engine.W
-  free  W_carried
+  free  W_design
   free  Wing.W
   fixed CDA0
   fixed W_fixed
   fixed W_pay
   cons  W_tilde ≥ W_fixed + W_pay + Engine.W
-  cons  W_carried ≥ W_tilde
+  cons  W_design ≥ W_tilde
   cons  W_zfw ≥ W_tilde + Wing.W
 [UAV.Aircraft.Wing]
   free  A
@@ -18,7 +18,7 @@
   free  M_rbar
   free  S
   free  W_cap
-  free  W_carried
+  free  W_design
   free  W_web
   free  W
   free  nu
@@ -44,10 +44,10 @@
   cons (Geometry)  p ≥ 1.9
   cons (Geometry)  tau ≤ 0.15
   cons (Geometry)  nu^3.94 ≥ 0.86⋅p^-2.38 + 0.14⋅p^0.56
-  cons (Root bending stress)  M_rbar ≥ W_carried⋅A⋅p/(24⋅W_ref)
+  cons (Root bending stress)  M_rbar ≥ W_design⋅A⋅p/(24⋅W_ref)
   cons (Root bending stress)  0.423⋅w⋅tau²⋅t_cap ≥ I_cap⋅k_shear + 0.92⋅w⋅tau⋅t_cap²
   cons (Root bending stress)  N_lift⋅M_rbar⋅A⋅q²⋅tau⋅EI_ref/(S⋅I_cap⋅sigma_max) ≤ 8
-  cons (Root bending stress)  A⋅W_carried⋅N_lift⋅q²/(tau⋅S⋅t_web⋅sigma_max_shear) ≤ 12
+  cons (Root bending stress)  A⋅W_design⋅N_lift⋅q²/(tau⋅S⋅t_web⋅sigma_max_shear) ≤ 12
   cons (Weight rollup)  W_cap ≥ 8⋅rho_alum⋅g⋅w⋅t_cap⋅S^1.5⋅nu/(3⋅A^0.5)
   cons (Weight rollup)  W_web ≥ 8⋅rho_alum⋅g⋅r_h⋅tau⋅t_web⋅S^1.5⋅nu/(3⋅A^0.5)
   cons (Weight rollup)  W/f_wadd ≥ W_cap + W_web

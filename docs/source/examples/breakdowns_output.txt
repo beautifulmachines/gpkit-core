@@ -83,7 +83,7 @@ Model sensitivity breakdowns (note the two methods of access)
           ┃┃      ┣╸2⋅q ≥ 1 + p
           ┃┃      ┛
           ┃┣╸Wing ┣╸0.423⋅w⋅tau²⋅t_cap ≥ I_cap⋅k_shear + 0.92⋅w⋅tau⋅t_cap²
-          ┃┃      ┣╸M_rbar ≥ W_carried⋅A⋅p/(24⋅W_ref)
+          ┃┃      ┣╸M_rbar ≥ W_design⋅A⋅p/(24⋅W_ref)
           ┃┃      ┣╸N_lift⋅M_rbar⋅A⋅q²⋅tau⋅EI_ref/(S⋅I_cap⋅sigma_max) ≤ 8
           ┃┃      ┣╸W/f_wadd ≥ W_cap + W_web
  Aircraft╺┫┃      ┣╸W_cap ≥ 8⋅rho_alum⋅g⋅w⋅t_cap⋅S^1.5⋅nu/(3⋅A^0.5)
@@ -96,7 +96,7 @@ Model sensitivity breakdowns (note the two methods of access)
           ┃┃
           ┃┣╸W_zfw ≥ W_tilde + Wing.W
           ┃┛
-          ┃┣╸W_carried ≥ W_tilde
+          ┃┣╸W_design ≥ W_tilde
 
 Exhaustive variable breakdown traces (and configuration arguments)
 ====================================
