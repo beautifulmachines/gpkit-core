@@ -10,7 +10,7 @@ from time import time
 
 import numpy as np
 
-from ..constraints.set import ConstraintSet
+from ..constraints.set import ConstraintSet, walk_owned
 from ..exceptions import (
     DualInfeasible,
     Infeasible,
@@ -45,6 +45,27 @@ class MonoEqualityIndexes:
     def __init__(self):
         self.all = set()
         self.first_half = set()
+
+
+def _senss_by_id(model, constraint_senss) -> dict:
+    """Constraint sensitivities keyed by position in model's constraint walk.
+
+    The same numbers as the object-keyed map, under the id to_ir() indexes its
+    flat constraint list by and the report dict reports.  Built from the walk
+    rather than by enumerating constraint_senss, so the two orders agree by
+    construction rather than by both happening to follow the hmaps.
+
+    Built during the solve because it cannot be recovered afterwards: a
+    solution references its model weakly and pickling drops the reference, so
+    there may be no model left to walk by the time anyone serializes.
+    """
+    if model is None:
+        return {}
+    return {
+        i: constraint_senss[c]
+        for i, (_, c) in enumerate(walk_owned(model))
+        if c in constraint_senss
+    }
 
 
 def _get_solver(solver, kwargs):
@@ -744,6 +765,7 @@ class GeometricProgram:
             constants=VarMap(self.substitutions),
             sens=Sensitivities(
                 constraints=constraint_senss,
+                constraints_by_id=_senss_by_id(self.model, constraint_senss),
                 models=dict(m_senss),
                 variables=VarMap(gpv_ss),
                 variablerisk=VarMap(absv_ss),
