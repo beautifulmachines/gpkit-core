@@ -1,5 +1,7 @@
 """Tests for Solution class"""
 
+import gc
+import json
 import sys
 import threading
 
@@ -10,11 +12,13 @@ import gpkit
 from gpkit import (
     Model,
     SignomialsEnabled,
+    Var,
     Variable,
     VectorVariable,
     breakdowns,
     printing,
 )
+from gpkit.constraints.set import walk_owned
 from gpkit.tests.conftest import run_threads
 from gpkit.util.small_classes import Quantity, Strings
 
@@ -182,3 +186,81 @@ def test_printing_table_backward_compat():
     result = printing.table(sol)
     assert isinstance(result, str)
     assert len(result) > 0
+
+
+class TestConstraintSensitivitiesById:
+    """Per-constraint sensitivities a consumer outside the process can read.
+
+    sens.constraints is keyed by live constraint objects, which is right for
+    in-process use and useless once serialized.  sens.constraints_by_id keys
+    the same numbers by the constraint's position in the model's walk -- the
+    id to_ir() and the report dict both use.
+    """
+
+    def test_ids_are_the_report_ids(self):
+        "A sensitivity's id is the id the report gives that same constraint."
+        m = _sens_model()
+        sol = m.solve(verbosity=0)
+        by_id = sol.sens.constraints_by_id
+        report = m.report(sol, fmt="dict")
+        entries = [c for g in report["constraint_groups"] for c in g["constraints"]]
+        for child in report["children"]:
+            entries += [c for g in child["constraint_groups"] for c in g["constraints"]]
+        assert {e["id"] for e in entries} == set(by_id)
+
+    def test_agrees_with_the_object_keyed_map(self):
+        "Same numbers, reached by position instead of by object."
+        m = _sens_model()
+        sol = m.solve(verbosity=0)
+        walked = [c for _, c in walk_owned(m)]
+        for i, c in enumerate(walked):
+            assert sol.sens.constraints_by_id[i] == pytest.approx(
+                sol.sens.constraints[c]
+            )
+
+    def test_is_json_serializable(self):
+        "The point of the id: the numbers survive leaving the process."
+        sol = _sens_model().solve(verbosity=0)
+        json.dumps(sol.sens.constraints_by_id)
+
+    def test_survives_the_model_being_discarded(self):
+        """Solve-and-discard is the recommended concurrent pattern.
+
+        meta["model"] is a weak ref, and pickling drops it on purpose, so
+        anything derived from the model at serialization time is already gone.
+        """
+
+        def solve_and_discard():
+            m = _sens_model()
+            return m.solve(verbosity=0), len(list(m.flat()))
+
+        sol, n_constraints = solve_and_discard()
+        gc.collect()
+        assert sol.meta["model"]() is None
+        assert len(sol.sens.constraints_by_id) == n_constraints
+
+    def test_duplicate_constraints_stay_distinct(self):
+        "Two identical constraints are two constraints; position tells them apart."
+        x = Variable("x_dup")
+        m = Model(x, [x >= 1, x >= 1, x >= 2])
+        sol = m.solve(verbosity=0)
+        assert len(sol.sens.constraints_by_id) == 3
+
+
+class _SensChild(Model):
+    y = Var("-")
+
+    def setup(self):
+        return [self.y >= 2]
+
+
+def _sens_model():
+    "A model with a child, so ids span more than one report section."
+
+    class _SensTop(Model):
+        def setup(self):
+            x = Variable("x_sens")
+            self.child = _SensChild()
+            return [x >= self.child.y, x <= 10, self.child]
+
+    return _SensTop()
