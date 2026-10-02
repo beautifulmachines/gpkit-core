@@ -524,7 +524,6 @@ class Model(CostedConstraintSet):
         if solveargs.get("verbosity", 1) > 0:
             print(f"Sweeping took {time() - tic:.3g} seconds.")
 
-        sols.modelstr = str(self)
         return sols
 
     def autosweep(self, sweeps, tol=0.01, samplepoints=100, **solveargs):
