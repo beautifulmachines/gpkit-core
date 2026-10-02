@@ -8,7 +8,7 @@ functions of the IR.
 from dataclasses import dataclass, field
 from typing import Any
 
-from .constraints.set import constraint_indices, constraint_varkeys, own_constraints
+from .constraints.set import constraint_varkeys, own_keyed_constraints
 from .display import DisplayScope
 from .model import Model as _Model
 from .printing import _format_aligned_columns
@@ -46,17 +46,14 @@ class VarEntry:
 class CGroup:
     """A named constraint group within a report section.
 
-    ids give each constraint its position in the walk of the model the report
-    is rooted at -- the index to_ir()'s flat list and a solve's per-constraint
-    sensitivities both use, so a consumer can join the three.  It identifies a
-    place in one model build, not a constraint: the same constraint reached
-    through two models, or through a parent and that child on its own, has a
-    different id in each.
+    keys name each constraint the way to_ir() and a solve's per-constraint
+    sensitivities name it, so a consumer can join the three -- and the way a
+    second build of the same model will name it, so two solves can be compared.
     """
 
     label: str  # "" for unnamed groups
     constraints: list  # raw constraint objects; str_without() or str() fallback
-    ids: list  # one int per constraint, same order
+    keys: list  # one ConstraintKey per constraint, same order
 
 
 @dataclass
@@ -97,8 +94,8 @@ class ReportSection:
             {
                 "label": cg.label,
                 "constraints": [
-                    _constraint_dict(c, i, scope)
-                    for c, i in zip(cg.constraints, cg.ids, strict=True)
+                    _constraint_dict(c, key, scope)
+                    for c, key in zip(cg.constraints, cg.keys, strict=True)
                 ],
             }
             for cg in self.constraint_groups
@@ -192,12 +189,12 @@ def _render_constraint(c, scope) -> str:
         return str(c)
 
 
-def _constraint_dict(c, cid, scope) -> dict:
+def _constraint_dict(c, key, scope) -> dict:
     """One constraint as JSON: how to print it, how to typeset it, what it is.
 
     str and latex name variables from the same scope, so the two forms of a
-    constraint always agree.  type is the class name to_ir() records against
-    the same id, so a consumer reads one vocabulary from both.
+    constraint always agree.  key and type are what to_ir() records for the
+    same constraint, so a consumer reads one name and one vocabulary from both.
     """
     try:
         latex = c.latex(scope)
@@ -206,7 +203,7 @@ def _constraint_dict(c, cid, scope) -> dict:
     return {
         "str": _render_constraint(c, scope),
         "latex": latex,
-        "id": cid,
+        "key": key.ref,
         "type": type(c).__name__,
     }
 
@@ -308,7 +305,7 @@ def _build_split_var_entries(
     return free_entries, fixed_entries
 
 
-def _build_constraint_groups(model, ids) -> list[CGroup]:
+def _build_constraint_groups(model) -> list[CGroup]:
     """Build CGroup list from model.cgroups or a single unnamed group.
 
     CGroup.constraints holds the leaf (single-equation) constraints this model
@@ -317,23 +314,15 @@ def _build_constraint_groups(model, ids) -> list[CGroup]:
     through, so every item accepts .latex(excluded, aligned=True). Raw objects
     are stored; renderers call str() or .latex().
 
-    ids are this model's constraint positions in that same canonical order, so
-    handing them out group by group gives each constraint the one that is its
-    own.  The groups partition exactly these; nothing is left over.
+    Keys come from own_keyed_constraints, the same call the IR names constraints
+    with, so the two cannot name a constraint differently.
     """
-    take = iter(ids)
-
-    def group(label, constraints):
-        return CGroup(label, constraints, [next(take) for _ in constraints])
-
-    if model.cgroups is not None:
-        return [
-            group(label, own_constraints(model, items))
-            for label, items in model.cgroups.items()
-        ]
-
-    own = own_constraints(model)
-    return [group("", own)] if own else []
+    named = model.cgroups is not None
+    return [
+        CGroup(label, [c for _, c in pairs], [k for k, _ in pairs])
+        for label, pairs in own_keyed_constraints(model)
+        if pairs or named  # an empty group is still a group if it was named
+    ]
 
 
 def _build_objective(model, solution) -> dict:
@@ -405,7 +394,6 @@ def build_report_ir(
     _parent_path: str = "",
     front_matter: str = "",
     toc: bool = False,
-    _ids: dict | None = None,
 ) -> ReportSection:
     """Build a ReportSection tree from *model*.
 
@@ -428,9 +416,7 @@ def build_report_ir(
     is_anon = type(model) is _Model
     own_name = "" if is_anon else type(model).__name__
     lineage_path = model.lineagestr() if own_name else _parent_path
-    if _ids is None:  # one walk of the root model numbers the whole tree
-        _ids = constraint_indices(model)
-    cgroups = _build_constraint_groups(model, _ids.get(id(model), []))
+    cgroups = _build_constraint_groups(model)
     extra_vks = (
         constraint_varkeys(c for cg in cgroups for c in cg.constraints)
         - model.own_varkeys
@@ -474,9 +460,7 @@ def build_report_ir(
         toc=toc,
         **_build_objective(model, solution),
         children=[
-            build_report_ir(
-                child, solution=solution, _parent_path=lineage_path, _ids=_ids
-            )
+            build_report_ir(child, solution=solution, _parent_path=lineage_path)
             for child in model.submodels
         ],
     )

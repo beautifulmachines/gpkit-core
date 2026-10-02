@@ -75,7 +75,7 @@ class Sensitivities:
     "Container for a Solution's sensitivities"
 
     constraints: dict  # {constraint object: sensitivity} -- in-process only
-    constraints_by_id: dict  # {constraint id: sensitivity} -- the serializable form
+    constraints_by_key: dict  # {ConstraintKey: sensitivity} -- the serializable form
     # cost: dict
     models: dict
     variables: VarMap

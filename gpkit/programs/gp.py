@@ -10,7 +10,7 @@ from time import time
 
 import numpy as np
 
-from ..constraints.set import ConstraintSet, walk_owned
+from ..constraints.set import ConstraintSet, keyed_constraints
 from ..exceptions import (
     DualInfeasible,
     Infeasible,
@@ -47,23 +47,23 @@ class MonoEqualityIndexes:
         self.first_half = set()
 
 
-def _senss_by_id(model, constraint_senss) -> dict:
-    """Constraint sensitivities keyed by position in model's constraint walk.
+def _senss_by_key(model, constraint_senss) -> dict:
+    """Constraint sensitivities keyed by ConstraintKey.
 
-    The same numbers as the object-keyed map, under the id to_ir() indexes its
-    flat constraint list by and the report dict reports.  Built from the walk
-    rather than by enumerating constraint_senss, so the two orders agree by
-    construction rather than by both happening to follow the hmaps.
+    The same numbers as the object-keyed map, under a key that says which
+    constraint it belongs to -- so they still mean something once serialized,
+    and two solves of the same model can be compared.  The object-keyed map is
+    the solution's only handle on the constraint objects themselves.
 
-    Built during the solve because it cannot be recovered afterwards: a
-    solution references its model weakly and pickling drops the reference, so
-    there may be no model left to walk by the time anyone serializes.
+    Built during the solve because it cannot be recovered afterwards: a solution
+    references its model weakly and pickling drops the reference, so there may
+    be no model left to walk by the time anyone serializes.
     """
     if model is None:
         return {}
     return {
-        i: constraint_senss[c]
-        for i, (_, c) in enumerate(walk_owned(model))
+        k: constraint_senss[c]
+        for k, c in keyed_constraints(model)
         if c in constraint_senss
     }
 
@@ -765,7 +765,7 @@ class GeometricProgram:
             constants=VarMap(self.substitutions),
             sens=Sensitivities(
                 constraints=constraint_senss,
-                constraints_by_id=_senss_by_id(self.model, constraint_senss),
+                constraints_by_key=_senss_by_key(self.model, constraint_senss),
                 models=dict(m_senss),
                 variables=VarMap(gpv_ss),
                 variablerisk=VarMap(absv_ss),

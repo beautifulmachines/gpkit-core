@@ -7,7 +7,7 @@ from time import time
 import numpy as np
 
 from .constraints.costed import CostedConstraintSet
-from .constraints.set import build_model_tree, walk_owned
+from .constraints.set import build_model_tree, keyed_constraints
 from .exceptions import (
     AmbiguousVariable,
     Infeasible,
@@ -184,37 +184,40 @@ class Model(CostedConstraintSet):
         return list(self._children)
 
     def walk(self):
-        """Yield all descendant models depth-first."""
+        """Yield this model and all its descendants, depth-first."""
+        yield self
         for child in self._children:
-            yield child
             yield from child.walk()
 
     def _check_lineage_collisions(self):
-        """Raise if two distinct descendant Models share a lineage.
+        """Raise if two Models in this tree share a lineage.
 
         Two separately built instances of the same class get identical
         lineages (numbering resets per root build, not per process);
         composing both into one tree would silently merge their variables
         and substitutions. Skips if nested -- the outermost call's walk
         already covers this subtree.
+
+        A bare Model() has no lineage and several can nest, so they are skipped
+        here and told apart where constraint keys are formed instead.
         """
         if NamedVariables.lineage:
             return
         seen = {}
-        for descendant in self.walk():
-            lineage = getattr(descendant, "lineage", None)
+        for model in self.walk():
+            lineage = getattr(model, "lineage", None)
             if not lineage:
                 continue
             prior = seen.get(lineage)
-            if prior is not None and prior is not descendant:
+            if prior is not None and prior is not model:
                 raise ValueError(
-                    f"{type(prior).__name__} and {type(descendant).__name__} "
+                    f"{type(prior).__name__} and {type(model).__name__} "
                     f"are distinct instances with the same lineage {lineage!r}. "
                     "Build differing instances as siblings inside one parent's "
                     "setup() instead, e.g. self.left = Wing(...); "
                     "self.right = Wing(...)."
                 )
-            seen[lineage] = descendant
+            seen[lineage] = model
 
     @classmethod
     def description(cls):
@@ -309,8 +312,14 @@ class Model(CostedConstraintSet):
         # Serialize cost
         cost_ir = self.cost.to_ir()
 
-        # walk_owned, so this list and model_tree's indices are one enumeration
-        constraints_ir = [c.to_ir() for _, c in walk_owned(self)]
+        # keyed_constraints walks walk_owned, so this list and model_tree's
+        # indices stay one enumeration; each entry carries its own key as well,
+        # so a consumer can name a constraint without counting list positions.
+        constraints_ir = []
+        for key, c in keyed_constraints(self):
+            c_ir = c.to_ir()
+            c_ir["key"] = key.ref
+            constraints_ir.append(c_ir)
 
         # Serialize substitutions; linked (callable-computed) vars get null
         subs_ir = {}

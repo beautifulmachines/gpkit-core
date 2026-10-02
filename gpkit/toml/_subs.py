@@ -68,7 +68,7 @@ def save_subs(model, path=None):
         "",
     ]
 
-    for m in [model] + list(model.walk()):
+    for m in model.walk():
         if not m.lineage:
             continue
         path_str = _lineage_path(m)
@@ -179,7 +179,7 @@ def apply_subs(model, path_or_dict):
 
     # Build lineage_path → model map
     model_map = {}
-    for m in [model] + list(model.walk()):
+    for m in model.walk():
         if m.lineage:
             model_map[_lineage_path(m)] = m
 

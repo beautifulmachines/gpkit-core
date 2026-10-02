@@ -6,6 +6,7 @@ from functools import cached_property
 
 import numpy as np
 
+from ..constraintkey import ConstraintKey
 from ..nomials import NomialArray, Variable
 from ..util.repr_conventions import ReprMixin, also_excluding, lineagestr
 from ..util.small_scripts import try_str_without
@@ -69,7 +70,7 @@ def _walk_owned(items, owner):
     if isinstance(items, dict):
         items = items.values()
     for item in items:
-        if any(item is child for child in children):
+        if any(item is child for child in children) and getattr(item, "lineage", None):
             yield from _walk_owned(item, item)
         elif not hasattr(item, "__iter__"):
             yield owner, item
@@ -91,6 +92,41 @@ def constraint_indices(model) -> dict:
     for i, (owner, _) in enumerate(walk_owned(model)):
         indices.setdefault(id(owner), []).append(i)
     return indices
+
+
+def keyed_constraints(cset):
+    "Yield (ConstraintKey, constraint) for every leaf constraint, in canonical order."
+    for owner in _owners(cset):
+        for _, pairs in own_keyed_constraints(owner):
+            yield from pairs
+
+
+def own_keyed_constraints(model):
+    """Yield (group label, [(ConstraintKey, constraint), ...]) per group of model's own.
+
+    One group labelled "" when the model declared no named ones.  The only place
+    a constraint's key is formed, so the IR and the report cannot name one
+    differently; a model names its own, with nothing threaded down the tree.
+    """
+    path = tuple(lineagestr(model.lineage).split(".")) if model.lineage else ()
+    groups = getattr(model, "cgroups", None)
+    for label, items in (groups if groups is not None else {"": None}).items():
+        yield (
+            label,
+            [
+                (ConstraintKey(path=(*path, label) if label else path, index=i), c)
+                for i, c in enumerate(own_constraints(model, items))
+            ],
+        )
+
+
+def _owners(cset):
+    "The models holding constraints, first appearance first."
+    owners = []
+    for owner, _ in walk_owned(cset):
+        if not any(owner is seen for seen in owners):
+            owners.append(owner)
+    return owners
 
 
 def own_constraints(model, items=None):
