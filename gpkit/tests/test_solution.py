@@ -18,7 +18,7 @@ from gpkit import (
     breakdowns,
     printing,
 )
-from gpkit.constraints.set import walk_owned
+from gpkit.constraints.set import keyed_constraints
 from gpkit.tests.conftest import run_threads
 from gpkit.util.small_classes import Quantity, Strings
 
@@ -188,40 +188,39 @@ def test_printing_table_backward_compat():
     assert len(result) > 0
 
 
-class TestConstraintSensitivitiesById:
+class TestConstraintSensitivitiesByKey:
     """Per-constraint sensitivities a consumer outside the process can read.
 
-    sens.constraints is keyed by live constraint objects, which is right for
-    in-process use and useless once serialized.  sens.constraints_by_id keys
-    the same numbers by the constraint's position in the model's walk -- the
-    id to_ir() and the report dict both use.
+    sens.constraints is keyed by live constraint objects, which is right in
+    process and meaningless once serialized -- and is the solution's only handle
+    on the objects themselves.  sens.constraints_by_key carries the same numbers
+    under the key to_ir() and the report dict both use.
     """
 
-    def test_ids_are_the_report_ids(self):
-        "A sensitivity's id is the id the report gives that same constraint."
+    def test_keys_are_the_report_keys(self):
+        "A sensitivity's key is the key the report gives that same constraint."
         m = _sens_model()
         sol = m.solve(verbosity=0)
-        by_id = sol.sens.constraints_by_id
+        refs = {k.ref for k in sol.sens.constraints_by_key}
         report = m.report(sol, fmt="dict")
         entries = [c for g in report["constraint_groups"] for c in g["constraints"]]
         for child in report["children"]:
             entries += [c for g in child["constraint_groups"] for c in g["constraints"]]
-        assert {e["id"] for e in entries} == set(by_id)
+        assert {e["key"] for e in entries} == refs
 
     def test_agrees_with_the_object_keyed_map(self):
-        "Same numbers, reached by position instead of by object."
+        "Same numbers, reached by key instead of by object."
         m = _sens_model()
         sol = m.solve(verbosity=0)
-        walked = [c for _, c in walk_owned(m)]
-        for i, c in enumerate(walked):
-            assert sol.sens.constraints_by_id[i] == pytest.approx(
+        for key, c in keyed_constraints(m):
+            assert sol.sens.constraints_by_key[key] == pytest.approx(
                 sol.sens.constraints[c]
             )
 
     def test_is_json_serializable(self):
-        "The point of the id: the numbers survive leaving the process."
+        "The point of the key: the numbers survive leaving the process."
         sol = _sens_model().solve(verbosity=0)
-        json.dumps(sol.sens.constraints_by_id)
+        json.dumps({k.ref: v for k, v in sol.sens.constraints_by_key.items()})
 
     def test_survives_the_model_being_discarded(self):
         """Solve-and-discard is the recommended concurrent pattern.
@@ -237,14 +236,14 @@ class TestConstraintSensitivitiesById:
         sol, n_constraints = solve_and_discard()
         gc.collect()
         assert sol.meta["model"]() is None
-        assert len(sol.sens.constraints_by_id) == n_constraints
+        assert len(sol.sens.constraints_by_key) == n_constraints
 
     def test_duplicate_constraints_stay_distinct(self):
         "Two identical constraints are two constraints; position tells them apart."
         x = Variable("x_dup")
         m = Model(x, [x >= 1, x >= 1, x >= 2])
         sol = m.solve(verbosity=0)
-        assert len(sol.sens.constraints_by_id) == 3
+        assert len(sol.sens.constraints_by_key) == 3
 
 
 class _SensChild(Model):

@@ -192,7 +192,7 @@ class TestSubmodels:
         assert len(a.submodels) == 1  # only wing, not spar
         assert a.submodels[0] is a.wing
 
-    def test_walk_yields_all_descendants_depth_first(self):
+    def test_walk_yields_the_whole_subtree_depth_first(self):
         class _WalkSpar(Model):
             def setup(self):
                 t = Variable("t")
@@ -219,9 +219,10 @@ class TestSubmodels:
 
         a = _WalkAircraft()
         walked = list(a.walk())
-        assert walked[0] is a.wing
-        assert walked[1] is a.wing.spar
-        assert len(walked) == 2
+        assert walked[0] is a
+        assert walked[1] is a.wing
+        assert walked[2] is a.wing.spar
+        assert len(walked) == 3
 
     def test_budget_rollup_pattern(self):
         """sum(child.W for child in model.submodels) works without helper."""
