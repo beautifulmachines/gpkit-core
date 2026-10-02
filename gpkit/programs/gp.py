@@ -20,7 +20,7 @@ from ..exceptions import (
     UnboundedGP,
     UnknownInfeasible,
 )
-from ..solutions import MarginSolution, Sensitivities, Solution, _WeakModelRef
+from ..solutions import MarginSolution, Sensitivities, Solution
 from ..solvers import default_solver
 from ..util.repr_conventions import lineagestr
 from ..util.small_classes import CootMatrix, FixedScalar, Numbers, SolverLog
@@ -778,7 +778,6 @@ class GeometricProgram:
             derived=derived,
         )
         result.meta["cost function"] = self.cost
-        result.meta["model"] = _WeakModelRef(self.model)
         return result
 
     def _handle_choicevars(self, solver_out):

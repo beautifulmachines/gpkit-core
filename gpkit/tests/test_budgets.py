@@ -2,6 +2,7 @@
 
 import json
 import math
+import pickle
 import warnings
 
 import pytest
@@ -130,7 +131,7 @@ class TestFindBudgetConstraints:
     def test_wing_budget(self):
         model = Aircraft()
         sol, _ = solve(model)
-        matches = find_budget_constraints(model, model.wing.m.key, sol)
+        matches = find_budget_constraints(model.wing.m.key, sol)
         # Wing has one budget constraint: wing.m >= spar.m + skin.m
         assert len(matches) >= 1
         _, lt, _ = matches[0]
@@ -140,14 +141,14 @@ class TestFindBudgetConstraints:
     def test_top_level(self):
         model = Aircraft()
         sol, _ = solve(model)
-        matches = find_budget_constraints(model, model.m.key, sol)
+        matches = find_budget_constraints(model.m.key, sol)
         assert len(matches) >= 1
 
     def test_leaf_budget_has_constant_term(self):
         model = Aircraft()
         sol, _ = solve(model)
         # Spar mass has budget constraint m >= m_min, where m_min is a constant
-        matches = find_budget_constraints(model, model.wing.spar.m.key, sol)
+        matches = find_budget_constraints(model.wing.spar.m.key, sol)
         assert len(matches) >= 1
         _, lt, _ = matches[0]
         # m_min is a substituted constant, so lt has exactly one constant term
@@ -165,38 +166,38 @@ class TestBuildBudgetBasic:
     def test_returns_budget(self):
         model = Aircraft()
         sol, _ = solve(model)
-        assert isinstance(build_budget(sol, model, model.m), Budget)
+        assert isinstance(build_budget(sol, model.m), Budget)
 
     def test_total_correct(self):
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         assert abs(b.total - float(sol[model.m].magnitude)) < 1e-6
 
     def test_units(self):
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         assert b.units == "kg"
 
     def test_children_sum_to_total(self):
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         child_sum = sum(n.value for n in b.children)
         assert abs(child_sum - b.total) / b.total < 1e-4
 
     def test_fractions_sum_to_one(self):
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         frac_sum = sum(n.fraction for n in b.children)
         assert abs(frac_sum - 1.0) < 1e-4
 
     def test_recursion_into_wing(self):
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         # One child (wing.m), which itself has two children (spar.m, skin.m)
         assert len(b.children) == 1
         wing_node = b.children[0]
@@ -205,7 +206,7 @@ class TestBuildBudgetBasic:
     def test_display_units(self):
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m, display_units="g")
+        b = build_budget(sol, model.m, display_units="g")
         assert b.units == "g"
         assert b.total > 1000  # 15 kg → 15000 g
 
@@ -213,7 +214,7 @@ class TestBuildBudgetBasic:
         # Child labels must include lineage so "m" is not ambiguous
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         wing_node = b.children[0]
         assert "Wing" in wing_node.label
         spar_node = next(n for n in wing_node.children if abs(n.value - 10) < 1e-3)
@@ -224,7 +225,7 @@ class TestBuildBudgetBasic:
         # Under Wing, the spar node should be "Spar.m" not "Aircraft.Wing.Spar.m"
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         wing_node = b.children[0]
         assert wing_node.label == "Wing.m"
         spar_node = next(n for n in wing_node.children if abs(n.value - 10) < 1e-3)
@@ -242,14 +243,14 @@ class TestBudgetSlack:
     def test_slack_node_added(self):
         model = SlackModel()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m_total)
+        b = build_budget(sol, model.m_total)
         labels = [n.label for n in b.children]
         assert "[slack]" in labels
 
     def test_slack_node_value(self):
         model = SlackModel()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m_total)
+        b = build_budget(sol, model.m_total)
         slack_node = next(n for n in b.children if n.label == "[slack]")
         # m_total=100 kg, m_wing=60 kg → slack = 40 kg
         assert slack_node.value == pytest.approx(40.0, rel=1e-4)
@@ -269,12 +270,13 @@ class TestSolutionBudgetMethod:
         b = sol.budget(model.m)
         assert isinstance(b, Budget)
 
-    def test_method_no_model_raises(self):
+    def test_works_without_the_model(self):
+        "A budget needs the constraints, and sens.constraints already holds them."
         model = Aircraft()
         sol, _ = solve(model)
-        del sol.meta["model"]
-        with pytest.raises(ValueError, match="No model in solution"):
-            sol.budget(model.m)
+        var = model.m
+        restored = pickle.loads(pickle.dumps(sol))
+        assert isinstance(restored.budget(var), Budget)
 
 
 # ---------------------------------------------------------------------------
@@ -288,19 +290,19 @@ class TestBudgetRendering:
     def test_text_contains_units(self):
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         assert "[kg]" in b.text()
 
     def test_text_contains_percent(self):
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         assert "%" in b.text()
 
     def test_markdown_has_table(self):
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         md = b.markdown()
         assert "| --- |" in md
         assert "[kg]" in md
@@ -308,7 +310,7 @@ class TestBudgetRendering:
     def test_to_dict(self):
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         d = b.to_dict()
         assert d["units"] == "kg"
         assert isinstance(d["children"], list)
@@ -324,14 +326,14 @@ class TestBudgetRendering:
         """
         model = ZeroTermBudgetModel()
         sol, _ = solve(model)
-        d = build_budget(sol, model, model.m).to_dict()
+        d = build_budget(sol, model.m).to_dict()
         # allow_nan=False mirrors strict serializers (e.g. Starlette JSONResponse)
         json.dumps(d, allow_nan=False)
 
     def test_repr_is_text(self):
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         assert repr(b) == b.text()
 
 
@@ -347,13 +349,13 @@ class TestBudgetErrors:
         model = Aircraft()
         sol, _ = solve(model)
         with pytest.raises(TypeError):
-            build_budget(sol, model, "m")
+            build_budget(sol, "m")
 
     def test_spar_budget_leaf(self):
         # Spar.m >= m_min: m_min is a bare variable, kept as a child row.
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.wing.spar.m)
+        b = build_budget(sol, model.wing.spar.m)
         assert any("m_min" in c.label for c in b.children)
 
     def test_compound_leaf_suppressed_when_alone(self):
@@ -374,14 +376,14 @@ class TestBudgetErrors:
 
         model = Inner()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         assert not b.children
 
     def test_multi_term_posynomial_keeps_children(self):
         # Wing.m >= Spar.m + Skin.m has two terms — both rows must stay.
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         wing_node = b.children[0]
         assert len(wing_node.children) == 2
 
@@ -496,14 +498,14 @@ class TestBudgetWithGrowth:
     def test_allowance_term_not_rendered_as_child(self):
         model = GrowthSpar()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         labels = [n.label for n in b.children]
         assert not any("growth" in (lbl or "") for lbl in labels)
 
     def test_leaf_cbe_plus_ga_equals_total(self):
         model = GrowthSpar()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         # m = 1.20 * 50 = 60; cbe = 50 (from leaf expr); ga = 10
         assert b.total == pytest.approx(60.0, rel=1e-4)
         assert b.cbe_total == pytest.approx(50.0, rel=1e-4)
@@ -513,7 +515,7 @@ class TestBudgetWithGrowth:
     def test_two_level_recursive_ga_accumulation(self):
         model = GrowthWing()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         # spar_total = 60 each; wing_cbe constraint = 120; wing.m = 132
         # leaf cbe sum (recursive) = 50 + 50 = 100
         # ga (recursive) = 132 - 100 = 32 (Wing.m_growth=12 + 2*Spar.m_growth=20)
@@ -524,7 +526,7 @@ class TestBudgetWithGrowth:
     def test_invariant_at_every_node(self):
         model = GrowthWing()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         for node in _walk_all_nodes(b.children):
             assert node.cbe_value + node.ga_value == pytest.approx(node.value, rel=1e-4)
 
@@ -533,7 +535,7 @@ class TestBudgetWithGrowth:
         # is kept (the user named it for a reason).
         model = GrowthSpar()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         assert any(c.label == "e" for c in b.children)
         assert b.cbe_total == pytest.approx(50.0, rel=1e-4)
         assert b.ga_total == pytest.approx(10.0, rel=1e-4)
@@ -557,7 +559,7 @@ class TestBudgetWithGrowth:
 
         model = GrowthCompoundExpr()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         # rho * L * A = 7800 * 0.1 * 1e-4 = 0.078 kg.
         # m = 0.078 * 1.20 = 0.0936 kg; cbe = 0.078; ga = 0.0156.
         assert b.total == pytest.approx(0.0936, rel=1e-4)
@@ -569,7 +571,7 @@ class TestBudgetWithGrowth:
     def test_mixed_growth_and_plain_children(self):
         model = GrowthMixedWing()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         # Spar: cbe=50, ga=10, total=60
         # Skin: cbe=30, ga=0, total=30 (no growth declared)
         # Wing.m_cbe = spar.m + skin.m = 90; Wing.m_growth = 9; Wing.m = 99
@@ -592,28 +594,28 @@ class TestBudgetRenderingWithGrowth:
     def test_text_includes_nominal_and_growth_columns(self):
         model = GrowthWing()
         sol, _ = solve(model)
-        out = build_budget(sol, model, model.m).text()
+        out = build_budget(sol, model.m).text()
         assert "Nominal" in out
         assert "Growth" in out
 
     def test_markdown_includes_nominal_and_growth_columns(self):
         model = GrowthWing()
         sol, _ = solve(model)
-        out = build_budget(sol, model, model.m).markdown()
+        out = build_budget(sol, model.m).markdown()
         assert "Nominal" in out
         assert "Growth" in out
 
     def test_text_unchanged_for_no_growth_budget(self):
         model = Aircraft()
         sol, _ = solve(model)
-        out = build_budget(sol, model, model.m).text()
+        out = build_budget(sol, model.m).text()
         assert "Nominal" not in out
         assert "Growth" not in out
 
     def test_to_dict_always_has_cbe_ga(self):
         model = GrowthSpar()
         sol, _ = solve(model)
-        d = build_budget(sol, model, model.m).to_dict()
+        d = build_budget(sol, model.m).to_dict()
         assert "cbe_total" in d
         assert "ga_total" in d
         assert d["cbe_total"] + d["ga_total"] == pytest.approx(d["total"], rel=1e-4)
@@ -627,7 +629,7 @@ class TestBudgetGrowthCellBlanking:
         # should be blank because e itself has no growth allowance.
         model = GrowthSpar()
         sol, _ = solve(model)
-        out = build_budget(sol, model, model.m).text()
+        out = build_budget(sol, model.m).text()
         e_line = next(
             line for line in out.splitlines() if line.lstrip().startswith("e ")
         )
@@ -637,7 +639,7 @@ class TestBudgetGrowthCellBlanking:
     def test_non_growth_submodel_has_blank_ga_despite_noise(self):
         model = GrowthMixedWing()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         # Find the GrowthSkin.m node (no growth declared)
         skin_node = next(n for n in b.children if n.vk and "Skin" in n.label)
         assert skin_node.has_growth is False
@@ -652,7 +654,7 @@ class TestBudgetGrowthCellBlanking:
     def test_growth_enabled_row_still_renders_numeric_ga(self):
         model = GrowthSpar()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         assert b.has_growth is True
         # The top-row entry in the rendered table should carry the numeric GA
         out = b.text()
@@ -670,7 +672,7 @@ class TestBudgetGrowthCellBlanking:
     def test_has_growth_propagates_in_to_dict(self):
         model = GrowthSpar()
         sol, _ = solve(model)
-        d = build_budget(sol, model, model.m).to_dict()
+        d = build_budget(sol, model.m).to_dict()
         assert d["has_growth"] is True
         # The leaf 'e' child has no growth of its own.
         e_child = next(c for c in d["children"] if c["label"] == "e")
@@ -696,14 +698,14 @@ class TestBareParentWithGrowthChild:
         # Budget.has_growth must be True even though the top var declares no growth
         model = BareParentGrowthChild()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         assert b.has_growth is True
 
     def test_cbe_and_ga_totals(self):
         # ga_total should equal the leaf's 10 kg growth; cbe = 80; total = 90
         model = BareParentGrowthChild()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         assert b.total == pytest.approx(90.0, rel=1e-4)
         assert b.cbe_total == pytest.approx(80.0, rel=1e-4)
         assert b.ga_total == pytest.approx(10.0, rel=1e-4)
@@ -711,7 +713,7 @@ class TestBareParentWithGrowthChild:
     def test_growth_child_node_has_growth_true(self):
         model = BareParentGrowthChild()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         spar_node = next(n for n in b.children if n.vk and "Spar" in n.vk.lineagestr())
         assert spar_node.has_growth is True
         assert spar_node.ga_value == pytest.approx(10.0, rel=1e-4)
@@ -719,21 +721,21 @@ class TestBareParentWithGrowthChild:
     def test_plain_child_node_has_growth_false(self):
         model = BareParentGrowthChild()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         skin_node = next(n for n in b.children if n.vk and "Skin" in n.vk.lineagestr())
         assert skin_node.has_growth is False
 
     def test_growth_columns_rendered_in_text(self):
         model = BareParentGrowthChild()
         sol, _ = solve(model)
-        out = build_budget(sol, model, model.m).text()
+        out = build_budget(sol, model.m).text()
         assert "Nominal" in out
         assert "Growth" in out
 
     def test_invariant_at_every_node(self):
         model = BareParentGrowthChild()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         for node in _walk_all_nodes(b.children):
             assert node.cbe_value + node.ga_value == pytest.approx(node.value, rel=1e-4)
 
@@ -745,7 +747,7 @@ class TestBareParentWithGrowthChild:
         # cbe: spar_cbe=50, skin_cbe=30, wing_cbe=80, skin2_cbe=30, total_cbe=110; ga=10
         model = BareGrandparentGrowthGrandchild()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         assert b.has_growth is True
         assert b.total == pytest.approx(120.0, rel=1e-4)
         assert b.cbe_total == pytest.approx(110.0, rel=1e-4)
@@ -754,7 +756,7 @@ class TestBareParentWithGrowthChild:
     def test_three_level_all_nodes_invariant(self):
         model = BareGrandparentGrowthGrandchild()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         for node in _walk_all_nodes(b.children):
             assert node.cbe_value + node.ga_value == pytest.approx(node.value, rel=1e-4)
 
@@ -790,7 +792,7 @@ class TestBudgetUnitMismatchCoeff:
     def test_value_is_physical(self):
         model = MixedUnitMass()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         struct_node = next(
             n for n in b.children if n.vk is not None and "m_struct" in n.label
         )
@@ -802,7 +804,7 @@ class TestBudgetUnitMismatchCoeff:
     def test_label_has_no_spurious_coeff(self):
         model = MixedUnitMass()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         struct_node = next(
             n for n in b.children if n.vk is not None and "m_struct" in n.label
         )
@@ -839,20 +841,20 @@ class TestBuildBudgetMixedUnits:
         # Should not raise pint.DimensionalityError (issue #161)
         model = Cylinder()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         assert isinstance(b, Budget)
 
     def test_total_correct(self):
         model = Cylinder()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         # rho=7800 kg/m^3, L=1 m, A=0.01 m^2 → m = 78 kg
         assert abs(b.total - 78.0) < 1e-4
 
     def test_children_have_finite_values(self):
         model = Cylinder()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         assert all(c.value == c.value for c in b.children)  # no NaN
 
     def test_solution_budget_method(self):
@@ -866,7 +868,7 @@ class TestBuildBudgetMixedUnits:
         # so no recursion is possible. Result: budget renders with no children.
         model = Cylinder()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         assert not b.children
 
 
@@ -894,7 +896,7 @@ class TestMixedUnitCoeff:
         # children are rendered.
         model = MixedUnitCoeffModel()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         # 1 lb (≈ 0.4536 kg) + 1 kg ≈ 1.4536 kg total
         assert b.total == pytest.approx(1.45359237, rel=1e-4)
 
@@ -902,7 +904,7 @@ class TestMixedUnitCoeff:
         # Each child renders in its declared units: m_a in lbs, m_b in kg.
         model = MixedUnitCoeffModel()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         m_a_node = next(n for n in b.children if "m_a" in n.label)
         assert m_a_node.units == "lbs"
         assert m_a_node.value == pytest.approx(1.0, rel=1e-4)
@@ -914,7 +916,7 @@ class TestMixedUnitCoeff:
         """Pure unit-conversion terms should NOT show a numeric coefficient."""
         model = MixedUnitCoeffModel()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         # m_a and m_b each appear with coefficient 1 in the original expression —
         # neither label should start with a digit (no spurious "0.4536⋅m_a")
         for node in b.children:
@@ -946,7 +948,7 @@ class TestPhysCoeff:
     def test_coeff_shown_in_label(self):
         model = PhysCoeffModel()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         # 0.25*m_a contributes 0.25*4 = 1 kg; label should mention 0.25
         m_a_node = next(n for n in b.children if "m_a" in n.label)
         assert "0.25" in m_a_node.label
@@ -954,14 +956,14 @@ class TestPhysCoeff:
     def test_value_correct(self):
         model = PhysCoeffModel()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         m_a_node = next(n for n in b.children if "m_a" in n.label)
         assert m_a_node.value == pytest.approx(1.0, rel=1e-4)  # 0.25 * 4 kg
 
     def test_children_sum_to_total(self):
         model = PhysCoeffModel()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         child_sum = sum(n.value for n in b.children)
         assert abs(child_sum - b.total) / b.total < 1e-4
 
@@ -978,7 +980,7 @@ class TestBudgetNodeUnits:
         """Aircraft budget: all nodes in kg, units column shows kg everywhere."""
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         wing_node = b.children[0]
         assert wing_node.units == "kg"
         for child in wing_node.children:
@@ -988,7 +990,7 @@ class TestBudgetNodeUnits:
         """m_struct (declared in g) should have units='g' and value in grams."""
         model = MixedUnitMass()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         struct_node = next(
             n for n in b.children if n.vk is not None and "m_struct" in n.label
         )
@@ -1001,7 +1003,7 @@ class TestBudgetNodeUnits:
         """Fractions sum to 1 regardless of per-row units."""
         model = MixedUnitMass()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         frac_sum = sum(n.fraction for n in b.children)
         assert abs(frac_sum - 1.0) < 1e-4
 
@@ -1009,7 +1011,7 @@ class TestBudgetNodeUnits:
         """text() output contains a units column with per-row units."""
         model = MixedUnitMass()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         text = b.text()
         assert "[g]" in text
         assert "[kg]" in text
@@ -1018,7 +1020,7 @@ class TestBudgetNodeUnits:
         """markdown() contains a Units column header and per-row units."""
         model = MixedUnitMass()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         md = b.markdown()
         assert "| Units |" in md
         assert "[g]" in md
@@ -1027,7 +1029,7 @@ class TestBudgetNodeUnits:
         """to_dict() includes a 'units' key on each child node."""
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         child_dict = b.to_dict()["children"][0]
         assert "units" in child_dict
         assert child_dict["units"] == "kg"
@@ -1036,7 +1038,7 @@ class TestBudgetNodeUnits:
         """Slack node units match the budget level units."""
         model = SlackModel()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m_total)
+        b = build_budget(sol, model.m_total)
         slack_node = next(n for n in b.children if n.label == "[slack]")
         assert slack_node.units == "kg"
 
@@ -1052,13 +1054,13 @@ class TestBudgetDepth:
     def test_depth_zero_no_children(self):
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m, depth=0)
+        b = build_budget(sol, model.m, depth=0)
         assert not b.children
 
     def test_depth_one_no_grandchildren(self):
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m, depth=1)
+        b = build_budget(sol, model.m, depth=1)
         assert len(b.children) == 1
         wing_node = b.children[0]
         assert not wing_node.children
@@ -1066,7 +1068,7 @@ class TestBudgetDepth:
     def test_depth_two_has_grandchildren(self):
         model = Aircraft()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m, depth=2)
+        b = build_budget(sol, model.m, depth=2)
         assert len(b.children) == 1
         wing_node = b.children[0]
         assert len(wing_node.children) == 2
@@ -1076,8 +1078,8 @@ class TestBudgetDepth:
     def test_depth_inf_same_as_default(self):
         model = Aircraft()
         sol, _ = solve(model)
-        b_default = build_budget(sol, model, model.m)
-        b_inf = build_budget(sol, model, model.m, depth=math.inf)
+        b_default = build_budget(sol, model.m)
+        b_inf = build_budget(sol, model.m, depth=math.inf)
         assert len(b_default.children) == len(b_inf.children)
         assert len(b_default.children[0].children) == len(b_inf.children[0].children)
 
@@ -1113,7 +1115,7 @@ class TestBudgetDepth:
         sol = model.solve(verbosity=0)
         # depth=2 traverses Outer -> Inner -> rho*L*A; the compound
         # grandchild row should be dropped, leaving Inner.m as a leaf.
-        b = build_budget(sol, model, model.m, depth=2)
+        b = build_budget(sol, model.m, depth=2)
         inner_node = b.children[0]
         assert "Inner.m" in inner_node.label
         assert inner_node.children == []
@@ -1132,7 +1134,7 @@ class TestBudgetDepth:
         # row, but the cbe/ga totals and has_growth must still reflect the full tree.
         model = BareParentGrowthChild()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m, depth=1)
+        b = build_budget(sol, model.m, depth=1)
         assert b.has_growth is True
         assert b.ga_total == pytest.approx(10.0, rel=1e-4)
         spar_node = next(n for n in b.children if n.vk and "Spar" in n.vk.lineagestr())
@@ -1167,19 +1169,19 @@ class TestDimensionlessBudget:
     def test_no_crash(self):
         model = DimensionlessBudgetModel()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.f)
+        b = build_budget(sol, model.f)
         assert isinstance(b, Budget)
 
     def test_units_is_dimensionless(self):
         model = DimensionlessBudgetModel()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.f)
+        b = build_budget(sol, model.f)
         assert b.units == "dimensionless"
 
     def test_total_correct(self):
         model = DimensionlessBudgetModel()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.f)
+        b = build_budget(sol, model.f)
         assert abs(b.total - 0.7) < 1e-4  # f_a_min=0.3, f_b_min=0.4 → f=0.7
 
 
@@ -1216,14 +1218,14 @@ class TestScaledTermNoRecursion:
         # the row is redundant with the parent total, so no child is rendered.
         model = ScaledTermModel()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         assert not b.children
 
     def test_scaled_term_total_correct(self):
         """Top total reflects 0.5 * 10 = 5 kg, even with no child row."""
         model = ScaledTermModel()
         sol, _ = solve(model)
-        b = build_budget(sol, model, model.m)
+        b = build_budget(sol, model.m)
         assert b.total == pytest.approx(5.0, rel=1e-4)
 
 
@@ -1281,9 +1283,9 @@ class TwoTightBoundsOnSub(Model):
         ]
 
 
-def _force_both_tight(sol, model, m_var):
+def _force_both_tight(sol, m_var):
     """Patch the solution so both budget constraints on m have sens > threshold."""
-    matches = find_budget_constraints(model, m_var.key, sol)
+    matches = find_budget_constraints(m_var.key, sol)
     assert len(matches) == 2, "fixture must have exactly two matches"
     for c, _, _ in matches:
         sol.sens.constraints[c] = 0.5
@@ -1298,7 +1300,7 @@ class TestMultipleBudgetConstraints:
         sol, _ = solve(model)
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            build_budget(sol, model, model.m)
+            build_budget(sol, model.m)
 
     def test_no_warning_for_tight_plus_slack_at_sub_budget(self):
         # Same model exercised through a parent so it lands in _attach_sub_budget.
@@ -1316,7 +1318,7 @@ class TestMultipleBudgetConstraints:
         sol, _ = solve(model)
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            build_budget(sol, model, model.m)
+            build_budget(sol, model.m)
 
     def test_sub_budget_ambiguity_silent_leaf(self):
         # Sub-variable with two genuinely tight bounds: leaf with no children.
@@ -1332,10 +1334,10 @@ class TestMultipleBudgetConstraints:
 
         model = Outer()
         sol, _ = solve(model)
-        _force_both_tight(sol, model, model.sub.m)
+        _force_both_tight(sol, model.sub.m)
         with warnings.catch_warnings():
             warnings.simplefilter("error")
-            b = build_budget(sol, model, model.m)
+            b = build_budget(sol, model.m)
         assert len(b.children) == 1
         assert not b.children[0].children
 
@@ -1343,6 +1345,6 @@ class TestMultipleBudgetConstraints:
         # User explicitly asked for a budget on the ambiguous variable.
         model = TwoTightBoundsOnSub()
         sol, _ = solve(model)
-        _force_both_tight(sol, model, model.m)
+        _force_both_tight(sol, model.m)
         with pytest.raises(ValueError, match="multiple"):
-            build_budget(sol, model, model.m)
+            build_budget(sol, model.m)

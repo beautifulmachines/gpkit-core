@@ -114,7 +114,6 @@ def solvify(genfunction):
             else SolveStatus.OPTIMAL
         )
         self.solution = result
-        self.solution.meta["modelstr"] = str(self)
         return result
 
     return solvefn

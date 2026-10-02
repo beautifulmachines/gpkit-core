@@ -241,11 +241,7 @@ class TestConstraintSensitivitiesByKey:
         json.dumps({k.ref: v for k, v in sol.sens.constraints_by_key.items()})
 
     def test_survives_the_model_being_discarded(self):
-        """Solve-and-discard is the recommended concurrent pattern.
-
-        meta["model"] is a weak ref, and pickling drops it on purpose, so
-        anything derived from the model at serialization time is already gone.
-        """
+        "Solve-and-discard is the recommended concurrent pattern."
 
         def solve_and_discard():
             m = _sens_model()
@@ -253,7 +249,6 @@ class TestConstraintSensitivitiesByKey:
 
         sol, n_constraints = solve_and_discard()
         gc.collect()
-        assert sol.meta["model"]() is None
         assert len(sol.sens.constraints_by_key) == n_constraints
 
     def test_duplicate_constraints_stay_distinct(self):
