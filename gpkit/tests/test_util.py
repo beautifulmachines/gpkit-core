@@ -5,7 +5,14 @@ import pytest
 import gpkit
 from gpkit import Variable, units
 from gpkit.util.build import build
-from gpkit.util.repr_conventions import extract_subscript, latexify, unitstr
+from gpkit.util.repr_conventions import (
+    MUL,
+    _strip_parens,
+    extract_subscript,
+    latexify,
+    parenthesize,
+    unitstr,
+)
 from gpkit.util.small_classes import HashVector
 
 
@@ -113,6 +120,38 @@ class TestSmallScripts:
         assert latexify("lamda") == r"\lambda"
         assert latexify("lambda_") == r"\lambda"
         assert latexify("lambda_dry") == r"\lambda_{\text{dry}}"  # preserved
+
+    def test_parenthesize_past_parens_in_names(self):
+        """Parens inside variable names must not hide the operators between them.
+
+        Names like "(P/S)_{min}" are common in aero models.  Stripping groups
+        greedily ran from the first "(" to the last ")" and swallowed the
+        operator between two sibling names, so a ratio of them looked
+        operator-free and needed no parentheses of its own.
+        """
+        assert parenthesize("(P/S)_{min}/(P/S)_{ref}") == "((P/S)_{min}/(P/S)_{ref})"
+        assert parenthesize(f"(a)_{{1}}{MUL}(b)_{{2}}") == f"((a)_{{1}}{MUL}(b)_{{2}})"
+        # one group, or a string already wrapped as a whole, is left alone
+        assert parenthesize("(P/S)_{min}") == "(P/S)_{min}"
+        assert parenthesize("(a/b)") == "(a/b)"
+        assert parenthesize(f"((a + b){MUL}c)") == f"((a + b){MUL}c)"
+        assert parenthesize("a/b") == "(a/b)"
+        # unbalanced parens terminate rather than looping
+        assert _strip_parens("(a/b") == "(a/b"
+
+    def test_exponent_over_ratio_of_paren_named_vars(self):
+        """A power over a ratio keeps the grouping that says what it applies to.
+
+        Without it, "17.2*((P/S)_min/(P/S)_ref)^0.9187" renders as
+        "17.2*(P/S)_min/(P/S)_ref^0.9187", which reads as though only the
+        denominator were raised to the exponent.
+        """
+        pmin = Variable("(P/S)_{min}")
+        pref = Variable("(P/S)_{ref}")
+        assert (
+            str(17.2 * (pmin / pref) ** 0.9187)
+            == f"17.2{MUL}((P/S)_{{min}}/(P/S)_{{ref}})^0.9187"
+        )
 
     def test_pint_366(self):
         # test for https://github.com/hgrecco/pint/issues/366
