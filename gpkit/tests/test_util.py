@@ -1,5 +1,8 @@
 """Tests for utils module"""
 
+import io
+import pickle
+
 import pytest
 
 import gpkit
@@ -13,7 +16,21 @@ from gpkit.util.repr_conventions import (
     parenthesize,
     unitstr,
 )
-from gpkit.util.small_classes import HashVector
+from gpkit.util.small_classes import HashVector, SolverLog
+
+
+class TestSolverLog:
+    """TestCase for the SolverLog class"""
+
+    def test_close_keeps_the_text_and_drops_the_stream(self):
+        "A log outlives its capture, so it must not outlive its hold on stdout."
+        stream = io.StringIO()
+        log = SolverLog(stream, verbosity=1)
+        log.write("solving\n")
+        log.close()
+        assert log.lines() == ["solving", ""]
+        assert log.output is None
+        assert pickle.dumps(log)
 
 
 class TestHashVector:

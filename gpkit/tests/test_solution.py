@@ -2,6 +2,7 @@
 
 import gc
 import json
+import pickle
 import sys
 import threading
 
@@ -175,6 +176,23 @@ def test_concurrent_tables_dont_corrupt_stdout(monkeypatch):
         if leaked:
             sys.stdout = real_stdout  # don't swallow the rest of the session
     assert not leaked, "sys.stdout was not restored after concurrent tables"
+
+
+def test_solving_leaves_the_model_picklable():
+    """A solve must not leave the terminal's stdout attached to the model.
+
+    The solver's output is captured by swapping in a SolverLog, which holds the
+    real stdout so it can echo as it goes.  The log is kept on the program
+    afterwards, and the model keeps the program, so holding that stream past the
+    capture made every solved model unpicklable -- and is why a Solution refers
+    to its model weakly.
+    """
+    x = Variable("x_pkl")
+    m = Model(x, [x >= 2])
+    assert pickle.dumps(m)  # unsolved
+    m.solve(verbosity=0)
+    assert pickle.dumps(m)  # and solved
+    assert m.program.solve_log.lines() is not None  # text still readable
 
 
 def test_printing_table_backward_compat():

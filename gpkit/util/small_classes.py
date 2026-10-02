@@ -102,6 +102,16 @@ class SolverLog:
     def flush(self):
         "Dummy function for I/O api compatibility"
 
+    def close(self):
+        """End the capture, releasing the stream echoed to.
+
+        What was written stays readable.  A log outlives its capture -- a solve
+        keeps one for the caller to read -- and a stream is not picklable, so
+        holding one past the capture makes everything referring to the log
+        unpicklable too.
+        """
+        self.output = None
+
 
 class HashVector(dict):
     """A simple, sparse, string-indexed vector. Inherits from dict.

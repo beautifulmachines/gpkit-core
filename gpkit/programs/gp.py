@@ -392,6 +392,7 @@ class GeometricProgram:
             finally:
                 self.solve_log = sys.stdout
                 sys.stdout = original_stdout
+                self.solve_log.close()
                 self.solver_out = solver_out
 
         if infeasibility:
