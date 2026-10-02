@@ -68,5 +68,5 @@ class GrowthAllowance(Model):
 if __name__ == "__main__":
     model = GrowthAllowance()
     sol = model.solve(verbosity=0)
-    print(build_budget(sol, model, model.m).text())
+    print(build_budget(sol, model.m).text())
     print(sol.derived.table(sol.sens.variables))
