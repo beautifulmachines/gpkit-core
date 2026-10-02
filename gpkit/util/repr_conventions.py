@@ -6,7 +6,7 @@ import sys
 from .small_classes import Numbers, Quantity
 from .small_scripts import try_str_without
 
-INSIDE_PARENS = re.compile(r"\(.*\)")
+INNERMOST_PARENS = re.compile(r"\([^()]*\)")
 
 if sys.platform[:3] == "win":  # pragma: no cover
     MUL = "*"
@@ -218,9 +218,25 @@ def strify(val, excluded):
     return val
 
 
+def _strip_parens(string):
+    """Drop every parenthesized group, so what is left is this string's own operators.
+
+    Repeats innermost-first to handle nesting.  A single greedy `\\(.*\\)` would
+    run from the first `(` to the last `)` and swallow the operators between two
+    sibling groups -- which is how `(P/S)_{min}/(P/S)_{ref}` came to look
+    operator-free, and so lost the parentheses it needed under an exponent.
+    """
+    while "(" in string:
+        stripped = INNERMOST_PARENS.sub("", string)
+        if stripped == string:  # unbalanced parens; nothing more to remove
+            break
+        string = stripped
+    return string
+
+
 def parenthesize(string, addi=True, mult=True):
     "Parenthesizes a string if it needs it and isn't already."
-    parensless = string if "(" not in string else INSIDE_PARENS.sub("", string)
+    parensless = _strip_parens(string)
     bare_addi = " + " in parensless or " - " in parensless
     bare_mult = MUL in parensless or "/" in parensless
     if parensless and (addi and bare_addi) or (mult and bare_mult):
