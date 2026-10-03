@@ -197,7 +197,7 @@ solutions and can be solved with 'Model.solve()'.""")
             if cost / prevcost >= 1 + 10 * EPS:
                 pywarnings.warn(
                     "SGP not convergent: Cost rose by "
-                    f"{100 * (cost - prevcost) / prevcost:.2g}%% "
+                    f"{100 * (cost - prevcost) / prevcost:.2g}% "
                     f"({prevcost:.6g} to {cost:.6g}) on GP solve {len(self.gps)}. "
                     "Details can be found in `m.program.results` "
                     "or by solving at a higher verbosity. Note convergence "
@@ -222,7 +222,7 @@ solutions and can be solved with 'Model.solve()'.""")
             if excess_slack > EPS:
                 msg = (
                     "Final PCCP solution let non-GP constraints slacken by"
-                    f" {(100 * excess_slack):.2g}%%."
+                    f" {(100 * excess_slack):.2g}%."
                 )
                 expl = (
                     msg + " Calling .localsolve(pccp_penalty=...) with a higher"

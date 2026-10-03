@@ -442,7 +442,7 @@ class GeometricProgram:
         result = self._compile_result(solver_out)  # NOTE: SIDE EFFECTS
         if verbosity > 0:
             rpackpct = (time() - tic) / soltime * 100
-            print(f"Result packing took {rpackpct:.2g}%% of solve time.")
+            print(f"Result packing took {rpackpct:.2g}% of solve time.")
             tic = time()
         # solution checking #
         try:
