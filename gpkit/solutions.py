@@ -55,7 +55,6 @@ class Sensitivities:
     models: dict
     variables: VarMap
     variablerisk: VarMap  # only used for breakdowns
-    constants: VarMap  # variables, filtered to the fixed/substituted VarKeys
 
     def __getitem__(self, key: VarKey) -> float:
         return self.variables[key]
