@@ -15,7 +15,7 @@ from ..exceptions import (
 )
 from ..nomials import Posynomial, PosynomialInequality, Variable
 from ..util.globals import NamedVariables
-from ..util.small_scripts import appendsolwarning, initsolwarning
+from ..util.small_scripts import appendsolwarning
 from ..varmap import VarMap
 from .gp import GeometricProgram
 
@@ -197,7 +197,7 @@ solutions and can be solved with 'Model.solve()'.""")
             if cost / prevcost >= 1 + 10 * EPS:
                 pywarnings.warn(
                     "SGP not convergent: Cost rose by "
-                    f"{100 * (cost - prevcost) / prevcost:.2g}%% "
+                    f"{100 * (cost - prevcost) / prevcost:.2g}% "
                     f"({prevcost:.6g} to {cost:.6g}) on GP solve {len(self.gps)}. "
                     "Details can be found in `m.program.results` "
                     "or by solving at a higher verbosity. Note convergence "
@@ -218,12 +218,11 @@ solutions and can be solved with 'Model.solve()'.""")
                 f"{len(self.gps)} GP solves."
             )
         if hasattr(self.slack, "key"):
-            initsolwarning(self.result, "Slack Non-GP Constraints")
             excess_slack = self.result.primal[self.slack.key] - 1
             if excess_slack > EPS:
                 msg = (
                     "Final PCCP solution let non-GP constraints slacken by"
-                    f" {(100 * excess_slack):.2g}%%."
+                    f" {(100 * excess_slack):.2g}%."
                 )
                 expl = (
                     msg + " Calling .localsolve(pccp_penalty=...) with a higher"
@@ -237,7 +236,10 @@ solutions and can be solved with 'Model.solve()'.""")
                 if err_on_relax:
                     raise Infeasible(expl)
                 appendsolwarning(
-                    msg, (1 + excess_slack), self.result, "Slack Non-GP Constraints"
+                    msg,
+                    self.result,
+                    "Slack Non-GP Constraints",
+                    value=1 + excess_slack,
                 )
                 if verbosity > -1:
                     print(expl)

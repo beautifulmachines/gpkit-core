@@ -24,7 +24,7 @@ from ..solutions import MarginSolution, Sensitivities, Solution
 from ..solvers import default_solver
 from ..util.repr_conventions import lineagestr
 from ..util.small_classes import CootMatrix, FixedScalar, Numbers, SolverLog
-from ..util.small_scripts import appendsolwarning, initsolwarning
+from ..util.small_scripts import appendsolwarning
 from ..varmap import VarMap
 
 DEFAULT_SOLVER_KWARGS = {"cvxopt": {"kktsolver": "ldl"}}
@@ -442,7 +442,7 @@ class GeometricProgram:
         result = self._compile_result(solver_out)  # NOTE: SIDE EFFECTS
         if verbosity > 0:
             rpackpct = (time() - tic) / soltime * 100
-            print(f"Result packing took {rpackpct:.2g}%% of solve time.")
+            print(f"Result packing took {rpackpct:.2g}% of solve time.")
             tic = time()
         # solution checking #
         try:
@@ -451,8 +451,7 @@ class GeometricProgram:
         except Infeasible as chkerror:
             msg = str(chkerror)
             if not ("Dual" in msg and not dual_check):
-                initsolwarning(result, "Solution Inconsistency")
-                appendsolwarning(msg, None, result, "Solution Inconsistency")
+                appendsolwarning(msg, result, "Solution Inconsistency")
                 if verbosity > -4:
                     print(f"Solution check warning: {msg}")
         if verbosity > 0:
@@ -745,10 +744,6 @@ class GeometricProgram:
         varvals = VarMap(zip(self.vars, np.exp(primal)))
         varvals.update(self.substitutions)
 
-        warnings = {}
-        if self.integersolve or self.choicevaridxs:
-            warnings.update(self._handle_choicevars(solver_out))
-
         margin_obj = getattr(self.model, "margin_objective", None)
         derived = None
         if margin_obj is not None:
@@ -774,45 +769,36 @@ class GeometricProgram:
                     {vk: v for vk, v in gpv_ss.items() if vk in self.substitutions}
                 ),
             ),
-            meta={"soltime": solver_out.meta["soltime"], "warnings": warnings},
+            meta={"soltime": solver_out.meta["soltime"], "warnings": {}},
             derived=derived,
         )
         result.meta["cost function"] = self.cost
+        if self.integersolve or self.choicevaridxs:
+            self._warn_about_choicevars(solver_out, result)
         return result
 
-    def _handle_choicevars(self, solver_out):
+    def _warn_about_choicevars(self, solver_out, result):
         "This is essentially archived code, until it can be tested with mosek"
-        warnings = {}
-
+        choicevars = sorted(self.choicevaridxs.keys())
         if self.integersolve:
-            warnings["No Dual Solution"] = [
-                (
-                    (
-                        "This model has the discretized choice variables"
-                        f" {sorted(self.choicevaridxs.keys())} and hence no dual"
-                        " solution. You can fix those variables to their optimal"
-                        " values and get sensitivities to the resulting"
-                        " continuous problem by updating your model's"
-                        " substitions with `sol['choicevariables']`."
-                    ),
-                    self.choicevaridxs,
-                )
-            ]
-
+            appendsolwarning(
+                f"This model has the discretized choice variables {choicevars}"
+                " and hence no dual solution. You can fix those variables to"
+                " their optimal values and get sensitivities to the resulting"
+                " continuous problem by updating your model's substitions with"
+                " `sol['choicevariables']`.",
+                result,
+                "No Dual Solution",
+            )
         if self.choicevaridxs:
-            warnings["Freed Choice Variables"] = [
-                (
-                    (
-                        "This model has the discretized choice variables"
-                        f" {sorted(self.choicevaridxs.keys())}, but since the "
-                        f"'{solver_out.meta['solver']}' solver doesn't support "
-                        "discretization they were treated as continuous variables."
-                    ),
-                    self.choicevaridxs,
-                )
-            ]  # TODO: choicevaridxs seems unnecessary
-
-        return warnings
+            appendsolwarning(
+                f"This model has the discretized choice variables {choicevars},"
+                f" but since the '{solver_out.meta['solver']}' solver doesn't"
+                " support discretization they were treated as continuous"
+                " variables.",
+                result,
+                "Freed Choice Variables",
+            )
 
 
 def gen_meq_bounds(missingbounds, exps, meq_idxs):  # noqa: PLR0912

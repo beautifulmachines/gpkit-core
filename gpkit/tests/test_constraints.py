@@ -480,9 +480,9 @@ class TestLoose:
         x_min = Variable("x_{min}", 2)
         m = Model(x, [Loose([x >= x_min]), x >= 1])
         sol = m.solve(verbosity=0)
-        warndata = sol.meta["warnings"]["Unexpectedly Tight Constraints"][0][1]
-        assert warndata[-1] is m[0][0]
-        assert warndata[0] == pytest.approx(+1, abs=1e-3)
+        (warn,) = sol.meta["warnings"]["Unexpectedly Tight Constraints"]
+        assert warn["subject"] is m[0][0]
+        assert warn["value"] == pytest.approx(+1, abs=1e-3)
         assert sol.meta["status"] == SolveStatus.OPTIMAL_WITH_WARNINGS
         m.substitutions[x_min] = 0.5
         assert m.solve(verbosity=0).cost == pytest.approx(1)
@@ -496,9 +496,9 @@ class TestLoose:
             sig_constraint = x + y >= 3.5
         m = Model(x * y, [Loose([x >= y]), x >= x_min, y >= y_min, sig_constraint])
         sol = m.localsolve(verbosity=0)
-        warndata = sol.meta["warnings"]["Unexpectedly Tight Constraints"][0][1]
-        assert warndata[-1] is m[0][0]
-        assert warndata[0] == pytest.approx(+1, abs=1e-3)
+        (warn,) = sol.meta["warnings"]["Unexpectedly Tight Constraints"]
+        assert warn["subject"] is m[0][0]
+        assert warn["value"] == pytest.approx(+1, abs=1e-3)
         m.substitutions[x_min] = 2
         m.substitutions[y_min] = 1
         assert m.localsolve(verbosity=0).cost == pytest.approx(2.5, abs=1e-5)
@@ -521,9 +521,9 @@ class TestTight:
         x_min = Variable("x_{min}", 2)
         m = Model(x, [Tight([x >= 1]), x >= x_min])
         sol = m.solve(verbosity=0)
-        warndata = sol.meta["warnings"]["Unexpectedly Loose Constraints"][0][1]
-        assert warndata[-1] is m[0][0]
-        assert warndata[0] == pytest.approx(1, abs=1e-3)
+        (warn,) = sol.meta["warnings"]["Unexpectedly Loose Constraints"]
+        assert warn["subject"] is m[0][0]
+        assert warn["value"] == pytest.approx(1, abs=1e-3)
         m.substitutions[x_min] = 0.5
         assert m.solve(verbosity=0).cost == pytest.approx(1)
 
@@ -534,9 +534,9 @@ class TestTight:
             sig_constraint = x + y >= 0.1
         m = Model(x * y, [Tight([x >= y]), x >= 2, y >= 1, sig_constraint])
         sol = m.localsolve(verbosity=0)
-        warndata = sol.meta["warnings"]["Unexpectedly Loose Constraints"][0][1]
-        assert warndata[-1] is m[0][0]
-        assert warndata[0] == pytest.approx(1, abs=1e-3)
+        (warn,) = sol.meta["warnings"]["Unexpectedly Loose Constraints"]
+        assert warn["subject"] is m[0][0]
+        assert warn["value"] == pytest.approx(1, abs=1e-3)
         m.pop(1)
         assert m.localsolve(verbosity=0).cost == pytest.approx(1, abs=1e-5)
 
@@ -549,9 +549,9 @@ class TestTight:
         with SignomialsEnabled():
             m = Model(x, [Tight([x + y >= 1]), x >= x_min, y <= y_max])
         sol = m.localsolve(verbosity=0)
-        warndata = sol.meta["warnings"]["Unexpectedly Loose Constraints"][0][1]
-        assert warndata[-1] is m[0][0]
-        assert warndata[0] > 0.5
+        (warn,) = sol.meta["warnings"]["Unexpectedly Loose Constraints"]
+        assert warn["subject"] is m[0][0]
+        assert warn["value"] > 0.5
         m.substitutions[x_min] = 0.5
         assert m.localsolve(verbosity=0).cost == pytest.approx(0.5, abs=1e-5)
 

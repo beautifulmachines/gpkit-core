@@ -1,7 +1,7 @@
 "Implements Tight"
 
 from ..util.globals import SignomialsEnabled
-from ..util.small_scripts import appendsolwarning, initsolwarning, mag
+from ..util.small_scripts import appendsolwarning, mag
 from .set import ConstraintSet
 
 
@@ -18,28 +18,20 @@ class Tight(ConstraintSet):
     def process_result(self, result):
         "Checks that all constraints are satisfied with equality"
         super().process_result(result)
-        initsolwarning(result, "Unexpectedly Loose Constraints")
         for constraint in self.flat():
             with SignomialsEnabled():
                 leftval = constraint.left.sub(result.variables).value
                 rightval = constraint.right.sub(result.variables).value
             rel_diff = mag(abs(1 - leftval / rightval))
             if rel_diff >= self.reltol:
-                msg = (
-                    f"Constraint [{str(constraint.left)[:100]}... "
-                    f"{constraint.oper} {str(constraint.right)[:100]}...] "
-                    f"is not tight: the left hand side evaluated to {leftval} "
-                    f"but the right hand side evaluated to {rightval} "
-                    f"(Allowable error: {self.reltol * 100}%%,"
-                    f" Actual error: {mag(rel_diff) * 100:.2g}%%)"
-                )
                 if hasattr(leftval, "magnitude"):
                     rightval = rightval.to(leftval.units).magnitude
                     leftval = leftval.magnitude
-                tightvalues = (leftval, constraint.oper, rightval)
+                cstr = constraint.str_without({"units", "lineage"})
                 appendsolwarning(
-                    msg,
-                    (rel_diff, tightvalues, constraint),
+                    f"{leftval:.4g} {constraint.oper} {rightval:.4g} : {cstr}",
                     result,
                     "Unexpectedly Loose Constraints",
+                    subject=constraint,
+                    value=rel_diff,
                 )

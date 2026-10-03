@@ -5,7 +5,7 @@ from dataclasses import replace
 from ..nomials import NomialArray, Variable, VectorVariable
 from ..nomials.substitution import parse_linked, parse_subs
 from ..util.globals import NamedVariables, SignomialsEnabled
-from ..util.small_scripts import appendsolwarning, initsolwarning, mag
+from ..util.small_scripts import appendsolwarning, mag
 from ..varmap import VarMap
 from .set import ConstraintSet
 
@@ -60,13 +60,15 @@ class ConstraintsRelaxedEqually(ConstraintSet):
 
     def check_relaxed(self, result):
         "Adds relaxation warnings to the result"
-        initsolwarning(result, "Relaxed Constraints")
         for val, msg in get_relaxed(
             [result.primal[self.relaxvar]],
             ["All constraints relaxed by %i%%"],
         ):
             appendsolwarning(
-                msg % (0.9 + (val - 1) * 100), self, result, "Relaxed Constraints"
+                msg % (0.9 + (val - 1) * 100),
+                result,
+                "Relaxed Constraints",
+                value=val,
             )
 
 
@@ -125,7 +127,6 @@ class ConstraintsRelaxed(ConstraintSet):
             result.primal[self.relaxvars],
             range(len(self["relaxed constraints"])),
         )
-        initsolwarning(result, "Relaxed Constraints")
         for relaxval, i in relaxed:
             relax_percent = "%i%%" % (0.5 + (relaxval - 1) * 100)
             oldconstraint = self.original_constraints[i]
@@ -154,7 +155,13 @@ class ConstraintsRelaxed(ConstraintSet):
                     relaxdright,
                 )
             )
-            appendsolwarning(msg, oldconstraint, result, "Relaxed Constraints")
+            appendsolwarning(
+                msg,
+                result,
+                "Relaxed Constraints",
+                subject=oldconstraint,
+                value=relaxval,
+            )
 
 
 class ConstantsRelaxed(ConstraintSet):
@@ -265,14 +272,15 @@ class ConstantsRelaxed(ConstraintSet):
         relaxed = get_relaxed(
             [result.primal[r] for r in self.relaxvars], self.freedvars
         )
-        initsolwarning(result, "Relaxed Constants")
-        for _, freed in relaxed:
+        for relaxval, freed in relaxed:
             msg = "  %s: relaxed from %-.4g to %-.4g" % (
                 freed,
                 mag(self.constants[freed.key]),
                 mag(result.primal[freed]),
             )
-            appendsolwarning(msg, freed, result, "Relaxed Constants")
+            appendsolwarning(
+                msg, result, "Relaxed Constants", subject=freed, value=relaxval
+            )
 
 
 def get_relaxed(relaxvals, mapped_list):

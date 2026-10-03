@@ -1,6 +1,6 @@
 "Implements Loose"
 
-from ..util.small_scripts import appendsolwarning, initsolwarning
+from ..util.small_scripts import appendsolwarning
 from .set import ConstraintSet
 
 
@@ -17,21 +17,19 @@ class Loose(ConstraintSet):
     def process_result(self, result):
         "Checks that all constraints are satisfied with equality"
         super().process_result(result)
-        initsolwarning(result, "Unexpectedly Tight Constraints")
         for constraint in self.flat():
             c_senss = result.sens.constraints.get(constraint, 0)
             if c_senss >= self.senstol:
-                cstr = "Constraint [ %.100s... %s %.100s... )" % (
-                    constraint.left,
-                    constraint.oper,
-                    constraint.right,
-                )
-                msg = (
-                    "%s is not loose: it has a sensitivity of %+.4g."
-                    " (Allowable sensitivity: %.4g)" % (cstr, c_senss, self.senstol)
-                )
+                cstr = constraint.str_without({"units", "lineage"})
                 appendsolwarning(
-                    msg, (c_senss, constraint), result, "Unexpectedly Tight Constraints"
+                    f"{c_senss:+6.2g} : {cstr}",
+                    result,
+                    "Unexpectedly Tight Constraints",
+                    subject=constraint,
+                    value=c_senss,
                 )
                 if self.raiseerror:
-                    raise RuntimeWarning(msg)
+                    raise RuntimeWarning(
+                        f"{cstr} is not loose: it has a sensitivity of"
+                        f" {c_senss:+.4g}. (Allowable: {self.senstol:.4g})"
+                    )

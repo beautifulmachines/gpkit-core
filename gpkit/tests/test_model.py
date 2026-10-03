@@ -1046,4 +1046,25 @@ def test_n_free_and_n_constraints():
     assert mn.n_constraints == 4  # a>=1 plus 3 from child
 
 
+def test_percentages_read_as_percentages():
+    """A percent sign reaches the user as one character.
+
+    %% escapes a literal % for %-style formatting only; inside an f-string it
+    is two characters, so these messages used to read "infeasible by 1e+02%%".
+    """
+    c = Variable("c_pct", 2)
+    with pytest.raises(PrimalInfeasible) as excinfo:
+        Model(Variable("x_pct"), [c <= 1]).solve(verbosity=0)
+    assert "infeasible by 100%" in str(excinfo.value)
+
+
+def test_verbose_solve_percentages_read_as_percentages(capsys):
+    "The timing breakdown a verbose solve prints is user-facing too."
+    x = Variable("x_vrb")
+    Model(x, [x >= 1]).solve(verbosity=3)
+    printed = capsys.readouterr().out
+    assert "Result packing took" in printed
+    assert "%%" not in printed
+
+
 # ── Task 1: _cgroups from dict setup() ──────────────────────────────────────

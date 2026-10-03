@@ -19,7 +19,11 @@ from gpkit import (
     breakdowns,
     printing,
 )
+from gpkit.constraints.bounded import Bounded
+from gpkit.constraints.loose import Loose
 from gpkit.constraints.set import keyed_constraints
+from gpkit.constraints.tight import Tight
+from gpkit.solutions import SolveStatus
 from gpkit.tests.conftest import run_threads
 from gpkit.util.small_classes import Quantity, Strings
 
@@ -204,6 +208,59 @@ def test_printing_table_backward_compat():
     result = printing.table(sol)
     assert isinstance(result, str)
     assert len(result) > 0
+
+
+class TestSolutionWarnings:
+    """Every warning is the same shape, whoever raised it.
+
+    A warning says what happened (message), what it happened to (subject), and
+    the number that triggered it (value).  Printing just prints the message, so
+    no category needs special handling on the way out.
+    """
+
+    def test_every_warning_has_the_same_fields(self):
+        for sol in (_loose_warning_sol(), _tight_warning_sol(), _bounded_sol()):
+            for category, warns in sol.meta["warnings"].items():
+                assert warns, f"{category} is present but empty"
+                for w in warns:
+                    assert set(w) == {"message", "subject", "value"}
+                    assert isinstance(w["message"], str)
+
+    def test_a_tight_warning_names_its_constraint_and_the_error(self):
+        sol = _tight_warning_sol()
+        (w,) = sol.meta["warnings"]["Unexpectedly Loose Constraints"]
+        assert w["value"] == pytest.approx(1, abs=1e-3)
+        assert w["message"] == "2 >= 1 : x ≥ 1"
+
+    def test_a_loose_warning_names_its_constraint_and_the_sensitivity(self):
+        sol = _loose_warning_sol()
+        (w,) = sol.meta["warnings"]["Unexpectedly Tight Constraints"]
+        assert w["value"] == pytest.approx(+1, abs=1e-3)
+        assert w["message"] == "    +1 : x ≥ x_{min}"
+
+    def test_a_category_with_nothing_to_report_is_absent(self):
+        "A Tight constraint that is tight is not a warning."
+        x = Variable("x")
+        sol = Model(x, [Tight([x >= 1])]).solve(verbosity=0)
+        assert sol.meta["warnings"] == {}
+        assert sol.meta["status"] == SolveStatus.OPTIMAL
+
+
+def _tight_warning_sol():
+    x = Variable("x")
+    x_min = Variable("x_{min}", 2)
+    return Model(x, [Tight([x >= 1]), x >= x_min]).solve(verbosity=0)
+
+
+def _loose_warning_sol():
+    x = Variable("x")
+    x_min = Variable("x_{min}", 2)
+    return Model(x, [Loose([x >= x_min]), x >= 1]).solve(verbosity=0)
+
+
+def _bounded_sol():
+    x = Variable("x")
+    return Model(1 / x, Bounded([x >= 1])).solve(verbosity=0)
 
 
 class TestConstraintSensitivitiesByKey:

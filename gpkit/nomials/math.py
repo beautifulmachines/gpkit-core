@@ -469,7 +469,7 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
         if coeff >= -self.feastol and len(hmap) == 1:
             return None  # a tautological monomial!
         if coeff < -self.feastol:
-            msg = f"'{self}' is infeasible by {-coeff * 100:.2g}%%"
+            msg = f"'{self}' is infeasible by {-coeff * 100:.3g}%"
             if fixed:
                 msg += f" after substituting {fixed}."
             raise PrimalInfeasible(msg)
