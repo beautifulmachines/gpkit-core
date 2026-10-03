@@ -6,6 +6,7 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from .display.naming import DisplayScope
+from .ir import ir_units
 from .units import qty
 from .util.repr_conventions import ReprMixin, latexify, merge_subscript
 from .util.small_classes import Count
@@ -229,8 +230,8 @@ class VarKey(ReprMixin):
         ir = {"name": self.name}
         if self.lineage:
             ir["lineage"] = [list(pair) for pair in self.lineage]
-        if self.unitrepr and self.unitrepr != "-":
-            ir["units"] = self.unitrepr
+        if units := ir_units(self):
+            ir["units"] = units
         if self.label:
             ir["label"] = self.label
         if self.idx is not None:

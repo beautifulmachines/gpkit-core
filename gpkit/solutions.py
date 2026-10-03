@@ -8,9 +8,8 @@ from enum import StrEnum
 from . import printing
 from .breakdowns import bdtable_gen
 from .budgets import build_budget
-from .ir import IR_VERSION
+from .ir import IR_VERSION, ir_units
 from .units import Quantity
-from .util.repr_conventions import unitstr
 from .varkey import VarKey
 from .varmap import VarMap, display_names
 
@@ -153,7 +152,7 @@ def _value_ir(value, units: str) -> dict:
 
 def _varmap_ir(vmap: VarMap) -> dict:
     "Vector elements appear individually; Model.to_ir() holds the parent."
-    return {vk.ref: _value_ir(v, vk.unitstr()) for vk, v in vmap.items()}
+    return {vk.ref: _value_ir(v, ir_units(vk)) for vk, v in vmap.items()}
 
 
 def _subject_ir(sol, warning: dict) -> dict:
@@ -258,7 +257,7 @@ class Solution:
         """
         ir = {
             "gpkit_ir_version": IR_VERSION,
-            "cost": _value_ir(self.cost, unitstr(self.meta["cost function"])),
+            "cost": _value_ir(self.cost, ir_units(self.meta["cost function"])),
             "primal": _varmap_ir(self.primal),
             "sensitivities": {
                 "variables": {

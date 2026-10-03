@@ -36,7 +36,7 @@ from gpkit.nomials.math import (
 )
 from gpkit.tests.test_catalog import catalog_ids, load_catalog
 from gpkit.tests.test_margin_objective import SimpleMarginModel
-from gpkit.units import qty, units
+from gpkit.units import qty, units, ureg
 from gpkit.util.small_classes import EMPTY_HV, HashVector
 
 _CORE_CATALOG = load_catalog(__file__)
@@ -308,10 +308,22 @@ class TestVarKeyIR:
     def test_with_units(self):
         vk = VarKey("S", units="m^2")
         ir = vk.to_ir()
-        assert ir["units"] == "m^2"
+        assert ir["units"] == "m**2"
         vk2 = VarKey.from_ir(ir)
         assert vk2 == vk
-        assert vk2.unitrepr == "m^2"
+        assert vk2.units == vk.units
+
+    def test_units_are_canonical_however_they_were_declared(self):
+        """One spelling per unit in the IR, whoever typed what.
+
+        unitrepr keeps the declaration verbatim so TOML round-trips, and the
+        display form is platform-dependent (pint Pretty off Windows) -- neither
+        can be what a document serialized on one machine and read on another
+        carries.
+        """
+        irs = [VarKey("S", units=u).to_ir()["units"] for u in ("m^2", "m ** 2", "m*m")]
+        assert irs == ["m**2"] * 3
+        assert ureg(irs[0]).units == ureg("m^2").units
 
     def test_with_lineage(self):
         vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 0)))
@@ -1457,6 +1469,20 @@ class TestSolutionIR:
         sol = Model(x, [x >= 1]).solve(verbosity=0)
         assert sol.to_ir()["primal"][x.key.ref] == {"value": pytest.approx(1.0)}
         assert "units" not in sol.to_ir()["cost"]
+
+    def test_units_are_spelled_as_the_model_ir_spells_them(self):
+        """One spelling of a unit across both documents, and pint can read it.
+
+        The display form substitutes a middle dot for products ('m⋅N'), which no
+        unit registry parses -- so it cannot be what a joinable IR carries.
+        """
+        torque = Variable("tau_ir", "N*m", "torque")
+        f_min = Variable("tau_min_ir", 2.0, "N*m")
+        m = Model(torque, [torque >= f_min])
+        sol = m.solve(verbosity=0)
+        declared = m.to_ir()["variables"][torque.key.ref]["units"]
+        assert sol.to_ir()["primal"][torque.key.ref]["units"] == declared
+        assert ureg(declared).units == torque.key.units.units
 
     def test_meta_is_status_soltime_warnings_only(self):
         "Not wholesale: models write into meta (bounded.py adds boundedness)."
