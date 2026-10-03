@@ -18,7 +18,10 @@ from gpkit.ast_nodes import (
     to_ast,
 )
 from gpkit.constraints import ArrayConstraint
+from gpkit.constraints.bounded import Bounded
+from gpkit.constraints.relax import ConstantsRelaxed
 from gpkit.constraints.set import build_model_tree
+from gpkit.constraints.tight import Tight
 from gpkit.nomials.map import NomialMap
 from gpkit.nomials.math import (
     Monomial,
@@ -32,6 +35,7 @@ from gpkit.nomials.math import (
     nomial_from_ir,
 )
 from gpkit.tests.test_catalog import catalog_ids, load_catalog
+from gpkit.tests.test_margin_objective import SimpleMarginModel
 from gpkit.units import qty, units
 from gpkit.util.small_classes import EMPTY_HV, HashVector
 
@@ -1393,3 +1397,141 @@ def test_core_catalog_ir_roundtrip(model_entry):
     ir2 = m2.to_ir()
     diff = ir_diff(ir1, ir2)
     assert not diff, f"{cls.__name__} IR changed after round-trip:\n{diff}"
+
+
+# ── Solution IR ───────────────────────────────────────────────────────
+
+
+class _IRChild(Model):
+    "A child, so sensitivities span more than one model."
+
+    def setup(self):
+        self.t = Variable("t", "mm", "thickness")
+        self.t_min = Variable("t_min", 2.0, "mm", "min thickness")
+        return [self.t >= self.t_min]
+
+
+def _solved():
+    "Two variables, two units, one child, one fixed value."
+
+    class _IRTop(Model):
+        def setup(self):
+            self.D = Variable("D", "m", "diameter")
+            self.child = _IRChild()
+            self.cost = self.D
+            return [self.D >= 1000 * self.child.t, self.child]
+
+    m = _IRTop()
+    return m, m.solve(verbosity=0)
+
+
+class TestSolutionIR:
+    """A solution serializes to refs and numbers, and joins the model IR.
+
+    Structure lives in Model.to_ir(); this carries results only, so the two
+    documents are a pair and nothing is encoded twice.
+    """
+
+    def test_cost_carries_value_and_declared_units(self):
+        _, sol = _solved()
+        assert sol.to_ir()["cost"] == {
+            "value": pytest.approx(2.0, rel=1e-6),
+            "units": "m",
+        }
+
+    def test_values_are_in_declared_units(self):
+        "t is 2 mm, not 0.002 m -- the declared unit is the one reported."
+        m, sol = _solved()
+        ir = sol.to_ir()
+        assert ir["primal"][m.child.t.key.ref] == {
+            "value": pytest.approx(2.0, rel=1e-6),
+            "units": "mm",
+        }
+        assert ir["constants"][m.child.t_min.key.ref] == {
+            "value": pytest.approx(2.0),
+            "units": "mm",
+        }
+
+    def test_dimensionless_omits_units(self):
+        x = Variable("x_dimless")
+        sol = Model(x, [x >= 1]).solve(verbosity=0)
+        assert sol.to_ir()["primal"][x.key.ref] == {"value": pytest.approx(1.0)}
+        assert "units" not in sol.to_ir()["cost"]
+
+    def test_meta_is_status_soltime_warnings_only(self):
+        "Not wholesale: models write into meta (bounded.py adds boundedness)."
+        _, sol = _solved()
+        assert set(sol.to_ir()["meta"]) == {"status", "soltime", "warnings"}
+
+    def test_sensitivities_are_keyed_by_ref(self):
+        m, sol = _solved()
+        ir = sol.to_ir()
+        model_ir = m.to_ir()
+        assert set(ir["sensitivities"]["constraints"]) == {
+            c["key"] for c in model_ir["constraints"]
+        }
+        assert set(ir["sensitivities"]["variables"]) <= set(model_ir["variables"])
+
+    def test_variables_join_the_model_ir(self):
+        "Every solution key names a variable the model IR declares."
+        m, sol = _solved()
+        declared = set(m.to_ir()["variables"])
+        ir = sol.to_ir()
+        assert set(ir["primal"]) | set(ir["constants"]) <= declared
+
+    def test_is_json_serializable(self):
+        _, sol = _solved()
+        assert json.loads(json.dumps(sol.to_ir())) == sol.to_ir()
+
+    def test_vectors_are_elements_only(self):
+        "Model.to_ir() already carries the parent entry with its shape."
+        xv = VectorVariable(3, "xv", "m")
+        sol = Model(sum(xv), [xv >= 2 * Variable("u_v", 1, "m")]).solve(verbosity=0)
+        refs = set(sol.to_ir()["primal"])
+        assert len(refs) == 3
+        assert all("[" in r for r in refs)  # elements, never the bare parent
+
+    def test_derived_is_omitted_when_there_is_no_margin(self):
+        _, sol = _solved()
+        assert "derived" not in sol.to_ir()
+
+    def test_derived_carries_the_margin_and_ref_keyed_sensitivities(self):
+        m = SimpleMarginModel()
+        sol = m.solve(verbosity=0)
+        derived = sol.to_ir()["derived"]
+        assert derived["name"] == "mass margin"
+        assert derived["units"] == "kg"
+        assert set(derived["sensitivities"]) <= set(m.to_ir()["variables"])
+
+
+class TestWarningSubjectsBecomeRefs:
+    "A warning's subject is a live object in process and a ref in the IR."
+
+    def test_a_constraint_subject_becomes_its_constraint_key(self):
+        x = Variable("x_w")
+        x_min = Variable("x_min_w", 2)
+        m = Model(x, [Tight([x >= 1]), x >= x_min])
+        sol = m.solve(verbosity=0)
+        (warn,) = sol.to_ir()["meta"]["warnings"]["Unexpectedly Loose Constraints"]
+        keys = {k.ref for k in sol.sens.constraints_by_key}
+        assert warn["subject"] in keys
+        assert warn["value"] == pytest.approx(1, abs=1e-3)
+
+    def test_a_variable_subject_becomes_its_varkey_ref(self):
+        x = Variable("x_r")
+        x_min = Variable("x_min_r", 2)
+        x_max = Variable("x_max_r", 1)
+        inner = Model(x, [x <= x_max, x >= x_min])
+        relaxed = ConstantsRelaxed(inner)
+        sol = Model(relaxed.relaxvars.prod(), relaxed).solve(verbosity=0)
+        ir = sol.to_ir()
+        warns = ir["meta"]["warnings"]["Relaxed Constants"]
+        known = set(ir["primal"]) | set(ir["constants"])
+        assert warns and all(w["subject"] in known for w in warns)
+
+    def test_a_subjectless_warning_omits_the_field(self):
+        x = Variable("x_b")
+        sol = Model(1 / x, Bounded([x >= 1])).solve(verbosity=0)
+        (warn,) = sol.to_ir()["meta"]["warnings"]["Arbitrarily Bounded Variables"][:1]
+        assert "subject" not in warn
+        assert "value" not in warn

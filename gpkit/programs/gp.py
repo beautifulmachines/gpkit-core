@@ -20,7 +20,7 @@ from ..exceptions import (
     UnboundedGP,
     UnknownInfeasible,
 )
-from ..solutions import MarginSolution, Sensitivities, Solution
+from ..solutions import MarginSolution, Sensitivities, Solution, SolveStatus
 from ..solvers import default_solver
 from ..util.repr_conventions import lineagestr
 from ..util.small_classes import CootMatrix, FixedScalar, Numbers, SolverLog
@@ -766,7 +766,12 @@ class GeometricProgram:
                 variables=VarMap(gpv_ss),
                 variablerisk=VarMap(absv_ss),
             ),
-            meta={"soltime": solver_out.meta["soltime"], "warnings": {}},
+            meta={
+                "soltime": solver_out.meta["soltime"],
+                "warnings": {},
+                # solvefn upgrades this once process_result has added its warnings
+                "status": SolveStatus.OPTIMAL,
+            },
             derived=derived,
         )
         result.meta["cost function"] = self.cost

@@ -14,6 +14,7 @@ from .exceptions import (
     InvalidGPConstraint,
     VariableNotFound,
 )
+from .ir import IR_VERSION
 from .margin_objective import MarginObjective
 from .nomials import Monomial, Variable
 from .nomials.map import DIMLESS_QUANTITY
@@ -337,7 +338,7 @@ class Model(CostedConstraintSet):
             subs_ir[vk.ref] = float(val)
 
         ir = {
-            "gpkit_ir_version": "1.0",
+            "gpkit_ir_version": IR_VERSION,
             "variables": variables,
             "cost": cost_ir,
             "constraints": constraints_ir,
