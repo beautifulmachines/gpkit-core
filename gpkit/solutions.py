@@ -8,7 +8,7 @@ from enum import StrEnum
 from . import printing
 from .breakdowns import bdtable_gen
 from .budgets import build_budget
-from .ir import IR_VERSION, ir_units
+from .ir import IR_VERSION, diff_solutions, ir_units
 from .units import Quantity
 from .varkey import VarKey
 from .varmap import VarMap, display_names
@@ -210,19 +210,7 @@ class Solution:
         """Checks for almost-equality between two solutions.
         tol is treated as relative for primal; absolute for sensitivities
         """
-        if set(self.primal) != set(getattr(other, "primal", ())):
-            return False
-        if set(self.sens.variables) != set(other.sens.variables):
-            return False
-        for key in self.primal:
-            reldiff = abs(self.primal[key] / other.primal[key] - 1)
-            if reldiff > tol:
-                return False
-        for key in self.sens.variables:
-            absdiff = abs(self.sens.variables[key] - other.sens.variables[key])
-            if absdiff > tol:
-                return False
-        return True
+        return not diff_solutions(other.to_ir(), self.to_ir(), tol)["changed"]
 
     def subinto(self, posy):
         "solution substituted into posy."
