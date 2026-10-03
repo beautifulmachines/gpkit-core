@@ -1055,8 +1055,7 @@ def test_percentages_read_as_percentages():
     c = Variable("c_pct", 2)
     with pytest.raises(PrimalInfeasible) as excinfo:
         Model(Variable("x_pct"), [c <= 1]).solve(verbosity=0)
-    assert "%%" not in str(excinfo.value)
-    assert "%" in str(excinfo.value)
+    assert "infeasible by 100%" in str(excinfo.value)
 
 
 def test_verbose_solve_percentages_read_as_percentages(capsys):
