@@ -5,7 +5,7 @@ from collections import defaultdict
 import numpy as np
 
 from ..nomials import Variable
-from ..util.small_scripts import appendsolwarning, initsolwarning
+from ..util.small_scripts import appendsolwarning
 from .set import ConstraintSet
 
 
@@ -87,7 +87,6 @@ class Bounded(ConstraintSet):
     def check_boundaries(self, result):
         "Creates (and potentially prints) a dictionary of unbounded variables."
         out = defaultdict(set)
-        initsolwarning(result, "Arbitrarily Bounded Variables")
         for i, varkey in enumerate(self.bound_varkeys):
             value = result.primal[varkey]
             c_senss = [
@@ -107,5 +106,5 @@ class Bounded(ConstraintSet):
                     out["value near " + bound].add(varkey)
         for bound, vks in out.items():
             msg = f"{bound:>34}: {', '.join(str(v) for v in vks)}"
-            appendsolwarning(msg, out, result, "Arbitrarily Bounded Variables")
+            appendsolwarning(msg, result, "Arbitrarily Bounded Variables")
         return out

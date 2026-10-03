@@ -191,28 +191,9 @@ class Warnings(SectionSpec):
 
 
 def _warnings_single(sol):
-    "get the warning dict for a single solution, handling any special cases"
-
-    def _special_case(name, payload) -> str:
-        # refactor architecture to avoid these two special cases
-        if "Unexpectedly Loose Constraints" in name:
-            _rel_diff, loosevalues, c = payload
-            lhs, op, rhs = loosevalues
-            cstr = c.str_without({"units", "lineage"})
-            return f"{lhs:.4g} {op} {rhs:.4g} : {cstr}"
-        if "Unexpectedly Tight Constraints" in name:
-            relax_sens, c = payload
-            cstr = c.str_without({"units", "lineage"})
-            return f"{relax_sens:+6.2g} : {cstr}"
-        return ""
-
+    "a single solution's warning messages, by category"
     warns = getattr(sol, "meta", {}).get("warnings", {})
-    out = {}
-    for name, detail in warns.items():
-        if not detail:
-            continue
-        out[name] = [_special_case(name, pay) or msg for msg, pay in detail]
-    return out
+    return {name: [w["message"] for w in ws] for name, ws in warns.items() if ws}
 
 
 class FreeVariables(SectionSpec):

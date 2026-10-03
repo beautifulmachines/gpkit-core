@@ -15,7 +15,7 @@ from ..exceptions import (
 )
 from ..nomials import Posynomial, PosynomialInequality, Variable
 from ..util.globals import NamedVariables
-from ..util.small_scripts import appendsolwarning, initsolwarning
+from ..util.small_scripts import appendsolwarning
 from ..varmap import VarMap
 from .gp import GeometricProgram
 
@@ -218,7 +218,6 @@ solutions and can be solved with 'Model.solve()'.""")
                 f"{len(self.gps)} GP solves."
             )
         if hasattr(self.slack, "key"):
-            initsolwarning(self.result, "Slack Non-GP Constraints")
             excess_slack = self.result.primal[self.slack.key] - 1
             if excess_slack > EPS:
                 msg = (
@@ -237,7 +236,10 @@ solutions and can be solved with 'Model.solve()'.""")
                 if err_on_relax:
                     raise Infeasible(expl)
                 appendsolwarning(
-                    msg, (1 + excess_slack), self.result, "Slack Non-GP Constraints"
+                    msg,
+                    self.result,
+                    "Slack Non-GP Constraints",
+                    value=1 + excess_slack,
                 )
                 if verbosity > -1:
                     print(expl)
