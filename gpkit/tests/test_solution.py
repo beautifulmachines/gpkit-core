@@ -210,6 +210,18 @@ def test_printing_table_backward_compat():
     assert len(result) > 0
 
 
+def test_every_solution_has_a_status():
+    """A solve that bypasses Model.solve() still produces a complete Solution.
+
+    The status used to be assigned only by solvify, so a Solution from a
+    GeometricProgram solved directly carried no status at all.
+    """
+    x = Variable("x_gp")
+    m = Model(x, [x >= 1])
+    assert m.gp().solve(verbosity=0).meta["status"] == SolveStatus.OPTIMAL
+    assert m.solve(verbosity=0).meta["status"] == SolveStatus.OPTIMAL
+
+
 class TestSolutionWarnings:
     """Every warning is the same shape, whoever raised it.
 

@@ -1,6 +1,5 @@
 "Classes for representing solutions"
 
-import json
 import pickle
 from collections.abc import Sequence
 from dataclasses import dataclass
@@ -9,7 +8,9 @@ from enum import StrEnum
 from . import printing
 from .breakdowns import bdtable_gen
 from .budgets import build_budget
+from .ir import IR_VERSION
 from .units import Quantity
+from .util.repr_conventions import unitstr
 from .varkey import VarKey
 from .varmap import VarMap, display_names
 
@@ -59,6 +60,15 @@ class Sensitivities:
     def __getitem__(self, key: VarKey) -> float:
         return self.variables[key]
 
+    def _key_of(self, constraint):
+        """The ConstraintKey for a constraint object, or None if absent.
+
+        The two constraint maps are one enumeration under two kinds of key, so
+        position pairs them -- the only bridge a Solution has, holding no model.
+        Goes away with the object-keyed map itself (#283).
+        """
+        return dict(zip(self.constraints, self.constraints_by_key)).get(constraint)
+
 
 @dataclass(frozen=True, slots=True)
 class MarginSolution:
@@ -70,6 +80,17 @@ class MarginSolution:
     minus_value: float  # B*
     units: str  # unit string from plus_var.key.units (may be empty)
     sensitivities: dict  # {VarKey: ∂(margin)/∂c} for each constant
+
+    def to_ir(self) -> dict:
+        "Serialize to a dict, with sensitivities keyed by VarKey.ref."
+        return {
+            "name": self.name,
+            "value": float(self.value),
+            "plus_value": float(self.plus_value),
+            "minus_value": float(self.minus_value),
+            "units": self.units,
+            "sensitivities": {vk.ref: float(s) for vk, s in self.sensitivities.items()},
+        }
 
     def table(self, cost_sens=None) -> str:
         """Format sensitivities, ordered by |GP cost sensitivity| when provided.
@@ -120,6 +141,36 @@ class MarginSolution:
 
 
 SUMMARY_TABLES = ("sweeps", "cost", "warnings", "solution")
+
+
+def _value_ir(value, units: str) -> dict:
+    "A number and the units it is expressed in, which are the declared ones."
+    ir = {"value": float(value)}
+    if units:
+        ir["units"] = units
+    return ir
+
+
+def _varmap_ir(vmap: VarMap) -> dict:
+    "Vector elements appear individually; Model.to_ir() holds the parent."
+    return {vk.ref: _value_ir(v, vk.unitstr()) for vk, v in vmap.items()}
+
+
+def _subject_ir(sol, warning: dict) -> dict:
+    "Name a warning's subject by ref, dropping the fields that are empty."
+    ir = {}
+    subject = warning["subject"]
+    if subject is not None:
+        key = getattr(subject, "key", None)
+        ref = key.ref if isinstance(key, VarKey) else None
+        if ref is None:
+            constraint_key = sol.sens._key_of(subject)
+            ref = constraint_key.ref if constraint_key is not None else None
+        if ref is not None:
+            ir["subject"] = ref
+    if warning["value"] is not None:
+        ir["value"] = float(warning["value"])
+    return ir
 
 
 @dataclass(frozen=True, slots=True)
@@ -198,15 +249,46 @@ class Solution:
         with open(filename, "wb") as fil:
             pickle.dump(self, fil, **pickleargs)
 
-    def savejson(self, filename):
-        "Save primal variables to a json file"
-        # only saving primal is legacy carryover -- eventually add more
-        json_dict = {}
-        for k, v in self.primal.items():
-            val = list(v) if hasattr(v, "__len__") else v
-            json_dict[str(k)] = {"v": val, "u": k.unitstr()}
-        with open(filename, "w", encoding="utf-8") as f:
-            json.dump(json_dict, f)
+    def to_ir(self) -> dict:
+        """Serialize this Solution to a JSON-serializable dict of results.
+
+        Keyed by VarKey.ref and ConstraintKey.ref so it joins Model.to_ir() rather
+        than restating it: structure stays in the model IR, values are in each
+        variable's declared units, and anything empty is omitted.
+        """
+        ir = {
+            "gpkit_ir_version": IR_VERSION,
+            "cost": _value_ir(self.cost, unitstr(self.meta["cost function"])),
+            "primal": _varmap_ir(self.primal),
+            "sensitivities": {
+                "variables": {
+                    vk.ref: float(s) for vk, s in self.sens.variables.items()
+                },
+                "constraints": {
+                    key.ref: float(s) for key, s in self.sens.constraints_by_key.items()
+                },
+                "models": {k: float(v) for k, v in self.sens.models.items()},
+            },
+            "meta": {
+                "status": str(self.meta["status"]),
+                "soltime": float(self.meta["soltime"]),
+                "warnings": self._warnings_ir(),
+            },
+        }
+        if self.constants:
+            ir["constants"] = _varmap_ir(self.constants)
+        if self.derived is not None:
+            ir["derived"] = self.derived.to_ir()
+        return ir
+
+    def _warnings_ir(self) -> dict:
+        "Warnings with each subject named by ref instead of held as an object."
+        out = {}
+        for category, warns in self.meta["warnings"].items():
+            out[category] = [
+                {"message": w["message"], **_subject_ir(self, w)} for w in warns
+            ]
+        return out
 
     def summary(self, **kwargs) -> str:
         "Print a summary table of this Solution"
