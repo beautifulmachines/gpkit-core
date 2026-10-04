@@ -1043,6 +1043,14 @@ def test_n_free_and_n_constraints():
     assert mn.n_constraints == 4  # a>=1 plus 3 from child
 
 
+def test_n_free_with_unreferenced_constant():
+    """n_free counts free variables when a constant appears in no constraint."""
+    x = Variable("x", "m")
+    rho = Variable("rho", "kg/m^3")
+    m = Model(x, [x >= Variable("L", 2, "m")], substitutions={rho: 1600})
+    assert m.n_free == 1  # x; L and rho are both fixed
+
+
 def test_percentages_read_as_percentages():
     """A percent sign reaches the user as one character.
 

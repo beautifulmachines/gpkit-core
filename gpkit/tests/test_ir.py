@@ -938,6 +938,20 @@ class TestModelIR:
         ir = m.to_ir()
         assert "substitutions" not in ir
 
+    def test_substituted_variable_is_declared(self):
+        """A substitution names a variable the document declares (#214).
+
+        A constant no constraint references is still a parameter of the model,
+        so dropping its declaration while keeping its value would leave the
+        document asserting a value for a variable it never introduces.
+        """
+        x = Variable("x", "m")
+        rho = Variable("rho", "kg/m^3", "declared, referenced by nothing")
+        m = Model(x, [x >= Variable("L", 2, "m")], substitutions={rho: 1600})
+        ir = m.to_ir()
+        assert set(ir["substitutions"]) <= set(ir["variables"])
+        assert rho.key.ref in ir["variables"]
+
     def test_units_roundtrip(self):
         """Model with pint units round-trips with matching costs."""
         x = Variable("x", units="m")

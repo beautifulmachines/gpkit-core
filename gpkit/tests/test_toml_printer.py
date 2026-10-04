@@ -219,6 +219,25 @@ class TestRoundTrip:
         assert mag(sol1["w"]) == pytest.approx(mag(sol2["w"]), rel=1e-5)
         assert mag(sol1["d"]) == pytest.approx(mag(sol2["d"]), rel=1e-5)
 
+    def test_unreferenced_constant_survives_round_trip(self):
+        """A declared constant no constraint uses is still written back out (#214).
+
+        Losing it would silently delete a line the user wrote -- a material
+        property declared before anything consumes it, say.
+        """
+        toml_str = """
+        [vars]
+        h = ["2 m", "height"]
+        w = ["3 m", "width"]
+        rho = ["1600 kg/m^3", "material density, referenced by nothing"]
+        V = ["m^3", "volume"]
+
+        [model]
+        objective = "max: V"
+        constraints = ["V <= h*w*h"]
+        """
+        assert 'rho = ["1600 kg/m^3"' in to_toml(load_toml(toml_str))
+
     def test_water_tank_round_trip(self):
         sol1, sol2 = self._round_trip("docs/source/examples/toml/water_tank.toml")
         assert mag(sol1["A"]) == pytest.approx(mag(sol2["A"]), rel=1e-5)
