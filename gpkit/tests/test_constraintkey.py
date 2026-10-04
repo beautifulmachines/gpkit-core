@@ -93,9 +93,9 @@ class TestConstraintKey:
         same = ConstraintKey(path=("Wing",), index=0)
         assert {a: 0.5}[same] == pytest.approx(0.5)
 
-    def test_round_trips_through_the_ir(self):
+    def test_serializes_to_the_ir(self):
         k = ConstraintKey(path=("Aircraft", "Wing", "Geometry"), index=1)
-        assert ConstraintKey.from_ir(k.to_ir()) == k
+        assert k.to_ir() == {"path": ["Aircraft", "Wing", "Geometry"], "index": 1}
 
 
 class TestKeyedConstraints:
