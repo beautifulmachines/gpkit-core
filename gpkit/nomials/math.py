@@ -6,7 +6,7 @@ from typing import ClassVar
 import numpy as np
 
 from .. import units
-from ..ast_nodes import ExprNode, ast_from_ir, to_ast
+from ..ast_nodes import ExprNode, to_ast
 from ..exceptions import InvalidGPConstraint, InvalidPosynomial, PrimalInfeasible
 from ..units import DimensionalityError
 from ..util.globals import NamedVariables, SignomialsEnabled
@@ -79,24 +79,6 @@ class Signomial(Nomial):
         if self.ast is not None and hasattr(self.ast, "to_ir"):
             ir["ast"] = self.ast.to_ir()
         return ir
-
-    @classmethod
-    def from_ir(cls, ir_dict, var_registry):
-        """Reconstruct a nomial from an IR dict.
-
-        Parameters
-        ----------
-        ir_dict : dict
-            IR with "terms", optional "units", "type", "ast".
-        var_registry : dict
-            Mapping from ref strings to VarKey objects.
-        """
-        hmap = NomialMap.from_ir(ir_dict, var_registry)
-        nomial_type = ir_dict.get("type", "Signomial")
-        ast_node = None
-        if "ast" in ir_dict:
-            ast_node = ast_from_ir(ir_dict["ast"], var_registry)
-        return cls(hmap, require_positive=nomial_type != "Signomial", ast=ast_node)
 
     def diff(self, var):
         """Derivative of this with respect to a Variable
@@ -531,16 +513,6 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
                 out.append(hmap)
         return out
 
-    @classmethod
-    def from_ir(cls, ir_dict, var_registry):
-        "Reconstruct a PosynomialInequality from an IR dict."
-        left = Signomial.from_ir(ir_dict["left"], var_registry)
-        right = Signomial.from_ir(ir_dict["right"], var_registry)
-        constraint = cls(left, ir_dict["oper"], right)
-        if "lineage" in ir_dict:
-            constraint.lineage = tuple(tuple(pair) for pair in ir_dict["lineage"])
-        return constraint
-
     def sens_from_dual(self, las, nus, _):
         "Returns the variable/constraint sensitivities from lambda/nu"
         (la,) = las
@@ -592,16 +564,6 @@ class MonomialEquality(PosynomialInequality):
                 self.meq_bounded[(key, "upper")] = frozenset([ubs])
                 self.meq_bounded[(key, "lower")] = frozenset([lbs])
 
-    @classmethod
-    def from_ir(cls, ir_dict, var_registry):
-        "Reconstruct a MonomialEquality from an IR dict."
-        left = Signomial.from_ir(ir_dict["left"], var_registry)
-        right = Signomial.from_ir(ir_dict["right"], var_registry)
-        constraint = cls(left, right)
-        if "lineage" in ir_dict:
-            constraint.lineage = tuple(tuple(pair) for pair in ir_dict["lineage"])
-        return constraint
-
     def _gen_unsubbed(self, left, right):
         "Returns the unsubstituted posys <= 1."
         unsubbed = PosynomialInequality._gen_unsubbed
@@ -649,17 +611,6 @@ class SignomialInequality(ScalarSingleEquationConstraint):
             raise ValueError(f"operator {self.oper} is not supported.")
         self.unsubbed = [plt - pgt]
         self.bounded = self.as_gpconstr({}).bounded
-
-    @classmethod
-    def from_ir(cls, ir_dict, var_registry):
-        "Reconstruct a SignomialInequality from an IR dict."
-        left = Signomial.from_ir(ir_dict["left"], var_registry)
-        right = Signomial.from_ir(ir_dict["right"], var_registry)
-        with SignomialsEnabled():
-            constraint = cls(left, ir_dict["oper"], right)
-        if "lineage" in ir_dict:
-            constraint.lineage = tuple(tuple(pair) for pair in ir_dict["lineage"])
-        return constraint
 
     def as_hmapslt1(self, substitutions):
         "Returns the posys <= 1 representation of this constraint."
@@ -769,17 +720,6 @@ class SingleSignomialEquality(SignomialInequality):
         self.oper = "="
         self.meq_bounded = self.as_gpconstr({}).meq_bounded
 
-    @classmethod
-    def from_ir(cls, ir_dict, var_registry):
-        "Reconstruct a SingleSignomialEquality from an IR dict."
-        left = Signomial.from_ir(ir_dict["left"], var_registry)
-        right = Signomial.from_ir(ir_dict["right"], var_registry)
-        with SignomialsEnabled():
-            constraint = cls(left, right)
-        if "lineage" in ir_dict:
-            constraint.lineage = tuple(tuple(pair) for pair in ir_dict["lineage"])
-        return constraint
-
     def as_hmapslt1(self, substitutions):  # noqa: ARG002
         "SignomialEquality is never considered GP-compatible"
         raise InvalidGPConstraint(self)
@@ -794,48 +734,3 @@ class SingleSignomialEquality(SignomialInequality):
         mec.generated_by = self
         self.generated = mec
         return mec
-
-
-def constraint_from_ir(ir_dict, var_registry):
-    """Reconstruct a constraint from its IR dict.
-
-    Parameters
-    ----------
-    ir_dict : dict
-        IR dict with "type", "oper", "left", "right", and optional "lineage".
-    var_registry : dict
-        Mapping from ref strings to VarKey objects.
-
-    Returns
-    -------
-    constraint : ScalarSingleEquationConstraint
-    """
-    type_map = {
-        "PosynomialInequality": PosynomialInequality,
-        "MonomialEquality": MonomialEquality,
-        "SignomialInequality": SignomialInequality,
-        "SingleSignomialEquality": SingleSignomialEquality,
-    }
-
-    constraint_type = ir_dict["type"]
-    if constraint_type not in type_map:
-        raise ValueError(f"Unknown constraint type: {constraint_type}")
-    cls = type_map[constraint_type]
-    return cls.from_ir(ir_dict, var_registry)
-
-
-def nomial_from_ir(ir_dict, var_registry):
-    """Reconstruct a nomial from its IR dict.
-
-    Parameters
-    ----------
-    ir_dict : dict
-        IR dict with "terms", optional "units", "type", "ast".
-    var_registry : dict
-        Mapping from ref strings to VarKey objects.
-
-    Returns
-    -------
-    Signomial, Posynomial, or Monomial
-    """
-    return Signomial.from_ir(ir_dict, var_registry)

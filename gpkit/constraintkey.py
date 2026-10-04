@@ -54,8 +54,3 @@ class ConstraintKey(ReprMixin):
     def to_ir(self):
         "Serialize this ConstraintKey to an IR dict."
         return {"path": list(self.path), "index": self.index}
-
-    @classmethod
-    def from_ir(cls, ir_dict):
-        "Reconstruct a ConstraintKey from an IR dict."
-        return cls(path=tuple(ir_dict.get("path", ())), index=ir_dict["index"])

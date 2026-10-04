@@ -245,23 +245,6 @@ class VarKey(ReprMixin):
             ir["shape"] = list(self.shape)
         return ir
 
-    @classmethod
-    def from_ir(cls, ir_dict):
-        "Reconstruct a VarKey from an IR dict."
-        name = ir_dict["name"]
-        kwargs = {}
-        if "lineage" in ir_dict:
-            kwargs["lineage"] = tuple(tuple(pair) for pair in ir_dict["lineage"])
-        if "units" in ir_dict:
-            kwargs["units"] = ir_dict["units"]
-        if "label" in ir_dict:
-            kwargs["label"] = ir_dict["label"]
-        if "idx" in ir_dict:
-            kwargs["idx"] = tuple(ir_dict["idx"])
-        if "shape" in ir_dict:
-            kwargs["shape"] = tuple(ir_dict["shape"])
-        return cls(name, **kwargs)
-
     @property
     def models(self):
         "Returns a tuple of just the names of models in self.lineage"

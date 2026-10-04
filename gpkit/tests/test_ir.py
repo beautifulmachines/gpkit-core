@@ -24,15 +24,11 @@ from gpkit.constraints.set import build_model_tree
 from gpkit.constraints.tight import Tight
 from gpkit.nomials.map import NomialMap
 from gpkit.nomials.math import (
-    Monomial,
     MonomialEquality,
-    Posynomial,
     PosynomialInequality,
     Signomial,
     SignomialInequality,
     SingleSignomialEquality,
-    constraint_from_ir,
-    nomial_from_ir,
 )
 from gpkit.tests.test_catalog import catalog_ids, load_catalog
 from gpkit.tests.test_margin_objective import SimpleMarginModel
@@ -40,70 +36,6 @@ from gpkit.units import qty, units, ureg
 from gpkit.util.small_classes import EMPTY_HV, HashVector
 
 _CORE_CATALOG = load_catalog(__file__)
-
-# ── IR diff helper (importable by other repos) ────────────────────────
-
-
-def ir_diff(ir1, ir2) -> str:
-    """Return a human-readable diff string between two IR dicts, or '' if equal.
-
-    Checks:
-    - Same constraint count
-    - Same variable name set
-
-    Note: model_tree topology is intentionally NOT checked here because
-    Model.from_ir() explicitly reconstructs a flat Model (no nested sub-models).
-    The model_tree in ir2 will always reflect the flat reconstructed model, not
-    the original hierarchy. This is by design — from_ir() preserves solvability,
-    not class hierarchy. The model_tree topology gap is documented as a known IR
-    limitation for Phase 4 (GRAPH-05 follow-up).
-
-    Returns '' if identical, otherwise a multi-line string describing differences.
-    """
-    lines = []
-
-    # Constraint count
-    c1, c2 = len(ir1.get("constraints", [])), len(ir2.get("constraints", []))
-    if c1 != c2:
-        lines.append(f"constraint count: {c1} -> {c2}")
-
-    # Variable name set
-    v1 = set(ir1.get("variables", {}).keys())
-    v2 = set(ir2.get("variables", {}).keys())
-    only_in_1 = sorted(v1 - v2)
-    only_in_2 = sorted(v2 - v1)
-    if only_in_1:
-        lines.append(f"variables only in ir1: {only_in_1}")
-    if only_in_2:
-        lines.append(f"variables only in ir2: {only_in_2}")
-
-    return "\n".join(lines)
-
-
-def ir_diff_with_topology(ir1, ir2):
-    """Like ir_diff() but also checks model_tree topology.
-
-    Only use this when comparing two IRs that were both produced from
-    the same structural source (e.g. before/after a to_ir() call on the
-    same model instance, not across from_ir() reconstruction).
-    """
-    base = ir_diff(ir1, ir2)
-    lines = [base] if base else []
-
-    def tree_signature(node):
-        """Canonical topology string: class(child1_sig, child2_sig, ...)"""
-        if node is None:
-            return "None"
-        children_sig = ", ".join(tree_signature(c) for c in node.get("children", []))
-        return f"{node.get('class', '?')}({children_sig})"
-
-    t1 = tree_signature(ir1.get("model_tree"))
-    t2 = tree_signature(ir2.get("model_tree"))
-    if t1 != t2:
-        lines.append(f"model_tree topology changed:\n  before: {t1}\n  after:  {t2}")
-
-    return "\n".join(lines) if lines else None
-
 
 # ── Shared test model definitions ────────────────────────────────────
 
@@ -294,7 +226,7 @@ class TestASTNodes:
 
 
 class TestVarKeyIR:
-    """Tests for VarKey.to_ir() / VarKey.from_ir() round-trip."""
+    """Tests for VarKey.to_ir()."""
 
     def test_plain(self):
         vk = VarKey("x")
@@ -302,17 +234,11 @@ class TestVarKeyIR:
         assert ir["name"] == "x"
         assert "lineage" not in ir
         assert "units" not in ir
-        vk2 = VarKey.from_ir(ir)
-        assert vk2 == vk
 
     def test_with_units(self):
         "Units are reported as declared -- to_toml() writes this back out."
         vk = VarKey("S", units="m^2")
-        ir = vk.to_ir()
-        assert ir["units"] == "m^2"
-        vk2 = VarKey.from_ir(ir)
-        assert vk2 == vk
-        assert vk2.units == vk.units
+        assert vk.to_ir()["units"] == "m^2"
 
     @pytest.mark.parametrize("declared", ["USD", "USD/kg", "N*m", "ohm", "lbf", "m^2"])
     def test_ir_units_can_always_be_read_back(self, declared):
@@ -332,34 +258,22 @@ class TestVarKeyIR:
 
     def test_with_lineage(self):
         vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 0)))
-        ir = vk.to_ir()
-        assert ir["lineage"] == [["Aircraft", 0], ["Wing", 0]]
-        vk2 = VarKey.from_ir(ir)
-        assert vk2 == vk
-        assert vk2.lineage == (("Aircraft", 0), ("Wing", 0))
+        assert vk.to_ir()["lineage"] == [["Aircraft", 0], ["Wing", 0]]
 
     def test_with_idx(self):
         vk = VarKey("c_l", idx=(1,), shape=(3,))
         ir = vk.to_ir()
         assert ir["idx"] == [1]
         assert ir["shape"] == [3]
-        vk2 = VarKey.from_ir(ir)
-        assert vk2 == vk
 
     def test_with_label(self):
         vk = VarKey("W", label="total weight")
-        ir = vk.to_ir()
-        assert ir["label"] == "total weight"
-        vk2 = VarKey.from_ir(ir)
-        assert vk2.label == "total weight"
+        assert vk.to_ir()["label"] == "total weight"
 
     def test_json_serializable(self):
         vk = VarKey("S", lineage=(("Wing", 0),), units="m^2", label="area")
         ir = vk.to_ir()
-        json_str = json.dumps(ir)
-        ir2 = json.loads(json_str)
-        vk2 = VarKey.from_ir(ir2)
-        assert vk2 == vk
+        assert json.loads(json.dumps(ir)) == ir
 
     def test_dimensionless_omits_units(self):
         vk = VarKey("x")
@@ -472,7 +386,7 @@ class TestASTNodeIR:
 
 
 class TestNomialMapIR:
-    """Tests for NomialMap.to_ir() / NomialMap.from_ir() round-trip."""
+    """Tests for NomialMap.to_ir()."""
 
     def test_monomial(self):
         """Single-term NomialMap (monomial)."""
@@ -482,12 +396,6 @@ class TestNomialMapIR:
         assert len(ir["terms"]) == 1
         assert ir["terms"][0]["coeff"] == 3.0
         assert ir["terms"][0]["exps"]["x"] == 2
-        registry = {x.key.ref: x.key}
-        hmap2 = NomialMap.from_ir(ir, registry)
-        assert len(hmap2) == 1
-        ((exp, coeff),) = hmap2.items()
-        assert coeff == 3.0
-        assert exp[x.key] == 2
 
     def test_posynomial(self):
         """Multi-term NomialMap (posynomial)."""
@@ -499,11 +407,7 @@ class TestNomialMapIR:
                 HashVector({y.key: 1}): 3.0,
             }
         )
-        ir = hmap.to_ir()
-        assert len(ir["terms"]) == 2
-        registry = {x.key.ref: x.key, y.key.ref: y.key}
-        hmap2 = NomialMap.from_ir(ir, registry)
-        assert len(hmap2) == 2
+        assert len(hmap.to_ir()["terms"]) == 2
 
     def test_constant_term(self):
         """Constant term uses EMPTY_HV, no exps key."""
@@ -512,153 +416,68 @@ class TestNomialMapIR:
         assert len(ir["terms"]) == 1
         assert "exps" not in ir["terms"][0]
         assert ir["terms"][0]["coeff"] == 5.0
-        hmap2 = NomialMap.from_ir(ir, {})
-        assert hmap2[EMPTY_HV] == 5.0
 
     def test_with_units(self):
-        """Units survive round-trip."""
         x = Variable("x", units="m")
         hmap = NomialMap({HashVector({x.key: 1}): 1.0})
         hmap.units = qty("m")
-        ir = hmap.to_ir()
-        assert "units" in ir
-        registry = {x.key.ref: x.key}
-        hmap2 = NomialMap.from_ir(ir, registry)
-        assert hmap2.units is not None
+        assert "units" in hmap.to_ir()
 
     def test_json_serializable(self):
         """NomialMap IR is JSON-serializable."""
         x = Variable("x")
-        hmap = NomialMap({HashVector({x.key: 1}): 2.5})
-        ir = hmap.to_ir()
-        json_str = json.dumps(ir)
-        ir2 = json.loads(json_str)
-        registry = {x.key.ref: x.key}
-        hmap2 = NomialMap.from_ir(ir2, registry)
-        assert len(hmap2) == 1
+        ir = NomialMap({HashVector({x.key: 1}): 2.5}).to_ir()
+        assert json.loads(json.dumps(ir)) == ir
 
 
 class TestNomialIR:
-    """Tests for Signomial.to_ir() / Signomial.from_ir() round-trip."""
-
-    def _registry(self, nomial):
-        "Build var_registry from a nomial's varkeys."
-        return {vk.ref: vk for vk in nomial.vks}
-
-    def test_monomial_roundtrip(self):
-        x = Variable("x")
-        m = 2 * x**3
-        ir = m.to_ir()
-        assert ir["type"] == "Monomial"
-        m2 = Signomial.from_ir(ir, self._registry(m))
-        assert isinstance(m2, Monomial)
-        assert len(m2.hmap) == 1
-        ((exp, coeff),) = m2.hmap.items()
-        assert coeff == 2.0
-        assert exp[x.key] == 3
-
-    def test_posynomial_roundtrip(self):
-        x = Variable("x")
-        y = Variable("y")
-        p = x + 2 * y
-        ir = p.to_ir()
-        assert ir["type"] == "Posynomial"
-        p2 = Signomial.from_ir(ir, self._registry(p))
-        assert isinstance(p2, Posynomial)
-        assert len(p2.hmap) == 2
-
-    def test_signomial_roundtrip(self):
-        x = Variable("x")
-        y = Variable("y")
-        with SignomialsEnabled():
-            s = x - y
-        ir = s.to_ir()
-        assert ir["type"] == "Signomial"
-        s2 = Signomial.from_ir(ir, self._registry(s))
-        assert isinstance(s2, Signomial)
-        assert s2.any_nonpositive_cs
-
-    def test_ast_survives_roundtrip(self):
-        x = Variable("x")
-        y = Variable("y")
-        p = x + 2 * y
-        ir = p.to_ir()
-        assert "ast" in ir
-        p2 = Signomial.from_ir(ir, self._registry(p))
-        assert p2.ast is not None
-        assert p2.ast.str_without() == p.ast.str_without()
-
-    def test_units_survive_roundtrip(self):
-        x = Variable("x", units="m")
-        y = Variable("y", units="m")
-        p = x + y
-        ir = p.to_ir()
-        assert "units" in ir
-        p2 = Signomial.from_ir(ir, self._registry(p))
-        assert p2.units is not None
-
-    def test_json_roundtrip(self):
-        x = Variable("x")
-        y = Variable("y")
-        p = x + 2 * y
-        ir = p.to_ir()
-        json_str = json.dumps(ir)
-        ir2 = json.loads(json_str)
-        p2 = Signomial.from_ir(ir2, self._registry(p))
-        assert len(p2.hmap) == len(p.hmap)
-
-    def test_constant_nomial(self):
-        """A nomial with only a constant term."""
-        m = Signomial(5.0)
-        ir = m.to_ir()
-        assert ir["type"] == "Monomial"
-        m2 = Signomial.from_ir(ir, {})
-        assert m2.cs[0] == 5.0
-
-
-class TestNomialFromIR:
-    """Tests for the nomial_from_ir dispatcher function."""
-
-    def _registry(self, nomial):
-        "Build var_registry from a nomial's varkeys."
-        return {vk.ref: vk for vk in nomial.vks}
+    """Tests for Signomial.to_ir()."""
 
     def test_monomial(self):
         x = Variable("x")
-        m = 2 * x**3
-        ir = m.to_ir()
-        m2 = nomial_from_ir(ir, self._registry(m))
-        assert isinstance(m2, Monomial)
-        assert len(m2.hmap) == 1
+        ir = (2 * x**3).to_ir()
+        assert ir["type"] == "Monomial"
+        assert ir["terms"] == [{"coeff": 2.0, "exps": {"x": 3}}]
 
     def test_posynomial(self):
         x = Variable("x")
         y = Variable("y")
-        p = x + 2 * y
-        ir = p.to_ir()
-        p2 = nomial_from_ir(ir, self._registry(p))
-        assert isinstance(p2, Posynomial)
-        assert len(p2.hmap) == 2
+        ir = (x + 2 * y).to_ir()
+        assert ir["type"] == "Posynomial"
+        assert len(ir["terms"]) == 2
 
     def test_signomial(self):
         x = Variable("x")
         y = Variable("y")
         with SignomialsEnabled():
             s = x - y
-        ir = s.to_ir()
-        s2 = nomial_from_ir(ir, self._registry(s))
-        assert isinstance(s2, Signomial)
-        assert s2.any_nonpositive_cs
+        assert s.to_ir()["type"] == "Signomial"
+
+    def test_ast_is_serialized(self):
+        x = Variable("x")
+        y = Variable("y")
+        assert "ast" in (x + 2 * y).to_ir()
+
+    def test_units_are_serialized(self):
+        x = Variable("x", units="m")
+        y = Variable("y", units="m")
+        assert "units" in (x + y).to_ir()
+
+    def test_json_serializable(self):
+        x = Variable("x")
+        y = Variable("y")
+        ir = (x + 2 * y).to_ir()
+        assert json.loads(json.dumps(ir)) == ir
+
+    def test_constant_nomial(self):
+        """A nomial with only a constant term."""
+        assert Signomial(5.0).to_ir()["type"] == "Monomial"
 
 
 class TestConstraintIR:
-    """Tests for constraint to_ir() / from_ir() round-trips."""
+    """Tests for constraint to_ir()."""
 
-    def _registry(self, constraint):
-        "Build var_registry from a constraint's varkeys."
-        return {vk.ref: vk for vk in constraint.vks}
-
-    def test_posy_inequality_roundtrip(self):
+    def test_posy_inequality(self):
         """PosynomialInequality: x >= y + 1"""
         x = Variable("x")
         y = Variable("y")
@@ -671,12 +490,6 @@ class TestConstraintIR:
         assert "left" in ir
         assert "right" in ir
 
-        registry = self._registry(c)
-        c2 = PosynomialInequality.from_ir(ir, registry)
-        assert isinstance(c2, PosynomialInequality)
-        assert c2.oper == ">="
-        assert len(c2.unsubbed) == len(c.unsubbed)
-
     def test_posy_inequality_leq(self):
         """PosynomialInequality with <= operator.
 
@@ -687,14 +500,9 @@ class TestConstraintIR:
         y = Variable("y")
         c = x + y <= 2 * x * y
         assert isinstance(c, PosynomialInequality)
+        assert c.to_ir()["oper"] in ("<=", ">=")
 
-        ir = c.to_ir()
-        assert ir["oper"] in ("<=", ">=")
-        registry = self._registry(c)
-        c2 = PosynomialInequality.from_ir(ir, registry)
-        assert c2.oper == c.oper
-
-    def test_monomial_equality_roundtrip(self):
+    def test_monomial_equality(self):
         """MonomialEquality: x == y"""
         x = Variable("x")
         y = Variable("y")
@@ -705,13 +513,7 @@ class TestConstraintIR:
         assert ir["type"] == "MonomialEquality"
         assert ir["oper"] == "="
 
-        registry = self._registry(c)
-        c2 = MonomialEquality.from_ir(ir, registry)
-        assert isinstance(c2, MonomialEquality)
-        assert c2.oper == "="
-        assert len(c2.unsubbed) == len(c.unsubbed)
-
-    def test_signomial_inequality_roundtrip(self):
+    def test_signomial_inequality(self):
         """SignomialInequality: x >= 1 - y (requires SignomialsEnabled).
 
         Note: Monomial >= Signomial triggers Signomial.__le__ (subclass
@@ -727,13 +529,8 @@ class TestConstraintIR:
         assert ir["type"] == "SignomialInequality"
         assert ir["oper"] in ("<=", ">=")
 
-        registry = self._registry(c)
-        c2 = SignomialInequality.from_ir(ir, registry)
-        assert isinstance(c2, SignomialInequality)
-        assert c2.oper == c.oper
-
-    def test_single_signomial_equality_roundtrip(self):
-        """SingleSignomialEquality round-trip.
+    def test_single_signomial_equality(self):
+        """SingleSignomialEquality.
 
         Constructed directly since Posynomial == Signomial doesn't produce
         a constraint via operator overloading.
@@ -748,11 +545,6 @@ class TestConstraintIR:
         ir = c.to_ir()
         assert ir["type"] == "SingleSignomialEquality"
         assert ir["oper"] == "="
-
-        registry = self._registry(c)
-        c2 = SingleSignomialEquality.from_ir(ir, registry)
-        assert isinstance(c2, SingleSignomialEquality)
-        assert c2.oper == "="
 
     def test_array_constraint_to_ir(self):
         """ArrayConstraint serializes as list of element constraints."""
@@ -769,8 +561,7 @@ class TestConstraintIR:
             assert ir_dict["oper"] == ">="
 
     def test_slice_in_ast_serializes(self):
-        """Posynomial whose AST contains a slice (e.g. from arr[:j].sum())
-        must round-trip through model to_ir / from_ir without error.
+        """A slice in the AST (e.g. from arr[:j].sum()) serializes.
 
         This pattern appears in vectorized integration constraints like
         r[j] >= dr[:j].sum() used in BEMTHover and similar models.
@@ -779,68 +570,23 @@ class TestConstraintIR:
             dr = Variable("dr", "-", "bin width")
 
         x = Variable("x", "-")
-        m = Model(x, [x >= dr[:2].sum()])
-        ir = m.to_ir()
-        json.dumps(ir)
-        m2 = Model.from_ir(ir)
-        assert len(list(m2)) == len(list(m))
+        ir = Model(x, [x >= dr[:2].sum()]).to_ir()
+        assert json.loads(json.dumps(ir)) == ir
 
-    def test_tuple_with_integer_index_in_ast_round_trips(self):
+    def test_tuple_with_integer_index_in_ast_serializes(self):
         """2D array indexed with [int, :] produces a tuple child containing a
-        raw integer in the IR. ast_from_ir must not assert on that integer."""
+        raw integer in the IR, which has to survive JSON."""
         a = VectorVariable((2, 3), "a", "-")
         x = Variable("x", "-")
-        m = Model(x, [x >= a[0, :].sum()])
-        ir = m.to_ir()
-        json.dumps(ir)
-        m2 = Model.from_ir(ir)
-        assert len(list(m2)) == len(list(m))
-
-    def test_constraint_from_ir_dispatch(self):
-        """constraint_from_ir dispatches to the correct class."""
-        x = Variable("x")
-        y = Variable("y")
-
-        c = x >= y + 1
-        ir = c.to_ir()
-        registry = self._registry(c)
-        c2 = constraint_from_ir(ir, registry)
-        assert isinstance(c2, PosynomialInequality)
-
-    def test_constraint_from_ir_dispatch_meq(self):
-        """constraint_from_ir dispatches MonomialEquality."""
-        x = Variable("x")
-        y = Variable("y")
-        c = x == y
-        ir = c.to_ir()
-        registry = self._registry(c)
-        c2 = constraint_from_ir(ir, registry)
-        assert isinstance(c2, MonomialEquality)
-
-    def test_constraint_from_ir_dispatch_signomial(self):
-        """constraint_from_ir dispatches SignomialInequality."""
-        x = Variable("x")
-        y = Variable("y")
-        with SignomialsEnabled():
-            c = x >= 1 - y
-        ir = c.to_ir()
-        registry = self._registry(c)
-        c2 = constraint_from_ir(ir, registry)
-        assert isinstance(c2, SignomialInequality)
+        ir = Model(x, [x >= a[0, :].sum()]).to_ir()
+        assert json.loads(json.dumps(ir)) == ir
 
     def test_constraint_lineage(self):
-        """Lineage metadata survives round-trip."""
         x = Variable("x")
         y = Variable("y")
         c = x >= y + 1
         c.lineage = (("Aircraft", 0), ("Wing", 0))
-
-        ir = c.to_ir()
-        assert ir["lineage"] == [["Aircraft", 0], ["Wing", 0]]
-
-        registry = self._registry(c)
-        c2 = PosynomialInequality.from_ir(ir, registry)
-        assert c2.lineage == (("Aircraft", 0), ("Wing", 0))
+        assert c.to_ir()["lineage"] == [["Aircraft", 0], ["Wing", 0]]
 
     def test_constraint_no_lineage(self):
         """Constraint without lineage omits lineage key."""
@@ -852,43 +598,23 @@ class TestConstraintIR:
         ir = c.to_ir()
         assert "lineage" not in ir
 
-    def test_constraint_json_roundtrip(self):
-        """Constraint IR is JSON-serializable and survives round-trip."""
+    def test_constraint_json_serializable(self):
         x = Variable("x")
         y = Variable("y")
-        c = x >= y + 1
+        ir = (x >= y + 1).to_ir()
+        assert json.loads(json.dumps(ir)) == ir
 
-        ir = c.to_ir()
-        json_str = json.dumps(ir)
-        ir2 = json.loads(json_str)
-
-        registry = self._registry(c)
-        c2 = constraint_from_ir(ir2, registry)
-        assert isinstance(c2, PosynomialInequality)
-        assert c2.oper == ">="
-
-    def test_signomial_json_roundtrip(self):
-        """SignomialInequality IR survives JSON round-trip."""
+    def test_signomial_json_serializable(self):
         x = Variable("x")
         y = Variable("y")
         with SignomialsEnabled():
             c = x >= 1 - y
         ir = c.to_ir()
-        json_str = json.dumps(ir)
-        ir2 = json.loads(json_str)
-
-        registry = self._registry(c)
-        c2 = constraint_from_ir(ir2, registry)
-        assert isinstance(c2, SignomialInequality)
-
-    def test_constraint_from_ir_unknown_type(self):
-        """constraint_from_ir raises on unknown type."""
-        with pytest.raises(ValueError, match="Unknown constraint type"):
-            constraint_from_ir({"type": "BogusConstraint"}, {})
+        assert json.loads(json.dumps(ir)) == ir
 
 
 class TestModelIR:
-    """Tests for Model.to_ir() / Model.from_ir() round-trips."""
+    """Tests for Model.to_ir()."""
 
     def test_ir_document_structure(self):
         """IR document has required top-level keys."""
@@ -903,32 +629,11 @@ class TestModelIR:
         assert len(ir["variables"]) == 2
         assert len(ir["constraints"]) == 2
 
-    def test_simple_gp_roundtrip(self):
-        """Simple GP round-trip: solve both, compare costs."""
-        x = Variable("x")
-        y = Variable("y")
-        m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
-        sol = m.solve(verbosity=0)
-
-        ir = m.to_ir()
-        m2 = Model.from_ir(ir)
-        sol2 = m2.solve(verbosity=0)
-
-        assert abs(sol.cost - sol2.cost) < 1e-4
-
-    def test_substitutions_roundtrip(self):
-        """Substitutions survive round-trip."""
+    def test_substitutions(self):
         x = Variable("x")
         y = Variable("y")
         m = Model(x, [x >= y], substitutions={y: 3})
-        ir = m.to_ir()
-        assert "substitutions" in ir
-        assert ir["substitutions"]["y"] == 3.0
-
-        m2 = Model.from_ir(ir)
-        sol = m.solve(verbosity=0)
-        sol2 = m2.solve(verbosity=0)
-        assert abs(sol.cost - sol2.cost) < 1e-4
+        assert m.to_ir()["substitutions"]["y"] == 3.0
 
     def test_no_substitutions(self):
         """Model without substitutions omits substitutions key."""
@@ -952,21 +657,6 @@ class TestModelIR:
         assert set(ir["substitutions"]) <= set(ir["variables"])
         assert rho.key.ref in ir["variables"]
 
-    def test_units_roundtrip(self):
-        """Model with pint units round-trips with matching costs."""
-        x = Variable("x", units="m")
-        y = Variable("y", units="m")
-        u = Variable("u", units="m^2")
-        m = Model(x + y, [x * y >= 1 * u])
-        m.substitutions[u] = 1
-        sol = m.solve(verbosity=0)
-
-        ir = m.to_ir()
-        m2 = Model.from_ir(ir)
-        sol2 = m2.solve(verbosity=0)
-
-        assert abs(sol.cost - sol2.cost) < 1e-4
-
     def test_units_pow_fractional_to_ir(self):
         "Regression for #159: units(...)**<float> must not raise IRSerializationError."
         W = Variable("W", "lbf")
@@ -976,10 +666,9 @@ class TestModelIR:
         ir = m.to_ir()  # must not raise
         assert "constraints" in ir
 
-    def test_nested_model_roundtrip(self):
+    def test_nested_model(self):
         """Nested model: lineage appears in IR variables."""
-        ac = Aircraft()
-        ir = ac.to_ir()
+        ir = Aircraft().to_ir()
 
         # Verify lineage in variable refs
         assert "Aircraft.W" in ir["variables"]
@@ -990,82 +679,26 @@ class TestModelIR:
         wing_s = ir["variables"]["Aircraft.Wing.S"]
         assert wing_s["lineage"] == [["Aircraft", 0], ["Wing", 0]]
 
-        # Round-trip solve
-        sol = ac.solve(verbosity=0)
-        ac2 = Model.from_ir(ir)
-        sol2 = ac2.solve(verbosity=0)
-        assert abs(sol.cost - sol2.cost) < 1e-4
-
     def test_reused_submodel(self):
         """Reused sub-model: both instances appear with distinct refs."""
-        w = Widget()
-        ir = w.to_ir()
-
-        # Both Sub instances should be present
+        ir = Widget().to_ir()
         assert "Widget.Sub.m" in ir["variables"]
         assert "Widget.Sub1.m" in ir["variables"]
 
-        # Round-trip solve
-        sol = w.solve(verbosity=0)
-        w2 = Model.from_ir(ir)
-        sol2 = w2.solve(verbosity=0)
-        assert abs(sol.cost - sol2.cost) < 1e-4
-
-    def test_sp_roundtrip(self):
-        """SP round-trip with localsolve."""
-        x = Variable("x")
-        y = Variable("y")
-        with SignomialsEnabled():
-            m = Model(x, [x >= 1 - y, y <= 0.5])
-        sol = m.localsolve(verbosity=0)
-
-        ir = m.to_ir()
-        m2 = Model.from_ir(ir)
-        sol2 = m2.localsolve(verbosity=0)
-        assert abs(sol.cost - sol2.cost) < 1e-4
-
-    def test_vector_variable_roundtrip(self):
-        """VectorVariable round-trip."""
+    def test_vector_variable(self):
+        """Vector elements appear individually, ref including #shape."""
         x = VectorVariable(3, "x")
-        m = Model(x.prod(), [x >= 1])
-        sol = m.solve(verbosity=0)
-
-        ir = m.to_ir()
-        # Indexed variables should appear (ref includes #shape)
+        ir = Model(x.prod(), [x >= 1]).to_ir()
         assert "x[0]#3" in ir["variables"]
         assert "x[1]#3" in ir["variables"]
         assert "x[2]#3" in ir["variables"]
-
-        m2 = Model.from_ir(ir)
-        sol2 = m2.solve(verbosity=0)
-        assert abs(sol.cost - sol2.cost) < 1e-4
 
     def test_json_serialization(self):
         """json.dumps(model.to_ir()) succeeds."""
         x = Variable("x")
         y = Variable("y")
-        m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
-        ir = m.to_ir()
-        json_str = json.dumps(ir)
-        ir2 = json.loads(json_str)
-        m2 = Model.from_ir(ir2)
-        sol = m.solve(verbosity=0)
-        sol2 = m2.solve(verbosity=0)
-        assert abs(sol.cost - sol2.cost) < 1e-4
-
-    def test_save_load(self, tmp_path):
-        """Model.save writes JSON; Model.load reconstructs and solves."""
-        x = Variable("x")
-        y = Variable("y")
-        m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
-        filepath = tmp_path / "model.json"
-        m.save(filepath)
-        assert filepath.exists()
-
-        m2 = Model.load(filepath)
-        sol = m.solve(verbosity=0)
-        sol2 = m2.solve(verbosity=0)
-        assert abs(sol.cost - sol2.cost) < 1e-4
+        ir = Model(x + 2 * y, [x * y >= 1, y >= 0.5]).to_ir()
+        assert json.loads(json.dumps(ir)) == ir
 
 
 class TestModelTree:
@@ -1205,20 +838,6 @@ class TestModelTree:
         assert ir2["model_tree"]["class"] == "Aircraft"
         assert len(ir2["model_tree"]["children"]) == 1
 
-    def test_prev_tests_still_pass_with_model_tree(self):
-        """model_tree is additive: previous round-trip still works."""
-        x = Variable("x")
-        y = Variable("y")
-        m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
-        ir = m.to_ir()
-        assert "model_tree" in ir
-
-        # from_ir ignores model_tree and still produces a solvable model
-        m2 = Model.from_ir(ir)
-        sol = m.solve(verbosity=0)
-        sol2 = m2.solve(verbosity=0)
-        assert abs(sol.cost - sol2.cost) < 1e-4
-
     def test_model_tree_uses_children_not_lineage(self):
         """build_model_tree() reflects _children, not just lineage."""
 
@@ -1251,153 +870,9 @@ class TestMultiComponentIR:
 
     def test_sum_over_submodel_costs(self):
         """sum(c.cost for c in components) produces serializable AST."""
-        m = MultiComponent()
-        ir = m.to_ir()
-        assert "constraints" in ir
-        assert len(ir["constraints"]) > 0
-
-        # Verify JSON serializable
-        json_str = json.dumps(ir)
-        ir2 = json.loads(json_str)
-        assert len(ir2["constraints"]) == len(ir["constraints"])
-
-    def test_sum_over_submodel_roundtrip(self):
-        """Multi-component model with sum() round-trips correctly."""
-        m = MultiComponent()
-        sol = m.solve(verbosity=0)
-
-        ir = m.to_ir()
-        m2 = Model.from_ir(ir)
-        sol2 = m2.solve(verbosity=0)
-        assert abs(sol.cost - sol2.cost) < 1e-4
-
-
-# ── IR round-trip identity tests ──────────────────────────────────────
-
-
-class TestIRRoundTrip:
-    """Double IR identity: to_ir() -> from_ir() -> to_ir() is structurally identical.
-
-    Tests GRAPH-05: VectorVariable constraints round-trip safe in IR.
-    """
-
-    def _assert_ir_identity(self, m):
-        """Helper: assert ir1 == ir2 with diff on failure."""
-        ir1 = m.to_ir()
-        m2 = Model.from_ir(ir1)
-        ir2 = m2.to_ir()
-        diff = ir_diff(ir1, ir2)
-        assert not diff, f"IR changed after round-trip:\n{diff}"
-
-    def test_flat_model_identity(self):
-        """Flat model: IR is identical after round-trip."""
-        x = Variable("x")
-        y = Variable("y")
-        m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
-        self._assert_ir_identity(m)
-
-    def test_nested_model_identity(self):
-        """Nested model: constraint count and variables are identical after round-trip.
-
-        Note: model_tree topology is NOT preserved — from_ir() returns a flat Model.
-        This is by design and is documented as a known IR gap (see ir_diff() docstring).
-        The constraint set and variable registry must be identical.
-        """
-
-        class _RTWing(Model):
-            def setup(self):
-                S = Variable("S")
-                self.cost = S
-                return [S >= 10]
-
-        class _RTAircraft(Model):
-            wing: "_RTWing"
-
-            def setup(self):
-                W = Variable("W")
-                self.wing = _RTWing()
-                self.cost = W
-                return [W >= self.wing.cost * 1.2, self.wing]
-
-        m = _RTAircraft()
-        self._assert_ir_identity(m)
-
-    def test_nested_model_topology_not_preserved(self):
-        """from_ir() returns a flat Model — model_tree topology is intentionally lost.
-
-        This test documents the known IR gap: model_tree class hierarchy is not
-        reconstructed by from_ir(). Constraints and variables are preserved;
-        the nesting structure is not. This will be addressed in Phase 4.
-        """
-
-        class _RTWing2(Model):
-            def setup(self):
-                S = Variable("S")
-                self.cost = S
-                return [S >= 10]
-
-        class _RTAircraft2(Model):
-            wing: "_RTWing2"
-
-            def setup(self):
-                W = Variable("W")
-                self.wing = _RTWing2()
-                self.cost = W
-                return [W >= self.wing.cost * 1.2, self.wing]
-
-        m = _RTAircraft2()
-        ir1 = m.to_ir()
-        m2 = Model.from_ir(ir1)
-        ir2 = m2.to_ir()
-
-        # ir_diff (constraint+variable check) must pass
-        assert not ir_diff(ir1, ir2)
-
-        # but model_tree topology IS different (from_ir returns flat Model)
-        assert ir2["model_tree"]["class"] == "Model"
-        assert ir2["model_tree"]["children"] == []
-        assert ir1["model_tree"]["class"] == "_RTAircraft2"
-        assert len(ir1["model_tree"]["children"]) == 1
-
-    def test_vector_variable_identity(self):
-        """Vectorized model: IR is identical after round-trip (GRAPH-05 case)."""
-        x = VectorVariable(3, "x")
-        m = Model(x.prod(), [x >= 1])
-        self._assert_ir_identity(m)
-
-    def test_vector_with_substitutions_identity(self):
-        """Vectorized model with substitutions: IR is identical after round-trip."""
-        x = VectorVariable(3, "x")
-        m = Model(x.prod(), [x >= 1], substitutions={x: [1.0, 2.0, 3.0]})
-        self._assert_ir_identity(m)
-
-    def test_ir_diff_detects_constraint_change(self):
-        """ir_diff() correctly reports a constraint count change."""
-        x = Variable("x")
-        m = Model(x, [x >= 1])
-        ir1 = m.to_ir()
-        ir2 = dict(ir1)
-        ir2["constraints"] = []  # artificially remove constraints
-        diff = ir_diff(ir1, ir2)
-        assert diff and "constraint count" in diff
-
-    def test_ir_diff_detects_variable_change(self):
-        """ir_diff() correctly reports a missing variable."""
-        x = Variable("x")
-        y = Variable("y")
-        m = Model(x + y, [x >= 1, y >= 1])
-        ir1 = m.to_ir()
-        ir2 = dict(ir1)
-        ir2["variables"] = {k: v for k, v in ir1["variables"].items() if "x" not in k}
-        diff = ir_diff(ir1, ir2)
-        assert diff and "variables only in ir1" in diff
-
-    def test_ir_diff_returns_empty_for_equal(self):
-        """ir_diff() returns empty string when IRs are identical."""
-        x = Variable("x")
-        m = Model(x, [x >= 1])
-        ir = m.to_ir()
-        assert not ir_diff(ir, ir)
+        ir = MultiComponent().to_ir()
+        assert ir["constraints"]
+        assert json.loads(json.dumps(ir)) == ir
 
 
 # ── Monomial substitution serialization ───────────────────────────────
@@ -1414,20 +889,29 @@ def test_to_ir_monomial_substitution():
     assert ir["substitutions"][C3min.key.ref] == pytest.approx(9.0)
 
 
-# ── gpkit-core catalog round-trip ─────────────────────────────────────
+# ── gpkit-core catalog serialization ──────────────────────────────────
 
 
 @pytest.mark.parametrize("model_entry", _CORE_CATALOG, ids=catalog_ids(_CORE_CATALOG))
-def test_core_catalog_ir_roundtrip(model_entry):
-    """gpkit-core catalog model: IR must serialize and round-trip cleanly."""
+def test_core_catalog_to_ir(model_entry):
+    """Every catalog model serializes to an IR document that survives JSON.
+
+    Reconstruction is TOML's job (to_toml/load_toml), so what the IR owes a
+    consumer is a complete, self-consistent document: every substitution names
+    a variable it declares, and every constraint index the tree cites exists.
+    """
     mod = importlib.import_module(model_entry["module"])
     cls = getattr(mod, model_entry["class"])
-    m = cls.default()
-    ir1 = m.to_ir()
-    m2 = Model.from_ir(ir1)
-    ir2 = m2.to_ir()
-    diff = ir_diff(ir1, ir2)
-    assert not diff, f"{cls.__name__} IR changed after round-trip:\n{diff}"
+    ir = cls.default().to_ir()
+    assert json.loads(json.dumps(ir)) == ir
+    assert set(ir.get("substitutions", {})) <= set(ir["variables"])
+
+    def tree_indices(node):
+        yield from node["constraint_indices"]
+        for child in node["children"]:
+            yield from tree_indices(child)
+
+    assert sorted(tree_indices(ir["model_tree"])) == list(range(len(ir["constraints"])))
 
 
 # ── Solution IR ───────────────────────────────────────────────────────

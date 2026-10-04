@@ -1,7 +1,5 @@
 "Implements Model"
 
-import json
-from pathlib import Path
 from time import time
 
 import numpy as np
@@ -15,10 +13,8 @@ from .exceptions import (
     VariableNotFound,
 )
 from .ir import IR_VERSION
-from .margin_objective import MarginObjective
 from .nomials import Monomial, Variable
 from .nomials.map import DIMLESS_QUANTITY
-from .nomials.math import constraint_from_ir, nomial_from_ir
 from .nomials.substitution import is_linked
 from .programs.gp import GeometricProgram
 from .programs.prog_factories import progify, solvify
@@ -27,7 +23,6 @@ from .solutions import SolutionSequence
 from .tools.autosweep import autosweep_1d
 from .util.globals import NamedVariables, Vectorize
 from .var import Var
-from .varkey import VarKey
 from .varmap import VarMap
 
 
@@ -358,74 +353,6 @@ class Model(CostedConstraintSet):
             }
 
         return ir
-
-    @classmethod
-    def from_ir(cls, ir_doc):
-        """Reconstruct a solvable Model from an IR document dict.
-
-        Parameters
-        ----------
-        ir_doc : dict
-            Complete IR document with variables, cost, constraints, and
-            optional substitutions.
-
-        Returns
-        -------
-        Model
-            A flat Model (no nested sub-models) that can be solved.
-        """
-        # 1. Reconstruct var_registry
-        var_registry = {}
-        for ref, vk_ir in ir_doc["variables"].items():
-            vk = VarKey.from_ir(vk_ir)
-            var_registry[ref] = vk
-
-        # 2. Reconstruct cost
-        cost = nomial_from_ir(ir_doc["cost"], var_registry)
-
-        # 3. Reconstruct constraints
-        constraints = [
-            constraint_from_ir(c_ir, var_registry) for c_ir in ir_doc["constraints"]
-        ]
-
-        # 4. Reconstruct substitutions. Null entries represent linked subs
-        subs = None
-        if "substitutions" in ir_doc:
-            subs = {}
-            for ref, val in ir_doc["substitutions"].items():
-                if val is None:
-                    raise NotImplementedError(
-                        f"Cannot reconstruct model from IR: variable '{ref}' has a"
-                        " linked (callable-computed) substitution that is not"
-                        " serializable. Models with linked substitutions cannot be"
-                        " faithfully round-tripped through the IR."
-                    )
-                if ref in var_registry:
-                    subs[var_registry[ref]] = val
-
-        model = cls(cost, constraints, substitutions=subs)
-
-        if "margin_objective" in ir_doc:
-            mo_ir = ir_doc["margin_objective"]
-            plus_vk = var_registry[mo_ir["plus_var"]]
-            minus_vk = var_registry[mo_ir["minus_var"]]
-            model.margin_objective = MarginObjective(
-                name=mo_ir["name"],
-                plus_var=plus_vk,
-                minus_var=minus_vk,
-            )
-
-        return model
-
-    def save(self, path):
-        """Write this Model's IR to a JSON file."""
-        Path(path).write_text(json.dumps(self.to_ir(), indent=2), encoding="utf-8")
-
-    @classmethod
-    def load(cls, path):
-        """Load a Model from a JSON IR file."""
-        ir_doc = json.loads(Path(path).read_text(encoding="utf-8"))
-        return cls.from_ir(ir_doc)
 
     @classmethod
     def report_preamble(cls) -> str:

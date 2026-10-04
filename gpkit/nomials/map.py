@@ -43,30 +43,6 @@ class NomialMap(HashVector):
             ir["units"] = ir_units(self)
         return ir
 
-    @classmethod
-    def from_ir(cls, ir_dict, var_registry):
-        """Reconstruct a NomialMap from an IR dict.
-
-        Parameters
-        ----------
-        ir_dict : dict
-            IR with "terms" and optional "units".
-        var_registry : dict
-            Mapping from ref strings to VarKey objects.
-        """
-        hmap = cls()
-        for term in ir_dict["terms"]:
-            if term.get("exps"):
-                exp = HashVector(
-                    {var_registry[ref]: x for ref, x in term["exps"].items()}
-                )
-            else:
-                exp = EMPTY_HV
-            hmap[exp] = term["coeff"]
-        if "units" in ir_dict:
-            hmap.units = qty(ir_dict["units"])
-        return hmap
-
     def copy(self):
         "Return a copy of this"
         return self.__class__(self)
