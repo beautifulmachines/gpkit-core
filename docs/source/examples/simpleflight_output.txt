@@ -125,6 +125,7 @@ D : [ +11.5%   +30.7%   -2.9%    +7.54%  ]
 
 Free Variable Changes
 ---------------------
+  V : (only in baseline)                         cruising speed
  Re : [ +46.4%    +97.1%    -1.11%    +29.2%   ] Reynold's number
 C_L : [ -40.6%    -60.2%    -7.18%    -37.9%   ] Lift coefficent of wing
   A : [ -26.7%    -43.6%    +4.54%    -15.3%   ] aspect ratio

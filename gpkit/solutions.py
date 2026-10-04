@@ -8,9 +8,8 @@ from enum import StrEnum
 from . import printing
 from .breakdowns import bdtable_gen
 from .budgets import build_budget
-from .ir import IR_VERSION
+from .ir import IR_VERSION, diff_solutions, ir_units
 from .units import Quantity
-from .util.repr_conventions import unitstr
 from .varkey import VarKey
 from .varmap import VarMap, display_names
 
@@ -153,7 +152,8 @@ def _value_ir(value, units: str) -> dict:
 
 def _varmap_ir(vmap: VarMap) -> dict:
     "Vector elements appear individually; Model.to_ir() holds the parent."
-    return {vk.ref: _value_ir(v, vk.unitstr()) for vk, v in vmap.items()}
+    # Units as the model IR spells them, so the two documents join cleanly.
+    return {vk.ref: _value_ir(v, vk.to_ir().get("units", "")) for vk, v in vmap.items()}
 
 
 def _subject_ir(sol, warning: dict) -> dict:
@@ -211,19 +211,7 @@ class Solution:
         """Checks for almost-equality between two solutions.
         tol is treated as relative for primal; absolute for sensitivities
         """
-        if set(self.primal) != set(getattr(other, "primal", ())):
-            return False
-        if set(self.sens.variables) != set(other.sens.variables):
-            return False
-        for key in self.primal:
-            reldiff = abs(self.primal[key] / other.primal[key] - 1)
-            if reldiff > tol:
-                return False
-        for key in self.sens.variables:
-            absdiff = abs(self.sens.variables[key] - other.sens.variables[key])
-            if absdiff > tol:
-                return False
-        return True
+        return not diff_solutions(other.to_ir(), self.to_ir(), tol)["changed"]
 
     def subinto(self, posy):
         "solution substituted into posy."
@@ -258,7 +246,7 @@ class Solution:
         """
         ir = {
             "gpkit_ir_version": IR_VERSION,
-            "cost": _value_ir(self.cost, unitstr(self.meta["cost function"])),
+            "cost": _value_ir(self.cost, ir_units(self.meta["cost function"])),
             "primal": _varmap_ir(self.primal),
             "sensitivities": {
                 "variables": {

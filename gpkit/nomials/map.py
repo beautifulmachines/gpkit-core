@@ -5,8 +5,8 @@ from collections import defaultdict
 import numpy as np
 
 from .. import units
+from ..ir import ir_units
 from ..units import DimensionalityError, qty
-from ..util.repr_conventions import unitstr
 from ..util.small_classes import EMPTY_HV, HashVector, Strings
 from .substitution import parse_subs
 
@@ -40,7 +40,7 @@ class NomialMap(HashVector):
             terms.append(term)
         ir = {"terms": terms}
         if self.units:
-            ir["units"] = unitstr(self, "%s", ":~")
+            ir["units"] = ir_units(self)
         return ir
 
     @classmethod

@@ -36,7 +36,7 @@ from gpkit.nomials.math import (
 )
 from gpkit.tests.test_catalog import catalog_ids, load_catalog
 from gpkit.tests.test_margin_objective import SimpleMarginModel
-from gpkit.units import qty, units
+from gpkit.units import qty, units, ureg
 from gpkit.util.small_classes import EMPTY_HV, HashVector
 
 _CORE_CATALOG = load_catalog(__file__)
@@ -306,12 +306,29 @@ class TestVarKeyIR:
         assert vk2 == vk
 
     def test_with_units(self):
+        "Units are reported as declared -- to_toml() writes this back out."
         vk = VarKey("S", units="m^2")
         ir = vk.to_ir()
         assert ir["units"] == "m^2"
         vk2 = VarKey.from_ir(ir)
         assert vk2 == vk
-        assert vk2.unitrepr == "m^2"
+        assert vk2.units == vk.units
+
+    @pytest.mark.parametrize("declared", ["USD", "USD/kg", "N*m", "ohm", "lbf", "m^2"])
+    def test_ir_units_can_always_be_read_back(self, declared):
+        """A unit the IR writes has to be one a registry can parse.
+
+        Two spellings of one unit are fine, since nothing compares them as
+        strings -- but an unparseable one is not. The symbol form fails that:
+        USD's symbol is "$", which pint cannot read back.
+        """
+        vk = VarKey("q", units=declared)
+        assert ureg(vk.to_ir()["units"]).units == vk.units.units
+
+    def test_units_given_as_a_quantity_are_still_readable(self):
+        "Nothing was declared as a string here, so a spelling has to be derived."
+        vk = VarKey("q", units=qty("USD"))
+        assert ureg(vk.to_ir()["units"]).units == vk.units.units
 
     def test_with_lineage(self):
         vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 0)))
@@ -1432,12 +1449,23 @@ class TestSolutionIR:
     documents are a pair and nothing is encoded twice.
     """
 
-    def test_cost_carries_value_and_declared_units(self):
+    def test_cost_carries_value_and_units(self):
+        """A cost expression declares no units, so full names are derived.
+
+        Symbols would read better but need not parse back, and a money objective
+        is an ordinary thing to minimize.
+        """
         _, sol = _solved()
         assert sol.to_ir()["cost"] == {
             "value": pytest.approx(2.0, rel=1e-6),
-            "units": "m",
+            "units": "meter",
         }
+
+    def test_a_money_objective_has_readable_cost_units(self):
+        price = Variable("price_ir", "USD")
+        floor = Variable("price_min_ir", 40.0, "USD")
+        sol = Model(price, [price >= floor]).solve(verbosity=0)
+        assert ureg(sol.to_ir()["cost"]["units"]).units == ureg("USD").units
 
     def test_values_are_in_declared_units(self):
         "t is 2 mm, not 0.002 m -- the declared unit is the one reported."
@@ -1457,6 +1485,20 @@ class TestSolutionIR:
         sol = Model(x, [x >= 1]).solve(verbosity=0)
         assert sol.to_ir()["primal"][x.key.ref] == {"value": pytest.approx(1.0)}
         assert "units" not in sol.to_ir()["cost"]
+
+    def test_units_are_spelled_as_the_model_ir_spells_them(self):
+        """One spelling of a unit across both documents, and pint can read it.
+
+        The display form substitutes a middle dot for products ('m⋅N'), which no
+        unit registry parses -- so it cannot be what a joinable IR carries.
+        """
+        torque = Variable("tau_ir", "N*m", "torque")
+        f_min = Variable("tau_min_ir", 2.0, "N*m")
+        m = Model(torque, [torque >= f_min])
+        sol = m.solve(verbosity=0)
+        declared = m.to_ir()["variables"][torque.key.ref]["units"]
+        assert sol.to_ir()["primal"][torque.key.ref]["units"] == declared
+        assert ureg(declared).units == torque.key.units.units
 
     def test_meta_is_status_soltime_warnings_only(self):
         "Not wholesale: models write into meta (bounded.py adds boundedness)."

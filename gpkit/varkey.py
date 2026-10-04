@@ -108,9 +108,11 @@ class VarKey(ReprMixin):
                 object.__setattr__(self, "unitrepr", self.units)
             units = qty(self.units)
             object.__setattr__(self, "units", units)
-            # If still no unitrepr (units was already a Quantity), derive it
+            # If still no unitrepr (units was already a Quantity), derive it.
+            # Full names, not symbols: a symbol need not parse back ("$" doesn't),
+            # and unitrepr is what to_ir() and to_toml() hand out.
             if not self.unitrepr:
-                object.__setattr__(self, "unitrepr", f"{units.units:~}")
+                object.__setattr__(self, "unitrepr", f"{units.units:C}")
 
         # Set key = self
         object.__setattr__(self, "key", self)
@@ -229,6 +231,8 @@ class VarKey(ReprMixin):
         ir = {"name": self.name}
         if self.lineage:
             ir["lineage"] = [list(pair) for pair in self.lineage]
+        # As declared, not canonicalized: this is what to_toml() writes back out,
+        # and a spelling pint accepted on the way in it can read on the way back.
         if self.unitrepr and self.unitrepr != "-":
             ir["units"] = self.unitrepr
         if self.label:
