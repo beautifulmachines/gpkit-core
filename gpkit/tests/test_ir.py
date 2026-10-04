@@ -1,6 +1,5 @@
 """Tests for the IR (Intermediate Representation) infrastructure."""
 
-import importlib
 import json
 
 import numpy as np
@@ -30,12 +29,9 @@ from gpkit.nomials.math import (
     SignomialInequality,
     SingleSignomialEquality,
 )
-from gpkit.tests.test_catalog import catalog_ids, load_catalog
 from gpkit.tests.test_margin_objective import SimpleMarginModel
 from gpkit.units import qty, units, ureg
 from gpkit.util.small_classes import EMPTY_HV, HashVector
-
-_CORE_CATALOG = load_catalog(__file__)
 
 # ── Shared test model definitions ────────────────────────────────────
 
@@ -887,31 +883,6 @@ def test_to_ir_monomial_substitution():
     m = Model(C3, [C3 >= C3min], {C3min: 9.0 * units("km^2/s^2")})
     ir = m.to_ir()
     assert ir["substitutions"][C3min.key.ref] == pytest.approx(9.0)
-
-
-# ── gpkit-core catalog serialization ──────────────────────────────────
-
-
-@pytest.mark.parametrize("model_entry", _CORE_CATALOG, ids=catalog_ids(_CORE_CATALOG))
-def test_core_catalog_to_ir(model_entry):
-    """Every catalog model serializes to an IR document that survives JSON.
-
-    Reconstruction is TOML's job (to_toml/load_toml), so what the IR owes a
-    consumer is a complete, self-consistent document: every substitution names
-    a variable it declares, and every constraint index the tree cites exists.
-    """
-    mod = importlib.import_module(model_entry["module"])
-    cls = getattr(mod, model_entry["class"])
-    ir = cls.default().to_ir()
-    assert json.loads(json.dumps(ir)) == ir
-    assert set(ir.get("substitutions", {})) <= set(ir["variables"])
-
-    def tree_indices(node):
-        yield from node["constraint_indices"]
-        for child in node["children"]:
-            yield from tree_indices(child)
-
-    assert sorted(tree_indices(ir["model_tree"])) == list(range(len(ir["constraints"])))
 
 
 # ── Solution IR ───────────────────────────────────────────────────────

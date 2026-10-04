@@ -3,20 +3,30 @@
 Public API (importable by other repos):
   load_catalog(start)          — load models list from catalog.toml nearest to `start`
   catalog_ids(models)          — generate pytest parametrize IDs
+  catalog_params(models, xfail={id: reason})
+                               — the same, as pytest.param values, xfailing the
+                                 named ids (strictly, so a fix reports XPASS)
   run_catalog_test(entry)      — the shared test body
   run_catalog_snapshots(entry, start)
                                — write structure and solution snapshots for one
                                  entry into <start's dir>/snapshots/; drift shows
                                  up as a git diff, like docs/source/examples
+  run_catalog_to_ir(entry)     — the IR document serializes and is self-consistent
+  run_catalog_toml_roundtrip(entry)
+                               — the model survives to_toml → load_toml and solves
+                                 to the same cost
 """
 
 import importlib
+import json
 import tomllib
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+from gpkit.toml import load_toml
+from gpkit.toml._printer import to_toml
 from gpkit.util.small_scripts import mag
 
 # Expected (cost, rel_tol) for each gpkit-core catalog entry by id.
@@ -55,23 +65,41 @@ def catalog_ids(models):
     return [m.get("id", f"{m['module']}:{m['class']}") for m in models]
 
 
+def catalog_params(models, xfail=None):
+    """Parametrize argvalues for `models`, xfailing the ids named in `xfail`.
+
+    `xfail` maps a catalog id to the reason it is expected to fail, normally an
+    open issue. Strict, so a fixed entry reports XPASS as a failure and the
+    exemption has to be deleted rather than quietly outliving the bug.
+    """
+    xfail = xfail or {}
+    return [
+        pytest.param(
+            model,
+            id=entry_id,
+            marks=(
+                [pytest.mark.xfail(reason=xfail[entry_id], strict=True)]
+                if entry_id in xfail
+                else []
+            ),
+        )
+        for model, entry_id in zip(models, catalog_ids(models), strict=True)
+    ]
+
+
 def run_catalog_test(model_entry):
     """Each catalog entry must: import, build, and solve. Assert cost if provided."""
-    mod = importlib.import_module(model_entry["module"])
-    cls = getattr(mod, model_entry["class"])
-
-    m = cls.default()
+    m = _catalog_model(model_entry)
+    name = type(m).__name__
 
     assert m.cost is not None, (
-        f"{cls.__name__} did not set self.cost. setup() must assign self.cost."
+        f"{name} did not set self.cost. setup() must assign self.cost."
     )
 
-    sol = m.solve(verbosity=0) if m.is_gp() else m.localsolve(verbosity=0)
+    sol = _solve(m)
     assert sol is not None
     for val in sol.primal.values():
-        assert not np.isnan(np.atleast_1d(mag(val))).any(), (
-            f"{cls.__name__}: NaN in solution"
-        )
+        assert not np.isnan(np.atleast_1d(mag(val))).any(), f"{name}: NaN in solution"
 
     # expected_cost in the catalog entry takes precedence (for external repos);
     # fall back to the built-in table for gpkit-core entries.
@@ -85,9 +113,54 @@ def run_catalog_test(model_entry):
         expected, tol = entry
 
     assert mag(sol.cost) == pytest.approx(expected, rel=tol), (
-        f"{cls.__name__} cost {mag(sol.cost):.6g} does not match "
+        f"{name} cost {mag(sol.cost):.6g} does not match "
         f"expected {expected} (rel tol {tol})"
     )
+
+
+def _catalog_model(model_entry):
+    "The built model for a catalog entry."
+    mod = importlib.import_module(model_entry["module"])
+    return getattr(mod, model_entry["class"]).default()
+
+
+def _solve(model):
+    "Solve however the model's own math requires."
+    return model.solve(verbosity=0) if model.is_gp() else model.localsolve(verbosity=0)
+
+
+def run_catalog_to_ir(model_entry):
+    """The IR document survives JSON and declares every variable it substitutes.
+
+    The IR is export only, so what it owes a consumer is a complete and
+    self-consistent document rather than a reconstructable one.
+    """
+    ir = _catalog_model(model_entry).to_ir()
+    assert json.loads(json.dumps(ir)) == ir
+    dangling = sorted(set(ir.get("substitutions", {})) - set(ir["variables"]))
+    assert not dangling, f"substitutions name undeclared variables: {dangling}"
+
+    def tree_indices(node):
+        yield from node["constraint_indices"]
+        for child in node["children"]:
+            yield from tree_indices(child)
+
+    # every constraint claimed by exactly one node, which is what lets a
+    # consumer join model_tree against the flat constraints list
+    assert sorted(tree_indices(ir["model_tree"])) == list(range(len(ir["constraints"])))
+
+
+def run_catalog_toml_roundtrip(model_entry):
+    """The model survives to_toml → load_toml and solves to the same cost.
+
+    TOML is the format a model is stored in and loaded from, so this is the
+    round-trip that has to hold -- it exercises both halves of the path a user
+    or a dashboard takes to get a model back.
+    """
+    m = _catalog_model(model_entry)
+    m2 = load_toml(to_toml(m))
+    cost, cost2 = mag(_solve(m).cost), mag(_solve(m2).cost)
+    assert cost2 == pytest.approx(cost, rel=1e-5)
 
 
 def structure_digest(model) -> str:
@@ -132,16 +205,12 @@ def run_catalog_snapshots(model_entry, start):
     asserted — a change shows up as a git diff to review, so deliberate
     improvements are as easy to land as regressions are to spot.
     """
-    mod = importlib.import_module(model_entry["module"])
-    cls = getattr(mod, model_entry["class"])
-    entry_id = model_entry.get("id", cls.__name__)
+    m = _catalog_model(model_entry)
+    entry_id = model_entry.get("id", type(m).__name__)
     outdir = Path(start).resolve().parent / "snapshots"
 
-    m = cls.default()
     _write_snapshot(outdir / f"{entry_id}.structure.txt", structure_digest(m))
-
-    sol = m.solve(verbosity=0) if m.is_gp() else m.localsolve(verbosity=0)
-    _write_snapshot(outdir / f"{entry_id}.solution.txt", sol.table())
+    _write_snapshot(outdir / f"{entry_id}.solution.txt", _solve(m).table())
 
 
 try:
@@ -160,3 +229,23 @@ def test_catalog_model(model_entry):
 def test_catalog_snapshots(model_entry):
     """Regenerate each catalog entry's snapshots; drift shows as a git diff."""
     run_catalog_snapshots(model_entry, __file__)
+
+
+@pytest.mark.parametrize("model_entry", _CATALOG, ids=catalog_ids(_CATALOG))
+def test_catalog_to_ir(model_entry):
+    run_catalog_to_ir(model_entry)
+
+
+# Open gpkit-core defects in the TOML printer, not in these models.
+_TOML_ROUNDTRIP_GAPS = {
+    "pipeline": "#295: to_toml raises on a vector element whose parent is elsewhere",
+    "uav": "#296: to_toml writes 4 significant figures",
+    "bemt_hover": "#296: to_toml writes 4 significant figures",
+}
+
+
+@pytest.mark.parametrize(
+    "model_entry", catalog_params(_CATALOG, xfail=_TOML_ROUNDTRIP_GAPS)
+)
+def test_catalog_toml_roundtrip(model_entry):
+    run_catalog_toml_roundtrip(model_entry)
