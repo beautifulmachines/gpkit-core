@@ -11,13 +11,18 @@ IR_VERSION = "1.0"
 def ir_units(obj) -> str:
     """The unit string an IR document carries, for anything bearing units.
 
-    One spelling per unit however it was declared, and readable back by the unit
-    registry.  Neither property holds of the alternatives: VarKey.unitrepr keeps
-    the user's own spelling (m^2, m ** 2 and m*m all survive, by design, so TOML
-    round-trips), and the display form substitutes a middle dot for products
-    ("m⋅N") that no registry parses.
+    Full unit names ("meter**2", "USD"), because that is the only spelling that is
+    both canonical and readable back by the unit registry:
+
+    - VarKey.unitrepr keeps the user's own spelling, so m^2, m ** 2 and m*m all
+      survive distinctly, by design, for TOML round-trips
+    - the symbol form drops to glyphs a registry cannot parse -- USD becomes "$"
+    - the display form substitutes a middle dot for products ("m⋅N"), and is
+      platform-dependent besides
+
+    Display is unaffected: unitstr() formats from the live units, not from this.
     """
-    return unitstr(obj, "%s", ":~")
+    return unitstr(obj, "%s", ":C")
 
 
 def _by_quantity(refs) -> dict:
@@ -122,10 +127,16 @@ def diff_solutions(baseline: dict, scenario: dict, tol: float = 1e-6) -> dict:
     the same refs -- so it joins them the way a solution IR joins a model IR.
     Keys are the baseline's refs.
     """
-    diff = {}
+    diff = {"cost": {}}
     rel, dim_changed = _compare_values(baseline["cost"], scenario["cost"])
-    diff["cost"] = {"dimension_changed": True} if dim_changed else {}
-    if rel is not None:
+    if dim_changed:  # the objective was rewritten, e.g. from a mass to a cost
+        diff["cost"]["dimension_changed"] = [
+            baseline["cost"].get("units", ""),
+            scenario["cost"].get("units", ""),
+        ]
+    elif rel is None:
+        diff["cost"]["from_zero"] = True
+    else:
         diff["cost"]["rel"] = float(rel)
 
     sections = {}
@@ -143,7 +154,8 @@ def diff_solutions(baseline: dict, scenario: dict, tol: float = 1e-6) -> dict:
         diff["sensitivities"] = {"variables": sens}
 
     diff["changed"] = (
-        diff["cost"].get("dimension_changed", False)
+        "dimension_changed" in diff["cost"]
+        or "from_zero" in diff["cost"]
         or abs(diff["cost"].get("rel", 0)) > tol
         or any(_section_changed(s, tol) for s in sections.values())
     )

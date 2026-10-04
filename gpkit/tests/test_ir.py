@@ -306,24 +306,29 @@ class TestVarKeyIR:
         assert vk2 == vk
 
     def test_with_units(self):
+        "Units are reported as declared -- to_toml() writes this back out."
         vk = VarKey("S", units="m^2")
         ir = vk.to_ir()
-        assert ir["units"] == "m**2"
+        assert ir["units"] == "m^2"
         vk2 = VarKey.from_ir(ir)
         assert vk2 == vk
         assert vk2.units == vk.units
 
-    def test_units_are_canonical_however_they_were_declared(self):
-        """One spelling per unit in the IR, whoever typed what.
+    @pytest.mark.parametrize("declared", ["USD", "USD/kg", "N*m", "ohm", "lbf", "m^2"])
+    def test_ir_units_can_always_be_read_back(self, declared):
+        """A unit the IR writes has to be one a registry can parse.
 
-        unitrepr keeps the declaration verbatim so TOML round-trips, and the
-        display form is platform-dependent (pint Pretty off Windows) -- neither
-        can be what a document serialized on one machine and read on another
-        carries.
+        Two spellings of one unit are fine, since nothing compares them as
+        strings -- but an unparseable one is not. The symbol form fails that:
+        USD's symbol is "$", which pint cannot read back.
         """
-        irs = [VarKey("S", units=u).to_ir()["units"] for u in ("m^2", "m ** 2", "m*m")]
-        assert irs == ["m**2"] * 3
-        assert ureg(irs[0]).units == ureg("m^2").units
+        vk = VarKey("q", units=declared)
+        assert ureg(vk.to_ir()["units"]).units == vk.units.units
+
+    def test_units_given_as_a_quantity_are_still_readable(self):
+        "Nothing was declared as a string here, so a spelling has to be derived."
+        vk = VarKey("q", units=qty("USD"))
+        assert ureg(vk.to_ir()["units"]).units == vk.units.units
 
     def test_with_lineage(self):
         vk = VarKey("S", lineage=(("Aircraft", 0), ("Wing", 0)))
@@ -1444,12 +1449,23 @@ class TestSolutionIR:
     documents are a pair and nothing is encoded twice.
     """
 
-    def test_cost_carries_value_and_declared_units(self):
+    def test_cost_carries_value_and_units(self):
+        """A cost expression declares no units, so full names are derived.
+
+        Symbols would read better but need not parse back, and a money objective
+        is an ordinary thing to minimize.
+        """
         _, sol = _solved()
         assert sol.to_ir()["cost"] == {
             "value": pytest.approx(2.0, rel=1e-6),
-            "units": "m",
+            "units": "meter",
         }
+
+    def test_a_money_objective_has_readable_cost_units(self):
+        price = Variable("price_ir", "USD")
+        floor = Variable("price_min_ir", 40.0, "USD")
+        sol = Model(price, [price >= floor]).solve(verbosity=0)
+        assert ureg(sol.to_ir()["cost"]["units"]).units == ureg("USD").units
 
     def test_values_are_in_declared_units(self):
         "t is 2 mm, not 0.002 m -- the declared unit is the one reported."

@@ -194,6 +194,76 @@ def test_the_diff_is_json_serializable():
     assert json.loads(json.dumps(diff)) == diff
 
 
+class TestRenderedDiff:
+    """The text table renders the same comparison, rather than its own.
+
+    None of this was covered before: no test exercised Solution.diff,
+    SolutionSequence.diff or printing.diff.
+    """
+
+    def test_a_moved_value_is_reported_as_a_percentage(self):
+        x = Variable("x_rend")
+        c = Variable("c_rend", 2.0)
+        m = Model(x, [x >= c])
+        baseline = m.solve(verbosity=0)
+        m.substitutions[c] = 4.0
+        text = m.solve(verbosity=0).diff(baseline)
+        assert "Cost Change" in text
+        assert "+100%" in text
+
+    def test_an_unchanged_cost_still_reports(self):
+        "A diff that found nothing should say so, not render empty."
+        x = Variable("x_same")
+        sol = Model(x, [x >= 1]).solve(verbosity=0)
+        assert "+0%" in sol.diff(sol)
+
+    def test_a_variable_absent_from_the_baseline_renders(self):
+        "This raised TypeError in the renderer's filter before the rewrite."
+        x, y = Variable("x_add"), Variable("y_add")
+        baseline = Model(x, [x >= 1]).solve(verbosity=0)
+        scenario = Model(x + y, [x >= 1, y >= 2]).solve(verbosity=0)
+        text = scenario.diff(baseline)
+        assert "(new)" in text
+
+    def test_a_variable_absent_from_the_scenario_renders(self):
+        "Baseline-only keys used to be dropped without a word."
+        x, y = Variable("x_rm"), Variable("y_rm")
+        baseline = Model(x + y, [x >= 1, y >= 2]).solve(verbosity=0)
+        scenario = Model(x, [x >= 1]).solve(verbosity=0)
+        assert "(only in baseline)" in scenario.diff(baseline)
+
+    def test_a_rewritten_objective_shows_both_costs_with_their_own_units(self):
+        """Minimizing a mass, then a price: no ratio exists between them.
+
+        Both values with their own units say what happened without needing a
+        percentage, which is why no explanatory field is carried.
+        """
+        mass = Variable("m_obj", "kg")
+        m_min = Variable("m_obj_min", 100.0, "kg")
+        baseline = Model(mass, [mass >= m_min]).solve(verbosity=0)
+        price = Variable("p_obj", "USD")
+        p_min = Variable("p_obj_min", 40.0, "USD")
+        scenario = Model(price, [price >= p_min]).solve(verbosity=0)
+
+        d = diff_solutions(baseline.to_ir(), scenario.to_ir())
+        assert d["cost"]["dimension_changed"] == ["kilogram", "USD"]
+        assert "rel" not in d["cost"]
+        assert d["changed"] is True
+
+        text = scenario.diff(baseline)
+        assert "40$" in text and "100kg" in text
+        assert "%" not in text.split("Free Variable")[0]  # no bogus percentage
+
+    def test_a_sweep_diffs_against_one_baseline_per_point(self):
+        x = Variable("x_sw")
+        c = Variable("c_sw", 2.0)
+        m = Model(x, [x >= c])
+        baseline = m.solve(verbosity=0)
+        sweep = m.sweep({c: [2.0, 4.0]}, verbosity=0)
+        text = sweep.diff(baseline)
+        assert "+0%" in text and "+100%" in text  # one column per sweep point
+
+
 def test_changed_agrees_with_almost_equal():
     "almost_equal is this same comparison collapsed to a boolean."
     x = Variable("x_cmp")

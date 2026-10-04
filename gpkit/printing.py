@@ -7,7 +7,9 @@ from typing import Any
 
 import numpy as np
 
+from .ir import diff_solutions
 from .util.repr_conventions import unitstr
+from .varmap import is_veckey
 
 Item = tuple[Any, Any]
 
@@ -32,23 +34,27 @@ class ItemSource:
 
 
 @dataclass(frozen=True, slots=True)
-class DiffPair:
-    "Difference between new and old"
+class DiffRow:
+    """One row of a diff: the comparison, plus both values for context.
 
+    The comparison is read from ir.diff_solutions rather than recomputed here, so
+    the table and sol.almost_equal agree by construction.  rel is nan where no
+    ratio exists -- a quantity only one side has, or one that grew away from zero.
+    """
+
+    rel: Any
     new: Any
     old: Any
-
-    def rel(self):
-        "simple relative difference"
-        return np.asarray(self.new) / np.asarray(self.old) - 1
+    old_units: str = ""  # the baseline's own units, which need not be the new ones
 
     @property
     def shape(self):
-        "shape is inferred from new (old must match or be scalar)"
-        s = np.shape(self.new)
-        if np.shape(self.old):
-            assert np.shape(self.old) == s
-        return s
+        "Drives the section machinery's scalar-vs-vector handling."
+        return np.shape(self.rel)
+
+    @property
+    def no_ratio(self) -> bool:
+        return not np.shape(self.rel) and np.isnan(self.rel)
 
 
 class SectionSpec:
@@ -495,55 +501,106 @@ class SlackConstraints(Constraints):
         return lambda x: abs(x[1]) <= self.maxsens
 
 
+def _rel_magnitude(row) -> float:
+    "Largest |rel|; a missing ratio outranks any number, being news in itself."
+    rel = np.asarray(row.rel, dtype=float)
+    if np.isnan(rel).any():
+        return float("inf")
+    return float(np.max(np.abs(rel))) if rel.size else 0.0
+
+
 class DiffSection(SectionSpec):
+    "A section whose numbers come from ir.diff_solutions."
+
+    diff_section = None  # which part of that output supplies this section's rel
+    sortkey = staticmethod(lambda kv: (-rounded_mag(_rel_magnitude(kv[1])), str(kv[0])))
+    # an unchanged quantity says nothing; a missing ratio is itself worth a row
+    filterfun = staticmethod(lambda kv: _rel_magnitude(kv[1]) != 0)
+
+    def items_from(self, ctx):
+        return ctx.diff_items(self.source, self.diff_section)
+
     def row_from(self, item):
         "still abstract at this level"
         raise NotImplementedError
 
     def _width_array(self, v):
         "Use relative change when inferring widths for diff-style sections."
-        return v.rel()
+        return v.rel
+
+    def _pctstr(self, row) -> str:
+        "The relative change, or what happened instead of one."
+        if row.old is None:
+            return "(new)"
+        if row.new is None:
+            return "(only in baseline)"
+        if row.no_ratio:
+            return ""  # a rewritten objective, say: the two values speak for it
+        return self._fmt_val(np.asarray(row.rel) * 100, suff="%")
+
+    def _bothstr(self, row, units) -> str:
+        "Both values, each with its own units, which need not be the same ones."
+        if row.new is None or row.old is None or np.shape(row.rel):
+            return ""
+        return f"({row.new:.4g}{units} vs {row.old:.4g}{row.old_units})"
+
+    def _relstr(self, row, units) -> str:
+        parts = (self._pctstr(row), self._bothstr(row, units))
+        return "  ".join(p for p in parts if p)
 
 
 class DiffCost(DiffSection):
     title = "Cost Change"
     source = staticmethod(Cost.source)
+    diff_section = "cost"
+    filterfun = None  # the headline number, reported even when it did not move
     pm = "+"
 
     def row_from(self, item):
-        key, pair = item
+        key, row = item
         name = key.str_without("units") if key else "cost"
         u = unitstr(key, into="%s", dimless="")
-        vec = np.shape(pair.rel())
-        return [
-            f"{name} :",
-            f"{self._fmt_val(pair.rel() * 100, suff='%')}",
-            f"({pair.new:.4g}{u} vs {pair.old:.4g}{u})" if not vec else "",
-        ]
+        return [f"{name} :", self._pctstr(row), self._bothstr(row, u)]
 
 
 class DiffFreeVariables(DiffSection):
     title = "Free Variable Changes"
     source = staticmethod(FreeVariables.source)
-    sortkey = staticmethod(
-        lambda kv: (-rounded_mag(np.max(np.abs(kv[1].rel()))), str(kv[0]))
-    )
+    diff_section = "primal"
     pm = "+"
     align = "><<"
 
-    # filter out zero vals
-    filterfun = staticmethod(lambda kv: np.any(kv[1].rel() != 0))
+    def row_from(self, item):
+        key, row = item
+        u = unitstr(key, into="%s", dimless="")
+        return [f"{key.str_without('lineage')} :", self._relstr(row, u), key.label]
+
+
+class DiffConstants(DiffFreeVariables):
+    title = "Constant Changes"
+    source = ItemSource("constants")
+    diff_section = "constants"
+
+
+class DiffSensitivities(DiffSection):
+    """Sensitivities moved by a difference, not a ratio.
+
+    They are already log derivatives, so a percentage of one would be a
+    percentage of a derivative -- the swing itself is the readable number.
+    """
+
+    title = "Sensitivity Changes"
+    source = ItemSource("sens.variables")
+    diff_section = "sensitivities"
+    pm = "+"
+    align = "><<"
 
     def row_from(self, item):
-        key, pair = item
-        name = key.str_without("lineage")
-        u = unitstr(key, into="%s", dimless="")
-        label = key.label
-        rel = pair.rel()
-        diffstr = f"{self._fmt_val(rel * 100, suff='%')}"
-        if not np.shape(rel):
-            diffstr += f"  ({pair.new:.4g}{u} vs {pair.old:.4g}{u})"
-        return [f"{name} :", diffstr, label]
+        key, row = item
+        diffstr = self._fmt_val(row.rel)
+        if not np.shape(row.rel):
+            diffstr += f"  ({row.new:+.4g} vs {row.old:+.4g})"
+        return [f"{key.str_without('lineage')} :", diffstr, key.label]
 
 
 class ConditionTable(SectionSpec):
@@ -632,6 +689,8 @@ SECTION_SPECS = {
 DIFF_SECTION_SPECS = {
     "cost": DiffCost,
     "freevariables": DiffFreeVariables,
+    "constants": DiffConstants,
+    "sensitivities": DiffSensitivities,
 }
 
 
@@ -704,16 +763,101 @@ class SequenceContext:
 
 @dataclass(frozen=True, slots=True)
 class DiffContext:
-    "Adapter that provides (key, DiffPair(new, old)) items."
+    """Adapter that provides (key, DiffRow) items.
+
+    The numbers come from ir.diff_solutions over the two solutions' IR, and the
+    live keys come from the solutions themselves -- refs to compare with, objects
+    to name and label with.  A sequence is N one-to-one diffs with their ratios
+    stacked, which enables sweep comparisons.
+    """
 
     new: Any  # SolutionContext or SequenceContext
     baseline: Any  # Solution-like
 
-    def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
-        "Items are (key, DiffPair)"
+    @property
+    def _scenarios(self) -> list:
+        "The solutions on the new side: one, or a sweep's many."
+        return list(getattr(self.new, "sols", None) or [self.new.sol])
+
+    def diff_items(self, source, section: str) -> Iterable[Item]:
+        "Items are (key, DiffRow), one per key the new side shows."
+        baseline_ir = self.baseline.to_ir()
+        diffs = [diff_solutions(baseline_ir, s.to_ir()) for s in self._scenarios]
+        rels = [_rel_by_scenario_ref(d, section) for d in diffs]
+
         new_items = list(self.new.items(source))
         old_items = dict(SolutionContext(self.baseline).items(source))
-        return [(k, DiffPair(v, old_items.get(k))) for k, v in new_items]
+        varset = self.baseline.primal.varset
+        # A solution has exactly one cost, so its value pairs by position -- keying
+        # on the expression would fail the moment the objective is rewritten, which
+        # a scenario may legitimately do, and nothing can be "dropped" either.
+        is_cost = section == "cost"
+        out = []
+        for key, value in new_items:
+            rel = _stack_rel(rels, key, varset, scalar=len(diffs) == 1)
+            old_key, old = _baseline_entry(old_items, key, positional=is_cost)
+            out.append((key, DiffRow(rel, value, old, _display_units(old_key))))
+        if is_cost:
+            return out
+        shown = {key for key, _ in new_items}
+        for key, value in old_items.items():  # dropped, not merely unchanged
+            if key not in shown:
+                out.append(
+                    (key, DiffRow(float("nan"), None, value, _display_units(key)))
+                )
+        return out
+
+
+def _display_units(key) -> str:
+    "The units to print a baseline value in -- its own, not the scenario's."
+    return "" if key is None else unitstr(key, into="%s", dimless="")
+
+
+def _baseline_entry(old_items: dict, key, positional: bool):
+    "The baseline's (key, value) for a scenario key, or (None, None) if it has none."
+    if positional:
+        return next(iter(old_items.items()), (None, None))
+    return (key, old_items[key]) if key in old_items else (None, None)
+
+
+def _rel_by_scenario_ref(diff: dict, section: str) -> dict:
+    """One diff's comparisons, keyed by the ref the scenario uses.
+
+    diff_solutions keys by the baseline's ref; the table walks the new side, so a
+    redeclared unit has to be followed to the scenario's spelling.
+    """
+    if section == "cost":  # one scalar, under the name _stack_rel looks it up by
+        return {"cost": diff["cost"].get("rel", float("nan"))}
+    part = diff.get(section, {})
+    if section == "sensitivities":
+        part = part.get("variables", {})
+    redeclared = part.get("units_redeclared", {})
+    return {
+        redeclared.get(ref, ref): value
+        for ref, value in part.get("matched", {}).items()
+    }
+
+
+def _stack_rel(rels: list[dict], key, varset, scalar: bool):
+    """This key's comparison, across however many scenarios there are.
+
+    A vector shows one row per parent, so its elements' numbers are gathered back
+    into the parent's shape -- the IR carries elements only, by design.
+    """
+    nan = float("nan")
+
+    def one(rel: dict):
+        # Only the cost's key is an expression rather than a VarKey, so it alone
+        # has no ref; the diff files its comparison under "cost".
+        ref = getattr(key, "ref", "cost")
+        elements = varset.by_vec(key) if is_veckey(key) else None
+        if elements is None or not elements.size:
+            return rel.get(ref, nan)
+        flat = [rel.get(getattr(vk, "ref", None), nan) for vk in elements.flat]
+        return np.array(flat).reshape(elements.shape)
+
+    stacked = [one(rel) for rel in rels]
+    return stacked[0] if scalar else np.array(stacked)
 
 
 def table(

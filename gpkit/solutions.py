@@ -152,7 +152,8 @@ def _value_ir(value, units: str) -> dict:
 
 def _varmap_ir(vmap: VarMap) -> dict:
     "Vector elements appear individually; Model.to_ir() holds the parent."
-    return {vk.ref: _value_ir(v, ir_units(vk)) for vk, v in vmap.items()}
+    # Units as the model IR spells them, so the two documents join cleanly.
+    return {vk.ref: _value_ir(v, vk.to_ir().get("units", "")) for vk, v in vmap.items()}
 
 
 def _subject_ir(sol, warning: dict) -> dict:
