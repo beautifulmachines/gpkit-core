@@ -193,6 +193,9 @@ class ConstraintSet(list, ReprMixin):
             self.vks.update(bonusvks)
         if substitutions:
             self.substitutions.update(substitutions)
+        # A substituted variable is a parameter of the problem whether or not a
+        # constraint mentions it; setup() already keeps its own unused ones.
+        self.vks.update(self.substitutions)
         for key in self.vks:
             if key not in self.substitutions:
                 continue
