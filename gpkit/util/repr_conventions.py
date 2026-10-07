@@ -500,13 +500,26 @@ def _render_ast_node_latex(node, excluded):
 # gpkit.toml._printer.ast_to_expr for the default and multi-model resolver.
 
 
+# A double represents every integer only up to 2**53, so beyond it an integer
+# spelling would claim precision the value does not carry -- and TOML integers are
+# 64-bit, which a longer literal would overflow.
+_LARGEST_EXACT_INTEGRAL_FLOAT = 2**53
+
+
 def _toml_format_number(v):
-    "Format a number for TOML expression output."
+    """Format a number for TOML output, exactly.
+
+    TOML is read back by a parser, not by a person, so this is a serializer and
+    must not shorten: repr of a float is the shortest spelling that reads back as
+    the same value.  An integral value still prints as an integer, which costs no
+    precision and keeps exponents reading as x**2.
+    """
     if isinstance(v, int):
         return str(v)
-    if isinstance(v, float) and v == int(v) and abs(v) < 1e15:
-        return str(int(v))
-    return f"{v:.4g}"
+    f = float(v)  # also normalizes numpy scalars, whose repr carries their type
+    if f.is_integer() and abs(f) <= _LARGEST_EXACT_INTEGRAL_FLOAT:
+        return str(int(f))
+    return repr(f)
 
 
 def _toml_format_slice(s):
