@@ -8,8 +8,29 @@ from gpkit.examples.uav import UAV
 from gpkit.toml import load_toml
 from gpkit.toml._printer import _ref_to_name, ast_to_expr, to_toml
 from gpkit.util.globals import NamedVariables
+from gpkit.util.repr_conventions import _toml_format_number
 from gpkit.util.small_scripts import mag
 from gpkit.varkey import VarKey
+
+# ---------------------------------------------------------------------------
+# Numbers
+# ---------------------------------------------------------------------------
+
+
+class TestNumberFormatting:
+    """to_toml output is parser input, so a number has to survive being read back."""
+
+    @pytest.mark.parametrize(
+        "value", [0.1, 1 / 3, 1.23456789, 1.2345678901234e-7, 6.02214076e23, 2.5]
+    )
+    def test_exact(self, value):
+        assert float(_toml_format_number(value)) == value
+
+    @pytest.mark.parametrize("value", [2, 2.0, -3.0, 0])
+    def test_integral_values_stay_readable(self, value):
+        "An integral number reads as an integer, so exponents print as x**2."
+        assert _toml_format_number(value) == str(int(value))
+
 
 # ---------------------------------------------------------------------------
 # AST → expression string
@@ -218,6 +239,19 @@ class TestRoundTrip:
         assert mag(sol1["h"]) == pytest.approx(mag(sol2["h"]), rel=1e-5)
         assert mag(sol1["w"]) == pytest.approx(mag(sol2["w"]), rel=1e-5)
         assert mag(sol1["d"]) == pytest.approx(mag(sol2["d"]), rel=1e-5)
+
+    def test_constant_precision_survives_round_trip(self):
+        """A stored constant reads back as the number it was (#296).
+
+        to_toml output is parser input, not a printed table, so rounding it to a
+        readable number of digits silently changes the model.  Asserted on the
+        substitution rather than the solved cost, since the solver's own tolerance
+        is around 1e-9 and would hide a loss this size.
+        """
+        x = Variable("x", "m")
+        c = Variable("c", 1.23456789, "m")
+        m2 = load_toml(to_toml(Model(x, [x >= c])))
+        assert {k.ref: v for k, v in m2.substitutions.items()} == {"c|m": 1.23456789}
 
     def test_unreferenced_constant_survives_round_trip(self):
         """A declared constant no constraint uses is still written back out (#214).
