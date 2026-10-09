@@ -23,6 +23,7 @@ from .solutions import SolutionSequence
 from .tools.autosweep import autosweep_1d
 from .util.globals import NamedVariables, Vectorize
 from .var import Var
+from .varinfo import classify_variables
 from .varmap import FrozenVarSet, VarMap
 
 
@@ -296,8 +297,15 @@ class Model(CostedConstraintSet):
         return self._child_attrs[head].get_var(rest)
 
     def to_ir(self):
-        "Serialize this Model to a complete IR document dict."
+        """Serialize this Model to a complete IR document dict.
+
+        Each variable states its `kind`; a reader should not infer free-vs-fixed
+        from `substitutions`, because a vector's substitutions sit on its elements
+        and never on its veckey, so a wholly fixed vector has no entry of its own.
+        """
         variables = self.vks.to_ir()
+        for info in classify_variables(self.vks, self.substitutions):
+            variables[info.key.ref]["kind"] = info.kind.value
 
         # Serialize cost
         cost_ir = self.cost.to_ir()

@@ -10,7 +10,7 @@ from .util.repr_conventions import unitstr
 # Bump the major when a field is removed, re-keyed, or changes meaning; bump the
 # minor when one is added, or starts appearing where it did not before. Readers
 # check the major alone, so a minor bump never breaks one.
-IR_VERSION = "2.0"
+IR_VERSION = "2.1"
 
 
 def check_ir_version(doc):
