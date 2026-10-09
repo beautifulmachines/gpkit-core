@@ -71,6 +71,38 @@ class TestParseVarSpec:
         assert units is None
         assert label == "aspect ratio"
 
+    def test_value_list_with_units(self):
+        value, units, label = _parse_var_spec("[0.1, 0.18, 0.3] m^3/s")
+        assert value == [0.1, 0.18, 0.3]
+        assert units == "m^3/s"
+        assert label is None
+
+    def test_value_list_dimensionless(self):
+        value, units, label = _parse_var_spec("[1, 2, 3]")
+        assert value == [1.0, 2.0, 3.0]
+        assert units is None
+        assert label is None
+
+    def test_value_list_with_desc(self):
+        value, units, label = _parse_var_spec(["[1, 2] hr", "operating hours"])
+        assert value == [1.0, 2.0]
+        assert units == "hr"
+        assert label == "operating hours"
+
+    def test_value_list_rejects_non_numbers(self):
+        with pytest.raises(TomlParseError, match="only numbers"):
+            _parse_var_spec("[1, two, 3] m")
+
+    def test_value_list_length_must_match_the_vector(self):
+        with pytest.raises(TomlParseError, match="but was given"):
+            load_toml("""
+[vectors.3]
+q = "[1, 2] m"
+[model]
+objective = "min: sum(q)"
+constraints = ["sum(q) >= 1*units('m')"]
+""")
+
     def test_array_number_with_desc(self):
         value, units, label = _parse_var_spec([2, "lower limit"])
         assert value == 2

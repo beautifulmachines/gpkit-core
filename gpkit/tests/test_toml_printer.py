@@ -1,6 +1,7 @@
 "Tests for the TOML printer (AST → expression strings, Model → TOML)."
 
 import tomllib
+from pathlib import Path
 
 import pytest
 
@@ -13,6 +14,9 @@ from gpkit.util.globals import NamedVariables
 from gpkit.util.repr_conventions import _toml_format_number
 from gpkit.util.small_scripts import mag
 from gpkit.varkey import VarKey
+
+# The documents literalincluded by docs/source/tomlmodels.rst
+TOML_EXAMPLES = Path(__file__).parents[2] / "docs" / "source" / "examples" / "toml"
 
 # ---------------------------------------------------------------------------
 # Numbers
@@ -235,6 +239,16 @@ class TestRoundTrip:
         sol2 = m2.solve(verbosity=0)
 
         return sol1, sol2
+
+    @pytest.mark.parametrize("path", sorted(TOML_EXAMPLES.glob("*.toml")), ids=str)
+    def test_every_documented_example_round_trips(self, path):
+        """Every file in docs/source/examples/toml, so a new one can't go untested.
+
+        These back the literalincludes in docs/source/tomlmodels.rst: the page
+        can only show a document that loads, solves, and survives to_toml.
+        """
+        sol1, sol2 = self._round_trip(path)
+        assert mag(sol1.cost) == pytest.approx(mag(sol2.cost), rel=1e-5)
 
     def test_simple_box_round_trip(self):
         sol1, sol2 = self._round_trip("docs/source/examples/toml/simple_box.toml")
