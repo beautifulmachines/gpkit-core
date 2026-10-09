@@ -79,8 +79,15 @@ The model section
       "V == d[0]*d[1]*d[2]",
     ]
 
-Expressions use ``*``, ``/``, ``**``, ``+``, and the comparisons ``>=``, ``<=``, ``==``. A unit
-literal can be written ``units('W')`` where a bare conversion factor is needed.
+Expressions use ``+``, ``*``, ``/`` and ``**``, with the comparisons ``>=``, ``<=`` and ``==``.
+Three function calls are allowed and no others: ``sum()`` and ``prod()`` over a vector, and
+``units('W')`` for a unit literal where a bare conversion factor is needed.
+
+``-`` works between *numbers* only — a named dimension or a literal, as in ``(N-1)*dx`` below.
+Subtracting one variable from another is not a GP-compatible constraint and gpkit's variables
+have no subtraction operator, so it is rejected rather than quietly turned into a signomial. To
+write a constraint of that form, build the model in Python under ``SignomialsEnabled`` (see
+:doc:`signomialprogramming`).
 
 Submodels
 =========
