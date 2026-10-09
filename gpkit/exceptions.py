@@ -49,6 +49,10 @@ class IRSerializationError(RuntimeError):
     "Raised by to_ir() when a model or constraint cannot be serialized to IR"
 
 
+class IRVersionError(ValueError):
+    "Raised when reading an IR document whose gpkit_ir_version this gpkit cannot read"
+
+
 class VariableNotFound(LookupError):
     "Raised by get_var() when no variable matches the given dotted path"
 

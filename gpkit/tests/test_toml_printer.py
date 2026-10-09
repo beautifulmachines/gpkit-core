@@ -516,6 +516,45 @@ class TestVectorValues:
 
 
 # ---------------------------------------------------------------------------
+# String escaping
+# ---------------------------------------------------------------------------
+
+
+class TestStringEscaping:
+    """Emitted strings are TOML basic strings, so their content is escaped (#309)."""
+
+    @pytest.mark.parametrize(
+        "label",
+        [
+            r"\Delta (2y/b)",  # gassolar's LaTeX label, the case that found this
+            'a "quoted" word',
+            'back\\slash and "quote"',
+            "two\nlines",
+            "a\ttab",
+            "ends with a backslash\\",
+        ],
+    )
+    def test_label_survives_whatever_it_holds(self, label):
+        x = Variable("x", "m", label)
+        toml_str = to_toml(Model(x, [x >= 1 * units("m")]))
+        assert tomllib.loads(toml_str)["vars"]["x"][1] == label
+
+    def test_name_and_description_are_escaped(self):
+        "Both are read from a document rather than emitted by Model.to_ir()."
+        x = Variable("x", "m")
+        ir = Model(x, [x >= 1 * units("m")]).to_ir()
+        ir["name"], ir["description"] = 'a "name"', "a \\ description"
+        doc = tomllib.loads(to_toml(ir))
+        assert (doc["name"], doc["description"]) == ('a "name"', "a \\ description")
+
+    def test_label_round_trips_through_gpkit(self):
+        label = r"\Delta (2y/b)"
+        x = Variable("x", "m", label)
+        m2 = load_toml(to_toml(Model(x, [x >= 1 * units("m")])))
+        assert m2.vks.resolve("x").label == label
+
+
+# ---------------------------------------------------------------------------
 # _ref_to_name: lineage and suffix stripping
 # ---------------------------------------------------------------------------
 

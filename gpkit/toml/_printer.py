@@ -6,6 +6,7 @@ import types
 import numpy as np
 
 from ..ast_nodes import ast_from_ir
+from ..ir import check_ir_version
 from ..util.repr_conventions import _toml_format_number as _format_number
 
 # ---------------------------------------------------------------------------
@@ -28,6 +29,28 @@ def _ref_to_name(ref):
     bare = _REF_STRIP.sub("", ref)
     # Strip lineage prefix: "Aircraft0.Wing0.S" → "S"
     return bare.rsplit(".", 1)[-1]
+
+
+# ---------------------------------------------------------------------------
+# Quoting
+# ---------------------------------------------------------------------------
+
+# A TOML basic string may hold no character below 0x20, nor 0x7f.  The named
+# escapes come second, so they win over \uXXXX for the characters TOML names.
+_ESCAPES = str.maketrans(
+    {ordinal: f"\\u{ordinal:04x}" for ordinal in [*range(0x20), 0x7F]}
+    | {"\\": r"\\", '"': r"\"", "\b": r"\b", "\t": r"\t"}
+    | {"\n": r"\n", "\f": r"\f", "\r": r"\r"}
+)
+
+
+def _quote(text):
+    """A TOML basic string holding exactly `text`.
+
+    Every quoted string the printer emits goes through here, so a label
+    carrying LaTeX or a quote cannot break the document.
+    """
+    return '"' + str(text).translate(_ESCAPES) + '"'
 
 
 # ---------------------------------------------------------------------------
@@ -351,20 +374,18 @@ def to_toml(source, path=None):
     str
         The generated TOML string.
     """
-    if hasattr(source, "to_ir"):
-        ir = source.to_ir()
-    else:
-        ir = source
+    ir = source.to_ir() if hasattr(source, "to_ir") else source
+    check_ir_version(ir)
 
     lines = []
 
     # --- name/description ---
     name = ir.get("name", "")
     if name:
-        lines.append(f'name = "{name}"')
+        lines.append(f"name = {_quote(name)}")
     desc = ir.get("description", "")
     if desc:
-        lines.append(f'description = "{desc}"')
+        lines.append(f"description = {_quote(desc)}")
     if name or desc:
         lines.append("")
 
@@ -404,14 +425,13 @@ def _emit_single_model(ir, lines):
     lines.append("[model]")
     cost_ir = ir.get("cost", {})
     direction, cost_str = _format_objective(cost_ir)
-    lines.append(f'objective = "{direction}: {cost_str}"')
+    lines.append(f"objective = {_quote(f'{direction}: {cost_str}')}")
 
     constraints = ir.get("constraints", [])
     if constraints:
         lines.append("constraints = [")
         for c in constraints:
-            cstr = constraint_to_expr(c)
-            lines.append(f'  "{cstr}",')
+            lines.append(f"  {_quote(constraint_to_expr(c))},")
         lines.append("]")
 
 
@@ -498,11 +518,11 @@ def _emit_model_section(  # noqa: PLR0913, PLR0917
     # Objective (root only)
     if is_root and cost_ir:
         direction, cost_str = _format_objective(cost_ir, name_fn)
-        lines.append(f'objective = "{direction}: {cost_str}"')
+        lines.append(f"objective = {_quote(f'{direction}: {cost_str}')}")
 
     # Submodels
     if child_ids:
-        child_str = ", ".join(f'"{cid}"' for cid in child_ids)
+        child_str = ", ".join(_quote(cid) for cid in child_ids)
         lines.append(f"submodels = [{child_str}]")
 
     # Constraints
@@ -510,8 +530,7 @@ def _emit_model_section(  # noqa: PLR0913, PLR0917
     if node_constraints:
         lines.append("constraints = [")
         for c in node_constraints:
-            cstr = constraint_to_expr(c, name_fn)
-            lines.append(f'  "{cstr}",')
+            lines.append(f"  {_quote(constraint_to_expr(c, name_fn))},")
         lines.append("]")
 
     # Last, because a TOML key belongs to the most recently opened table: this
@@ -541,20 +560,21 @@ def _format_values(value):
 
 
 def _format_var_line(name, value, units, label):
-    """Format a single variable line for TOML output."""
+    """Format a single variable line for TOML output.
+
+    `value` is a number, a list of them, or None for a free variable. A
+    dimensionless scalar constant is the one spec that reads as a bare TOML
+    number rather than a string.
+    """
     if value is None:
-        spec = units if units is not None else "-"
+        spec = _quote(units if units is not None else "-")
     elif units is not None:
-        spec = f"{_format_values(value)} {units}"
+        spec = _quote(f"{_format_values(value)} {units}")
     elif isinstance(value, list):
-        spec = _format_values(value)
+        spec = _quote(_format_values(value))
     else:
-        spec = value if isinstance(value, (int, float)) else str(value)
+        spec = _format_number(value)
 
     if label:
-        if isinstance(spec, (int, float)):
-            return f'{name} = [{spec}, "{label}"]'
-        return f'{name} = ["{spec}", "{label}"]'
-    if isinstance(spec, (int, float)):
-        return f"{name} = {spec}"
-    return f'{name} = "{spec}"'
+        return f"{name} = [{spec}, {_quote(label)}]"
+    return f"{name} = {spec}"
