@@ -1,8 +1,10 @@
 "Tests for the TOML printer (AST → expression strings, Model → TOML)."
 
+import tomllib
+
 import pytest
 
-from gpkit import Model, Variable, VectorVariable, units
+from gpkit import Model, Variable, Vectorize, VectorVariable, units
 from gpkit.ast_nodes import ConstNode, ExprNode, UnitsNode, VarNode
 from gpkit.examples.uav import UAV
 from gpkit.toml import load_toml
@@ -395,6 +397,58 @@ class TestMultiInstanceModels:
         sol2 = m2.solve(verbosity=0)
 
         assert mag(sol1.cost) == pytest.approx(mag(sol2.cost), rel=1e-5)
+
+
+# ---------------------------------------------------------------------------
+# Vectorized submodels: one component exercised at several conditions
+# ---------------------------------------------------------------------------
+
+
+class TestVectorizedSubmodel:
+    """A submodel built under Vectorize owns vector elements, so its section
+    has to declare the vector its parent model never wrote down (#295)."""
+
+    def _duty_model(self):
+        NamedVariables.reset_modelnumbers()
+
+        class Condition(Model):
+            def setup(self):
+                self.P = Variable("P", "W")
+                self.Q = Variable("Q", 2, "m^3/s")
+                return [self.P >= self.Q * Variable("k", 3, "Pa")]
+
+        class Duty(Model):
+            def setup(self, n=3):
+                self.P_rated = Variable("P_rated", "W")
+                with Vectorize(n):
+                    self.cond = Condition()
+                self.cost = self.P_rated
+                return [self.cond, self.P_rated >= self.cond.P]
+
+        return Duty()
+
+    def test_emits_the_vector_in_its_owning_section(self):
+        toml_str = to_toml(self._duty_model())
+        assert "[models.Condition.vectors.3]" in toml_str
+        assert 'P = "W"' in toml_str
+
+    def test_section_keys_are_not_swallowed_by_the_vectors_subtable(self):
+        """objective/submodels/constraints must not land inside [.vectors.N].
+
+        TOML has no close-table, so a sub-table has to be emitted after the
+        section's own keys or they are parsed as belonging to it.
+        """
+        doc = tomllib.loads(to_toml(self._duty_model()))
+        assert "constraints" in doc["models"]["Condition"]
+        assert "constraints" not in doc["models"]["Condition"]["vectors"]["3"]
+        assert doc["models"]["Duty"]["objective"] == "min: P_rated"
+
+    def test_round_trip(self):
+        m1 = self._duty_model()
+        m2 = load_toml(to_toml(m1))
+        assert mag(m2.solve(verbosity=0).cost) == pytest.approx(
+            mag(m1.solve(verbosity=0).cost), rel=1e-5
+        )
 
 
 # ---------------------------------------------------------------------------
