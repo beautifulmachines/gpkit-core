@@ -3,6 +3,8 @@
 import re
 import types
 
+import numpy as np
+
 from ..ast_nodes import ast_from_ir
 from ..util.repr_conventions import _toml_format_number as _format_number
 
@@ -223,9 +225,25 @@ def _by_shape(vector_groups):
 
 
 def _format_vector_line(group, substitutions):
-    "Format one vector's declaration line, valued from its first element."
-    first_ref = group["elements"][0][0] if group["elements"] else None
-    value = substitutions.get(first_ref) if first_ref else None
+    """Format one vector's declaration line.
+
+    A vector whose elements share one value declares that value; one whose
+    elements differ declares them all, in the vector's own index order.
+    """
+    values = np.full(tuple(group["shape"]), None, dtype=object)
+    for ref, info in group["elements"]:
+        values[tuple(info["idx"])] = substitutions.get(ref)
+
+    distinct = set(values.flat)
+    if len(distinct) == 1:
+        value = distinct.pop()  # one shared value, or None for a free vector
+    elif None in distinct:
+        raise ValueError(
+            f"cannot write vector '{group['name']}' to TOML: it is partially "
+            f"fixed, which the format cannot express"
+        )
+    else:
+        value = values.tolist()
     return _format_var_line(group["name"], value, group["units"], group["label"])
 
 
@@ -515,16 +533,23 @@ def _emit_lines(lines, path):
     return result
 
 
+def _format_values(value):
+    "Render a number, or a vector's elements as a bracketed list."
+    if isinstance(value, list):
+        return "[" + ", ".join(_format_values(v) for v in value) + "]"
+    return _format_number(value)
+
+
 def _format_var_line(name, value, units, label):
     """Format a single variable line for TOML output."""
-    if value is not None and units is not None:
-        spec = f"{_format_number(value)} {units}"
-    elif value is not None:
-        spec = value if isinstance(value, (int, float)) else str(value)
+    if value is None:
+        spec = units if units is not None else "-"
     elif units is not None:
-        spec = units
+        spec = f"{_format_values(value)} {units}"
+    elif isinstance(value, list):
+        spec = _format_values(value)
     else:
-        spec = "-"
+        spec = value if isinstance(value, (int, float)) else str(value)
 
     if label:
         if isinstance(spec, (int, float)):

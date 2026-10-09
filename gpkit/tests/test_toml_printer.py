@@ -452,6 +452,56 @@ class TestVectorizedSubmodel:
 
 
 # ---------------------------------------------------------------------------
+# Vector constant values
+# ---------------------------------------------------------------------------
+
+
+class TestVectorValues:
+    """A vector constant's elements need not share one value (#307)."""
+
+    @staticmethod
+    def _model(values, n=3):
+        x = Variable("x", "m")
+        q = VectorVariable(n, "q", "m", "per-element demand")
+        m = Model(x, [x >= q.sum()])
+        if values is not None:
+            m.substitutions[q] = values
+        return m
+
+    def test_per_element_values_are_all_written(self):
+        toml_str = to_toml(self._model([0.1, 0.25, 0.4]))
+        assert 'q = ["[0.1, 0.25, 0.4] m", "per-element demand"]' in toml_str
+
+    def test_uniform_vector_keeps_the_scalar_form(self):
+        "No output churn for the common case."
+        assert 'q = ["0.2 m", "per-element demand"]' in to_toml(
+            self._model([0.2, 0.2, 0.2])
+        )
+
+    def test_free_vector_declares_units_only(self):
+        assert 'q = ["m", "per-element demand"]' in to_toml(self._model(None))
+
+    def test_round_trip_preserves_each_element(self):
+        m2 = load_toml(to_toml(self._model([0.1, 0.25, 0.4])))
+        assert [float(v) for v in m2.substitutions["q"]] == [0.1, 0.25, 0.4]
+
+    def test_order_survives_double_digit_indices(self):
+        """Element order is the vector's, not its refs' -- "q[10]" < "q[2]"."""
+        values = [float(i) + 0.5 for i in range(12)]
+        m2 = load_toml(to_toml(self._model(values, n=12)))
+        assert [float(v) for v in m2.substitutions["q"]] == values
+
+    def test_partially_fixed_vector_is_refused(self):
+        "Some elements fixed and others free has no TOML spelling."
+        x = Variable("x", "m")
+        q = VectorVariable(3, "q", "m")
+        m = Model(x, [x >= q.sum()])
+        m.substitutions[q[0]] = 0.1
+        with pytest.raises(ValueError, match="partially fixed"):
+            to_toml(m)
+
+
+# ---------------------------------------------------------------------------
 # _ref_to_name: lineage and suffix stripping
 # ---------------------------------------------------------------------------
 

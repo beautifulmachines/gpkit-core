@@ -29,6 +29,19 @@ class TomlParseError(Exception):
 # Matches a leading number (int, float, or scientific) followed by units
 _NUMERIC_PREFIX = re.compile(r"^([+-]?(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?)\s+(.*)")
 
+# Matches a leading bracketed list of per-element values, optionally then units
+_LIST_PREFIX = re.compile(r"^\[(.*)\]\s*(.*)$")
+
+
+def _parse_value_list(inner, raw):
+    "Parse the comma-separated numbers inside a vector value list."
+    try:
+        return [float(part) for part in inner.split(",")]
+    except ValueError:
+        raise TomlParseError(
+            f"Vector value list must hold only numbers: {raw!r}"
+        ) from None
+
 
 def _parse_var_spec(raw):
     """Parse a variable declaration value from TOML.
@@ -45,6 +58,11 @@ def _parse_var_spec(raw):
         ["200 m^2", "desc"]-> (200.0, "m^2", "desc")     param with label
         ["-", "desc"]      -> (None, None, "desc")        dimensionless + label
         [2, "desc"]        -> (2, None, "desc")           param + label
+
+    A vector whose elements differ declares them all, and `value` is then a
+    list:
+        "[1, 2, 3] m"      -> ([1.0, 2.0, 3.0], "m", None)
+        "[1, 2, 3]"        -> ([1.0, 2.0, 3.0], None, None)
     """
     if isinstance(raw, list):
         if len(raw) != 2:
@@ -67,6 +85,9 @@ def _parse_var_spec(raw):
     if isinstance(raw, str):
         if raw == "-":
             return None, None, None
+        m = _LIST_PREFIX.match(raw)
+        if m:
+            return _parse_value_list(m.group(1), raw), m.group(2) or None, None
         m = _NUMERIC_PREFIX.match(raw)
         if m:
             return float(m.group(1)), m.group(2), None
@@ -103,6 +124,11 @@ def _make_vector_variable(name, shape, value, units, label):
     _validate_var_name(name)
     descr = {"name": name}
     if value is not None:
+        if isinstance(value, list) and np.shape(value) != np.shape(np.ones(shape)):
+            raise TomlParseError(
+                f"Vector '{name}' has shape {np.shape(np.ones(shape))} but was "
+                f"given {np.shape(value)} values"
+            )
         descr["value"] = np.ones(shape) * value
     if units is not None:
         descr["units"] = units
