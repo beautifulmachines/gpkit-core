@@ -39,6 +39,10 @@ description:
 A spec with a leading number fixes the variable at that value; a spec that is only units leaves
 it free for the solver to choose.
 
+``to_toml`` escapes what it writes, so a description may hold anything. When writing one by hand,
+TOML's literal strings take no escapes at all, which is easier for LaTeX:
+``deta = ["-", '\Delta (2y/b)']``.
+
 Vectors
 =======
 
@@ -133,6 +137,5 @@ A TOML round-trip is not yet lossless. Known gaps, each tracked as an issue:
   graph is flattened on load (#298)
 * named constraint groups are not written (#299)
 * vector constraints are scalarized into one line per element (#141)
-* labels and units are not escaped, so a label containing a backslash or quote produces an
-  unparseable document (#309)
 * a variable whose name is not a valid identifier cannot be written or read (#310)
+* a document's ``name`` and ``description`` are neither read nor written (#314)
