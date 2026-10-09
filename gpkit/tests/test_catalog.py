@@ -236,14 +236,6 @@ def test_catalog_to_ir(model_entry):
     run_catalog_to_ir(model_entry)
 
 
-# Open gpkit-core defects in the TOML printer, not in these models.
-_TOML_ROUNDTRIP_GAPS = {
-    "pipeline": "#295: to_toml raises on a vector element whose parent is elsewhere",
-}
-
-
-@pytest.mark.parametrize(
-    "model_entry", catalog_params(_CATALOG, xfail=_TOML_ROUNDTRIP_GAPS)
-)
+@pytest.mark.parametrize("model_entry", catalog_params(_CATALOG))
 def test_catalog_toml_roundtrip(model_entry):
     run_catalog_toml_roundtrip(model_entry)

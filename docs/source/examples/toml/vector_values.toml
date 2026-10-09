@@ -1,0 +1,19 @@
+name = "Vector Values"
+description = "The three ways a vector variable can be declared."
+
+[vars]
+C = ["-", "total cost"]
+c_flow = ["2 1/(m^3/s)", "cost per unit flow delivered"]
+c_vel = ["5 1/(m/s)", "pumping cost per unit velocity"]
+
+[vectors.3]
+v = ["m/s", "bulk velocity, free"]
+area = ["0.5 m^2", "duct area, the same at every condition"]
+Q = ["[0.1, 0.18, 0.3] m^3/s", "flow demand, one value per condition"]
+
+[model]
+objective = "min: C"
+constraints = [
+  "C >= c_flow*sum(Q) + c_vel*sum(v)",
+  "Q <= v*area",
+]

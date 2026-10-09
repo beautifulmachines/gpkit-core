@@ -3,6 +3,8 @@
 import re
 import types
 
+import numpy as np
+
 from ..ast_nodes import ast_from_ir
 from ..util.repr_conventions import _toml_format_number as _format_number
 
@@ -177,46 +179,72 @@ def _format_objective(cost_ir, name_fn=_ref_to_name):
 # ---------------------------------------------------------------------------
 
 
-def _group_variables(variables):
+def _group_variables(variables, all_variables=None):
     """Group IR variables into scalars and vector groups.
 
     Returns (scalar_vars, vector_groups) where scalar_vars is a dict of
     ref → info for non-vector variables, and vector_groups is a dict of
     veckey_ref → {name, units, label, shape, elements}.
+
+    An element names its parent with `veckey_ref`; `all_variables` is where
+    that ref is looked up, defaulting to `variables` itself.
     """
+    all_variables = variables if all_variables is None else all_variables
     scalar_vars = {}
-    veckeys = {}
-    elements = []
+    vector_groups = {}
 
     for ref, info in variables.items():
         if info.get("idx") is not None:
-            elements.append((ref, info))
-        elif info.get("shape") is not None:
-            veckeys[ref] = info
-        else:
+            vecref = info["veckey_ref"]
+            if vecref not in vector_groups:
+                vecinfo = all_variables[vecref]
+                vector_groups[vecref] = {
+                    "name": vecinfo["name"],
+                    "units": vecinfo.get("units"),
+                    "label": vecinfo.get("label"),
+                    "shape": vecinfo["shape"],
+                    "elements": [],
+                }
+            vector_groups[vecref]["elements"].append((ref, info))
+        elif info.get("shape") is None:
             scalar_vars[ref] = info
-
-    vector_groups = {}
-    veckey_by_name_shape = {
-        (info["name"], tuple(info["shape"])): (ref, info)
-        for ref, info in veckeys.items()
-    }
-    for ref, info in elements:
-        key = (info["name"], tuple(info.get("shape", [])))
-        vecref, vecinfo = veckey_by_name_shape[key]
-        assert info["name"] == vecinfo["name"]
-        assert info.get("units") == vecinfo.get("units")
-        if vecref not in vector_groups:
-            vector_groups[vecref] = {
-                "name": vecinfo["name"],
-                "units": vecinfo.get("units"),
-                "label": vecinfo.get("label"),
-                "shape": vecinfo["shape"],
-                "elements": [],
-            }
-        vector_groups[vecref]["elements"].append((ref, info))
+        # a vector parent needs no entry of its own: its elements carry it
 
     return scalar_vars, vector_groups
+
+
+def _by_shape(vector_groups):
+    "Vector groups keyed by the TOML [vectors.<shape>] sub-table they belong in."
+    by_shape = {}
+    for group in vector_groups.values():
+        shape = group["shape"]
+        if isinstance(shape, (list, tuple)):
+            shape = shape[0] if len(shape) == 1 else tuple(shape)
+        by_shape.setdefault(shape, []).append(group)
+    return by_shape
+
+
+def _format_vector_line(group, substitutions):
+    """Format one vector's declaration line.
+
+    A vector whose elements share one value declares that value; one whose
+    elements differ declares them all, in the vector's own index order.
+    """
+    values = np.full(tuple(group["shape"]), None, dtype=object)
+    for ref, info in group["elements"]:
+        values[tuple(info["idx"])] = substitutions.get(ref)
+
+    distinct = set(values.flat)
+    if len(distinct) == 1:
+        value = distinct.pop()  # one shared value, or None for a free vector
+    elif None in distinct:
+        raise ValueError(
+            f"cannot write vector '{group['name']}' to TOML: it is partially "
+            f"fixed, which the format cannot express"
+        )
+    else:
+        value = values.tolist()
+    return _format_var_line(group["name"], value, group["units"], group["label"])
 
 
 def _assign_model_ids(tree):
@@ -367,26 +395,11 @@ def _emit_single_model(ir, lines):
             lines.append(_format_var_line(vname, value, units, label))
         lines.append("")
 
-    if vector_groups:
-        by_shape = {}
-        for group in vector_groups.values():
-            shape = group["shape"]
-            if isinstance(shape, (list, tuple)):
-                shape = shape[0] if len(shape) == 1 else tuple(shape)
-            by_shape.setdefault(shape, []).append(group)
-
-        for shape, groups in by_shape.items():
-            lines.append(f"[vectors.{shape}]")
-            for group in groups:
-                vname = group["name"]
-                units = group["units"]
-                label = group["label"]
-                value = None
-                if group["elements"]:
-                    first_ref = group["elements"][0][0]
-                    value = substitutions.get(first_ref)
-                lines.append(_format_var_line(vname, value, units, label))
-            lines.append("")
+    for shape, groups in _by_shape(vector_groups).items():
+        lines.append(f"[vectors.{shape}]")
+        for group in groups:
+            lines.append(_format_vector_line(group, substitutions))
+        lines.append("")
 
     lines.append("[model]")
     cost_ir = ir.get("cost", {})
@@ -473,7 +486,7 @@ def _emit_model_section(  # noqa: PLR0913, PLR0917
     # is this node's own own_varkeys refs — already scoped to this exact
     # instance, so distinct instances of the same class never mix vars.
     model_vars = {ref: variables[ref] for ref in node.get("variables", [])}
-    scalar_vars, vector_groups = _group_variables(model_vars)
+    scalar_vars, vector_groups = _group_variables(model_vars, variables)
 
     for ref, info in scalar_vars.items():
         vname = info["name"]
@@ -481,27 +494,6 @@ def _emit_model_section(  # noqa: PLR0913, PLR0917
         label = info.get("label")
         value = substitutions.get(ref)
         lines.append(_format_var_line(vname, value, units, label))
-
-    # Vector variables as [models.X.vectors.N] sub-tables
-    if vector_groups:
-        by_shape = {}
-        for group in vector_groups.values():
-            shape = group["shape"]
-            if isinstance(shape, (list, tuple)):
-                shape = shape[0] if len(shape) == 1 else tuple(shape)
-            by_shape.setdefault(shape, []).append(group)
-
-        for shape, groups in by_shape.items():
-            lines.append(f"[models.{model_id}.vectors.{shape}]")
-            for group in groups:
-                vname = group["name"]
-                units = group["units"]
-                label = group["label"]
-                value = None
-                if group["elements"]:
-                    first_ref = group["elements"][0][0]
-                    value = substitutions.get(first_ref)
-                lines.append(_format_var_line(vname, value, units, label))
 
     # Objective (root only)
     if is_root and cost_ir:
@@ -522,6 +514,13 @@ def _emit_model_section(  # noqa: PLR0913, PLR0917
             lines.append(f'  "{cstr}",')
         lines.append("]")
 
+    # Last, because a TOML key belongs to the most recently opened table: this
+    # section's own keys have to precede its sub-tables.
+    for shape, groups in _by_shape(vector_groups).items():
+        lines.append(f"[models.{model_id}.vectors.{shape}]")
+        for group in groups:
+            lines.append(_format_vector_line(group, substitutions))
+
     lines.append("")
 
 
@@ -534,16 +533,23 @@ def _emit_lines(lines, path):
     return result
 
 
+def _format_values(value):
+    "Render a number, or a vector's elements as a bracketed list."
+    if isinstance(value, list):
+        return "[" + ", ".join(_format_values(v) for v in value) + "]"
+    return _format_number(value)
+
+
 def _format_var_line(name, value, units, label):
     """Format a single variable line for TOML output."""
-    if value is not None and units is not None:
-        spec = f"{_format_number(value)} {units}"
-    elif value is not None:
-        spec = value if isinstance(value, (int, float)) else str(value)
+    if value is None:
+        spec = units if units is not None else "-"
     elif units is not None:
-        spec = units
+        spec = f"{_format_values(value)} {units}"
+    elif isinstance(value, list):
+        spec = _format_values(value)
     else:
-        spec = "-"
+        spec = value if isinstance(value, (int, float)) else str(value)
 
     if label:
         if isinstance(spec, (int, float)):

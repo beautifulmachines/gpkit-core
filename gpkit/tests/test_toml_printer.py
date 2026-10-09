@@ -1,8 +1,11 @@
 "Tests for the TOML printer (AST → expression strings, Model → TOML)."
 
+import tomllib
+from pathlib import Path
+
 import pytest
 
-from gpkit import Model, Variable, VectorVariable, units
+from gpkit import Model, Variable, Vectorize, VectorVariable, units
 from gpkit.ast_nodes import ConstNode, ExprNode, UnitsNode, VarNode
 from gpkit.examples.uav import UAV
 from gpkit.toml import load_toml
@@ -11,6 +14,9 @@ from gpkit.util.globals import NamedVariables
 from gpkit.util.repr_conventions import _toml_format_number
 from gpkit.util.small_scripts import mag
 from gpkit.varkey import VarKey
+
+# The documents literalincluded by docs/source/tomlmodels.rst
+TOML_EXAMPLES = Path(__file__).parents[2] / "docs" / "source" / "examples" / "toml"
 
 # ---------------------------------------------------------------------------
 # Numbers
@@ -234,6 +240,16 @@ class TestRoundTrip:
 
         return sol1, sol2
 
+    @pytest.mark.parametrize("path", sorted(TOML_EXAMPLES.glob("*.toml")), ids=str)
+    def test_every_documented_example_round_trips(self, path):
+        """Every file in docs/source/examples/toml, so a new one can't go untested.
+
+        These back the literalincludes in docs/source/tomlmodels.rst: the page
+        can only show a document that loads, solves, and survives to_toml.
+        """
+        sol1, sol2 = self._round_trip(path)
+        assert mag(sol1.cost) == pytest.approx(mag(sol2.cost), rel=1e-5)
+
     def test_simple_box_round_trip(self):
         sol1, sol2 = self._round_trip("docs/source/examples/toml/simple_box.toml")
         assert mag(sol1["h"]) == pytest.approx(mag(sol2["h"]), rel=1e-5)
@@ -395,6 +411,108 @@ class TestMultiInstanceModels:
         sol2 = m2.solve(verbosity=0)
 
         assert mag(sol1.cost) == pytest.approx(mag(sol2.cost), rel=1e-5)
+
+
+# ---------------------------------------------------------------------------
+# Vectorized submodels: one component exercised at several conditions
+# ---------------------------------------------------------------------------
+
+
+class TestVectorizedSubmodel:
+    """A submodel built under Vectorize owns vector elements, so its section
+    has to declare the vector its parent model never wrote down (#295)."""
+
+    def _duty_model(self):
+        NamedVariables.reset_modelnumbers()
+
+        class Condition(Model):
+            def setup(self):
+                self.P = Variable("P", "W")
+                self.Q = Variable("Q", 2, "m^3/s")
+                return [self.P >= self.Q * Variable("k", 3, "Pa")]
+
+        class Duty(Model):
+            def setup(self, n=3):
+                self.P_rated = Variable("P_rated", "W")
+                with Vectorize(n):
+                    self.cond = Condition()
+                self.cost = self.P_rated
+                return [self.cond, self.P_rated >= self.cond.P]
+
+        return Duty()
+
+    def test_emits_the_vector_in_its_owning_section(self):
+        toml_str = to_toml(self._duty_model())
+        assert "[models.Condition.vectors.3]" in toml_str
+        assert 'P = "W"' in toml_str
+
+    def test_section_keys_are_not_swallowed_by_the_vectors_subtable(self):
+        """objective/submodels/constraints must not land inside [.vectors.N].
+
+        TOML has no close-table, so a sub-table has to be emitted after the
+        section's own keys or they are parsed as belonging to it.
+        """
+        doc = tomllib.loads(to_toml(self._duty_model()))
+        assert "constraints" in doc["models"]["Condition"]
+        assert "constraints" not in doc["models"]["Condition"]["vectors"]["3"]
+        assert doc["models"]["Duty"]["objective"] == "min: P_rated"
+
+    def test_round_trip(self):
+        m1 = self._duty_model()
+        m2 = load_toml(to_toml(m1))
+        assert mag(m2.solve(verbosity=0).cost) == pytest.approx(
+            mag(m1.solve(verbosity=0).cost), rel=1e-5
+        )
+
+
+# ---------------------------------------------------------------------------
+# Vector constant values
+# ---------------------------------------------------------------------------
+
+
+class TestVectorValues:
+    """A vector constant's elements need not share one value (#307)."""
+
+    @staticmethod
+    def _model(values, n=3):
+        x = Variable("x", "m")
+        q = VectorVariable(n, "q", "m", "per-element demand")
+        m = Model(x, [x >= q.sum()])
+        if values is not None:
+            m.substitutions[q] = values
+        return m
+
+    def test_per_element_values_are_all_written(self):
+        toml_str = to_toml(self._model([0.1, 0.25, 0.4]))
+        assert 'q = ["[0.1, 0.25, 0.4] m", "per-element demand"]' in toml_str
+
+    def test_uniform_vector_keeps_the_scalar_form(self):
+        "No output churn for the common case."
+        assert 'q = ["0.2 m", "per-element demand"]' in to_toml(
+            self._model([0.2, 0.2, 0.2])
+        )
+
+    def test_free_vector_declares_units_only(self):
+        assert 'q = ["m", "per-element demand"]' in to_toml(self._model(None))
+
+    def test_round_trip_preserves_each_element(self):
+        m2 = load_toml(to_toml(self._model([0.1, 0.25, 0.4])))
+        assert [float(v) for v in m2.substitutions["q"]] == [0.1, 0.25, 0.4]
+
+    def test_order_survives_double_digit_indices(self):
+        """Element order is the vector's, not its refs' -- "q[10]" < "q[2]"."""
+        values = [float(i) + 0.5 for i in range(12)]
+        m2 = load_toml(to_toml(self._model(values, n=12)))
+        assert [float(v) for v in m2.substitutions["q"]] == values
+
+    def test_partially_fixed_vector_is_refused(self):
+        "Some elements fixed and others free has no TOML spelling."
+        x = Variable("x", "m")
+        q = VectorVariable(3, "q", "m")
+        m = Model(x, [x >= q.sum()])
+        m.substitutions[q[0]] = 0.1
+        with pytest.raises(ValueError, match="partially fixed"):
+            to_toml(m)
 
 
 # ---------------------------------------------------------------------------

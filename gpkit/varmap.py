@@ -134,6 +134,14 @@ class VarSet(set):
         for k in keys:
             self.add(k)
 
+    def vector_parents(self):
+        """The veckey of every vector with an element in this set.
+
+        Veckeys are not members, so iteration and `len` never yield one: this is
+        the only way to enumerate the vector level.
+        """
+        return set(self._by_vec)
+
     def vector_parent_keys(self):
         "set(self) but with veckeys and no individual vector element keys"
         ks = set(self)
@@ -141,6 +149,11 @@ class VarSet(set):
             ks -= set(vks.flat)
             ks.add(vk)
         return ks
+
+    def to_ir(self):
+        "{ref: VarKey.to_ir()} for every member and vector parent, sorted by ref."
+        keys = set(self) | self.vector_parents()
+        return {vk.ref: vk.to_ir() for vk in sorted(keys, key=lambda v: v.ref)}
 
     def _register_key(self, key):
         "adds the key to _by_name, _by_ref, and, if applicable, _by_vec"
@@ -164,6 +177,42 @@ class VarSet(set):
         if isinstance(key, str) and key in self._by_ref:
             return True
         return key in self._by_name or key in self._by_vec
+
+
+class FrozenVarSet(VarSet):
+    """A VarSet that cannot be changed once built.
+
+    For a key set that is declared in one go rather than accumulated, so it is
+    safe to share -- including as a class-level default.
+    """
+
+    _MSG = "a FrozenVarSet cannot be changed after construction"
+    _sealed = False
+
+    def __init__(self, keys=()):
+        super().__init__(keys)
+        self._sealed = True
+
+    def add(self, key):
+        if self._sealed:
+            raise TypeError(self._MSG)
+        super().add(key)
+
+    def discard(self, key):
+        if self._sealed:
+            raise TypeError(self._MSG)
+        super().discard(key)
+
+    def _frozen(self, *_args, **_kwargs):
+        raise TypeError(self._MSG)
+
+    # set's own mutators bypass add/discard, so they would desync the indices
+    clear = pop = remove = _frozen
+    difference_update = intersection_update = symmetric_difference_update = _frozen
+    __ior__ = __iand__ = __isub__ = __ixor__ = _frozen
+
+
+EMPTY_VARSET = FrozenVarSet()
 
 
 class VarMap(MutableMapping):

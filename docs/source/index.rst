@@ -29,6 +29,7 @@ Table of contents
        debugging
        visint
        modelbuilding
+       tomlmodels
        advancedcommands
        signomialprogramming
        examples
