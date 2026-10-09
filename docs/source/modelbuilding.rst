@@ -52,6 +52,37 @@ This allows models written with scalar constraints to be created with vector con
 .. literalinclude:: examples/vectorize_output.txt
     :language: breakdowns
 
+Vector parents and elements
+---------------------------
+
+A ``VectorVariable`` is two kinds of key: one *parent* (the veckey) and one per element. The
+solver only ever sees elements, so in a ``VarSet`` — ``model.vks``, or ``model.own_varkeys`` —
+only elements are members, and iteration, ``len`` and ``n_free`` count elements alone. The parent
+is still *addressable*, through the set's derived indices, but it is not equal to any element it
+parents:
+
+.. code-block:: python
+
+    len(m.vks)                  # elements and scalars only
+    veckey in m.vks             # True -- resolvable
+    veckey in set(m.vks)        # False -- not a member
+    m.vks.vector_parents()      # the veckeys; the only way to enumerate the vector level
+    m.vks.by_vec(veckey)        # that vector's element keys, as an ndarray
+    m.vks.keys(veckey)          # same, as a set
+    m.vks.vector_parent_keys()  # members, with each vector's elements replaced by its parent
+
+A whole vector is read and written through its parent, broadcasting a scalar or scattering an
+array by shape:
+
+.. code-block:: python
+
+    m.substitutions[m.flow.Q] = [0.10, 0.18, 0.30]
+    m.substitutions[m.flow.Q] = 0.2      # every element
+    sol[m.flow.Q]                        # array, with units
+
+Because ``own_varkeys`` holds elements, a model that declares a vector's elements declares the
+vector: ``build_model_tree`` claims both, so every ref in ``to_ir()["variables"]`` belongs to
+exactly one ``model_tree`` node.
 
 
 Multipoint analysis modeling

@@ -238,7 +238,7 @@ def test_catalog_to_ir(model_entry):
 
 # Open gpkit-core defects in the TOML printer, not in these models.
 _TOML_ROUNDTRIP_GAPS = {
-    "pipeline": "#295: to_toml raises on a vector element whose parent is elsewhere",
+    "pipeline": "#307: a vector constant's per-element values collapse to element 0",
 }
 
 
