@@ -6,6 +6,7 @@ import types
 import numpy as np
 
 from ..ast_nodes import ast_from_ir
+from ..ir import check_ir_version
 from ..util.repr_conventions import _toml_format_number as _format_number
 
 # ---------------------------------------------------------------------------
@@ -373,10 +374,8 @@ def to_toml(source, path=None):
     str
         The generated TOML string.
     """
-    if hasattr(source, "to_ir"):
-        ir = source.to_ir()
-    else:
-        ir = source
+    ir = source.to_ir() if hasattr(source, "to_ir") else source
+    check_ir_version(ir)
 
     lines = []
 

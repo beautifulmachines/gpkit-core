@@ -5,7 +5,8 @@ import json
 import pytest
 
 from gpkit import Model, Variable
-from gpkit.ir import diff_solutions
+from gpkit.exceptions import IRVersionError
+from gpkit.ir import IR_VERSION, diff_solutions
 
 
 def _sol_ir(cost=1.0, cost_units="m", primal=None, constants=None, sens=None):
@@ -22,7 +23,7 @@ def _sol_ir(cost=1.0, cost_units="m", primal=None, constants=None, sens=None):
         return out
 
     ir = {
-        "gpkit_ir_version": "1.0",
+        "gpkit_ir_version": IR_VERSION,
         "cost": {"value": cost} | ({"units": cost_units} if cost_units else {}),
         "primal": entries(primal),
         "sensitivities": {
@@ -192,6 +193,19 @@ def test_the_diff_is_json_serializable():
     b = _sol_ir(primal={"y|m": (2.0, "m")}, sens={"y|m": 0.1})
     diff = diff_solutions(a, b)
     assert json.loads(json.dumps(diff)) == diff
+
+
+@pytest.mark.parametrize("side", [0, 1])
+def test_a_document_from_another_major_is_refused(side):
+    """Refs are only comparable within one major (#290).
+
+    A stored baseline is the case: diffing it across a major would report its
+    refs as only_in_baseline rather than saying the documents don't line up.
+    """
+    docs = [_sol_ir(primal={"x|m": (1.0, "m")}) for _ in range(2)]
+    docs[side]["gpkit_ir_version"] = "99.0"
+    with pytest.raises(IRVersionError, match="gpkit_ir_version"):
+        diff_solutions(*docs)
 
 
 class TestRenderedDiff:

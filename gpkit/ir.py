@@ -1,11 +1,36 @@
 "The IR documents produced by Model.to_ir() and Solution.to_ir(), and diffs over them."
 
+from .exceptions import IRVersionError
 from .units import ureg
 from .util.repr_conventions import unitstr
 
-# Nothing validates this yet, and it has not tracked the schema changes made so
-# far -- see the issue on versioning policy before relying on it.
-IR_VERSION = "1.0"
+# One version for both documents, because a solution IR joins a model IR: two
+# numbers would admit pairings neither document could describe.
+#
+# Bump the major when a field is removed, re-keyed, or changes meaning; bump the
+# minor when one is added, or starts appearing where it did not before. Readers
+# check the major alone, so a minor bump never breaks one.
+IR_VERSION = "2.0"
+
+
+def check_ir_version(doc):
+    """Raise unless `doc` is an IR document this gpkit can read.
+
+    Checks the major alone: a minor bump is additive, so a document from a newer
+    minor still carries every field this reader needs.
+    """
+    version = doc.get("gpkit_ir_version")
+    parts = version.split(".") if isinstance(version, str) else []
+    if len(parts) != 2 or not all(part.isdigit() for part in parts):
+        raise IRVersionError(
+            f"gpkit_ir_version {version!r} is not a 'major.minor' version string"
+        )
+    if parts[0] != IR_VERSION.partition(".")[0]:
+        raise IRVersionError(
+            f"gpkit_ir_version {version} cannot be read by this gpkit, which "
+            f"writes {IR_VERSION}: a differing major version means a field was "
+            f"removed, re-keyed, or redefined"
+        )
 
 
 def ir_units(obj) -> str:
@@ -127,6 +152,8 @@ def diff_solutions(baseline: dict, scenario: dict, tol: float = 1e-6) -> dict:
     the same refs -- so it joins them the way a solution IR joins a model IR.
     Keys are the baseline's refs.
     """
+    check_ir_version(baseline)
+    check_ir_version(scenario)
     diff = {"cost": {}}
     rel, dim_changed = _compare_values(baseline["cost"], scenario["cost"])
     if dim_changed:  # the objective was rewritten, e.g. from a mass to a cost

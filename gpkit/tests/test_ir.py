@@ -29,6 +29,8 @@ from gpkit.constraints.bounded import Bounded
 from gpkit.constraints.relax import ConstantsRelaxed
 from gpkit.constraints.set import build_model_tree
 from gpkit.constraints.tight import Tight
+from gpkit.exceptions import IRVersionError
+from gpkit.ir import IR_VERSION, check_ir_version
 from gpkit.nomials.map import NomialMap
 from gpkit.nomials.math import (
     MonomialEquality,
@@ -38,6 +40,7 @@ from gpkit.nomials.math import (
     SingleSignomialEquality,
 )
 from gpkit.tests.test_margin_objective import SimpleMarginModel
+from gpkit.toml import to_toml
 from gpkit.units import qty, units, ureg
 from gpkit.util.small_classes import EMPTY_HV, HashVector
 
@@ -643,6 +646,42 @@ class TestConstraintIR:
         assert json.loads(json.dumps(ir)) == ir
 
 
+class TestIRVersion:
+    """The stamped version says what a reader may assume (#290)."""
+
+    @staticmethod
+    def _doc(version):
+        return {"gpkit_ir_version": version}
+
+    def test_accepts_what_gpkit_writes(self):
+        m = Model(Variable("x"), [Variable("x") >= 1])
+        check_ir_version(m.to_ir())
+        check_ir_version(m.solve(verbosity=0).to_ir())
+
+    def test_accepts_a_newer_minor(self):
+        "A minor bump is additive, so every field this reader needs is present."
+        check_ir_version(self._doc(f"{IR_VERSION.partition('.')[0]}.99"))
+
+    @pytest.mark.parametrize("offset", [-1, 1])
+    def test_rejects_another_major(self, offset):
+        "Older or newer alike: a major bump means a field moved or changed meaning."
+        major = int(IR_VERSION.partition(".")[0]) + offset
+        with pytest.raises(IRVersionError, match="gpkit_ir_version"):
+            check_ir_version(self._doc(f"{major}.0"))
+
+    @pytest.mark.parametrize("version", [None, "", "two", "2", 2.0])
+    def test_rejects_an_unreadable_version(self, version):
+        with pytest.raises(IRVersionError, match="gpkit_ir_version"):
+            check_ir_version({} if version is None else self._doc(version))
+
+    def test_to_toml_refuses_a_document_it_cannot_read(self):
+        "to_toml is the one in-repo IR reader, so it is where the check has teeth."
+        ir = Model(Variable("x"), [Variable("x") >= 1]).to_ir()
+        ir["gpkit_ir_version"] = "99.0"
+        with pytest.raises(IRVersionError, match="gpkit_ir_version"):
+            to_toml(ir)
+
+
 class TestModelIR:
     """Tests for Model.to_ir()."""
 
@@ -652,7 +691,7 @@ class TestModelIR:
         y = Variable("y")
         m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
         ir = m.to_ir()
-        assert ir["gpkit_ir_version"] == "1.0"
+        check_ir_version(ir)  # what gpkit writes is what gpkit accepts
         assert "variables" in ir
         assert "cost" in ir
         assert "constraints" in ir
