@@ -23,7 +23,7 @@ from .solutions import SolutionSequence
 from .tools.autosweep import autosweep_1d
 from .util.globals import NamedVariables, Vectorize
 from .var import Var
-from .varmap import VarMap
+from .varmap import FrozenVarSet, VarMap
 
 
 class Model(CostedConstraintSet):
@@ -154,7 +154,7 @@ class Model(CostedConstraintSet):
         if setup_vars:
             # add all the vars created in .setup to the Model's varkeys
             # even if they aren't used in any constraints
-            self.own_varkeys = frozenset(v.key for v in setup_vars)
+            self.own_varkeys = FrozenVarSet(v.key for v in setup_vars)
         CostedConstraintSet.__init__(self, cost, constraints, substitutions)
         self.computed = {}  # {VarKey: fn(solution)} for post-solve computation
 
@@ -297,13 +297,7 @@ class Model(CostedConstraintSet):
 
     def to_ir(self):
         "Serialize this Model to a complete IR document dict."
-        # Collect all variables (including veckeys for vector variables)
-        all_vks = set(self.vks)
-        variables = {}
-        for vk in sorted(all_vks, key=lambda v: v.ref):
-            variables[vk.ref] = vk.to_ir()
-            if vk.veckey and vk.veckey.ref not in variables:
-                variables[vk.veckey.ref] = vk.veckey.to_ir()
+        variables = self.vks.to_ir()
 
         # Serialize cost
         cost_ir = self.cost.to_ir()

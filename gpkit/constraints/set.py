@@ -11,7 +11,7 @@ from ..nomials import NomialArray, Variable
 from ..util.repr_conventions import ReprMixin, also_excluding, lineagestr
 from ..util.small_scripts import try_str_without
 from ..varkey import lineage_display_context
-from ..varmap import VarMap, VarSet, _collision_depths
+from ..varmap import EMPTY_VARSET, VarMap, VarSet, _collision_depths
 
 
 def add_meq_bounds(bounded, meq_bounded):  # TODO: collapse with GP version?
@@ -158,7 +158,7 @@ def constraint_varkeys(constraints) -> set:
 class ConstraintSet(list, ReprMixin):
     "Recursive container for ConstraintSets and Inequalities"
 
-    own_varkeys, idxlookup = frozenset(), {}
+    own_varkeys, idxlookup = EMPTY_VARSET, {}
     _varkeys = None
 
     def __init__(self, constraints, substitutions=None, *, bonusvks=None):  # noqa: PLR0912
@@ -396,7 +396,11 @@ def build_model_tree(model):
             class_name = type(cset).__name__
             instance_id = ""
 
-        owned_vars = sorted(vk.ref for vk in getattr(cset, "own_varkeys", frozenset()))
+        # own_varkeys holds only the keys setup() made, so a vectorized model's
+        # elements are there but their parent is not; declaring the elements
+        # declares the vector.
+        own = cset.own_varkeys
+        owned_vars = sorted(vk.ref for vk in set(own) | own.vector_parents())
         all_claimed_vars.update(owned_vars)
 
         return {
@@ -411,7 +415,8 @@ def build_model_tree(model):
 
     # Assign unclaimed variables to the root node (handles flat models
     # without setup() where own_varkeys is empty)
-    unclaimed = sorted(vk.ref for vk in model.vks if vk.ref not in all_claimed_vars)
+    all_keys = set(model.vks) | model.vks.vector_parents()
+    unclaimed = sorted(vk.ref for vk in all_keys if vk.ref not in all_claimed_vars)
     if unclaimed:
         tree["variables"] = sorted(set(tree["variables"]) | set(unclaimed))
 

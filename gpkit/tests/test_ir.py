@@ -6,7 +6,15 @@ import numpy as np
 import pytest
 
 import gpkit
-from gpkit import Model, SignomialsEnabled, Variable, VarKey, Vectorize, VectorVariable
+from gpkit import (
+    Model,
+    SignomialsEnabled,
+    Var,
+    Variable,
+    VarKey,
+    Vectorize,
+    VectorVariable,
+)
 from gpkit.ast_nodes import (
     ConstNode,
     ExprNode,
@@ -102,6 +110,32 @@ class SparredAircraft(Model):
         wing = SparredWing()
         self.cost = W
         return [W >= wing.cost * 1.2, wing]
+
+
+class Condition(Model):
+    """One operating condition, declaring only scalars."""
+
+    P = Var("-", "power at this condition")
+    Q = Var("-", "flow at this condition", value=2)
+
+    def setup(self):
+        return [self.P >= self.Q**2]
+
+
+class Duty(Model):
+    """One component exercised at several conditions, as pipeline's Vectorize does.
+
+    Vectorize turns the submodel's scalars into vector elements, so the vector
+    parent keys belong to a model whose setup() never declared them.
+    """
+
+    P_rated = Var("-", "rating, set by the peak condition")
+
+    def setup(self, n=3):
+        with Vectorize(n):
+            self.cond = Condition()
+        self.cost = self.P_rated
+        return [self.cond, self.P_rated >= self.cond.P]
 
 
 class MultiComponent(Model):
@@ -803,10 +837,14 @@ class TestModelTree:
             all_indices.update(child["constraint_indices"])
         assert all_indices == set(range(len(ir["constraints"])))
 
-    def test_variable_ownership(self):
-        """Each variable in the IR appears in exactly one tree node."""
-        ac = Aircraft()
-        ir = ac.to_ir()
+    @pytest.mark.parametrize("build", [Aircraft, Duty])
+    def test_variable_ownership(self, build):
+        """Each variable in the IR appears in exactly one tree node.
+
+        Duty covers the vector case, where the parent key is declared by no
+        setup() and so reaches the IR only through its elements (#295).
+        """
+        ir = build().to_ir()
         tree = ir["model_tree"]
 
         # Collect all variables from all tree nodes

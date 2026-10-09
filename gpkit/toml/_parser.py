@@ -14,6 +14,7 @@ from ..model import Model
 from ..nomials.array import NomialArray
 from ..nomials.variables import ArrayVariable, Variable
 from ..util.globals import NamedVariables, Vectorize
+from ..varmap import FrozenVarSet
 from ._expr import TomlExpressionError, parse_constraint, parse_objective
 
 
@@ -477,8 +478,13 @@ def _build_multi_model(models_section, dimension_overrides=None):
         else:
             cs = ConstraintSet(constraints)
             cs.lineage = per_model_lineage[model_id]
-            cs.own_varkeys = frozenset(
-                v.key for v in per_model_vars[model_id].values() if hasattr(v, "key")
+            # elements, not the veckey, so own_varkeys means the same thing here
+            # as it does for a Model built in Python
+            cs.own_varkeys = FrozenVarSet(
+                elem.key
+                for v in per_model_vars[model_id].values()
+                if hasattr(v, "key")
+                for elem in (v.flat if hasattr(v, "flat") else (v,))
             )
             submodel_sets[model_id] = cs
 
