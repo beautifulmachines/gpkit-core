@@ -11,11 +11,10 @@ from .varkey import lineage_display_context
 
 
 def _nested_lookup(nested_keys, val_dict):
-    if nested_keys is None:
-        return float("nan")
+    "Values in a vector's shape, nan where an element has none."
     if isinstance(nested_keys, np.ndarray):
         return [_nested_lookup(row, val_dict) for row in nested_keys]
-    return val_dict[nested_keys]
+    return val_dict.get(nested_keys, float("nan"))
 
 
 def is_veckey(key):
@@ -216,13 +215,11 @@ EMPTY_VARSET = FrozenVarSet()
 
 
 class VarMap(MutableMapping):
-    """A simple mapping from VarKey to value, with lookup by canonical
-    name string or veckey
+    """A mapping from VarKey to value, with lookup by name string or veckey.
 
-    Maintains:
-      - _data: dict mapping VarKey to value
-      - _by_name: dict mapping str (VarKey.name) to set of VarKeys
-      - _by_vec: dict mapping veckey to keys stored in nested list structure
+    `register_keys` adds a key without a value, so the varset this resolves
+    against may name more keys than the mapping holds. `in`, `len` and iteration
+    follow the values.
     """
 
     def __init__(self, *args, **kwargs):
@@ -235,14 +232,19 @@ class VarMap(MutableMapping):
         return val
 
     def item(self, key):
-        "get the (varkey, value) pair associated with a (str or key)"
+        """get the (varkey, value) pair associated with a (str or key)
+
+        A veckey gives the whole vector, nan where an element has no value.
+        Raises KeyError if no element has one, so a vector is here on the same
+        terms as a scalar: when the mapping holds a value for it.
+        """
         key = self._varset.resolve(key)
         try:
             return (key, self._data[key])  # single varkey case
         except KeyError:
-            key_arr = self._varset.by_vec(key)
-            if key_arr.any():
-                return (key, _nested_lookup(key_arr, self._data))
+            elements = self._varset.by_vec(key)
+            if any(vk in self._data for vk in elements.flat if vk is not None):
+                return (key, _nested_lookup(elements, self._data))
             raise
 
     @property
@@ -300,8 +302,10 @@ class VarMap(MutableMapping):
         self._varset.discard(key)
 
     def vector_parent_items(self):
-        "like items, but using veckeys and ignoring element keys/items"
-        return ((k, self[k]) for k in self._varset.vector_parent_keys())
+        "items(), with a vector's elements collapsed into one veckey item"
+        return (
+            (key, self[key]) for key in self._varset.vector_parent_keys() if key in self
+        )
 
     def __iter__(self):
         return iter(self._data)
