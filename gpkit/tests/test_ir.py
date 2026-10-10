@@ -646,6 +646,71 @@ class TestConstraintIR:
         assert json.loads(json.dumps(ir)) == ir
 
 
+class TestIRVariableKind:
+    """Each variable states its role, so no consumer infers it (#318).
+
+    A vector's substitutions sit on its elements, never on the veckey, so a
+    reader deriving free-vs-fixed from `substitutions` alone gets a wholly fixed
+    vector wrong. The kind is stated instead.
+    """
+
+    @staticmethod
+    def _ir():
+        class M(Model):
+            x = Var("m", "free scalar")
+            c = Var("m", "fixed scalar", value=2.0)
+
+            def setup(self):
+                self.q = VectorVariable(3, "q", [0.1, 0.2, 0.3], "m", "fixed vec")
+                self.v = VectorVariable(3, "v", "m", "free vec")
+                self.cost = self.x
+                return [self.x >= self.q.sum() + self.v.sum() + self.c]
+
+        return M().to_ir()
+
+    @staticmethod
+    def _kinds(ir):
+        return {
+            info["name"]: info["kind"]
+            for info in ir["variables"].values()
+            if "kind" in info
+        }
+
+    def test_vectors_and_scalars_state_their_kind(self):
+        assert self._kinds(self._ir()) == {
+            "x": "free",
+            "c": "fixed",
+            "q": "fixed",  # the shipped bug: derived from substitutions, reads free
+            "v": "free",
+        }
+
+    def test_a_wholly_fixed_vector_is_not_in_substitutions(self):
+        "The condition that made the derivation wrong, pinned so it stays visible."
+        ir = self._ir()
+        veckey_ref = next(
+            ref
+            for ref, i in ir["variables"].items()
+            if i["name"] == "q" and i.get("idx") is None
+        )
+        assert veckey_ref not in ir["substitutions"]
+        assert ir["variables"][veckey_ref]["kind"] == "fixed"
+
+    def test_elements_carry_no_kind(self):
+        "An element is part of a variable, not one itself; `idx` already says so."
+        for info in self._ir()["variables"].values():
+            assert ("kind" in info) is (info.get("idx") is None)
+
+    def test_a_linked_variable_is_linked(self):
+        x, y = Variable("x", "m"), Variable("y", "m")
+        z = Variable("z", 2.0, "m")
+        m = Model(x, [x >= y], substitutions={y: lambda c: 2 * c[z]})
+        assert self._kinds(m.to_ir())["y"] == "linked"
+
+    def test_the_document_is_still_json_serializable(self):
+        ir = self._ir()
+        assert json.loads(json.dumps(ir)) == ir
+
+
 class TestIRVersion:
     """The stamped version says what a reader may assume (#290)."""
 
