@@ -4,8 +4,8 @@
   free  W_tilde
   free  W_zfw
   free  Engine.W
-  free  W_design
   free  Wing.W
+  free  W_design
   fixed CDA0
   fixed W_fixed
   fixed W_pay
@@ -17,10 +17,10 @@
   free  I_cap
   free  M_rbar
   free  S
+  free  W
   free  W_cap
   free  W_design
   free  W_web
-  free  W
   free  nu
   free  p
   free  q
@@ -36,8 +36,8 @@
   fixed k_shear
   fixed r_h
   fixed rho_alum
-  fixed sigma_max_shear
   fixed sigma_max
+  fixed sigma_max_shear
   fixed w
   fixed g
   cons (Geometry)  2⋅q ≥ 1 + p
@@ -63,13 +63,13 @@
 [UAV.Mission]
   free  R
   free  W_fuel
+  free  Outbound.AircraftPerf.W
+  free  Return.AircraftPerf.W
+  free  SprintCondition.AircraftPerf.W
+  free  Outbound.W_fuel
+  free  Return.W_fuel
   free  W_mto  [UAV.Aircraft]
   free  W_zfw  [UAV.Aircraft]
-  free  Outbound.AircraftPerf.W
-  free  Outbound.W_fuel
-  free  Return.AircraftPerf.W
-  free  Return.W_fuel
-  free  SprintCondition.AircraftPerf.W
   fixed R_min
   cons  R ≥ R_min
   cons  Outbound.AircraftPerf.W ≥ W_zfw + Return.W_fuel
@@ -80,12 +80,12 @@
 [UAV.Mission.Outbound]
   free  W_fuel
   free  z_bre
-  free  eta_0
+  free  R  [UAV.Mission]
   free  T
   free  W
-  free  R  [UAV.Mission]
-  fixed h_fuel  [UAV.Aircraft.Engine]
+  free  eta_0
   fixed g
+  fixed h_fuel  [UAV.Aircraft.Engine]
   cons  z_bre ≥ g⋅R⋅T/(h_fuel⋅eta_0⋅W)
   cons  W_fuel/W ≥ z_bre^1 + z_bre²/2 + z_bre³/6 + z_bre⁴/24
 [UAV.Mission.Outbound.AircraftPerf]
@@ -94,9 +94,9 @@
   free  T
   free  W
   free  A  [UAV.Aircraft.Wing]
-  free  S  [UAV.Aircraft.Wing]
   free  C_Dp
   free  C_L
+  free  S  [UAV.Aircraft.Wing]
   free  V  [UAV.Mission.Outbound.FlightState]
   fixed CDA0  [UAV.Aircraft]
   fixed e  [UAV.Aircraft.Wing]
@@ -115,8 +115,8 @@
   free  Re
   free  A  [UAV.Aircraft.Wing]
   free  S  [UAV.Aircraft.Wing]
-  free  tau  [UAV.Aircraft.Wing]
   free  V  [UAV.Mission.Outbound.FlightState]
+  free  tau  [UAV.Aircraft.Wing]
   fixed mu  [UAV.Mission.Outbound.FlightState]
   fixed rho  [UAV.Mission.Outbound.FlightState]
   cons  Re = rho/mu⋅V⋅(S/A)^0.5
@@ -137,12 +137,12 @@
 [UAV.Mission.Return]
   free  W_fuel
   free  z_bre
-  free  eta_0
+  free  R  [UAV.Mission]
   free  T
   free  W
-  free  R  [UAV.Mission]
-  fixed h_fuel  [UAV.Aircraft.Engine]
+  free  eta_0
   fixed g
+  fixed h_fuel  [UAV.Aircraft.Engine]
   cons  z_bre ≥ g⋅R⋅T/(h_fuel⋅eta_0⋅W)
   cons  W_fuel/W ≥ z_bre^1 + z_bre²/2 + z_bre³/6 + z_bre⁴/24
 [UAV.Mission.Return.AircraftPerf]
@@ -151,9 +151,9 @@
   free  T
   free  W
   free  A  [UAV.Aircraft.Wing]
-  free  S  [UAV.Aircraft.Wing]
   free  C_Dp
   free  C_L
+  free  S  [UAV.Aircraft.Wing]
   free  V  [UAV.Mission.Return.FlightState]
   fixed CDA0  [UAV.Aircraft]
   fixed e  [UAV.Aircraft.Wing]
@@ -172,8 +172,8 @@
   free  Re
   free  A  [UAV.Aircraft.Wing]
   free  S  [UAV.Aircraft.Wing]
-  free  tau  [UAV.Aircraft.Wing]
   free  V  [UAV.Mission.Return.FlightState]
+  free  tau  [UAV.Aircraft.Wing]
   fixed mu  [UAV.Mission.Return.FlightState]
   fixed rho  [UAV.Mission.Return.FlightState]
   cons  Re = rho/mu⋅V⋅(S/A)^0.5
@@ -193,9 +193,9 @@
   cons  4⋅eta_i + T⋅eta_i²/(0.5⋅rho⋅V²⋅A_prop) ≤ 4
 [UAV.Mission.SprintCondition]
   free  P_max  [UAV.Aircraft.Engine]
-  free  eta_0
   free  T
   free  V
+  free  eta_0
   fixed V_reqt
   cons  P_max ≥ T⋅V/eta_0
   cons  V ≥ V_reqt
@@ -205,9 +205,9 @@
   free  T
   free  W
   free  A  [UAV.Aircraft.Wing]
-  free  S  [UAV.Aircraft.Wing]
   free  C_Dp
   free  C_L
+  free  S  [UAV.Aircraft.Wing]
   free  V  [UAV.Mission.SprintCondition.FlightState]
   fixed CDA0  [UAV.Aircraft]
   fixed e  [UAV.Aircraft.Wing]
@@ -226,8 +226,8 @@
   free  Re
   free  A  [UAV.Aircraft.Wing]
   free  S  [UAV.Aircraft.Wing]
-  free  tau  [UAV.Aircraft.Wing]
   free  V  [UAV.Mission.SprintCondition.FlightState]
+  free  tau  [UAV.Aircraft.Wing]
   fixed mu  [UAV.Mission.SprintCondition.FlightState]
   fixed rho  [UAV.Mission.SprintCondition.FlightState]
   cons  Re = rho/mu⋅V⋅(S/A)^0.5
@@ -247,8 +247,8 @@
   cons  4⋅eta_i + T⋅eta_i²/(0.5⋅rho⋅V²⋅A_prop) ≤ 4
 [UAV.HeavyLandingCase]
   free  V_stall
-  free  W_mto  [UAV.Aircraft]
   free  S  [UAV.Aircraft.Wing]
+  free  W_mto  [UAV.Aircraft]
   fixed V_stallmax
   fixed rho_sl
   fixed C_Lmax  [UAV.Aircraft.Wing]

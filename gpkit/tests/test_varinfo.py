@@ -120,10 +120,24 @@ class TestIdentity:
         assert len(seen) == len(set(seen)) == len(vks)
         assert set(seen) == set(vks)
 
-    def test_order_is_deterministic_by_ref(self):
+    def test_order_is_deterministic(self):
         x, a = VarKey(name="x"), VarKey(name="a")
         infos = classify_variables(VarSet([*vec("q", 2), x, a]), {})
         assert [i.key.name for i in infos] == ["a", "q", "x"]
+
+    @pytest.mark.parametrize("shape", ["scalar", "vector"])
+    def test_a_prefix_name_sorts_first_whatever_the_shape(self, shape):
+        """A ref sorts on its separators, so it cannot order names.
+
+        "CD#10" puts CD first while "CD|m" puts CDA first -- so ordering by ref
+        alone would sort one pair of names two ways depending on their shapes.
+        """
+        if shape == "scalar":
+            keys = [VarKey(name="CDA", units="m"), VarKey(name="CD", units="m")]
+        else:
+            keys = [*vec("CDA", 2), *vec("CD", 2)]
+        infos = classify_variables(VarSet(keys), {})
+        assert [i.key.name for i in infos] == ["CD", "CDA"]
 
 
 # ---------------------------------------------------------------------------

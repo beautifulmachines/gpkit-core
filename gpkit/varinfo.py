@@ -78,7 +78,11 @@ def _lookup(mapping, key):
 
 
 def classify_variables(vks, substitutions, solution=None) -> list:
-    """The VarInfo for every variable in `vks`, ordered by ref.
+    """The VarInfo for every variable in `vks`, ordered by name then ref.
+
+    Name first because a ref sorts on its separators: `#shape` puts "CD" before
+    "CDA" while `|units` puts "CDA" before "CD", so ref order alone would order
+    two variables differently according to their shapes. Ref breaks ties.
 
     `substitutions` determines each variable's kind, through the same
     `parse_subs`/`parse_linked` the solver uses -- so a kind here cannot disagree
@@ -106,4 +110,4 @@ def classify_variables(vks, substitutions, solution=None) -> list:
                 sensitivities=tuple(_lookup(sens, vk) for vk in elements),
             )
         )
-    return sorted(infos, key=lambda info: info.key.ref)
+    return sorted(infos, key=lambda info: (info.key.name, info.key.ref))
