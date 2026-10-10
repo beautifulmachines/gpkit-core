@@ -32,6 +32,105 @@ def fixture_y():
     return VarKey("y")
 
 
+class TestVectorParentItems:
+    """items(), with vectors collapsed to their veckey (#55).
+
+    A VarMap's varset is its namespace while _data holds only what has a value,
+    and the two are deliberately different sizes -- so this yields what the map
+    holds rather than everything the namespace can name.
+    """
+
+    def test_a_registered_key_without_a_value_is_not_an_item(self, vm, x, y):
+        vm[x] = 1.0
+        vm.register_keys(VarSet([x, y]))
+        assert len(vm) == 1 and len(vm.varset) == 2
+        assert dict(vm.vector_parent_items()) == {x: 1.0}
+
+    def test_a_models_substitutions(self):
+        "The reported case: substitutions registers every key, values only fixed."
+        from gpkit.examples.pipeline import Pipeline  # noqa: PLC0415
+
+        m = Pipeline.default()
+        assert len(m.substitutions) < len(m.substitutions.varset)
+        items = dict(m.substitutions.vector_parent_items())
+        assert items  # no KeyError
+        assert all(k in m.substitutions for k in items)
+
+    def test_a_complete_vector_is_one_item(self):
+        q = VectorVariable(3, "q", "m")
+        vm = VarMap()
+        vm.register_keys(VarSet([e.key for e in q]))
+        vm[q.key] = [1.0, 2.0, 3.0]
+        ((key, value),) = vm.vector_parent_items()
+        assert key is q.key
+        assert list(value) == [1.0, 2.0, 3.0]
+
+    @staticmethod
+    def _partly_valued():
+        "A 3-vector with values at 0 and 2, and its middle element unvalued."
+        q = VectorVariable(3, "q", "m")
+        vm = VarMap()
+        vm.register_keys(VarSet([e.key for e in q]))
+        vm[q[0].key] = 1.0
+        vm[q[2].key] = 3.0
+        return q, vm
+
+    def test_a_partly_valued_vector_reads_with_nan_in_the_gap(self):
+        "nan is already how an unregistered element reads, so a gap reads alike."
+        q, vm = self._partly_valued()
+        value = vm[q.key]
+        assert [value[0], value[2]] == [1.0, 3.0]
+        assert np.isnan(value[1])
+
+    def test_a_partly_valued_vector_is_in_the_map(self):
+        "Its values are here, so claiming otherwise would be a lie."
+        q, vm = self._partly_valued()
+        assert q.key in vm
+        assert list(dict(vm.vector_parent_items())) == [q.key]
+
+    def test_a_vector_with_no_values_is_absent(self):
+        "Registered names alone are not items -- the reported bug, on a vector."
+        q = VectorVariable(3, "q", "m")
+        vm = VarMap()
+        vm.register_keys(VarSet([e.key for e in q]))
+        assert q.key not in vm
+        with pytest.raises(KeyError):
+            _ = vm[q.key]
+        assert not list(vm.vector_parent_items())
+
+    def test_every_value_appears_exactly_once(self):
+        """Flattening the result reproduces items(): a regrouping, not a filter.
+
+        Spans a complete vector, a partly valued one and a scalar at once, which
+        is where a collapse could drop or double-count a value.
+        """
+        p, q = VectorVariable(2, "p", "m"), VectorVariable(3, "q", "m")
+        x = Variable("x", "m")
+        vm = VarMap()
+        vm.register_keys(VarSet([e.key for e in p] + [e.key for e in q] + [x.key]))
+        vm[p.key] = [1.0, 2.0]
+        vm[q[1].key] = 5.0
+        vm[x.key] = 9.0
+
+        flattened = {}
+        for key, value in vm.vector_parent_items():
+            if key.shape and key.idx is None:
+                for element in vm.varset.by_vec(key).flat:
+                    held = np.asarray(value)[element.idx]
+                    if not np.isnan(held):  # a gap stands for no value, not one
+                        flattened[element] = held
+            else:
+                flattened[key] = value
+        assert flattened == dict(vm.items())
+
+    def test_elements_never_appear_alongside_their_vector(self):
+        q = VectorVariable(2, "q", "m")
+        vm = VarMap()
+        vm.register_keys(VarSet([e.key for e in q]))
+        vm[q.key] = [1.0, 2.0]
+        assert [k for k, _ in vm.vector_parent_items()] == [q.key]
+
+
 class TestVarMap:
     "TestCase for the VarMap class"
 
@@ -191,10 +290,12 @@ class TestVarMap:
         # all elements registered, none have values
         assert veckey not in vm
         assert "v_novalue" not in vm
-        # set one element — veckey still not "in" because getitem would fail
+        # set one element — the veckey is now in, since the map holds a value
+        # for it; the elements without one read as nan
         vm[vks[0]] = 10
         assert vks[0] in vm
-        assert veckey not in vm  # partial: _data missing vks[1], vks[2]
+        assert veckey in vm
+        assert vm[veckey][0] == 10 and np.isnan(vm[veckey][1:]).all()
         # set all elements
         vm[vks[1]] = 20
         vm[vks[2]] = 30
