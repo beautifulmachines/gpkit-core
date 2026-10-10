@@ -1,15 +1,15 @@
 [Beam]
-  free  M[:]
-  free  V[:]
   free  dx
+  free  M[:]
   free  th[:]
+  free  V[:]
   free  w[:]
   fixed EI
   fixed L
   fixed M_tip
-  fixed V_tip
   fixed q[:]
   fixed th_base
+  fixed V_tip
   fixed w_base
   cons (definition of dx)  L = 3⋅dx
   cons (boundary_conditions)  V[3] ≥ V_tip

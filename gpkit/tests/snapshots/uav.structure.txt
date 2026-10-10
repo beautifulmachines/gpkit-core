@@ -16,29 +16,29 @@
   free  A
   free  I_cap
   free  M_rbar
+  free  nu
+  free  p
+  free  q
   free  S
+  free  t_cap
+  free  t_web
+  free  tau
   free  W
   free  W_cap
   free  W_design
   free  W_web
-  free  nu
-  free  p
-  free  q
-  free  t_cap
-  free  t_web
-  free  tau
   fixed C_Lmax
-  fixed EI_ref
-  fixed N_lift
-  fixed W_ref
   fixed e
+  fixed EI_ref
   fixed f_wadd
   fixed k_shear
+  fixed N_lift
   fixed r_h
   fixed rho_alum
   fixed sigma_max
   fixed sigma_max_shear
   fixed w
+  fixed W_ref
   fixed g
   cons (Geometry)  2⋅q ≥ 1 + p
   cons (Geometry)  p ≥ 1.9
@@ -55,10 +55,10 @@
   free  P_max
   free  W
   fixed A_prop
-  fixed W_eng_coeff
   fixed eta_eng
   fixed eta_v
   fixed h_fuel
+  fixed W_eng_coeff
   cons  W ≥ W_eng_coeff⋅P_max^0.803
 [UAV.Mission]
   free  R
@@ -80,10 +80,10 @@
 [UAV.Mission.Outbound]
   free  W_fuel
   free  z_bre
+  free  eta_0
   free  R  [UAV.Mission]
   free  T
   free  W
-  free  eta_0
   fixed g
   fixed h_fuel  [UAV.Aircraft.Engine]
   cons  z_bre ≥ g⋅R⋅T/(h_fuel⋅eta_0⋅W)
@@ -115,8 +115,8 @@
   free  Re
   free  A  [UAV.Aircraft.Wing]
   free  S  [UAV.Aircraft.Wing]
-  free  V  [UAV.Mission.Outbound.FlightState]
   free  tau  [UAV.Aircraft.Wing]
+  free  V  [UAV.Mission.Outbound.FlightState]
   fixed mu  [UAV.Mission.Outbound.FlightState]
   fixed rho  [UAV.Mission.Outbound.FlightState]
   cons  Re = rho/mu⋅V⋅(S/A)^0.5
@@ -137,10 +137,10 @@
 [UAV.Mission.Return]
   free  W_fuel
   free  z_bre
+  free  eta_0
   free  R  [UAV.Mission]
   free  T
   free  W
-  free  eta_0
   fixed g
   fixed h_fuel  [UAV.Aircraft.Engine]
   cons  z_bre ≥ g⋅R⋅T/(h_fuel⋅eta_0⋅W)
@@ -172,8 +172,8 @@
   free  Re
   free  A  [UAV.Aircraft.Wing]
   free  S  [UAV.Aircraft.Wing]
-  free  V  [UAV.Mission.Return.FlightState]
   free  tau  [UAV.Aircraft.Wing]
+  free  V  [UAV.Mission.Return.FlightState]
   fixed mu  [UAV.Mission.Return.FlightState]
   fixed rho  [UAV.Mission.Return.FlightState]
   cons  Re = rho/mu⋅V⋅(S/A)^0.5
@@ -192,10 +192,10 @@
   cons  eta_prop ≤ eta_i⋅eta_v
   cons  4⋅eta_i + T⋅eta_i²/(0.5⋅rho⋅V²⋅A_prop) ≤ 4
 [UAV.Mission.SprintCondition]
+  free  eta_0
   free  P_max  [UAV.Aircraft.Engine]
   free  T
   free  V
-  free  eta_0
   fixed V_reqt
   cons  P_max ≥ T⋅V/eta_0
   cons  V ≥ V_reqt
@@ -226,8 +226,8 @@
   free  Re
   free  A  [UAV.Aircraft.Wing]
   free  S  [UAV.Aircraft.Wing]
-  free  V  [UAV.Mission.SprintCondition.FlightState]
   free  tau  [UAV.Aircraft.Wing]
+  free  V  [UAV.Mission.SprintCondition.FlightState]
   fixed mu  [UAV.Mission.SprintCondition.FlightState]
   fixed rho  [UAV.Mission.SprintCondition.FlightState]
   cons  Re = rho/mu⋅V⋅(S/A)^0.5
@@ -249,8 +249,8 @@
   free  V_stall
   free  S  [UAV.Aircraft.Wing]
   free  W_mto  [UAV.Aircraft]
-  fixed V_stallmax
   fixed rho_sl
+  fixed V_stallmax
   fixed C_Lmax  [UAV.Aircraft.Wing]
   cons  W_mto ≤ 0.5⋅rho_sl⋅V_stall²⋅C_Lmax⋅S
   cons  V_stall ≤ V_stallmax

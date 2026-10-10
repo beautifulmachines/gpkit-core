@@ -139,6 +139,16 @@ class TestIdentity:
         infos = classify_variables(VarSet(keys), {})
         assert [i.key.name for i in infos] == ["CD", "CDA"]
 
+    def test_case_does_not_outrank_spelling(self):
+        """ASCII would put "m_LM_wet" before "m_empty", which no reader expects.
+
+        "Mach" trails both because "_" sorts before a letter, which is the
+        underscore's doing rather than the case folding's.
+        """
+        keys = [VarKey(name="m_LM_wet"), VarKey(name="m_empty"), VarKey(name="Mach")]
+        infos = classify_variables(VarSet(keys), {})
+        assert [i.key.name for i in infos] == ["m_empty", "m_LM_wet", "Mach"]
+
 
 # ---------------------------------------------------------------------------
 # Values and sensitivities
