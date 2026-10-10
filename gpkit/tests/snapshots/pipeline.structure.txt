@@ -2,16 +2,16 @@
   free  C_nrg
   free  LCC
   free  Pipe.C
-  free  D
-  free  t
-  free  P[:]
   free  Pump.C
-  free  P_rated
+  free  D
   free  M
+  free  P[:]
+  free  P_rated
+  free  t
   fixed c_nrg
   fixed p_sys
-  fixed sigma
   fixed hours[:]
+  fixed sigma
   cons  sigma ≥ p_sys⋅D/(2⋅t) + 4⋅M/(3.14⋅D²⋅t)
   cons  P[0] ≤ P_rated
   cons  P[1] ≤ P_rated
@@ -25,10 +25,10 @@
   free  A
   free  C
   free  D
-  free  W
   free  t
-  fixed L
+  free  W
   fixed c_mat
+  fixed L
   fixed rho_m
   fixed sigma
   fixed t_min
@@ -43,19 +43,19 @@
   fixed eta
   cons (Cost)  C ≥ c_unit⋅P_rated
 [Pipeline.PipeFlow]
+  free  dp[:]
+  free  f[:]
+  free  hours[:]
   free  P[:]
   free  Q[:]
   free  Re[:]
   free  V[:]
-  free  dp[:]
-  free  f[:]
-  free  hours[:]
   free  A  [Pipeline.Pipe]
   free  D  [Pipeline.Pipe]
+  fixed eta  [Pipeline.Pump]
+  fixed L  [Pipeline.Pipe]
   fixed mu  [Pipeline.Fluid]
   fixed rho  [Pipeline.Fluid]
-  fixed L  [Pipeline.Pipe]
-  fixed eta  [Pipeline.Pump]
   cons (Continuity)  Q[0] ≤ V[0]⋅A
   cons (Continuity)  Q[1] ≤ V[1]⋅A
   cons (Continuity)  Q[2] ≤ V[2]⋅A

@@ -31,6 +31,7 @@ from gpkit.report import (
 )
 from gpkit.util.repr_conventions import unitstr
 from gpkit.util.small_classes import Quantity
+from gpkit.varkey import VarKey
 
 
 def _all_vars(ir):
@@ -84,12 +85,59 @@ class _BareGroupParent(Model):
 # ── Dataclass structure ───────────────────────────────────────────────────────
 
 
+class TestVariableRowsAreJoinable:
+    """A report row names its variable the way the IR does (#318).
+
+    A report is naturally built once per model and cached while solves are
+    separate; without a key on the row there is nothing to join values back to,
+    which is what forced a consumer to rebuild the table from the IR.
+    """
+
+    class Mixed(gpkit.Model):
+        "A fixed vector, a free vector, and scalars of each kind."
+
+        x = gpkit.Var("m", "free scalar")
+        c = gpkit.Var("m", "fixed scalar", value=2.0)
+
+        def setup(self):
+            self.q = gpkit.VectorVariable(3, "q", [0.1, 0.2, 0.3], "m", "fixed vec")
+            self.v = gpkit.VectorVariable(3, "v", "m", "free vec")
+            self.cost = self.x
+            return [self.x >= self.q.sum() + self.v.sum() + self.c]
+
+    def test_entries_carry_their_varkey(self):
+        ir = build_report_ir(self.Mixed())
+        for entry in _all_vars(ir):
+            assert isinstance(entry.key, VarKey)
+
+    def test_a_vector_row_carries_the_veckey(self):
+        "Only elements hold solved values, so the row has to say which vector."
+        ir = build_report_ir(self.Mixed())
+        q = next(e for e in _all_vars(ir) if e.key.name == "q")
+        assert q.key.shape == (3,) and q.key.idx is None
+
+    def test_every_row_ref_resolves_in_the_model_ir(self):
+        "The join the row exists for: report ref -> to_ir()['variables']."
+        model = self.Mixed()
+        variables = model.to_ir()["variables"]
+        for section in _sections(model.report(fmt="dict")):
+            for entry in section["free_variables"] + section["fixed_variables"]:
+                assert entry["ref"] in variables
+
+    def test_a_wholly_fixed_vector_is_reported_fixed(self):
+        "No substitution sits on the veckey; the kind has to come from elements."
+        ir = build_report_ir(self.Mixed())
+        assert {e.key.name for e in ir.fixed_variables} == {"c", "q"}
+        assert {e.key.name for e in ir.free_variables} == {"x", "v"}
+
+
 class TestReportDataclasses:
     """Tests for VarEntry, CGroup, and ReportSection dataclasses."""
 
     def test_var_entry_in_report(self):
         """VarEntry holds name, latex, value, sensitivity, units, label fields."""
         ve = VarEntry(
+            key=VarKey(name="x", units="m"),
             name="x",
             latex="x",
             value=3.14,
@@ -116,7 +164,13 @@ class TestReportDataclasses:
     def test_report_section_dataclass(self):
         """ReportSection has all required fields."""
         ve = VarEntry(
-            name="x", latex="x", value=1.0, sensitivity=None, units="-", label=""
+            key=VarKey(name="x"),
+            name="x",
+            latex="x",
+            value=1.0,
+            sensitivity=None,
+            units="-",
+            label="",
         )
         cg = CGroup(label="", constraints=[], keys=[])
         rs = ReportSection(
@@ -139,7 +193,13 @@ class TestReportDataclasses:
     def test_report_section_to_dict(self):
         """ReportSection.to_dict() returns a JSON-serializable dict."""
         ve = VarEntry(
-            name="x", latex="x", value=2.0, sensitivity=0.1, units="m", label="span"
+            key=VarKey(name="x", units="m"),
+            name="x",
+            latex="x",
+            value=2.0,
+            sensitivity=0.1,
+            units="m",
+            label="span",
         )
         x_test = Variable("x_to_dict_test")
         cg = CGroup(
@@ -596,7 +656,13 @@ class TestRenderText:
     def test_render_text_direct(self):
         """render_text(ir) returns hierarchical text from a ReportSection IR."""
         ve = VarEntry(
-            name="x", latex="x", value=1.0, sensitivity=None, units="m", label="span"
+            key=VarKey(name="x", units="m"),
+            name="x",
+            latex="x",
+            value=1.0,
+            sensitivity=None,
+            units="m",
+            label="span",
         )
         cg = CGroup(label="Load", constraints=[], keys=[])
         ir = ReportSection(
@@ -712,7 +778,13 @@ class TestRenderMarkdown:
     def test_render_markdown_direct(self):
         """render_markdown(ir) returns markdown from a ReportSection IR."""
         ve = VarEntry(
-            name="x", latex="x", value=2.0, sensitivity=0.5, units="m", label="span"
+            key=VarKey(name="x", units="m"),
+            name="x",
+            latex="x",
+            value=2.0,
+            sensitivity=0.5,
+            units="m",
+            label="span",
         )
         cg = CGroup(label="Aero", constraints=[], keys=[])
         ir = ReportSection(
@@ -775,6 +847,7 @@ class TestRenderMarkdown:
         km<sup>2/s</sup>2 in HTML.  The fix escapes ^ to \\^ so it is literal.
         """
         ve = VarEntry(
+            key=VarKey(name="v", units="km^2/s^2"),
             name="v",
             latex="v",
             value=1.0,

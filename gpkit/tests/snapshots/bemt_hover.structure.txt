@@ -1,19 +1,19 @@
 [BEMTHover]
   free  A
+  free  dC_P[:]
+  free  dC_T[:]
   free  Delta_r[:]
+  free  dP[:]
   free  Omega
   free  P
   free  R
-  free  V_i[:]
-  free  dC_P[:]
-  free  dC_T[:]
-  free  dP[:]
   free  r[:]
+  free  V_i[:]
+  fixed dr_min
   fixed Omega_max
   fixed Omega_min
   fixed R_max
   fixed R_min
-  fixed dr_min
   fixed rho
   fixed xi[:]
   cons  A = 3.14⋅R²

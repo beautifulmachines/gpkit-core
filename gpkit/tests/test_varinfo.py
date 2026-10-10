@@ -120,10 +120,34 @@ class TestIdentity:
         assert len(seen) == len(set(seen)) == len(vks)
         assert set(seen) == set(vks)
 
-    def test_order_is_deterministic_by_ref(self):
+    def test_order_is_deterministic(self):
         x, a = VarKey(name="x"), VarKey(name="a")
         infos = classify_variables(VarSet([*vec("q", 2), x, a]), {})
         assert [i.key.name for i in infos] == ["a", "q", "x"]
+
+    @pytest.mark.parametrize("shape", ["scalar", "vector"])
+    def test_a_prefix_name_sorts_first_whatever_the_shape(self, shape):
+        """A ref sorts on its separators, so it cannot order names.
+
+        "CD#10" puts CD first while "CD|m" puts CDA first -- so ordering by ref
+        alone would sort one pair of names two ways depending on their shapes.
+        """
+        if shape == "scalar":
+            keys = [VarKey(name="CDA", units="m"), VarKey(name="CD", units="m")]
+        else:
+            keys = [*vec("CDA", 2), *vec("CD", 2)]
+        infos = classify_variables(VarSet(keys), {})
+        assert [i.key.name for i in infos] == ["CD", "CDA"]
+
+    def test_case_does_not_outrank_spelling(self):
+        """ASCII would put "m_LM_wet" before "m_empty", which no reader expects.
+
+        "Mach" trails both because "_" sorts before a letter, which is the
+        underscore's doing rather than the case folding's.
+        """
+        keys = [VarKey(name="m_LM_wet"), VarKey(name="m_empty"), VarKey(name="Mach")]
+        infos = classify_variables(VarSet(keys), {})
+        assert [i.key.name for i in infos] == ["m_empty", "m_LM_wet", "Mach"]
 
 
 # ---------------------------------------------------------------------------
@@ -241,19 +265,6 @@ class TestAgreement:
             (i.key, i.vks, i.kind) for i in after
         ]
         assert any(i.values != (None,) * len(i.vks) for i in after)
-
-    def test_classification_matches_the_report(self):
-        """Bridge to report.py's _is_free_vk, which this will replace.
-
-        Guards the overlap while both exist, so the migration can delete one.
-        """
-        m = ClassifyMe()
-        sol = m.solve(verbosity=0)
-        rep = m.report(solution=sol, fmt="dict")
-        reported_free = {v["name"] for v in rep["free_variables"]}
-        infos = classify_variables(VarSet(m.own_varkeys), m.substitutions, sol)
-        computed_free = {i.key.name for i in infos if i.kind is VarKind.FREE}
-        assert {n.replace("[:]", "") for n in reported_free} == computed_free
 
 
 # ---------------------------------------------------------------------------
