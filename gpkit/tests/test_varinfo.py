@@ -242,19 +242,6 @@ class TestAgreement:
         ]
         assert any(i.values != (None,) * len(i.vks) for i in after)
 
-    def test_classification_matches_the_report(self):
-        """Bridge to report.py's _is_free_vk, which this will replace.
-
-        Guards the overlap while both exist, so the migration can delete one.
-        """
-        m = ClassifyMe()
-        sol = m.solve(verbosity=0)
-        rep = m.report(solution=sol, fmt="dict")
-        reported_free = {v["name"] for v in rep["free_variables"]}
-        infos = classify_variables(VarSet(m.own_varkeys), m.substitutions, sol)
-        computed_free = {i.key.name for i in infos if i.kind is VarKind.FREE}
-        assert {n.replace("[:]", "") for n in reported_free} == computed_free
-
 
 # ---------------------------------------------------------------------------
 # The row stays free of anything surface-dependent

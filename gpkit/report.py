@@ -8,20 +8,30 @@ functions of the IR.
 from dataclasses import dataclass, field
 from typing import Any
 
+import numpy as np
+
 from .constraints.set import constraint_varkeys, own_keyed_constraints
 from .display import DisplayScope
 from .model import Model as _Model
 from .printing import _format_aligned_columns
 from .util.repr_conventions import unitstr
 from .util.small_classes import Quantity
-from .varmap import VarMap
+from .varinfo import VarKind, classify_variables
+from .varmap import VarSet
 
 
 @dataclass
 class VarEntry:
-    """A variable row in a report section."""
+    """A variable row in a report section.
 
-    name: str  # display name (from VarKey.name)
+    `key` names the variable -- the veckey for a vector -- and is what joins a
+    row to a solution or to to_ir()'s variables. The rest are renderings of it
+    against this section's DisplayScope, and so are display-layer fields that
+    #319 moves out; prefer `key` over `name` for anything but display.
+    """
+
+    key: "VarKey"  # noqa: F821
+    name: str  # display name, relative to this section's scope
     latex: str  # LaTeX rendering (from VarKey.latex())
     value: Any  # float | ndarray | None — never a pint Quantity
     sensitivity: float | None  # shadow price from solution, or None
@@ -32,6 +42,7 @@ class VarEntry:
     def to_dict(self) -> dict:
         """JSON-serializable dict."""
         return {
+            "ref": self.key.ref,
             "name": self.name,
             "latex": self.latex,
             "value": _serialize_value(self.value),
@@ -146,38 +157,6 @@ def _serialize_value(val: Any) -> Any:
         return str(val)
 
 
-def _value_units(vk, varmap: VarMap) -> tuple[Any, str]:
-    """Get (magnitude, unit_str) for vk from varmap.
-
-    Both values come from the same pint Quantity returned by varmap.quantity(),
-    guaranteeing they are consistent.  Raises KeyError if vk is not in varmap.
-    """
-    qty = varmap.quantity(vk)
-    return qty.magnitude, unitstr(qty) or "-"
-
-
-def _resolve_sensitivity(vk, solution=None):
-    """Get sensitivity (shadow price) for a variable from solution.
-
-    Returns float for scalar variables, numpy array for vector variables,
-    or None if unavailable.
-    """
-    if solution is None:
-        return None
-    try:
-        import numpy as np  # noqa: PLC0415
-
-        sens_vars = solution.sens.variables
-        if vk not in sens_vars:
-            return None
-        raw = sens_vars[vk]
-        mag = getattr(raw, "magnitude", raw)
-        arr = np.asarray(mag)
-        return arr if arr.shape else float(arr)
-    except (AttributeError, KeyError, TypeError):
-        return None
-
-
 # ── Constraint rendering ──────────────────────────────────────────────────────
 
 
@@ -211,29 +190,27 @@ def _constraint_dict(c, key, scope) -> dict:
 # ── Core builder helpers ──────────────────────────────────────────────────────
 
 
-def _make_var_entry(display_vk, scope, get_val_units, solution, source="") -> VarEntry:
-    "Build a VarEntry for display_vk using the provided value-lookup callable."
-    value, units_str = get_val_units(display_vk)
+def _entry_datum(values):
+    "One VarInfo column as a VarEntry field: a scalar, an array, or None."
+    if len(values) == 1:
+        return values[0]
+    if all(v is None for v in values):
+        return None
+    return np.array([np.nan if v is None else v for v in values])
+
+
+def _make_var_entry(info, scope, source="") -> VarEntry:
+    "Render a VarInfo against scope, keeping the key it was built from."
     return VarEntry(
-        name=display_vk.str_without(scope),
-        latex=display_vk.latex(scope),
-        value=value,
-        sensitivity=_resolve_sensitivity(display_vk, solution=solution),
-        units=units_str,
-        label=display_vk.label or "",
+        key=info.key,
+        name=info.key.str_without(scope),
+        latex=info.key.latex(scope),
+        value=_entry_datum(info.values),
+        sensitivity=_entry_datum(info.sensitivities),
+        units=unitstr(info.key) or "-",
+        label=info.key.label or "",
         source=source,
     )
-
-
-def _is_free_vk(display_vk, solution, model) -> bool:
-    """Return True if display_vk is an optimized (free) variable.
-
-    With a solution: free iff the key appears in solution.primal.
-    Without a solution: free iff the key has no substitution in the model.
-    """
-    if solution is not None:
-        return display_vk in solution.primal
-    return display_vk not in model.substitutions
 
 
 def _build_split_var_entries(
@@ -245,62 +222,31 @@ def _build_split_var_entries(
     fixed_entries — Fixed Variables: prescribed constants with sensitivities.
 
     Names come from scope, so a variable this model owns shows only the context
-    below it and one owned elsewhere shows its path relative to here. Vector
-    variables collapse to a single VarEntry.
+    below it and one owned elsewhere shows its path relative to here. A vector is
+    one entry, under its veckey.
 
     Cross-model variables (extra_vks) additionally store their absolute dotted
     name in VarEntry.source, for display in brackets.
     """
-    display_map: VarMap = (
-        solution.variables if solution is not None else model.substitutions
-    )
-
-    def _get_value_units(vk):
-        try:
-            return _value_units(vk, display_map)
-        except KeyError:
-            return None, unitstr(vk) or "-"
-
     free_entries: list[VarEntry] = []
     fixed_entries: list[VarEntry] = []
-    seen_veckeys: set = set()
 
-    for vk in sorted(model.own_varkeys, key=lambda v: v.ref):
-        if vk.veckey is not None:
-            if vk.veckey in seen_veckeys:
-                continue
-            seen_veckeys.add(vk.veckey)
-            display_vk = vk.veckey
-        else:
-            display_vk = vk
-        entry = _make_var_entry(display_vk, scope, _get_value_units, solution)
-        if _is_free_vk(display_vk, solution, model):
-            free_entries.append(entry)
-        else:
-            fixed_entries.append(entry)
-
-    if extra_vks:
-        owned_display = {(vk.veckey or vk) for vk in model.own_varkeys}
-        cross_seen: set = set()
-        for vk in sorted(extra_vks, key=lambda v: v.ref):
-            display_vk = vk.veckey if vk.veckey is not None else vk
-            if display_vk in owned_display or display_vk in cross_seen:
-                continue
-            cross_seen.add(display_vk)
+    def collect(vks):
+        for info in classify_variables(vks, model.substitutions, solution):
             # Annotate exactly what the scope could not locate by name -- the
-            # same keys legend() covers. A variable under this model shows its
-            # path already, so a source column would only repeat it.
-            entry = _make_var_entry(
-                display_vk,
-                scope,
-                _get_value_units,
-                solution,
-                source="" if scope.owns(display_vk) else display_vk.lineagestr(),
-            )
-            if _is_free_vk(display_vk, solution, model):
+            # same keys legend() covers. A variable at or below this model shows
+            # its path already, so a source column would only repeat it.
+            source = "" if scope.owns(info.key) else info.key.lineagestr()
+            entry = _make_var_entry(info, scope, source)
+            if info.kind is VarKind.FREE:
                 free_entries.append(entry)
             else:
                 fixed_entries.append(entry)
+
+    collect(model.own_varkeys)
+    if extra_vks:
+        owned = {(vk.veckey or vk) for vk in model.own_varkeys}
+        collect(VarSet(vk for vk in extra_vks if (vk.veckey or vk) not in owned))
 
     return free_entries, fixed_entries
 
@@ -481,7 +427,6 @@ def _fmt_value(val, precision: int = 4, vecn: int = 6, col_widths=()) -> str:
     col_widths is a per-column list of minimum widths so that element position i
     across all vector rows in the same table renders at the same width.
     """
-    import numpy as np  # noqa: PLC0415
 
     if val is None:
         return "-"
@@ -512,7 +457,6 @@ _SENS_NEARZERO_TOL = 1e-7
 
 def _fmt_sensitivity(sens, vecn: int = 6, col_widths=()) -> str:
     """Format a sensitivity value for display, handling scalars and arrays."""
-    import numpy as np  # noqa: PLC0415
 
     if sens is None:
         return "-"
@@ -538,7 +482,6 @@ def _fmt_sensitivity(sens, vecn: int = 6, col_widths=()) -> str:
 
 def _compute_vec_col_widths(variables: list, precision: int, vecn: int) -> list:
     """Pre-scan vector values to compute per-column widths for alignment."""
-    import numpy as np  # noqa: PLC0415
 
     col_widths: list = []
     for ve in variables:
