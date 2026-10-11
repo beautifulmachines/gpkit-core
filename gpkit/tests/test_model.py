@@ -462,6 +462,25 @@ class TestGPSensitivities:
         assert len(nu) == 1
         assert nu[0] == pytest.approx(sol.sens.constraints_by_key[eq])
 
+    def test_a_signomial_made_gp_by_substitution_reports_no_terms(self, solver):
+        """`x + y >= z` with y and z fixed is `x >= 3`, a valid GP constraint.
+
+        SignomialInequality.sens_from_dual owns this path -- it sets
+        `p_ineq.parent = self` so its own chain rule runs over
+        `(coeff signomial)/(negy signomial)` monomials. Those index the
+        substituted form, not the signomial as written, so it reports no per-term
+        duals; the variable sensitivities are still exact.
+        """
+        x, y, z = Variable("x"), Variable("y", 1), Variable("z", 4)
+        with SignomialsEnabled():
+            m = Model(x, [x + y >= z])
+        sol = m.solve(solver=solver, verbosity=0)
+        assert float(sol.cost) == pytest.approx(3.0)
+        assert sol.sens.variables[z.key] == pytest.approx(4 / 3)
+        assert sol.sens.variables[y.key] == pytest.approx(-1 / 3)
+        assert not sol.sens.terms_by_key  # written terms have no duals
+        assert sol.sens.constraints_by_key  # but the aggregate still does
+
     def test_fixed_and_free_keys_share_one_sensitivity_map(self, solver):
         "sens.variables covers both, so a filtered copy would be a second encoding."
         x = Variable("x")
