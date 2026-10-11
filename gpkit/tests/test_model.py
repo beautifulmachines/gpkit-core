@@ -390,6 +390,36 @@ class TestGPSensitivities:
         assert senss[fuel_per_nm] == pytest.approx(0.41, abs=0.01)
         assert senss[W_payload] == pytest.approx(0.39, abs=0.01)
 
+    def test_cost_senss_when_substitution_merges_monomials(self, solver):
+        """Two cost monomials collapsing into one must still report separately.
+
+        `a*x + b*x` is two monomials as written and one after a and b are fixed,
+        so the solved nu is shorter than the written hmap (#329). Each written
+        term's share is its coefficient over the merged total: 2/5 and 3/5.
+        """
+        a = Variable("a", 2.0, "-")
+        b = Variable("b", 3.0, "-")
+        x = Variable("x", "-")
+        m = Model(a * x + b * x, [x >= 1])
+        sol = m.solve(solver=solver, verbosity=0)
+        assert float(sol.cost) == pytest.approx(5.0)
+        senss = sol.sens.variables
+        assert senss[a.key] == pytest.approx(0.4)
+        assert senss[b.key] == pytest.approx(0.6)
+        # the cost's duals sum to 1, so the two shares account for all of it
+        assert senss[a.key] + senss[b.key] == pytest.approx(1.0)
+        # x is free, so its column of A^T nu vanishes
+        assert senss[x.key] == pytest.approx(0.0, abs=1e-9)
+
+    def test_cost_senss_survive_a_merge_against_a_constant(self, solver):
+        "A written term whose variables all vanish still owns its share."
+        a = Variable("a", 1.5, "-")
+        x = Variable("x", "-")
+        m = Model(a * x + x, [x >= 2])  # a*x and x merge into 2.5*x
+        sol = m.solve(solver=solver, verbosity=0)
+        assert float(sol.cost) == pytest.approx(5.0)
+        assert sol.sens.variables[a.key] == pytest.approx(0.6)  # 1.5/2.5
+
     def test_fixed_and_free_keys_share_one_sensitivity_map(self, solver):
         "sens.variables covers both, so a filtered copy would be a second encoding."
         x = Variable("x")
