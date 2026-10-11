@@ -514,7 +514,14 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
         return out
 
     def sens_from_dual(self, las, nus, _):
-        "Returns the variable/constraint sensitivities from lambda/nu"
+        """Returns the variable/constraint/term sensitivities from lambda/nu
+
+        The returned nu indexes the monomials of this constraint's `p/m <= 1`
+        form -- the less-than side's terms as written -- so substitution's
+        merging is undone through `pmap` first. The greater-than side gets no
+        entry of its own: it reaches the solver as one monomial, so its weight is
+        `la`, the sum of nu.
+        """
         (la,) = las
         (nu,) = nus
         (presub,) = self.unsubbed
@@ -534,7 +541,7 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
         for nu_i, exp in zip(nu, presub.hmap):
             for vk, x in exp.items():
                 self.v_ss[vk] = nu_i * x + self.v_ss.get(vk, 0)
-        return self.v_ss, la
+        return self.v_ss, la, nu
 
 
 class MonomialEquality(PosynomialInequality):
@@ -583,12 +590,16 @@ class MonomialEquality(PosynomialInequality):
         return bool(self.left.c == self.right.c and self.left.exp == self.right.exp)
 
     def sens_from_dual(self, las, nus, _):  # noqa: ARG002
-        "Returns the variable/constraint sensitivities from lambda/nu"
+        """Returns the variable/constraint/term sensitivities from lambda/nu
+
+        The net of the two directions, over the l_over_r form's one monomial;
+        its sign is the binding direction. Only the net is unique (#324).
+        """
         la_lr, la_rl = las  # l_over_r, r_over_l -- see _gen_unsubbed
         la = la_lr - la_rl
         (exp,) = self.unsubbed[0].hmap
         self.v_ss = exp * la
-        return self.v_ss, la
+        return self.v_ss, la, np.array([la])
 
 
 class SignomialInequality(ScalarSingleEquationConstraint):
@@ -698,7 +709,9 @@ class SignomialInequality(ScalarSingleEquationConstraint):
                 sens = nu_i * inv_mon_val * d_mon_d_var * var_val
                 assert isinstance(sens, float)
                 self.v_ss[var] = sens + self.v_ss.get(var, 0)
-        return self.v_ss, la
+        # No per-term duals: nu here indexes the substituted posy/negy monomials
+        # rather than the terms as written (#324).
+        return self.v_ss, la, None
 
     def as_gpconstr(self, x0):
         "Returns GP-compatible approximation at x0"

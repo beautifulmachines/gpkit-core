@@ -201,6 +201,57 @@ class TestConstraint:
             c.as_hmapslt1(subs)
 
 
+class TestSensFromDualTerms:
+    """sens_from_dual also returns the per-monomial duals it computes (#324).
+
+    They index the less-than side's terms as written -- not the solver's
+    monomials, so a merged monomial's dual is distributed back by coefficient
+    share, which is what the constraint's pmap already records. The greater-than
+    side needs none: it reaches the solver as a single monomial, so its weight is
+    `la`, the sum.
+    """
+
+    def test_a_merged_dual_is_distributed_by_share(self):
+        W = Variable("W", "N")
+        W_a = Variable("W_a", 2.0, "N")
+        W_b = Variable("W_b", 3.0, "N")
+        c = W >= W_a + W_b
+        list(c.as_hmapslt1({W_a.key: 2.0, W_b.key: 3.0}))  # one merged monomial
+        _, la, nu = c.sens_from_dual([1.0], [np.array([1.0])], None)
+        assert len(c.unsubbed[0].hmap) == 2  # two terms as written
+        assert list(nu) == pytest.approx([0.4, 0.6])  # 2/5 and 3/5
+        assert sum(nu) == pytest.approx(la)  # lambda is the sum
+
+    def test_unmerged_terms_pass_through(self):
+        W = Variable("W", "N")
+        W_a = Variable("W_a", "N")
+        W_b = Variable("W_b", "N")
+        c = W >= W_a + W_b
+        list(c.as_hmapslt1({}))
+        _, la, nu = c.sens_from_dual([0.9], [np.array([0.6, 0.3])], None)
+        assert list(nu) == pytest.approx([0.6, 0.3])
+        assert sum(nu) == pytest.approx(la)
+
+    def test_a_monomial_equality_reports_one_signed_net(self):
+        """Its two solver relations differ only by the sign of their duals.
+
+        The split between them is not unique -- only the difference is, since
+        their exponent rows are exactly opposite -- so the net is reported, over
+        `unsubbed[0]`'s one monomial (the l_over_r direction). A negative net
+        means the other direction is the binding one.
+        """
+        x = Variable("x", "-")
+        y = Variable("y", "-")
+        c = MonomialEquality(x, y)
+        list(c.as_hmapslt1({}))
+        _, la, nu = c.sens_from_dual(
+            [0.0, 1.0], [np.array([0.0]), np.array([1.0])], None
+        )
+        assert len(c.unsubbed[0].hmap) == 1
+        assert list(nu) == pytest.approx([la])
+        assert la == pytest.approx(-1.0)  # the r_over_l direction binds
+
+
 class TestCostedConstraint:
     "Tests for Costed Constraint class"
 

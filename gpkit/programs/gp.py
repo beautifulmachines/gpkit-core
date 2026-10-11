@@ -498,7 +498,7 @@ class GeometricProgram:
             nus_list.append(nus)
 
         for c, (las_list, nus_list) in roots.items():
-            v_ss, c_senss = c.sens_from_dual(las_list, nus_list, varvals)
+            v_ss, c_senss, _c_terms = c.sens_from_dual(las_list, nus_list, varvals)
             for vk, x in v_ss.items():
                 gpv_ss[vk] = x + gpv_ss.get(vk, 0)
                 absv_ss[vk] = abs(x) + absv_ss.get(vk, 0)
