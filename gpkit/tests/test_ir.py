@@ -1125,6 +1125,38 @@ class TestSolutionIR:
         }
         assert set(ir["sensitivities"]["variables"]) <= set(model_ir["variables"])
 
+    def test_terms_join_the_model_irs_written_terms(self):
+        """A term's dual lines up with the constraint's terms as serialized.
+
+        nu indexes the less-than side's terms, so the counts match whichever side
+        is the posynomial -- the other reaches the solver as one monomial (#324).
+        """
+        m, sol = _solved()
+        terms = sol.to_ir()["sensitivities"]["terms"]
+        by_key = {c["key"]: c for c in m.to_ir()["constraints"]}
+        assert terms  # the model has posynomial constraints
+        for ref, nu in terms.items():
+            c = by_key[ref]
+            sides = (len(c["left"]["terms"]), len(c["right"]["terms"]))
+            assert len(nu) in sides
+
+    def test_a_terms_sum_is_its_constraints_sensitivity(self):
+        "lambda is the sum, so the two cannot drift apart."
+        _, sol = _solved()
+        ir = sol.to_ir()["sensitivities"]
+        for ref, nu in ir["terms"].items():
+            assert sum(nu) == pytest.approx(ir["constraints"][ref], abs=1e-9)
+
+    def test_cost_terms_are_a_distribution(self):
+        _, sol = _solved()
+        cost_terms = sol.to_ir()["sensitivities"]["cost_terms"]
+        assert sum(cost_terms) == pytest.approx(1.0)
+
+    def test_the_solution_ir_is_json_serializable_with_terms(self):
+        _, sol = _solved()
+        ir = sol.to_ir()
+        assert json.loads(json.dumps(ir)) == ir
+
     def test_variables_join_the_model_ir(self):
         "Every solution key names a variable the model IR declares."
         m, sol = _solved()
