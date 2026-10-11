@@ -286,6 +286,10 @@ class GeometricProgram:
         cost_hmap = cost.hmap.sub(self.substitutions, cost.vks)
         if any(c <= 0 for c in cost_hmap.values()):
             raise InvalidPosynomial("a GP's cost must be Posynomial")
+        # Substitution can merge cost monomials, so the solved nu is indexed over
+        # fewer terms than the cost was written with; this maps one back onto the
+        # other, as a constraint's pmap does for its own hmap.
+        self.cost_pmap = cost_hmap.mmap(cost.hmap)
         hmapgen = ConstraintSet.as_hmapslt1(constraints, self.substitutions)
         self.hmaps = [cost_hmap] + list(hmapgen)
         self.gen()  # Generate various maps into the posy- and monomials
@@ -470,9 +474,11 @@ class GeometricProgram:
             (cost_senss, gpv_ss, absv_ss, m_senss)
         """
         nu_by_posy = [nu[mi] for mi in self.data.m_idxs]
-        cost_senss = sum(
-            nu_i * exp for (nu_i, exp) in zip(nu_by_posy[0], self.cost.hmap)
-        )
+        cost_nu = np.zeros(len(self.cost.hmap))
+        for i, mmap in enumerate(self.cost_pmap):
+            for idx, fraction in mmap.items():
+                cost_nu[idx] += fraction * nu_by_posy[0][i]
+        cost_senss = sum(nu_i * exp for (nu_i, exp) in zip(cost_nu, self.cost.hmap))
         gpv_ss = cost_senss.copy()
         m_senss = defaultdict(float)
         constraint_senss = {}
