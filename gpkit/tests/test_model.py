@@ -25,6 +25,7 @@ from gpkit.constraints.relax import (
     ConstraintsRelaxed,
     ConstraintsRelaxedEqually,
 )
+from gpkit.constraints.set import keyed_constraints
 from gpkit.exceptions import (
     DualInfeasible,
     InvalidGPConstraint,
@@ -419,6 +420,47 @@ class TestGPSensitivities:
         sol = m.solve(solver=solver, verbosity=0)
         assert float(sol.cost) == pytest.approx(5.0)
         assert sol.sens.variables[a.key] == pytest.approx(0.6)  # 1.5/2.5
+
+    def test_terms_by_key_gives_a_constraints_term_shares(self, solver):
+        """Per-monomial duals, keyed as the aggregate ones are (#324).
+
+        The weight buildup below has shares 0.3/0.2/0.5 -- the fractions of W
+        each term accounts for -- which the aggregate lambda alone cannot give.
+        """
+        W = Variable("W", "N")
+        W_s, W_f = Variable("W_s", "N"), Variable("W_f", "N")
+        W_p = Variable("W_p", 20.0, "N")
+        m = Model(W, [W >= W_s + W_f + W_p, W_s >= 0.3 * W, W_f >= 0.2 * W])
+        sol = m.solve(solver=solver, verbosity=0)
+        assert float(sol.cost) == pytest.approx(40.0)
+
+        buildup = next(
+            k for k, c in keyed_constraints(m) if "W_s + W_f + W_p" in str(c)
+        )
+        nu = sol.sens.terms_by_key[buildup]
+        assert len(nu) == 3
+        la = sol.sens.constraints_by_key[buildup]
+        assert sum(nu) == pytest.approx(la)  # lambda is the sum
+        assert [n / la for n in nu] == pytest.approx([0.3, 0.2, 0.5], abs=1e-6)
+
+    def test_cost_terms_share_out_the_objective(self, solver):
+        "The cost's duals are a distribution: they sum to 1."
+        x, y = Variable("x", "-"), Variable("y", "-")
+        m = Model(x + y, [x >= 1, y >= 3])
+        sol = m.solve(solver=solver, verbosity=0)
+        assert float(sol.cost) == pytest.approx(4.0)
+        assert sum(sol.sens.cost_terms) == pytest.approx(1.0)
+        assert sorted(sol.sens.cost_terms) == pytest.approx([0.25, 0.75])
+
+    def test_a_monomial_equality_has_one_signed_term(self, solver):
+        x, y = Variable("x", "-"), Variable("y", "-")
+        c = Variable("c", 2.0, "-")
+        m = Model(x, [x == y, y >= c])
+        sol = m.solve(solver=solver, verbosity=0)
+        eq = next(k for k, con in keyed_constraints(m) if "=" in str(con))
+        nu = sol.sens.terms_by_key[eq]
+        assert len(nu) == 1
+        assert nu[0] == pytest.approx(sol.sens.constraints_by_key[eq])
 
     def test_fixed_and_free_keys_share_one_sensitivity_map(self, solver):
         "sens.variables covers both, so a filtered copy would be a second encoding."

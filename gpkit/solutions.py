@@ -51,6 +51,8 @@ class Sensitivities:
 
     constraints: dict  # {constraint object: sensitivity} -- in-process only
     constraints_by_key: dict  # {ConstraintKey: sensitivity} -- the serializable form
+    terms_by_key: dict  # {ConstraintKey: (nu, ...)} -- per monomial, as written
+    cost_terms: tuple  # (nu, ...) over the cost's terms; sums to 1
     # cost: dict
     models: dict
     variables: VarMap

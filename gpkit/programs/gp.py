@@ -465,14 +465,8 @@ class GeometricProgram:
             )
         return result
 
-    def _calculate_sensitivities(self, la, nu, varvals):
-        """Calculate sensitivities for variables and constraints.
-
-        Returns
-        -------
-        tuple
-            (cost_senss, gpv_ss, absv_ss, m_senss)
-        """
+    def _calculate_sensitivities(self, la, nu, varvals) -> Sensitivities:
+        "The solution's Sensitivities, from the solver's lambda and nu."
         nu_by_posy = [nu[mi] for mi in self.data.m_idxs]
         cost_nu = np.zeros(len(self.cost.hmap))
         for i, mmap in enumerate(self.cost_pmap):
@@ -482,6 +476,7 @@ class GeometricProgram:
         gpv_ss = cost_senss.copy()
         m_senss = defaultdict(float)
         constraint_senss = {}
+        constraint_terms = {}
         absv_ss = {vk: abs(x) for vk, x in cost_senss.items()}
 
         # Group each hmap's (la, nu) by the root constraint that owns it --
@@ -498,13 +493,15 @@ class GeometricProgram:
             nus_list.append(nus)
 
         for c, (las_list, nus_list) in roots.items():
-            v_ss, c_senss, _c_terms = c.sens_from_dual(las_list, nus_list, varvals)
+            v_ss, c_senss, c_terms = c.sens_from_dual(las_list, nus_list, varvals)
             for vk, x in v_ss.items():
                 gpv_ss[vk] = x + gpv_ss.get(vk, 0)
                 absv_ss[vk] = abs(x) + absv_ss.get(vk, 0)
             while getattr(c, "generated_by", None) is not None:
                 c = c.generated_by  # ...while generated_bys are just labels
             constraint_senss[c] = c_senss
+            if c_terms is not None:  # None where the written terms have no duals
+                constraint_terms[c] = c_terms
             m_senss[lineagestr(c)] += abs(c_senss)
 
         # Handle linked sensitivities
@@ -525,7 +522,15 @@ class GeometricProgram:
                     before = cost_senss.get(c, 0)
                     cost_senss[c] = before + dlogcost_dlogv * dlogv_dlogc
 
-        return cost_senss, gpv_ss, absv_ss, m_senss, constraint_senss
+        return Sensitivities(
+            constraints=constraint_senss,
+            constraints_by_key=_senss_by_key(self.model, constraint_senss),
+            terms_by_key=_senss_by_key(self.model, constraint_terms),
+            cost_terms=tuple(cost_nu),
+            models=dict(m_senss),
+            variables=VarMap(gpv_ss),
+            variablerisk=VarMap(absv_ss),
+        )
 
     def _compute_free_var_adjoints(self, nu, free_varkeys):
         """Compute per-variable adjoint vectors for each vk in free_varkeys.
@@ -757,21 +762,11 @@ class GeometricProgram:
                 solver_out.nu, varvals, margin_obj
             )
 
-        _, gpv_ss, absv_ss, m_senss, constraint_senss = self._calculate_sensitivities(
-            solver_out.la, solver_out.nu, varvals
-        )
-
         result = Solution(
             cost=float(solver_out.cost),
             primal=VarMap(zip(self.vars, np.exp(primal))),
             constants=VarMap(self.substitutions),
-            sens=Sensitivities(
-                constraints=constraint_senss,
-                constraints_by_key=_senss_by_key(self.model, constraint_senss),
-                models=dict(m_senss),
-                variables=VarMap(gpv_ss),
-                variablerisk=VarMap(absv_ss),
-            ),
+            sens=self._calculate_sensitivities(solver_out.la, solver_out.nu, varvals),
             meta={
                 "soltime": solver_out.meta["soltime"],
                 "warnings": {},
