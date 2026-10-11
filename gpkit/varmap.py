@@ -255,30 +255,18 @@ class VarMap(MutableMapping):
     def __setitem__(self, key, value):
         key = self._varset.resolve(key)
         if isinstance(value, Quantity):
+            # stored in the key's units, which is what quantity() reads back
             value = value.to(key.units or "dimensionless").magnitude
-        elif hasattr(value, "hmap") and not any(value.hmap.keys()):
-            # Constant Monomial (e.g. 3*units("day")): extract plain coefficient.
-            # Non-constant Monomials (variables) pass through so solve-time
-            # validation can emit the appropriate error.
-            (value,) = value.hmap.to(key.units or qty("dimensionless")).values()
         if is_veckey(key):
-            if key not in self._varset._by_vec:
-                raise NotImplementedError
-            if callable(value):  # a linked vector-function
-                fn = value
-                value = np.empty(key.shape, dtype="object")
-                it = np.nditer(value, flags=["multi_index", "refs_ok"])
-                while not it.finished:
-                    i = it.multi_index
-                    it.iternext()
-                    value[i] = veclinkedfn(fn, i)
-            # to setitem via a veckey, the keys must already be registered.
-            vks = set(self.varset._by_vec[key].flat)
-            if np.prod(key.shape) != len(vks):
+            # Setting a whole vector writes its elements, so their keys have to
+            # be registered first -- they carry idx and units this cannot invent.
+            vks = {vk for vk in self._varset.by_vec(key).flat if vk is not None}
+            size = np.prod(key.shape)
+            if len(vks) != size:
                 raise ValueError(
-                    f"{key} shape is {key.shape}, but _by_vec[{key}] only has "
-                    f" {len(vks)} registered keys."
-                )  # now we know all vks are present
+                    f"cannot set {key} by veckey: {len(vks)} of {size} element "
+                    f"keys are registered here"
+                )
             if not np.shape(value):
                 self.update({vk: value for vk in vks})
                 return
@@ -286,7 +274,10 @@ class VarMap(MutableMapping):
                 for vk in vks:
                     self[vk] = np.array(value)[vk.idx]
                 return
-            raise NotImplementedError
+            raise ValueError(
+                f"cannot set {key} of shape {key.shape} from a value of shape "
+                f"{np.shape(value)}"
+            )
         self._varset.add(key)
         self._data[key] = value
 
@@ -332,6 +323,33 @@ class VarMap(MutableMapping):
         "Return a quantity corresponding to self[key]"
         clean_key, val = self.item(key)
         return Quantity(val, clean_key.units or "dimensionless")
+
+
+def _elementwise_linked(veckey, fn):
+    "One linked function per element of veckey, each reading its own index."
+    out = np.empty(veckey.shape, dtype="object")
+    for idx in np.ndindex(out.shape):
+        out[idx] = veclinkedfn(fn, idx)
+    return out
+
+
+class Substitutions(VarMap):
+    """The values prescribed for a problem's parameters.
+
+    Handles two value types a plain VarMap does not: a constant Monomial, such
+    as `3*units("day")`, stored as its coefficient; and a linked function, over
+    a vector stored as one function per element.
+    """
+
+    def __setitem__(self, key, value):
+        key = self._varset.resolve(key)
+        if hasattr(value, "hmap") and not any(value.hmap.keys()):
+            # A Monomial carrying variables passes through, so solve-time
+            # validation is what reports it.
+            (value,) = value.hmap.to(key.units or qty("dimensionless")).values()
+        elif callable(value) and is_veckey(key):
+            value = _elementwise_linked(key, value)
+        super().__setitem__(key, value)
 
 
 def _compute_collision_depths(name_collisions):

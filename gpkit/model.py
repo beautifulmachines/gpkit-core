@@ -24,7 +24,7 @@ from .tools.autosweep import autosweep_1d
 from .util.globals import NamedVariables, Vectorize
 from .var import Var
 from .varinfo import classify_variables
-from .varmap import FrozenVarSet, VarMap
+from .varmap import FrozenVarSet, Substitutions, VarMap
 
 
 class Model(CostedConstraintSet):
@@ -434,7 +434,9 @@ class Model(CostedConstraintSet):
         tic = time()
         for i in range(lengths.pop()):
             sweepsubs = {var: vals[i] for var, vals in sweepvals.items()}
-            self.substitutions = {**oldsubs, **sweepsubs}
+            self.substitutions = Substitutions(oldsubs)
+            self.substitutions.register_keys(self.varkeys)
+            self.substitutions.update(sweepsubs)
             try:
                 sols.append(solvefn(**solveargs))
                 sp = VarMap()

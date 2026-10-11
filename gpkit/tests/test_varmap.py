@@ -3,9 +3,10 @@
 import numpy as np
 import pytest
 
-from gpkit import Variable, VectorVariable, ureg
+from gpkit import Model, Variable, VectorVariable, units, ureg
 from gpkit.varkey import VarKey
 from gpkit.varmap import (
+    Substitutions,
     VarMap,
     VarSet,
     _collision_depths,
@@ -30,6 +31,71 @@ def fixture_x():
 def fixture_y():
     """VarKey named 'y'."""
     return VarKey("y")
+
+
+class TestSubstitutions:
+    """Prescribed values accept two types a plain VarMap does not (#55)."""
+
+    def test_a_constant_monomial_is_stored_as_its_coefficient(self):
+        "3*units('day') is a Monomial, so this is the everyday spelling."
+        t = Variable("t", "hr")
+        subs = Substitutions()
+        subs[t.key] = 3 * units("day")
+        assert subs[t.key] == pytest.approx(72.0)  # in the key's units
+
+    def test_a_monomial_carrying_variables_passes_through(self):
+        "Solving reports it; coercing here would hide which value was bad."
+        x, y = Variable("x", "m"), Variable("y", "m")
+        subs = Substitutions()
+        subs[y.key] = 2 * x
+        assert subs[y.key] is not None and hasattr(subs[y.key], "hmap")
+
+    def test_a_linked_function_over_a_vector_becomes_one_per_element(self):
+        q, a = VectorVariable(3, "q", "m"), Variable("a", "-")
+        subs = Substitutions()
+        subs.register_keys(VarSet([e.key for e in q] + [a.key]))
+        subs[q.key] = lambda c: np.array([1.0, 2.0, 3.0]) * c[a.key]
+        for i, element in enumerate(q):
+            assert subs[element.key]({a.key: 2.0}) == 2.0 * (i + 1)
+
+    def test_a_plain_varmap_handles_neither(self):
+        "They are substitution inputs; the container stores values."
+        t = Variable("t", "hr")
+        vm = VarMap()
+        vm[t.key] = 3 * units("day")
+        assert hasattr(vm[t.key], "hmap")  # stored as given, uncoerced
+
+    def test_a_quantity_is_the_containers_business(self):
+        "quantity() rebuilds from the key's units, so storing must match."
+        t = Variable("t", "hr")
+        vm = VarMap()
+        vm[t.key] = ureg.Quantity(3, "day")
+        assert vm[t.key] == pytest.approx(72.0)
+        assert vm.quantity(t.key).to("day").magnitude == pytest.approx(3.0)
+
+    def test_a_models_substitutions_are_substitutions(self):
+        x = Variable("x", "m")
+        m = Model(x, [x >= 1 * units("m")])
+        assert isinstance(m.substitutions, Substitutions)
+
+    def test_a_sweep_keeps_them_substitutions(self):
+        "Mid-sweep they were rebuilt as a plain dict, bypassing the type."
+        seen = []
+
+        class Recorder(Model):
+            def setup(self):
+                self.x = Variable("x", "m")
+                self.c = Variable("c", 1.0, "m")
+                self.cost = self.x
+                return [self.x >= self.c]
+
+            def solve(self, *args, **kwargs):
+                seen.append(type(self.substitutions))
+                return super().solve(*args, **kwargs)
+
+        m = Recorder()
+        m.sweep({m.c: [1.0, 2.0]}, verbosity=0)
+        assert seen == [Substitutions, Substitutions]
 
 
 class TestVectorParentItems:
@@ -217,11 +283,27 @@ class TestVarMap:
         assert vm[x] == [4, 5, 6]
         assert vm["x"] == [4, 5, 6]
 
+    @pytest.mark.parametrize("registered", [0, 2])
+    def test_setting_by_veckey_needs_every_element_registered(self, vm, registered):
+        """Broadcasting needs the element keys themselves, which it can't invent.
+
+        Two of three used to escape the count check and die on resolve(None):
+        _by_vec pads with None, so the None made the length match.
+        """
+        v = VectorVariable(3, "v")
+        if registered:
+            vm.register_keys(VarSet([v[i].key for i in range(registered)]))
+        with pytest.raises(ValueError, match=f"{registered} of 3"):
+            vm[v] = np.array([2, 3, 4])
+
+    def test_setting_by_veckey_rejects_a_mismatched_shape(self, vm):
+        v = VectorVariable(3, "v")
+        vm.register_keys(VarSet([e.key for e in v]))
+        with pytest.raises(ValueError, match="shape"):
+            vm[v] = np.array([1, 2])
+
     def test_vector_partial(self, vm):
         v = VectorVariable(3, "v")
-        with pytest.raises(NotImplementedError):
-            # can't set by vector if keys not known
-            vm[v] = np.array([2, 3, 4])
         assert v[0].key.idx == (0,)  # legacy; belongs elsewhere
         vm[v[0]] = 6
         assert vm[v][0] == vm[v[0]]

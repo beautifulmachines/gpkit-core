@@ -11,7 +11,7 @@ from ..nomials import NomialArray, Variable
 from ..util.repr_conventions import ReprMixin, also_excluding, lineagestr
 from ..util.small_scripts import try_str_without
 from ..varkey import lineage_display_context
-from ..varmap import EMPTY_VARSET, VarMap, VarSet, _collision_depths
+from ..varmap import EMPTY_VARSET, Substitutions, VarSet, _collision_depths
 
 
 def add_meq_bounds(bounded, meq_bounded):  # TODO: collapse with GP version?
@@ -169,7 +169,7 @@ class ConstraintSet(list, ReprMixin):
             constraints = [constraints]  # put it one level down
         list.__init__(self, constraints)
         self.vks = VarSet(self.own_varkeys)
-        self.substitutions = VarMap(
+        self.substitutions = Substitutions(
             {k: k.value for k in self.own_varkeys if k.value is not None}
         )
         self.substitutions.register_keys(self.vks)
