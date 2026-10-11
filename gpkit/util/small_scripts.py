@@ -2,14 +2,18 @@
 
 
 def veclinkedfn(linkedfn, i):
-    "Generate an indexed linking function."
+    """Generate an indexed linking function.
+
+    `original_fn` exposes the unindexed function, so a caller holding every
+    element can evaluate it once for the whole vector instead of once per index
+    (see evaluate_linked).
+    """
 
     def newlinkedfn(c):
         "Linked function that pulls out a particular index"
         return linkedfn(c)[i]
 
     newlinkedfn.original_fn = linkedfn
-    newlinkedfn.idx = i
     return newlinkedfn
 
 

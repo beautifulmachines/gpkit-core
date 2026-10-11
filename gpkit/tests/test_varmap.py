@@ -3,9 +3,10 @@
 import numpy as np
 import pytest
 
-from gpkit import Variable, VectorVariable, ureg
+from gpkit import Model, Variable, VectorVariable, units, ureg
 from gpkit.varkey import VarKey
 from gpkit.varmap import (
+    Substitutions,
     VarMap,
     VarSet,
     _collision_depths,
@@ -30,6 +31,170 @@ def fixture_x():
 def fixture_y():
     """VarKey named 'y'."""
     return VarKey("y")
+
+
+class TestSubstitutions:
+    """Prescribed values accept two types a plain VarMap does not (#55)."""
+
+    def test_a_constant_monomial_is_stored_as_its_coefficient(self):
+        "3*units('day') is a Monomial, so this is the everyday spelling."
+        t = Variable("t", "hr")
+        subs = Substitutions()
+        subs[t.key] = 3 * units("day")
+        assert subs[t.key] == pytest.approx(72.0)  # in the key's units
+
+    def test_a_monomial_carrying_variables_passes_through(self):
+        "Solving reports it; coercing here would hide which value was bad."
+        x, y = Variable("x", "m"), Variable("y", "m")
+        subs = Substitutions()
+        subs[y.key] = 2 * x
+        assert subs[y.key] is not None and hasattr(subs[y.key], "hmap")
+
+    def test_a_linked_function_over_a_vector_becomes_one_per_element(self):
+        q, a = VectorVariable(3, "q", "m"), Variable("a", "-")
+        subs = Substitutions()
+        subs.register_keys(VarSet([e.key for e in q] + [a.key]))
+        subs[q.key] = lambda c: np.array([1.0, 2.0, 3.0]) * c[a.key]
+        for i, element in enumerate(q):
+            assert subs[element.key]({a.key: 2.0}) == 2.0 * (i + 1)
+
+    def test_a_plain_varmap_handles_neither(self):
+        "They are substitution inputs; the container stores values."
+        t = Variable("t", "hr")
+        vm = VarMap()
+        vm[t.key] = 3 * units("day")
+        assert hasattr(vm[t.key], "hmap")  # stored as given, uncoerced
+
+    def test_a_quantity_is_the_containers_business(self):
+        "quantity() rebuilds from the key's units, so storing must match."
+        t = Variable("t", "hr")
+        vm = VarMap()
+        vm[t.key] = ureg.Quantity(3, "day")
+        assert vm[t.key] == pytest.approx(72.0)
+        assert vm.quantity(t.key).to("day").magnitude == pytest.approx(3.0)
+
+    def test_a_models_substitutions_are_substitutions(self):
+        x = Variable("x", "m")
+        m = Model(x, [x >= 1 * units("m")])
+        assert isinstance(m.substitutions, Substitutions)
+
+    def test_a_sweep_keeps_them_substitutions(self):
+        "Mid-sweep they were rebuilt as a plain dict, bypassing the type."
+        seen = []
+
+        class Recorder(Model):
+            def setup(self):
+                self.x = Variable("x", "m")
+                self.c = Variable("c", 1.0, "m")
+                self.cost = self.x
+                return [self.x >= self.c]
+
+            def solve(self, *args, **kwargs):
+                seen.append(type(self.substitutions))
+                return super().solve(*args, **kwargs)
+
+        m = Recorder()
+        m.sweep({m.c: [1.0, 2.0]}, verbosity=0)
+        assert seen == [Substitutions, Substitutions]
+
+
+class TestVectorParentItems:
+    """items(), with vectors collapsed to their veckey (#55).
+
+    A VarMap's varset is its namespace while _data holds only what has a value,
+    and the two are deliberately different sizes -- so this yields what the map
+    holds rather than everything the namespace can name.
+    """
+
+    def test_a_registered_key_without_a_value_is_not_an_item(self, vm, x, y):
+        vm[x] = 1.0
+        vm.register_keys(VarSet([x, y]))
+        assert len(vm) == 1 and len(vm.varset) == 2
+        assert dict(vm.vector_parent_items()) == {x: 1.0}
+
+    def test_a_models_substitutions(self):
+        "The reported case: substitutions registers every key, values only fixed."
+        from gpkit.examples.pipeline import Pipeline  # noqa: PLC0415
+
+        m = Pipeline.default()
+        assert len(m.substitutions) < len(m.substitutions.varset)
+        items = dict(m.substitutions.vector_parent_items())
+        assert items  # no KeyError
+        assert all(k in m.substitutions for k in items)
+
+    def test_a_complete_vector_is_one_item(self):
+        q = VectorVariable(3, "q", "m")
+        vm = VarMap()
+        vm.register_keys(VarSet([e.key for e in q]))
+        vm[q.key] = [1.0, 2.0, 3.0]
+        ((key, value),) = vm.vector_parent_items()
+        assert key is q.key
+        assert list(value) == [1.0, 2.0, 3.0]
+
+    @staticmethod
+    def _partly_valued():
+        "A 3-vector with values at 0 and 2, and its middle element unvalued."
+        q = VectorVariable(3, "q", "m")
+        vm = VarMap()
+        vm.register_keys(VarSet([e.key for e in q]))
+        vm[q[0].key] = 1.0
+        vm[q[2].key] = 3.0
+        return q, vm
+
+    def test_a_partly_valued_vector_reads_with_nan_in_the_gap(self):
+        "nan is already how an unregistered element reads, so a gap reads alike."
+        q, vm = self._partly_valued()
+        value = vm[q.key]
+        assert [value[0], value[2]] == [1.0, 3.0]
+        assert np.isnan(value[1])
+
+    def test_a_partly_valued_vector_is_in_the_map(self):
+        "Its values are here, so claiming otherwise would be a lie."
+        q, vm = self._partly_valued()
+        assert q.key in vm
+        assert list(dict(vm.vector_parent_items())) == [q.key]
+
+    def test_a_vector_with_no_values_is_absent(self):
+        "Registered names alone are not items -- the reported bug, on a vector."
+        q = VectorVariable(3, "q", "m")
+        vm = VarMap()
+        vm.register_keys(VarSet([e.key for e in q]))
+        assert q.key not in vm
+        with pytest.raises(KeyError):
+            _ = vm[q.key]
+        assert not list(vm.vector_parent_items())
+
+    def test_every_value_appears_exactly_once(self):
+        """Flattening the result reproduces items(): a regrouping, not a filter.
+
+        Spans a complete vector, a partly valued one and a scalar at once, which
+        is where a collapse could drop or double-count a value.
+        """
+        p, q = VectorVariable(2, "p", "m"), VectorVariable(3, "q", "m")
+        x = Variable("x", "m")
+        vm = VarMap()
+        vm.register_keys(VarSet([e.key for e in p] + [e.key for e in q] + [x.key]))
+        vm[p.key] = [1.0, 2.0]
+        vm[q[1].key] = 5.0
+        vm[x.key] = 9.0
+
+        flattened = {}
+        for key, value in vm.vector_parent_items():
+            if key.shape and key.idx is None:
+                for element in vm.varset.by_vec(key).flat:
+                    held = np.asarray(value)[element.idx]
+                    if not np.isnan(held):  # a gap stands for no value, not one
+                        flattened[element] = held
+            else:
+                flattened[key] = value
+        assert flattened == dict(vm.items())
+
+    def test_elements_never_appear_alongside_their_vector(self):
+        q = VectorVariable(2, "q", "m")
+        vm = VarMap()
+        vm.register_keys(VarSet([e.key for e in q]))
+        vm[q.key] = [1.0, 2.0]
+        assert [k for k, _ in vm.vector_parent_items()] == [q.key]
 
 
 class TestVarMap:
@@ -118,11 +283,27 @@ class TestVarMap:
         assert vm[x] == [4, 5, 6]
         assert vm["x"] == [4, 5, 6]
 
+    @pytest.mark.parametrize("registered", [0, 2])
+    def test_setting_by_veckey_needs_every_element_registered(self, vm, registered):
+        """Broadcasting needs the element keys themselves, which it can't invent.
+
+        Two of three used to escape the count check and die on resolve(None):
+        _by_vec pads with None, so the None made the length match.
+        """
+        v = VectorVariable(3, "v")
+        if registered:
+            vm.register_keys(VarSet([v[i].key for i in range(registered)]))
+        with pytest.raises(ValueError, match=f"{registered} of 3"):
+            vm[v] = np.array([2, 3, 4])
+
+    def test_setting_by_veckey_rejects_a_mismatched_shape(self, vm):
+        v = VectorVariable(3, "v")
+        vm.register_keys(VarSet([e.key for e in v]))
+        with pytest.raises(ValueError, match="shape"):
+            vm[v] = np.array([1, 2])
+
     def test_vector_partial(self, vm):
         v = VectorVariable(3, "v")
-        with pytest.raises(NotImplementedError):
-            # can't set by vector if keys not known
-            vm[v] = np.array([2, 3, 4])
         assert v[0].key.idx == (0,)  # legacy; belongs elsewhere
         vm[v[0]] = 6
         assert vm[v][0] == vm[v[0]]
@@ -191,10 +372,12 @@ class TestVarMap:
         # all elements registered, none have values
         assert veckey not in vm
         assert "v_novalue" not in vm
-        # set one element — veckey still not "in" because getitem would fail
+        # set one element — the veckey is now in, since the map holds a value
+        # for it; the elements without one read as nan
         vm[vks[0]] = 10
         assert vks[0] in vm
-        assert veckey not in vm  # partial: _data missing vks[1], vks[2]
+        assert veckey in vm
+        assert vm[veckey][0] == 10 and np.isnan(vm[veckey][1:]).all()
         # set all elements
         vm[vks[1]] = 20
         vm[vks[2]] = 30

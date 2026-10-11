@@ -11,11 +11,10 @@ from .varkey import lineage_display_context
 
 
 def _nested_lookup(nested_keys, val_dict):
-    if nested_keys is None:
-        return float("nan")
+    "Values in a vector's shape, nan where an element has none."
     if isinstance(nested_keys, np.ndarray):
         return [_nested_lookup(row, val_dict) for row in nested_keys]
-    return val_dict[nested_keys]
+    return val_dict.get(nested_keys, float("nan"))
 
 
 def is_veckey(key):
@@ -216,13 +215,11 @@ EMPTY_VARSET = FrozenVarSet()
 
 
 class VarMap(MutableMapping):
-    """A simple mapping from VarKey to value, with lookup by canonical
-    name string or veckey
+    """A mapping from VarKey to value, with lookup by name string or veckey.
 
-    Maintains:
-      - _data: dict mapping VarKey to value
-      - _by_name: dict mapping str (VarKey.name) to set of VarKeys
-      - _by_vec: dict mapping veckey to keys stored in nested list structure
+    `register_keys` adds a key without a value, so the varset this resolves
+    against may name more keys than the mapping holds. `in`, `len` and iteration
+    follow the values.
     """
 
     def __init__(self, *args, **kwargs):
@@ -235,14 +232,19 @@ class VarMap(MutableMapping):
         return val
 
     def item(self, key):
-        "get the (varkey, value) pair associated with a (str or key)"
+        """get the (varkey, value) pair associated with a (str or key)
+
+        A veckey gives the whole vector, nan where an element has no value.
+        Raises KeyError if no element has one, so a vector is here on the same
+        terms as a scalar: when the mapping holds a value for it.
+        """
         key = self._varset.resolve(key)
         try:
             return (key, self._data[key])  # single varkey case
         except KeyError:
-            key_arr = self._varset.by_vec(key)
-            if key_arr.any():
-                return (key, _nested_lookup(key_arr, self._data))
+            elements = self._varset.by_vec(key)
+            if any(vk in self._data for vk in elements.flat if vk is not None):
+                return (key, _nested_lookup(elements, self._data))
             raise
 
     @property
@@ -253,30 +255,18 @@ class VarMap(MutableMapping):
     def __setitem__(self, key, value):
         key = self._varset.resolve(key)
         if isinstance(value, Quantity):
+            # stored in the key's units, which is what quantity() reads back
             value = value.to(key.units or "dimensionless").magnitude
-        elif hasattr(value, "hmap") and not any(value.hmap.keys()):
-            # Constant Monomial (e.g. 3*units("day")): extract plain coefficient.
-            # Non-constant Monomials (variables) pass through so solve-time
-            # validation can emit the appropriate error.
-            (value,) = value.hmap.to(key.units or qty("dimensionless")).values()
         if is_veckey(key):
-            if key not in self._varset._by_vec:
-                raise NotImplementedError
-            if callable(value):  # a linked vector-function
-                fn = value
-                value = np.empty(key.shape, dtype="object")
-                it = np.nditer(value, flags=["multi_index", "refs_ok"])
-                while not it.finished:
-                    i = it.multi_index
-                    it.iternext()
-                    value[i] = veclinkedfn(fn, i)
-            # to setitem via a veckey, the keys must already be registered.
-            vks = set(self.varset._by_vec[key].flat)
-            if np.prod(key.shape) != len(vks):
+            # Setting a whole vector writes its elements, so their keys have to
+            # be registered first -- they carry idx and units this cannot invent.
+            vks = {vk for vk in self._varset.by_vec(key).flat if vk is not None}
+            size = np.prod(key.shape)
+            if len(vks) != size:
                 raise ValueError(
-                    f"{key} shape is {key.shape}, but _by_vec[{key}] only has "
-                    f" {len(vks)} registered keys."
-                )  # now we know all vks are present
+                    f"cannot set {key} by veckey: {len(vks)} of {size} element "
+                    f"keys are registered here"
+                )
             if not np.shape(value):
                 self.update({vk: value for vk in vks})
                 return
@@ -284,7 +274,10 @@ class VarMap(MutableMapping):
                 for vk in vks:
                     self[vk] = np.array(value)[vk.idx]
                 return
-            raise NotImplementedError
+            raise ValueError(
+                f"cannot set {key} of shape {key.shape} from a value of shape "
+                f"{np.shape(value)}"
+            )
         self._varset.add(key)
         self._data[key] = value
 
@@ -300,8 +293,10 @@ class VarMap(MutableMapping):
         self._varset.discard(key)
 
     def vector_parent_items(self):
-        "like items, but using veckeys and ignoring element keys/items"
-        return ((k, self[k]) for k in self._varset.vector_parent_keys())
+        "items(), with a vector's elements collapsed into one veckey item"
+        return (
+            (key, self[key]) for key in self._varset.vector_parent_keys() if key in self
+        )
 
     def __iter__(self):
         return iter(self._data)
@@ -328,6 +323,33 @@ class VarMap(MutableMapping):
         "Return a quantity corresponding to self[key]"
         clean_key, val = self.item(key)
         return Quantity(val, clean_key.units or "dimensionless")
+
+
+def _elementwise_linked(veckey, fn):
+    "One linked function per element of veckey, each reading its own index."
+    out = np.empty(veckey.shape, dtype="object")
+    for idx in np.ndindex(out.shape):
+        out[idx] = veclinkedfn(fn, idx)
+    return out
+
+
+class Substitutions(VarMap):
+    """The values prescribed for a problem's parameters.
+
+    Handles two value types a plain VarMap does not: a constant Monomial, such
+    as `3*units("day")`, stored as its coefficient; and a linked function, over
+    a vector stored as one function per element.
+    """
+
+    def __setitem__(self, key, value):
+        key = self._varset.resolve(key)
+        if hasattr(value, "hmap") and not any(value.hmap.keys()):
+            # A Monomial carrying variables passes through, so solve-time
+            # validation is what reports it.
+            (value,) = value.hmap.to(key.units or qty("dimensionless")).values()
+        elif callable(value) and is_veckey(key):
+            value = _elementwise_linked(key, value)
+        super().__setitem__(key, value)
 
 
 def _compute_collision_depths(name_collisions):
