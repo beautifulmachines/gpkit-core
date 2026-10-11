@@ -392,10 +392,8 @@ class Model(CostedConstraintSet):
         """
         from .report import build_report_ir, render_report  # noqa: PLC0415
 
-        ir = build_report_ir(
-            self, solution=solution, front_matter=front_matter, toc=toc
-        )
-        return render_report(ir, fmt=fmt)
+        ir = build_report_ir(self, solution=solution)
+        return render_report(ir, fmt=fmt, front_matter=front_matter, toc=toc)
 
     gp = progify(GeometricProgram)
     solve = solvify(progify(GeometricProgram, "solve"))

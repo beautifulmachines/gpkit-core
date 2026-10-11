@@ -87,10 +87,7 @@ class ReportSection:
     children: list = field(default_factory=list)  # list of ReportSection
     scope: DisplayScope = field(default_factory=DisplayScope)  # NOT in to_dict
     references: list = field(default_factory=list)  # list of str
-    front_matter: str = ""  # raw text/MD prepended at root only
-    toc: bool = (
-        False  # insert TOC marker (supported by renderers that have a native facility)
-    )
+    preamble: str = ""  # this model's own report_preamble(), rendered per section
     objective_str: str = ""  # text representation of cost expression; "" if constant
     objective_latex: str = ""  # LaTeX representation of cost expression
     objective_label: str = ""  # variable label when expr is a single variable; else ""
@@ -123,8 +120,7 @@ class ReportSection:
             "description": self.description,
             "assumptions": list(self.assumptions),
             "references": list(self.references),
-            "front_matter": self.front_matter,
-            "toc": self.toc,
+            "preamble": self.preamble,
             "objective_str": self.objective_str,
             "objective_latex": self.objective_latex,
             "objective_value": self.objective_value,
@@ -338,8 +334,6 @@ def build_report_ir(
     model,
     solution=None,
     _parent_path: str = "",
-    front_matter: str = "",
-    toc: bool = False,
 ) -> ReportSection:
     """Build a ReportSection tree from *model*.
 
@@ -349,15 +343,6 @@ def build_report_ir(
         Root model to report on.
     solution : Solution, optional
         If provided, variable entries include solved values and sensitivities.
-    front_matter : str, optional
-        Raw text/markdown prepended before the root section.  For the root
-        model, caller-supplied *front_matter* is combined with the model's
-        ``report_preamble()`` (if any).  For child models, only
-        ``report_preamble()`` is used.
-    toc : bool, optional
-        If True, a table-of-contents marker is inserted by renderers that have
-        a native TOC facility (e.g. ``[TOC]`` in Markdown).  Set only on the
-        root ReportSection; not propagated to children.
     """
     is_anon = type(model) is _Model
     own_name = "" if is_anon else type(model).__name__
@@ -381,16 +366,10 @@ def build_report_ir(
     )
     if is_anon:
         desc = {"summary": "", "assumptions": [], "references": []}
-        section_fm = front_matter
+        preamble = ""
     else:
         desc = type(model).description()
         preamble = type(model).report_preamble()
-        if preamble and front_matter:
-            section_fm = front_matter + "\n\n" + preamble
-        elif preamble:
-            section_fm = preamble
-        else:
-            section_fm = front_matter
     return ReportSection(
         title=own_name or "Model",
         description=desc["summary"],
@@ -402,8 +381,7 @@ def build_report_ir(
         fixed_variables=fixed_vars,
         constraint_groups=cgroups,
         scope=scope,
-        front_matter=section_fm,
-        toc=toc,
+        preamble=preamble,
         **_build_objective(model, solution),
         children=[
             build_report_ir(child, solution=solution, _parent_path=lineage_path)
@@ -588,8 +566,8 @@ def render_text(ir: "ReportSection", indent: int = 0) -> str:
     pad = _INDENT * indent
     lines: list = []
 
-    if ir.front_matter:
-        lines.append(ir.front_matter)
+    if ir.preamble:
+        lines.append(ir.preamble)
         lines.append("")
 
     if ir.is_anonymous:
@@ -706,12 +684,8 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
     hdr = "#" * min(level, 6)
     lines: list = []
 
-    # Front matter and TOC marker (before first heading)
-    if ir.front_matter:
-        lines.append(ir.front_matter)
-        lines.append("")
-    if ir.toc:
-        lines.append("[TOC]")
+    if ir.preamble:
+        lines.append(ir.preamble)
         lines.append("")
 
     if ir.is_anonymous:
@@ -767,7 +741,12 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
 # ── Renderer dispatcher ───────────────────────────────────────────────────────
 
 
-def render_report(ir: "ReportSection", fmt: str = "text") -> "dict | str":
+def render_report(
+    ir: "ReportSection",
+    fmt: str = "text",
+    front_matter: str = "",
+    toc: bool = False,
+) -> "dict | str":
     """Dispatch to the appropriate format renderer.
 
     Parameters
@@ -776,14 +755,22 @@ def render_report(ir: "ReportSection", fmt: str = "text") -> "dict | str":
         The root IR produced by build_report_ir().
     fmt : str
         Output format: "dict", "text", "md", or "latex".
+    front_matter : str, optional
+        Raw text prepended once, ahead of the root section. A model's own
+        `report_preamble()` is separate, and renders per section.
+    toc : bool, optional
+        Insert a table-of-contents marker, where the format has one. Markdown
+        does; plain text accepts the argument and drops it.
     """
     if fmt == "dict":
-        return ir.to_dict()
+        return ir.to_dict() | {"front_matter": front_matter, "toc": toc}
     if fmt == "text":
-        return render_text(ir)
-    if fmt == "md":
-        return render_markdown(ir)
-    raise ValueError(
-        f"Format '{fmt}' not yet implemented. "
-        "Available formats: 'dict', 'text', 'md', 'latex'."
-    )
+        body = render_text(ir)
+    elif fmt == "md":
+        body = f"[TOC]\n\n{render_markdown(ir)}" if toc else render_markdown(ir)
+    else:
+        raise ValueError(
+            f"Format '{fmt}' not yet implemented. "
+            "Available formats: 'dict', 'text', 'md', 'latex'."
+        )
+    return f"{front_matter}\n\n{body}" if front_matter else body

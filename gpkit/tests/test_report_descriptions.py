@@ -6,6 +6,8 @@ fields (references, front_matter, toc, objective_*), build_report_ir wiring,
 and renderer output for all new fields.
 """
 
+import dataclasses
+import inspect
 from typing import ClassVar
 
 import pytest
@@ -15,6 +17,7 @@ from gpkit.report import (
     ReportSection,
     build_report_ir,
     render_markdown,
+    render_report,
     render_text,
 )
 
@@ -51,8 +54,8 @@ class TestReportSectionReferences:
         assert "references" in d
         assert d["references"] == ["Anderson 2001"]
 
-    def test_front_matter_field_exists(self):
-        """ReportSection has a front_matter field defaulting to ''."""
+    def test_preamble_field_exists(self):
+        """A section carries its model's own preamble, defaulting to ''."""
         ir = ReportSection(
             title="Aircraft",
             description="",
@@ -61,10 +64,9 @@ class TestReportSectionReferences:
             fixed_variables=[],
             constraint_groups=[],
         )
-        assert ir.front_matter == ""
+        assert ir.preamble == ""
 
-    def test_toc_field_exists(self):
-        """ReportSection has a toc field defaulting to False."""
+    def test_preamble_in_to_dict(self):
         ir = ReportSection(
             title="Aircraft",
             description="",
@@ -72,24 +74,18 @@ class TestReportSectionReferences:
             free_variables=[],
             fixed_variables=[],
             constraint_groups=[],
+            preamble="Derived in Anderson ch. 5.",
         )
-        assert ir.toc is False
+        assert ir.to_dict()["preamble"] == "Derived in Anderson ch. 5."
 
-    def test_front_matter_toc_in_to_dict(self):
-        """front_matter and toc appear in to_dict()."""
-        ir = ReportSection(
-            title="Aircraft",
-            description="",
-            assumptions=[],
-            free_variables=[],
-            fixed_variables=[],
-            constraint_groups=[],
-            front_matter="# Study",
-            toc=True,
-        )
-        d = ir.to_dict()
-        assert d["front_matter"] == "# Study"
-        assert d["toc"] is True
+    def test_a_section_carries_no_document_parameters(self):
+        """front_matter and toc describe a document, not a model (#319).
+
+        They are renderer arguments; a section that carried them would make a
+        model's data depend on how it is being printed.
+        """
+        fields = {f.name for f in dataclasses.fields(ReportSection)}
+        assert not fields & {"front_matter", "toc"}
 
 
 # ── build_report_ir description wiring ───────────────────────────────────────
@@ -176,27 +172,42 @@ class TestBuildReportIRDescription:
         assert not ir.assumptions
         assert not ir.references
 
-    def test_build_ir_front_matter_kwarg(self):
-        """build_report_ir passes front_matter to root ReportSection only."""
+    def test_build_ir_takes_no_document_parameters(self):
+        "It describes a model; how that model is printed is not its input."
 
         class _IRFM(Model):
             def setup(self):
                 x = Variable("x_ir_fm")
                 return [x >= 1]
 
-        ir = build_report_ir(_IRFM(), front_matter="# Study\nIntro text.")
-        assert ir.front_matter == "# Study\nIntro text."
+        params = inspect.signature(build_report_ir).parameters
+        assert not params.keys() & {"front_matter", "toc"}
+        build_report_ir(_IRFM())  # and it still builds
 
-    def test_build_ir_toc_kwarg(self):
-        """build_report_ir passes toc=True to root ReportSection."""
+    def test_build_ir_carries_each_models_own_preamble(self):
+        "Per section, unlike front_matter, which applies once at the root."
 
-        class _IRToc(Model):
+        class _Child(Model):
+            @classmethod
+            def report_preamble(cls):
+                return "Child notes."
+
             def setup(self):
-                x = Variable("x_ir_toc")
-                return [x >= 1]
+                self.y = Variable("y_ir_pre")
+                return [self.y >= 1]
 
-        ir = build_report_ir(_IRToc(), toc=True)
-        assert ir.toc is True
+        class _Parent(Model):
+            @classmethod
+            def report_preamble(cls):
+                return "Parent notes."
+
+            def setup(self):
+                self.child = _Child()
+                return [self.child, self.child.y >= 1]
+
+        ir = build_report_ir(_Parent())
+        assert ir.preamble == "Parent notes."
+        assert [c.preamble for c in ir.children] == ["Child notes."]
 
 
 # ── Renderer: references ──────────────────────────────────────────────────────
@@ -262,65 +273,56 @@ class TestRenderReferences:
 
 
 class TestRenderFrontMatterToc:
-    """Tests that renderers handle front_matter and toc fields."""
+    """front_matter and toc are render_report arguments, not section fields."""
 
-    def test_render_markdown_front_matter(self):
-        """render_markdown prepends front_matter text before the root heading."""
-        ir = ReportSection(
+    @staticmethod
+    def _section(**kwargs):
+        return ReportSection(
             title="Aircraft",
             description="",
             assumptions=[],
             free_variables=[],
             fixed_variables=[],
             constraint_groups=[],
-            front_matter="# Design Study\nIntroductory text.",
+            **kwargs,
         )
-        out = render_markdown(ir)
+
+    def test_markdown_front_matter(self):
+        out = render_report(
+            self._section(), fmt="md", front_matter="# Design Study\nIntroductory text."
+        )
         assert out.startswith("# Design Study")
         assert "Introductory text." in out
 
-    def test_render_markdown_toc_marker(self):
-        """render_markdown inserts [TOC] marker when toc=True."""
-        ir = ReportSection(
-            title="Aircraft",
-            description="",
-            assumptions=[],
-            free_variables=[],
-            fixed_variables=[],
-            constraint_groups=[],
-            toc=True,
-        )
-        out = render_markdown(ir)
-        assert "[TOC]" in out
+    def test_markdown_toc_marker(self):
+        assert "[TOC]" in render_report(self._section(), fmt="md", toc=True)
 
-    def test_render_text_front_matter(self):
-        """render_text prepends front_matter before the section header."""
-        ir = ReportSection(
-            title="Aircraft",
-            description="",
-            assumptions=[],
-            free_variables=[],
-            fixed_variables=[],
-            constraint_groups=[],
-            front_matter="Intro text.",
-        )
-        out = render_text(ir)
+    def test_text_front_matter(self):
+        out = render_report(self._section(), fmt="text", front_matter="Intro text.")
         assert out.startswith("Intro text.")
 
-    def test_render_text_toc_ignored(self):
-        """render_text silently ignores toc=True (no TOC facility in plain text)."""
-        ir = ReportSection(
-            title="Aircraft",
-            description="",
-            assumptions=[],
-            free_variables=[],
-            fixed_variables=[],
-            constraint_groups=[],
-            toc=True,
-        )
-        # Should not raise; output is plain text with no [TOC] marker
-        out = render_text(ir)
+    def test_text_toc_ignored(self):
+        "Plain text has no TOC facility, so the argument is accepted and dropped."
+        out = render_report(self._section(), fmt="text", toc=True)
         assert "[TOC]" not in out
+
+    def test_a_preamble_renders_per_section(self):
+        "Unlike front_matter, which is applied once by the renderer."
+        child = self._section(preamble="Child notes.")
+        root = self._section(preamble="Root notes.", children=[child])
+        out = render_report(root, fmt="text", front_matter="Intro.")
+        assert out.startswith("Intro.")
+        assert out.count("Root notes.") == 1
+        assert out.count("Child notes.") == 1
+
+    def test_the_dict_form_still_carries_both(self):
+        "They are document metadata, so the dict renderer supplies them."
+        d = render_report(self._section(), fmt="dict", front_matter="# S", toc=True)
+        assert (d["front_matter"], d["toc"]) == ("# S", True)
+
+    def test_a_dict_section_carries_neither(self):
+        ir = self._section()
+        assert not ir.to_dict().keys() & {"front_matter", "toc"}
 
 
 # ── Objective section ─────────────────────────────────────────────────────────
