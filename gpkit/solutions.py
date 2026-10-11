@@ -51,6 +51,8 @@ class Sensitivities:
 
     constraints: dict  # {constraint object: sensitivity} -- in-process only
     constraints_by_key: dict  # {ConstraintKey: sensitivity} -- the serializable form
+    terms_by_key: dict  # {ConstraintKey: (nu, ...)} -- per monomial, as written
+    cost_terms: tuple  # (nu, ...) over the cost's terms; sums to 1
     # cost: dict
     models: dict
     variables: VarMap
@@ -243,6 +245,14 @@ class Solution:
         Keyed by VarKey.ref and ConstraintKey.ref so it joins Model.to_ir() rather
         than restating it: structure stays in the model IR, values are in each
         variable's declared units, and anything empty is omitted.
+
+        `sensitivities.terms` and `cost_terms` are the per-monomial duals, nu.
+        Each indexes its nomial's less-than side as the model IR serializes it;
+        the greater-than side gets none, reaching the solver as a single monomial
+        whose weight is the sum -- so `sum(terms[ref]) == constraints[ref]`, and a
+        term's share of its constraint is nu/that sum. A constraint is absent from
+        `terms` when its written terms have no duals, as a condensed signomial's
+        do not.
         """
         ir = {
             "gpkit_ir_version": IR_VERSION,
@@ -255,6 +265,11 @@ class Solution:
                 "constraints": {
                     key.ref: float(s) for key, s in self.sens.constraints_by_key.items()
                 },
+                "terms": {
+                    key.ref: [float(n) for n in nu]
+                    for key, nu in self.sens.terms_by_key.items()
+                },
+                "cost_terms": [float(n) for n in self.sens.cost_terms],
                 "models": {k: float(v) for k, v in self.sens.models.items()},
             },
             "meta": {
