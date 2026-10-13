@@ -124,4 +124,4 @@ Pipeline.Pump
 +0.0966 : C ≥ c_unit⋅P_rated
 
 Pipeline.SpanLoading
-+0.3059 : M ≥ (rho_m⋅3.14⋅D⋅t⋅9.81 + rho⋅A⋅9.81)⋅L_span²/8
++0.3059 : M ≥ (rho_m⋅3.14⋅D⋅t⋅9.81⋅[m/s²] + rho⋅A⋅9.81⋅[m/s²])⋅L_span²/8

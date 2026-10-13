@@ -50,7 +50,14 @@ class Nomial(NomialData):
         if hasattr(self, "key"):
             return self.key.str_without(excluded) + units
         if "ast" not in excluded and self.ast:
-            return self.parse_ast(excluded) + units
+            # As in .latex: suppress the inner UnitsNode only when appending our
+            # own suffix, so a constant's units show once rather than twice.
+            inner = excluded if not units else also_excluding(excluded, "ast_units")
+            aststr = self.parse_ast(inner)
+            if aststr:
+                return aststr + units
+            # Nothing left: the AST was only unit literals, which `units` now
+            # carries. The hmap below keeps the coefficient.
         mstrs = []
         for exp, c in self.hmap.items():
             pvarstrs, nvarstrs = [], []

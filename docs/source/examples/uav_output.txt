@@ -191,7 +191,7 @@ UAV.Aircraft
 +0.3559 : W_design ≥ W_tilde
 
 UAV.Aircraft.Engine
-+0.1561 : W ≥ W_eng_coeff⋅P_max^0.803
++0.1561 : W ≥ W_eng_coeff⋅(P_max/[W])^0.803
 
 UAV.Aircraft.Wing
 +0.7398  : p ≥ 1.9

@@ -79,4 +79,4 @@
   fixed L_span
   fixed rho  [Pipeline.Fluid]
   fixed rho_m  [Pipeline.Pipe]
-  cons  M ≥ (rho_m⋅3.14⋅D⋅t⋅9.81 + rho⋅A⋅9.81)⋅L_span²/8
+  cons  M ≥ (rho_m⋅3.14⋅D⋅t⋅9.81⋅[m/s²] + rho⋅A⋅9.81⋅[m/s²])⋅L_span²/8
