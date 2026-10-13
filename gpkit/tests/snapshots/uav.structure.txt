@@ -59,7 +59,7 @@
   fixed eta_v
   fixed h_fuel
   fixed W_eng_coeff
-  cons  W ≥ W_eng_coeff⋅P_max^0.803
+  cons  W ≥ W_eng_coeff⋅(P_max/[W])^0.803
 [UAV.Mission]
   free  R
   free  W_fuel

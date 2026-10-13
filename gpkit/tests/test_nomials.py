@@ -137,6 +137,63 @@ class TestMonomial:
         assert r"\mathrm" in latex  # units rendered on the constant
         assert "4" in latex
 
+    def test_str_whole_side_unit_literal(self):
+        "A bare unit literal is the whole side; it cannot render as nothing (#332)."
+        r = Variable("r", "m")
+        rendered = str(r >= 1 * units("m"))
+        assert not rendered.rstrip().endswith("≥")
+        assert "m" in rendered.split("≥")[1]
+
+    def test_str_unit_literal_divisor_survives(self):
+        """`(P/P_ref)**0.803` must keep P_ref, which carries a x1000 conversion.
+
+        uav.py divides a kW variable by a bare 1 W constant; dropping it shows a
+        constraint wrong by 1000**0.803.
+        """
+        power = Variable("P", "kW")
+        weight = Variable("W", "N")
+        coeff = Variable("k", 1, "N")
+        c = weight >= (power / (1 * units("W"))) ** 0.803 * coeff
+        assert "W]" in str(c) or "W)" in str(c)  # the unit literal is shown
+
+    def test_str_unit_literal_term_survives(self):
+        "A unit-only term in a posynomial cannot vanish from the sum."
+        y = Variable("y", "m^2")
+        x = Variable("x", "m")
+        rendered = str(y >= (x / 2) ** -0.5 * units.m**2.5 + 1 * units.m**2)
+        assert not rendered.rstrip().endswith("+")
+
+    def test_str_standalone_unit_literal_keeps_its_coefficient(self):
+        "The AST renders nothing here, so the hmap form is the faithful one."
+        assert str(1 * units("m")).strip() == "1 [m]"
+
+    def test_str_units_are_not_doubled(self):
+        "The nomial appends one suffix, so the inner UnitsNode must not repeat it."
+        assert str(2 * units("m")).count("[m]") == 1
+
+    @pytest.mark.parametrize("excluded", [(), ("units",)])
+    def test_str_and_latex_agree_on_showing_a_unit_literal(self, excluded):
+        """Whatever one renderer shows of a unit literal, the other shows too.
+
+        #332 happened because latex was taught that a constant's units are not a
+        variable annotation and str was not, so str silently dropped the factor.
+        A renderer may choose its own tokens, never whether the math appears.
+        """
+        x = Variable("x", "m")
+        power = Variable("P", "kW")
+        weight = Variable("W", "N")
+        coeff = Variable("k", 1, "N")
+        cases = [
+            x >= 4 * gpkit.units("m"),
+            x >= 1 * gpkit.units("m"),
+            # uav.py's idiom: a kW variable over a bare 1 W constant
+            weight >= (power / (1 * gpkit.units("W"))) ** 0.803 * coeff,
+        ]
+        for c in cases:
+            shown_str = "[" in c.str_without(excluded)
+            shown_latex = r"\mathrm" in c.latex(excluded)
+            assert shown_str == shown_latex, c.str_without(excluded)
+
     def test_latex_mixed_expr_constant_units_shown(self):
         """In expressions mixing a unit-bearing constant with variables,
         the constant's units must appear even with excluded=('units',)"""

@@ -115,7 +115,9 @@ class UnitsNode(ASTNode):
     units: object  # pint Quantity
 
     def str_without(self, excluded=()):
-        if "units" in excluded:
+        # Suppressed by "ast_units", as in .latex below, not by plain "units":
+        # a constant's dimensional context is not a variable annotation.
+        if "ast_units" in excluded:
             return ""
         return unitstr(self.units, "[%s]")
 
