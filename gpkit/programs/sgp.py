@@ -248,13 +248,7 @@ solutions and can be solved with 'Model.solve()'.""")
             assert hasattr(self.result, "sens")  # not true for MIGP
             del self.result.sens.variables[self.slack.key]
             del self.result.sens.variablerisk[self.slack.key]
-            slcon = self.gpconstraints[0]
-            slconsenss = self.result.sens.constraints[slcon]
-            del self.result.sens.constraints[slcon]
-            # TODO: create constraint in RelaxPCCP namespace
-            self.result.sens.models[""] -= slconsenss
-            if not self.result.sens.models[""]:
-                del self.result.sens.models[""]
+            del self.result.sens.constraints[self.gpconstraints[0]]
         return self.result
 
     @property

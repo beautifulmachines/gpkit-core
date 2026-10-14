@@ -5,7 +5,7 @@ from time import time
 import numpy as np
 
 from .constraints.costed import CostedConstraintSet
-from .constraints.set import build_model_tree, keyed_constraints
+from .constraints.set import build_model_tree, keyed_constraints, senss_by_id
 from .exceptions import (
     AmbiguousVariable,
     Infeasible,
@@ -500,7 +500,7 @@ class Model(CostedConstraintSet):
             except InvalidGPConstraint:
                 sol = feas.sp(use_pccp=False).localsolve(**solveargs)
             # limited results processing
-            bounded.check_boundaries(sol)
+            bounded.check_boundaries(sol, senss_by_id(feas, sol))
             tants.check_relaxed(sol)
         except Infeasible:
             if verbosity:

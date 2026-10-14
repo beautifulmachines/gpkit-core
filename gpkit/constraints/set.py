@@ -120,6 +120,42 @@ def own_keyed_constraints(model):
         )
 
 
+def senss_by_id(cset, solution) -> dict:
+    """{id(constraint): sensitivity} for every leaf of cset, joined by key.
+
+    A solution names a constraint by its ConstraintKey; only the model can say
+    which object that key belongs to.  Keyed by id() because two constraints
+    with the same math are still two constraints.
+    """
+    senss = solution.sens.constraints_by_key
+    return {id(c): senss.get(k, 0.0) for k, c in keyed_constraints(cset)}
+
+
+def audit_solution(cset, solution):
+    """Run every audit cset's constraint sets make of the solution.
+
+    An audit checks the optimum's constraint sensitivities against something
+    its set states about them -- that a dual vanishes, that no artificial bound
+    binds -- and records what it finds in the solution's meta.  Run from the
+    root, which is the only place that can say how each constraint is keyed.
+    """
+    senss = senss_by_id(cset, solution)
+    for node in _walk_sets(cset):
+        if hasattr(node, "audit"):
+            node.audit(solution, senss)
+
+
+def _walk_sets(items):
+    "Every ConstraintSet within items, children before their parent."
+    if isinstance(items, np.ndarray):
+        items = items.flat
+    for item in items.values() if isinstance(items, dict) else items:
+        if hasattr(item, "__iter__"):
+            yield from _walk_sets(item)
+    if isinstance(items, ConstraintSet):
+        yield items
+
+
 def _owners(cset):
     "The models holding constraints, first appearance first."
     owners = []
