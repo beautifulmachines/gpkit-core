@@ -198,7 +198,7 @@ class TestLoadSimpleFlight:
     def test_drag_positive(self, model):
         """Optimal drag should be positive."""
         sol = model.solve(verbosity=0)
-        cost = float(sol.cost)
+        cost = sol.cost.magnitude
         assert cost > 0
 
 
@@ -227,7 +227,7 @@ class TestLoadBeam:
     def test_tip_displacement_reasonable(self, model):
         """Tip displacement w[N-1] should be positive and finite."""
         sol = model.solve(verbosity=0)
-        cost = float(sol.cost)
+        cost = sol.cost.magnitude
         assert cost > 0
         assert cost < 1e3  # sanity bound
 
@@ -394,13 +394,13 @@ class TestMultiModel:
         """Three-model composition: wing + fuselage + aircraft."""
         m = load_toml("docs/source/examples/toml/modular_aircraft.toml")
         sol = m.solve(verbosity=0)
-        assert float(sol.cost) == pytest.approx(150.0, rel=1e-3)
+        assert sol.cost.magnitude == pytest.approx(150.0, rel=1e-3)
 
     def test_load_performance_modeling(self):
         """Full performance_modeling port with vectorize."""
         m = load_toml("docs/source/examples/toml/performance_modeling.toml")
         sol = m.solve(verbosity=0)
-        assert float(sol.cost) == pytest.approx(1.091, rel=1e-2)
+        assert sol.cost.magnitude == pytest.approx(1.091, rel=1e-2)
 
     def test_multi_model_from_string(self):
         """Load multi-model from inline TOML string."""

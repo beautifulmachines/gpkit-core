@@ -43,7 +43,7 @@ class TestExamples:
 
     def test_breakdowns(self, example):
         # the example solves a live model, so its breakdowns track the code
-        assert example.sol.cost == pytest.approx(7105.40, rel=1e-2)
+        assert example.sol.cost.magnitude == pytest.approx(7105.40, rel=1e-2)
         tree = example.bds.get_tree("cost")
         assert tree, "cost breakdown produced no tree"
 
@@ -185,7 +185,7 @@ class TestExamples:
     def test_uav(self, example):
         m = example.UAV()
         sol = m.solve(verbosity=0)
-        assert sol.cost == pytest.approx(7105.40, rel=1e-2)
+        assert sol.cost.magnitude == pytest.approx(7105.40, rel=1e-2)
 
         # Spot-checks against thesis Chapter 6 table (example.tex)
         assert mag(sol[m.mission.outbound_leg.state.V]) == pytest.approx(69.2, rel=1e-3)
@@ -240,9 +240,9 @@ class TestExamples:
 
     def test_sp_to_gp_sweep(self, example):
         sol = example.sol
-        assert sol[0].cost == pytest.approx(4628.21, abs=0.01)
-        assert sol[1].cost == pytest.approx(6226.60, abs=0.01)
-        assert sol[2].cost == pytest.approx(7362.77, abs=0.01)
+        assert sol[0].cost.magnitude == pytest.approx(4628.21, abs=0.01)
+        assert sol[1].cost.magnitude == pytest.approx(6226.60, abs=0.01)
+        assert sol[2].cost.magnitude == pytest.approx(7362.77, abs=0.01)
 
     def test_boundschecking(self, example):  # pragma: no cover
         if "mosek_cli" in default_solver():
@@ -355,7 +355,7 @@ class TestExamples:
 
     def test_bemt_hover(self, example):
         # Minimum induced power for a 5-bin BEMT rotor at 1e4 N vehicle weight
-        assert example.sol.cost == pytest.approx(43582.47, rel=1e-2)
+        assert example.sol.cost.magnitude == pytest.approx(43582.47, rel=1e-2)
 
     def test_gp_textbook(self, example):
         # Five classical GP textbook problems; solves run directly on classes

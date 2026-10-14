@@ -179,7 +179,7 @@ def _subject_ir(sol, warning: dict) -> dict:
 class Solution:
     "A single GP solution, with mappings back to variables and constraints"
 
-    cost: float
+    cost: Quantity  # in the objective's units; dimensionless if it has none
     primal: VarMap
     constants: VarMap
     sens: Sensitivities
@@ -256,7 +256,7 @@ class Solution:
         """
         ir = {
             "gpkit_ir_version": IR_VERSION,
-            "cost": _value_ir(self.cost, ir_units(self.meta["cost function"])),
+            "cost": _value_ir(self.cost.magnitude, ir_units(self.cost)),
             "primal": _varmap_ir(self.primal),
             "sensitivities": {
                 "variables": {

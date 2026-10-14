@@ -47,6 +47,21 @@ class TestSolution:
         assert sol[y] / sol[x] == pytest.approx(1.0, abs=1e-6)
         assert sol[x] / sol[y] == pytest.approx(1.0, abs=1e-6)
 
+    def test_cost_is_a_quantity(self):
+        "The cost is a value in the objective's units, like any variable's."
+        y = Variable("y", "m")
+        x = Variable("x", 10, "ft")
+        sol = Model(y, [y >= x]).solve(verbosity=0)
+        assert isinstance(sol.cost, Quantity)
+        assert sol.cost.to("ft").magnitude == pytest.approx(10)
+
+    def test_dimensionless_cost_is_a_quantity_too(self):
+        "One type, whatever the objective's units."
+        x = Variable("x")
+        sol = Model(x, [x >= 2]).solve(verbosity=0)
+        assert isinstance(sol.cost, Quantity)
+        assert sol.cost == pytest.approx(2)
+
     def test_call_vector(self):
         n = 5
         x = VectorVariable(n, "x")

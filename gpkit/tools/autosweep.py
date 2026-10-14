@@ -194,20 +194,18 @@ class SolutionOracle:
             key_at = self.bst.posy_at
             v0 = self.bst.sols[0][key]
         units = getattr(v0, "units", None)
-        fit = [key_at(key, x) for x in self.sampled_at]
-        return fit * units if units else np.array(fit)
+        fit = np.array([key_at(key, x) for x in self.sampled_at])
+        return fit * units if units else fit
 
     def cost_lb(self):
         "Gets cost lower bounds from the BST and units them"
-        units = getattr(self.bst.sols[0].cost, "units", None)
         fit = [self.bst.cost_at("cost", x, "lb") for x in self.sampled_at]
-        return fit * units if units else np.array(fit)
+        return np.array(fit) * self.bst.sols[0].cost.units
 
     def cost_ub(self):
         "Gets cost upper bounds from the BST and units them"
-        units = getattr(self.bst.sols[0].cost, "units", None)
         fit = [self.bst.cost_at("cost", x, "ub") for x in self.sampled_at]
-        return fit * units if units else np.array(fit)
+        return np.array(fit) * self.bst.sols[0].cost.units
 
     def plot(self, posys=None, axes=None):
         "Plots the sweep for each posy"

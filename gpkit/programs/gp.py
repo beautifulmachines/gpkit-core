@@ -20,6 +20,7 @@ from ..exceptions import (
     UnboundedGP,
     UnknownInfeasible,
 )
+from ..nomials.map import DIMLESS_QUANTITY
 from ..solutions import MarginSolution, Sensitivities, Solution, SolveStatus
 from ..solvers import default_solver
 from ..util.repr_conventions import lineagestr
@@ -777,7 +778,7 @@ class GeometricProgram:
             )
 
         result = Solution(
-            cost=float(solver_out.cost),
+            cost=float(solver_out.cost) * (self.cost.units or DIMLESS_QUANTITY),
             primal=VarMap(zip(self.vars, np.exp(primal))),
             constants=VarMap(self.substitutions),
             sens=self._calculate_sensitivities(solver_out.la, solver_out.nu, varvals),

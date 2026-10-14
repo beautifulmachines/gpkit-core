@@ -207,7 +207,9 @@ class TestGP:
             1 / R, [t >= sum(R / a0 / M / theta**0.5) + T_loiter + T_reserve, M <= 0.76]
         )
         sol = prob.solve(solver=solver, verbosity=0)
-        assert 0.000553226 / sol.cost == pytest.approx(1, abs=10 ** (-get_ndig(solver)))
+        assert 0.000553226 / sol.cost.magnitude == pytest.approx(
+            1, abs=10 ** (-get_ndig(solver))
+        )
         assert 340.29 / sol.constants["a0"] == pytest.approx(
             1, abs=10 ** (-get_ndig(solver))
         )
@@ -432,7 +434,7 @@ class TestGPSensitivities:
         W_p = Variable("W_p", 20.0, "N")
         m = Model(W, [W >= W_s + W_f + W_p, W_s >= 0.3 * W, W_f >= 0.2 * W])
         sol = m.solve(solver=solver, verbosity=0)
-        assert float(sol.cost) == pytest.approx(40.0)
+        assert sol.cost.magnitude == pytest.approx(40.0)
 
         buildup = next(
             k for k, c in keyed_constraints(m) if "W_s + W_f + W_p" in str(c)
