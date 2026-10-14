@@ -1,5 +1,6 @@
 """Tests for Solution class"""
 
+import dataclasses
 import gc
 import json
 import pickle
@@ -21,7 +22,7 @@ from gpkit import (
 )
 from gpkit.constraints.bounded import Bounded
 from gpkit.constraints.loose import Loose
-from gpkit.constraints.set import keyed_constraints
+from gpkit.constraints.set import audit_solution, keyed_constraints
 from gpkit.constraints.tight import Tight
 from gpkit.solutions import SolveStatus
 from gpkit.tests.conftest import run_threads
@@ -273,6 +274,84 @@ def _loose_warning_sol():
 def _bounded_sol():
     x = Variable("x")
     return Model(1 / x, Bounded([x >= 1])).solve(verbosity=0)
+
+
+class TestAuditsReadByKey:
+    """Tight, Loose and Bounded check a solution through constraint keys.
+
+    A solution holds refs and numbers (#283), so a check about a constraint's
+    sensitivity joins through the key the model gives that constraint rather
+    than through the live object.  Emptying the object-keyed map shows which.
+    """
+
+    @staticmethod
+    def _without_objects(sol):
+        sens = dataclasses.replace(sol.sens, constraints={})
+        return dataclasses.replace(sol, sens=sens, meta={"warnings": {}})
+
+    def test_loose(self):
+        x = Variable("x")
+        x_min = Variable("x_{min}", 2)
+        m = Model(x, [Loose([x >= x_min]), x >= 1])
+        sol = self._without_objects(m.solve(verbosity=0))
+        audit_solution(m, sol)
+        (w,) = sol.meta["warnings"]["Unexpectedly Tight Constraints"]
+        assert w["value"] == pytest.approx(+1, abs=1e-3)
+
+    def test_bounded(self):
+        x = Variable("x")
+        y = Variable("y")
+        m = Model(x * y, Bounded([x * y**1.01 >= 100], lower=0.001))
+        sol = self._without_objects(m.solve(verbosity=0))
+        audit_solution(m, sol)
+        bounds = sol.meta["boundedness"]
+        assert bounds["sensitive to lower bound of 0.001"] == {x.key}
+
+    def test_nested_in_a_named_model(self):
+        "A wrapper's constraints are keyed by the model owning them."
+
+        class _Part(Model):
+            def setup(self):
+                self.x = x = Variable("x")
+                x_min = Variable("x_{min}", 2)
+                return [Loose([x >= x_min]), x >= 1]
+
+        class _Whole(Model):
+            def setup(self):
+                self.part = _Part()
+                self.cost = self.part.x
+                return [self.part]
+
+        m = _Whole()
+        sol = self._without_objects(m.solve(verbosity=0))
+        audit_solution(m, sol)
+        assert "Unexpectedly Tight Constraints" in sol.meta["warnings"]
+
+
+class TestModelSensitivities:
+    "sens.models is each owner's sum of |constraint sensitivity|, by key."
+
+    def test_sums_constraints_by_owner(self):
+        m = _sens_model()
+        sol = m.solve(verbosity=0)
+        expected = {}
+        for key, _ in keyed_constraints(m):
+            owner = ".".join(key.path)
+            expected[owner] = expected.get(owner, 0) + abs(
+                sol.sens.constraints_by_key[key]
+            )
+        assert sol.sens.models == pytest.approx(expected)
+
+    def test_sp_slack_is_not_a_model(self):
+        "PCCP's slack constraint belongs to no model the user wrote."
+        x = Variable("x")
+        y = Variable("y")
+        with SignomialsEnabled():
+            m = Model(x, [x >= 1 - y, y <= 0.5])
+        sol = m.localsolve(verbosity=0)
+        assert sum(sol.sens.models.values()) == pytest.approx(
+            sum(abs(s) for s in sol.sens.constraints_by_key.values())
+        )
 
 
 class TestConstraintSensitivitiesByKey:

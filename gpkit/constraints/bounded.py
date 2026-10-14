@@ -77,21 +77,18 @@ class Bounded(ConstraintSet):
             }
         )
 
-    def process_result(self, result):
+    def audit(self, result, senss):
         "Add boundedness to the model's solution"
-        super().process_result(result)
         if "boundedness" not in result.meta:
             result.meta["boundedness"] = {}
-        result.meta["boundedness"].update(self.check_boundaries(result))
+        result.meta["boundedness"].update(self.check_boundaries(result, senss))
 
-    def check_boundaries(self, result):
+    def check_boundaries(self, result, senss):
         "Creates (and potentially prints) a dictionary of unbounded variables."
         out = defaultdict(set)
         for i, varkey in enumerate(self.bound_varkeys):
             value = result.primal[varkey]
-            c_senss = [
-                result.sens.constraints.get(c, 0) for c in self["variable bounds"][i]
-            ]
+            c_senss = [senss.get(id(c), 0) for c in self["variable bounds"][i]]
             if self.lowerbound:
                 bound = f"lower bound of {self.lowerbound:.2g}"
                 if c_senss[0] >= self.sens_threshold:

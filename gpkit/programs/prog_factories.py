@@ -3,6 +3,7 @@
 import numpy as np
 from adce import adnumber
 
+from ..constraints.set import audit_solution
 from ..nomials.substitution import parse_linked, parse_subs
 from ..solutions import SolveStatus
 from ..util.globals import SignomialsEnabled
@@ -108,6 +109,7 @@ def solvify(genfunction):
         result = progsolve(solver, verbosity=verbosity, **kwargs)
         if kwargs.get("process_result", True):
             self.process_result(result)
+            audit_solution(self, result)
         result.meta["status"] = (
             SolveStatus.OPTIMAL_WITH_WARNINGS
             if result.meta.get("warnings")

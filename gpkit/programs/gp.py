@@ -10,7 +10,7 @@ from time import time
 
 import numpy as np
 
-from ..constraints.set import ConstraintSet, keyed_constraints
+from ..constraints.set import ConstraintSet, keyed_constraints, walk_owned
 from ..exceptions import (
     DualInfeasible,
     Infeasible,
@@ -66,6 +66,22 @@ def _senss_by_key(model, constraint_senss) -> dict:
         for k, c in keyed_constraints(model)
         if c in constraint_senss
     }
+
+
+def _senss_by_model(model, constraint_senss) -> dict:
+    """Each model's sum of |constraint sensitivity| over the constraints it owns.
+
+    Ownership comes from the same walk that keys constraints, so a constraint
+    the program generated for itself -- PCCP's slack, say -- belongs to no
+    model and is counted by none.
+    """
+    if model is None:
+        return {}
+    senss = defaultdict(float)
+    for owner, c in walk_owned(model):
+        if c in constraint_senss:
+            senss[lineagestr(owner)] += abs(constraint_senss[c])
+    return dict(senss)
 
 
 def _get_solver(solver, kwargs):
@@ -474,7 +490,6 @@ class GeometricProgram:
                 cost_nu[idx] += fraction * nu_by_posy[0][i]
         cost_senss = sum(nu_i * exp for (nu_i, exp) in zip(cost_nu, self.cost.hmap))
         gpv_ss = cost_senss.copy()
-        m_senss = defaultdict(float)
         constraint_senss = {}
         constraint_terms = {}
         absv_ss = {vk: abs(x) for vk, x in cost_senss.items()}
@@ -502,7 +517,6 @@ class GeometricProgram:
             constraint_senss[c] = c_senss
             if c_terms is not None:  # None where the written terms have no duals
                 constraint_terms[c] = c_terms
-            m_senss[lineagestr(c)] += abs(c_senss)
 
         # Handle linked sensitivities
         for v in [v for v in gpv_ss if self.linked_derivs.get(v)]:
@@ -527,7 +541,7 @@ class GeometricProgram:
             constraints_by_key=_senss_by_key(self.model, constraint_senss),
             terms_by_key=_senss_by_key(self.model, constraint_terms),
             cost_terms=tuple(cost_nu),
-            models=dict(m_senss),
+            models=_senss_by_model(self.model, constraint_senss),
             variables=VarMap(gpv_ss),
             variablerisk=VarMap(absv_ss),
         )

@@ -14,11 +14,10 @@ class Loose(ConstraintSet):
         super().__init__(constraints)
         self.senstol = senstol or self.senstol
 
-    def process_result(self, result):
-        "Checks that all constraints are satisfied with equality"
-        super().process_result(result)
+    def audit(self, result, senss):
+        "Checks that every constraint's sensitivity is (nearly) zero"
         for constraint in self.flat():
-            c_senss = result.sens.constraints.get(constraint, 0)
+            c_senss = senss.get(id(constraint), 0)
             if c_senss >= self.senstol:
                 cstr = constraint.str_without({"units", "lineage"})
                 appendsolwarning(
