@@ -174,7 +174,7 @@ class SectionSpec:
 
 class Cost(SectionSpec):
     title = "Optimal Cost"
-    source = staticmethod(lambda sol: {sol.meta["cost function"]: sol.cost})
+    source = staticmethod(lambda sol: {sol.meta["cost function"]: sol.cost.magnitude})
 
     def row_from(self, item):
         """Extract [name, value, unit] for cost display."""

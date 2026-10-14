@@ -134,10 +134,10 @@ class TestModelSubs:
         v_min = VectorVariable(1, "v_min", "km")
         m = Model(v.prod(), [v >= v_min], {v_min: [2 * gpkit.units("nmi")]})
         cost = m.solve(verbosity=0).cost
-        assert cost / 3.704 == pytest.approx(1.0)
+        assert cost / (2 * gpkit.ureg.nmi) == pytest.approx(1.0)
         m = Model(v.prod(), [v >= v_min], {v_min: np.array([2]) * gpkit.units("nmi")})
         cost = m.solve(verbosity=0).cost
-        assert cost / 3.704 == pytest.approx(1.0)
+        assert cost / (2 * gpkit.ureg.nmi) == pytest.approx(1.0)
 
     def test_phantoms(self):
         x = Variable("x")
@@ -182,7 +182,8 @@ class TestModelSubs:
                 h: 35 * gpkit.units("USD"),
             }
         )
-        cost = [sol.cost for sol in m.sweep({Q: [50, 100, 500]}, verbosity=0)]
+        sols = m.sweep({Q: [50, 100, 500]}, verbosity=0)
+        cost = [sol.cost.to("USD").magnitude for sol in sols]
         npt.assert_allclose(cost, [1760, 3505, 17501])
 
     def test_skipfailures(self):
@@ -307,18 +308,17 @@ class TestModelSubs:
         concatm = Model(a.cost * b.cost, [a, b])
         concat_cost = concatm.solve(verbosity=0).cost
         yard, cm = gpkit.ureg("yard"), gpkit.ureg("cm")
-        ft, meter = gpkit.ureg("ft"), gpkit.ureg("m")
         if not isinstance(a.x.key.units, str):
-            assert round(a.solve(verbosity=0).cost - ft / yard, 5) == 0
-            assert round(b.solve(verbosity=0).cost - cm / meter, 5) == 0
-            assert round(concat_cost - cm / yard, 5) == 0
+            assert a.solve(verbosity=0).cost * yard == pytest.approx(1)
+            assert b.solve(verbosity=0).cost / cm == pytest.approx(1)
+            assert concat_cost * yard / cm == pytest.approx(1)
         NamedVariables.reset_modelnumbers()
         a1, b1 = Above(), Below()
         assert a1.x.key.lineage == (("Above", 0),)
         m = Model(a1.x, [a1, b1, b1.x == a1.x])
         sol = m.solve(verbosity=0)
         if not isinstance(a1.x.key.units, str):
-            assert round(sol.cost - cm / ft, 5) == 0
+            assert sol.cost / cm == pytest.approx(1)
         a1, b1 = Above(), Below()
         # A second, independent root build of Above -- never composed with
         # the first (its `m` is discarded before this point) -- so it also
@@ -327,7 +327,7 @@ class TestModelSubs:
         m = Model(b1.x, [a1, b1, b1.x == a1.x])
         sol = m.solve(verbosity=0)
         if not isinstance(b1.x.key.units, str):
-            assert round(sol.cost - cm / meter, 5) == 0
+            assert sol.cost / cm == pytest.approx(1)
         assert a1.x in sol.primal
         assert b1.x in sol.primal
         # a/b and a1/b1 are independent, never-composed builds of the same

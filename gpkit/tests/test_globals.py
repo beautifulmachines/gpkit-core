@@ -91,7 +91,7 @@ def test_concurrent_build_and_solve():
         barrier.wait(timeout=30)
         model = uav.UAV()
         ir = json.dumps(model.to_ir(), sort_keys=True, default=str)
-        results[tid] = (ir, float(model.solve(verbosity=0).cost))
+        results[tid] = (ir, model.solve(verbosity=0).cost.magnitude)
 
     run_threads(build_and_solve)
 

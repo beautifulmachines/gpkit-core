@@ -1,5 +1,6 @@
 """Tests for the IR (Intermediate Representation) infrastructure."""
 
+import dataclasses
 import json
 
 import numpy as np
@@ -1071,6 +1072,13 @@ class TestSolutionIR:
             "value": pytest.approx(2.0, rel=1e-6),
             "units": "meter",
         }
+
+    def test_cost_units_are_the_solutions_own(self):
+        "The cost's units are held by the solution, not read off the cost expression."
+        _, sol = _solved()
+        meta = {k: v for k, v in sol.meta.items() if k != "cost function"}
+        sol = dataclasses.replace(sol, meta=meta)
+        assert sol.to_ir()["cost"]["units"] == "meter"
 
     def test_a_money_objective_has_readable_cost_units(self):
         price = Variable("price_ir", "USD")

@@ -117,7 +117,8 @@ class CostedConstraintSet(ConstraintSet):
         units = unitstr(expr)
         value = None
         if solution is not None:
-            value = 1.0 / float(solution.cost) if is_recip else float(solution.cost)
+            cost = solution.cost.magnitude
+            value = 1.0 / cost if is_recip else cost
         return Objective(
             sense=sense, expr=expr, variable=variable, units=units, value=value
         )
