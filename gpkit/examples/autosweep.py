@@ -24,9 +24,9 @@ a_els = " ".join(f" {n:.1f}" for n in sol1("A").magnitude)
 print(f"values of A: [{a_els}] {sol1('A').units}")
 cost_estimate = sol1["cost"]
 cost_lb, cost_ub = sol1.cost_lb(), sol1.cost_ub()
-print(f"cost lower bound:\n{cost_lb}\n")
-print(f"cost estimate:\n{cost_estimate}\n")
-print(f"cost upper bound:\n{cost_ub}\n")
+print(f"cost lower bound:\n{cost_lb:.6g}\n")
+print(f"cost estimate:\n{cost_estimate:.6g}\n")
+print(f"cost upper bound:\n{cost_ub:.6g}\n")
 # you can evaluate arbitrary posynomials
 np.testing.assert_allclose(mag(2 * sol1(A)), mag(sol1(2 * A)))
 assert (sol1["cost"] == sol1(A**2)).all()
