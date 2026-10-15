@@ -24,3 +24,8 @@ Solution
 --------
 x : 0.7854
 y : 0.7071
+
+Most Sensitive Constraints
+--------------------------
++1 : x ≥ 0.785
++1 : <gpkit.examples.external_constraint.ExternalConstraint object>

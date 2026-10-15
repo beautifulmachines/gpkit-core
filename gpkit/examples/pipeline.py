@@ -221,4 +221,4 @@ class Pipeline(Model):
 if __name__ == "__main__":
     m = Pipeline.default()
     sol = m.solve(verbosity=0)
-    print(sol.table())
+    print(m.table(sol))

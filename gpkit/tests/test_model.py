@@ -499,7 +499,7 @@ class TestGPSensitivities:
         c = Variable("c", 2.0, "-")
         m = Model(x, [x >= c])
         sol = m.solve(solver=solver, verbosity=0)
-        sum_lambdas = sum(abs(v) for v in sol.sens.constraints.values())
+        sum_lambdas = sum(abs(v) for v in sol.sens.constraints_by_key.values())
         assert sol.sens.models.get("", 0) == pytest.approx(sum_lambdas, rel=1e-4)
 
 

@@ -103,20 +103,11 @@ def modelcontrolpanel(model, showvars=(), fns_of_sol=None, **solvekwargs):  # no
     live. args and kwargs are passed on to interact()
     """
 
-    freevars = set(model.varkeys).difference(model.substitutions)
-    freev_in_showvars = False
-    for var in showvars:
-        if var in model.varkeys and freevars.intersection(model.varkeys[var]):
-            freev_in_showvars = True
-            break
-
     if fns_of_sol is None:
 
         def __defaultfn(solution):
             "Display function to run when a slider is moved."
-            # NOTE: if there are some freevariables in showvars, filter
-            #       the table to show only those and the slider constants
-            print(solution.summary(showvars if freev_in_showvars else ()))
+            print(solution.table())
 
         __defaultfntable = __defaultfn
 

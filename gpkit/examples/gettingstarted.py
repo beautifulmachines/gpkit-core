@@ -53,7 +53,7 @@ m = Model(objective, constraints)
 sol = m.solve(verbosity=0)
 
 # Printing Results 1
-print(sol.table())
+print(m.table(sol))
 
 # Printing Results 2
 print(f"The optimal value is {sol.cost:~.4g}.")

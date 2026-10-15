@@ -5,6 +5,7 @@ from collections import defaultdict, namedtuple
 
 import numpy as np
 
+from gpkit.constraints.set import constraint_senss
 from gpkit.nomials import Monomial, Posynomial
 from gpkit.nomials.map import NomialMap
 from gpkit.units import DimensionalityError
@@ -17,19 +18,6 @@ from gpkit.varmap import get_lineage_map
 
 Tree = namedtuple("Tree", ["key", "value", "branches"])
 Transform = namedtuple("Transform", ["factor", "power", "origkey"])
-
-
-def bdtable_gen(key):
-    "Generator for breakdown tablefns"
-
-    def bdtable(self, _showvars, **_):
-        "Cost breakdown plot"
-        lineage_map = get_lineage_map(self)
-        bds = Breakdowns(self)
-        with lineage_display_context(lineage_map):
-            return bds.lines(key)
-
-    return bdtable
 
 
 def is_factor(key):
@@ -45,9 +33,9 @@ def get_free_vks(posy, solution):
     return {vk for vk in posy.vks if vk not in solution.constants}
 
 
-def get_model_breakdown(solution):
+def get_model_breakdown(csenss):
     breakdowns = {"|sensitivity|": 0}
-    for constraint, senss in solution.sens.constraints.items():
+    for constraint, senss in csenss.items():
         senss = abs(senss)  # for those monomial
         if senss <= 1e-5:
             continue
@@ -93,7 +81,7 @@ def divide_out_vk(vk, pow, lt, gt):
 
 
 # @profile
-def get_breakdowns(basically_fixed_variables, solution):  # noqa: PLR0912, PLR0915
+def get_breakdowns(basically_fixed_variables, solution, csenss):  # noqa: PLR0912, PLR0915
     """Returns {key: (lt, gt, constraint)} for breakdown constrain in solution.
 
     A breakdown constraint is any whose "gt" contains a single free variable.
@@ -102,7 +90,7 @@ def get_breakdowns(basically_fixed_variables, solution):  # noqa: PLR0912, PLR09
     """
     breakdowns = defaultdict(list)
     for constraint, senss in sorted(
-        solution.sens.constraints.items(),
+        csenss.items(),
         key=lambda kv: (-abs(float("%.2g" % kv[1])), str(kv[0])),
     ):
         while getattr(constraint, "child", None) is not None:
@@ -141,7 +129,7 @@ def get_breakdowns(basically_fixed_variables, solution):  # noqa: PLR0912, PLR09
                 constraint = constraint.generated_by
             breakdowns[chosenvk].append((lt, gt, constraint))
     for constraint, senss in sorted(
-        solution.sens.constraints.items(),
+        csenss.items(),
         key=lambda kv: (-abs(float("%.2g" % kv[1])), str(kv[0])),
     ):
         if abs(senss) <= 1e-5:  # only tight-ish ones
@@ -242,6 +230,8 @@ def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
     key,
     bd,
     solution,
+    csenss,
+    cost,
     basescale=1,
     permissivity=2,
     verbosity=0,
@@ -250,7 +240,7 @@ def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
     all_visited_bdkeys=None,
 ):
     "Returns the tree of breakdowns of key in bd, sorting by solution's values"
-    if key != solution.meta["cost function"] and hasattr(key, "key"):
+    if key != cost and hasattr(key, "key"):
         key = key.key  # clear up Variables
     if key in bd:
         # TODO: do multiple if sensitivities are quite close?
@@ -285,7 +275,7 @@ def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
                 "  " * indent
                 + "which in: "
                 + constraint.str_without(["units", "lineage"])
-                + " (sensitivity %+.2g)" % solution.sens.constraints[constraint]
+                + " (sensitivity %+.2g)" % csenss[constraint]
             )
         interesting_vks = {key}
         (subkey,) = interesting_vks
@@ -375,7 +365,6 @@ def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
                 interesting_vks = interesting_vks - filter
         # if filters weren't enough and permissivity is high enough, sort!
         if len(interesting_vks) > 1 and permissivity > 1:
-            csenss = solution.sens.constraints
             best_vks = sorted(
                 (vk for vk in interesting_vks if vk in bd),
                 key=lambda vk: (
@@ -479,6 +468,8 @@ def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
                 subkey,
                 bd,
                 solution,
+                csenss,
+                cost,
                 scaledmonval,
                 permissivity,
                 subverbosity,
@@ -733,6 +724,7 @@ def graph(  # noqa: PLR0912, PLR0913, PLR0915
     solution,
     basically_fixed_variables,
     *,
+    cost,
     height=None,
     maxdepth=None,
     maxwidth=81,
@@ -775,7 +767,7 @@ def graph(  # noqa: PLR0912, PLR0913, PLR0915
     # Format depth=0
     (A_key,) = [key for key, value in legend.items() if value == "A"]
     prefix = ""
-    if A_key is solution.meta["cost function"]:
+    if A_key is cost:
         A_str = "Cost"
     else:
         A_str = get_keystr(A_key, solution)
@@ -962,12 +954,14 @@ def get_valstr(key, solution, into="%s"):
 
 
 class Breakdowns:
-    def __init__(self, sol):
+    def __init__(self, model, sol):
         self.sol = sol
+        self.cost = model.cost
+        self.csenss = constraint_senss(model, sol)
         self.lineage_map = get_lineage_map(sol)
         self.mlookup = {}
         with lineage_display_context(self.lineage_map):
-            bd = get_model_breakdown(sol)
+            bd = get_model_breakdown(self.csenss)
             model_keys = [k for k in bd if k != "|sensitivity|"]
             # Skip the generic "Model" wrapper when there's a single named
             # submodel — but only if that key is a real model (has children),
@@ -980,7 +974,7 @@ class Breakdowns:
             else:
                 self.mtree = crawl_modelbd(bd, self.mlookup)
         self.basically_fixed_variables = set()
-        self.bd = get_breakdowns(self.basically_fixed_variables, self.sol)
+        self.bd = get_breakdowns(self.basically_fixed_variables, self.sol, self.csenss)
 
     def trace(self, key, *, permissivity=2):
         print()  # a little padding to start
@@ -995,7 +989,7 @@ class Breakdowns:
                 tree = self.mtree
                 kind = "constraint"
             elif key == "cost":
-                key = self.sol.meta["cost function"]
+                key = self.cost
             elif key in self.mlookup:
                 tree = self.mlookup[key]
                 kind = "constraint"
@@ -1017,6 +1011,8 @@ class Breakdowns:
                 key,
                 self.bd,
                 self.sol,
+                self.csenss,
+                self.cost,
                 permissivity=permissivity,
                 verbosity=verbosity,
             )
@@ -1032,6 +1028,7 @@ class Breakdowns:
                 lookup,
                 self.sol,
                 self.basically_fixed_variables,
+                cost=self.cost,
                 height=height,
                 showlegend=showlegend,
                 maxwidth=maxwidth,

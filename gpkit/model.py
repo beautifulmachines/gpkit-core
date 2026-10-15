@@ -4,8 +4,11 @@ from time import time
 
 import numpy as np
 
+from . import printing
+from .breakdowns import Breakdowns
+from .budgets import build_budget
 from .constraints.costed import CostedConstraintSet
-from .constraints.set import build_model_tree, keyed_constraints, senss_by_id
+from .constraints.set import build_model_tree, constraint_keys, keyed_constraints
 from .exceptions import (
     AmbiguousVariable,
     Infeasible,
@@ -395,6 +398,41 @@ class Model(CostedConstraintSet):
         ir = build_report_ir(self, solution=solution)
         return render_report(ir, fmt=fmt, front_matter=front_matter, toc=toc)
 
+    def table(self, solution, **kwargs):
+        """A text table of solution, with what only this model can say about it.
+
+        A solution holds values and sensitivities; the cost expression and the
+        constraints those sensitivities belong to are this model's.  Takes a
+        Solution or a SolutionSequence (a sweep).
+        """
+        if "tables" in kwargs or isinstance(solution, SolutionSequence):
+            kwargs.setdefault("tables", printing.MODEL_TABLES)
+            return printing.table(solution, model=self, **kwargs)
+        bds = Breakdowns(self, solution)
+        lines = bds.lines("cost") + bds.lines("model sensitivities") + [""]
+        if solution.derived is not None:
+            lines.append(solution.derived.table())
+        table = printing.table(solution, printing.MODEL_TABLES, model=self, **kwargs)
+        return "\n".join(lines) + table
+
+    def budget(self, solution, var, display_units=None, depth=float("inf")):
+        """The Budget breaking var down, read from this model's constraints.
+
+        Parameters
+        ----------
+        solution : Solution
+            A solution of this model.
+        var : Variable or VarKey
+            The top-level budget variable (e.g. ``aircraft.m_total``).
+        display_units : str, optional
+            Units for all displayed values.  Defaults to the variable's units.
+        depth : int or float, optional
+            Maximum expansion depth. ``depth=0`` returns only the top variable
+            with no children. ``depth=1`` expands one level of submodels.
+            Defaults to ``float('inf')`` (fully recursive).
+        """
+        return build_budget(self, solution, var, display_units, depth=depth)
+
     gp = progify(GeometricProgram)
     solve = solvify(progify(GeometricProgram, "solve"))
 
@@ -500,7 +538,7 @@ class Model(CostedConstraintSet):
             except InvalidGPConstraint:
                 sol = feas.sp(use_pccp=False).localsolve(**solveargs)
             # limited results processing
-            bounded.check_boundaries(sol, senss_by_id(feas, sol))
+            bounded.check_boundaries(sol, constraint_keys(feas))
             tants.check_relaxed(sol)
         except Infeasible:
             if verbosity:
@@ -516,7 +554,7 @@ class Model(CostedConstraintSet):
                 except InvalidGPConstraint:
                     sol = feas.sp(use_pccp=False).localsolve(**solveargs)
                 # limited results processing
-                traints.check_relaxed(sol)
+                traints.check_relaxed(sol, constraint_keys(feas))
             except Infeasible:
                 print("<DEBUG> Model is not feasible with bounded constraints.")
         if sol and verbosity:

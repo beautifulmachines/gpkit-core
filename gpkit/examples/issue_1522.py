@@ -50,7 +50,7 @@ class Yum1(Model):
 
 m = Yum1()
 sol = m.solve(verbosity=0)
-print(sol.table())
+print(m.table(sol))
 
 
 class Yum2(Model):
@@ -67,4 +67,4 @@ class Yum2(Model):
 
 m = Yum2()
 sol = m.solve(verbosity=0)
-print(sol.table())
+print(m.table(sol))

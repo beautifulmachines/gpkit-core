@@ -51,10 +51,9 @@ class MonoEqualityIndexes:
 def _senss_by_key(model, constraint_senss) -> dict:
     """Constraint sensitivities keyed by ConstraintKey.
 
-    The same numbers as the object-keyed map, under a key that says which
-    constraint it belongs to -- so they still mean something once serialized,
-    and two solves of the same model can be compared.  The object-keyed map is
-    the solution's only handle on the constraint objects themselves.
+    A key says which constraint a number belongs to, so the numbers still mean
+    something once serialized, and two solves of the same model can be
+    compared.  The constraints themselves stay with the model.
 
     Built during the solve because it cannot be recovered afterwards: a solution
     references its model weakly and pickling drops the reference, so there may
@@ -538,7 +537,6 @@ class GeometricProgram:
                     cost_senss[c] = before + dlogcost_dlogv * dlogv_dlogc
 
         return Sensitivities(
-            constraints=constraint_senss,
             constraints_by_key=_senss_by_key(self.model, constraint_senss),
             terms_by_key=_senss_by_key(self.model, constraint_terms),
             cost_terms=tuple(cost_nu),
@@ -790,7 +788,6 @@ class GeometricProgram:
             },
             derived=derived,
         )
-        result.meta["cost function"] = self.cost
         if self.integersolve or self.choicevaridxs:
             self._warn_about_choicevars(solver_out, result)
         return result

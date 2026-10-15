@@ -13,7 +13,7 @@ with SignomialsEnabled():
 # create and solve the SP
 m = Model(x, constraints)
 sol = m.localsolve(verbosity=0)
-print(sol.summary())
+print(m.table(sol))
 assert abs(sol[x] - 0.9) < 1e-6
 
 # full interim solutions are available

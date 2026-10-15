@@ -381,7 +381,7 @@ class UAV(Model):
 if __name__ == "__main__":
     m = UAV()
     sol = m.solve(verbosity=0)
-    print(sol.table())
+    print(m.table(sol))
     print()
     print(
         sol.table(

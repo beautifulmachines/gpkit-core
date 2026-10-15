@@ -243,12 +243,10 @@ solutions and can be solved with 'Model.solve()'.""")
                 )
                 if verbosity > -1:
                     print(expl)
-            self.result.meta["cost function"] = self.cost
             del self.result.primal[self.slack.key]
             assert hasattr(self.result, "sens")  # not true for MIGP
             del self.result.sens.variables[self.slack.key]
             del self.result.sens.variablerisk[self.slack.key]
-            del self.result.sens.constraints[self.gpconstraints[0]]
         return self.result
 
     @property

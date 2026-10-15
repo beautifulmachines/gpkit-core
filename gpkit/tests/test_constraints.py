@@ -19,6 +19,7 @@ from gpkit.constraints.relax import (
     ConstraintsRelaxed,
     ConstraintsRelaxedEqually,
 )
+from gpkit.constraints.set import constraint_keys
 from gpkit.constraints.tight import Tight
 from gpkit.exceptions import Infeasible, InvalidGPConstraint, PrimalInfeasible
 from gpkit.nomials import MonomialEquality, PosynomialInequality, SignomialInequality
@@ -532,7 +533,7 @@ class TestLoose:
         m = Model(x, [Loose([x >= x_min]), x >= 1])
         sol = m.solve(verbosity=0)
         (warn,) = sol.meta["warnings"]["Unexpectedly Tight Constraints"]
-        assert warn["subject"] is m[0][0]
+        assert warn["subject"] == constraint_keys(m)[m[0][0]]
         assert warn["value"] == pytest.approx(+1, abs=1e-3)
         assert sol.meta["status"] == SolveStatus.OPTIMAL_WITH_WARNINGS
         m.substitutions[x_min] = 0.5
@@ -548,7 +549,7 @@ class TestLoose:
         m = Model(x * y, [Loose([x >= y]), x >= x_min, y >= y_min, sig_constraint])
         sol = m.localsolve(verbosity=0)
         (warn,) = sol.meta["warnings"]["Unexpectedly Tight Constraints"]
-        assert warn["subject"] is m[0][0]
+        assert warn["subject"] == constraint_keys(m)[m[0][0]]
         assert warn["value"] == pytest.approx(+1, abs=1e-3)
         m.substitutions[x_min] = 2
         m.substitutions[y_min] = 1
@@ -573,7 +574,7 @@ class TestTight:
         m = Model(x, [Tight([x >= 1]), x >= x_min])
         sol = m.solve(verbosity=0)
         (warn,) = sol.meta["warnings"]["Unexpectedly Loose Constraints"]
-        assert warn["subject"] is m[0][0]
+        assert warn["subject"] == constraint_keys(m)[m[0][0]]
         assert warn["value"] == pytest.approx(1, abs=1e-3)
         m.substitutions[x_min] = 0.5
         assert m.solve(verbosity=0).cost == pytest.approx(1)
@@ -586,7 +587,7 @@ class TestTight:
         m = Model(x * y, [Tight([x >= y]), x >= 2, y >= 1, sig_constraint])
         sol = m.localsolve(verbosity=0)
         (warn,) = sol.meta["warnings"]["Unexpectedly Loose Constraints"]
-        assert warn["subject"] is m[0][0]
+        assert warn["subject"] == constraint_keys(m)[m[0][0]]
         assert warn["value"] == pytest.approx(1, abs=1e-3)
         m.pop(1)
         assert m.localsolve(verbosity=0).cost == pytest.approx(1, abs=1e-5)
@@ -601,7 +602,7 @@ class TestTight:
             m = Model(x, [Tight([x + y >= 1]), x >= x_min, y <= y_max])
         sol = m.localsolve(verbosity=0)
         (warn,) = sol.meta["warnings"]["Unexpectedly Loose Constraints"]
-        assert warn["subject"] is m[0][0]
+        assert warn["subject"] == constraint_keys(m)[m[0][0]]
         assert warn["value"] > 0.5
         m.substitutions[x_min] = 0.5
         assert m.localsolve(verbosity=0).cost == pytest.approx(0.5, abs=1e-5)

@@ -49,7 +49,7 @@ class Fleet2(Model):
 
 m = System()
 sol = m.solve(verbosity=0)
-print(sol.table())
+print(m.table(sol))
 
 
 # now with more fleets per system
@@ -66,7 +66,7 @@ class System2(Model):
 
 m = System2()
 sol = m.solve(verbosity=0)
-print(sol.table())
+print(m.table(sol))
 
 
 # now testing substitutions
@@ -99,4 +99,4 @@ class Cake(Model):
 m = Cake()
 m.substitutions.update({"z": lambda v: np.array(v["y"]) ** 2})
 sol = m.sweep({"y": [[1, 2, 3]]}, verbosity=0)
-print(sol.table())
+print(m.table(sol))

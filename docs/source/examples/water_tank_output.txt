@@ -37,3 +37,10 @@ d[:] : [ 0.464  0.464  0.464 ] [m] dimension vector
 ...constants
    M : 100   [kg]    (+0.6667) mass of water
  rho : 1000  [kg/m³] (-0.6667) density of water
+
+Most Sensitive Constraints
+--------------------------
+WaterTank
++1      : A ≥ 2⋅(d[0]⋅d[1] + d[0]⋅d[2] + d[1]⋅d[2])
++0.6667 : M = V⋅rho
++0.6667 : V = d[0]⋅d[1]⋅d[2]

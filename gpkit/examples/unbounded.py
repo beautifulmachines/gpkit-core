@@ -11,7 +11,7 @@ m = Model(1 / x, constraints)  # MOSEK returns DUAL_INFEAS_CER on .solve()
 m = Model(1 / x, Bounded(constraints))
 # by default, prints bounds warning during solve
 sol = m.solve(verbosity=0)
-print(sol.summary())
+print(m.table(sol))
 # but they can also be accessed from the solution:
 assert (
     sol.meta["boundedness"]["value near upper bound of 1e+30"]

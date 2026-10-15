@@ -6,8 +6,6 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from . import printing
-from .breakdowns import bdtable_gen
-from .budgets import build_budget
 from .ir import IR_VERSION, diff_solutions, ir_units
 from .units import Quantity
 from .varkey import VarKey
@@ -49,8 +47,7 @@ class RawSolution:
 class Sensitivities:
     "Container for a Solution's sensitivities"
 
-    constraints: dict  # {constraint object: sensitivity} -- in-process only
-    constraints_by_key: dict  # {ConstraintKey: sensitivity} -- the serializable form
+    constraints_by_key: dict  # {ConstraintKey: sensitivity}; the model has the math
     terms_by_key: dict  # {ConstraintKey: (nu, ...)} -- per monomial, as written
     cost_terms: tuple  # (nu, ...) over the cost's terms; sums to 1
     # cost: dict
@@ -60,15 +57,6 @@ class Sensitivities:
 
     def __getitem__(self, key: VarKey) -> float:
         return self.variables[key]
-
-    def _key_of(self, constraint):
-        """The ConstraintKey for a constraint object, or None if absent.
-
-        The two constraint maps are one enumeration under two kinds of key, so
-        position pairs them -- the only bridge a Solution has, holding no model.
-        Goes away with the object-keyed map itself (#283).
-        """
-        return dict(zip(self.constraints, self.constraints_by_key)).get(constraint)
 
 
 @dataclass(frozen=True, slots=True)
@@ -141,9 +129,6 @@ class MarginSolution:
         return "\n".join(lines)
 
 
-SUMMARY_TABLES = ("sweeps", "cost", "warnings", "solution")
-
-
 def _value_ir(value, units: str) -> dict:
     "A number and the units it is expressed in, which are the declared ones."
     ir = {"value": float(value)}
@@ -158,18 +143,13 @@ def _varmap_ir(vmap: VarMap) -> dict:
     return {vk.ref: _value_ir(v, vk.to_ir().get("units", "")) for vk, v in vmap.items()}
 
 
-def _subject_ir(sol, warning: dict) -> dict:
-    "Name a warning's subject by ref, dropping the fields that are empty."
+def _subject_ir(warning: dict) -> dict:
+    "A warning's subject as its ref, dropping the fields that are empty."
     ir = {}
-    subject = warning["subject"]
-    if subject is not None:
-        key = getattr(subject, "key", None)
-        ref = key.ref if isinstance(key, VarKey) else None
-        if ref is None:
-            constraint_key = sol.sens._key_of(subject)
-            ref = constraint_key.ref if constraint_key is not None else None
-        if ref is not None:
-            ir["subject"] = ref
+    # a VarKey or a ConstraintKey; a Variable names its VarKey
+    ref = getattr(getattr(warning["subject"], "key", warning["subject"]), "ref", None)
+    if ref is not None:
+        ir["subject"] = ref
     if warning["value"] is not None:
         ir["value"] = float(warning["value"])
     return ir
@@ -288,56 +268,19 @@ class Solution:
         "Warnings with each subject named by ref instead of held as an object."
         out = {}
         for category, warns in self.meta["warnings"].items():
-            out[category] = [
-                {"message": w["message"], **_subject_ir(self, w)} for w in warns
-            ]
+            out[category] = [{"message": w["message"], **_subject_ir(w)} for w in warns]
         return out
 
-    def summary(self, **kwargs) -> str:
-        "Print a summary table of this Solution"
-        lines = self.cost_breakdown() + self.model_sens_breakdown() + [""]
-        if self.derived is not None:
-            lines.append(self.derived.table())
-        table = printing.table(self, tables=SUMMARY_TABLES, **kwargs)
-        return "\n".join(lines) + table
-
     def table(self, **kwargs) -> str:
-        "Per legacy, prints breakdowns then Solution.table"
-        lines = []
-        if "tables" not in kwargs:  # don't add breakdowns if tables custom
-            lines += self.cost_breakdown() + self.model_sens_breakdown() + [""]
-            if self.derived is not None:
-                lines.append(self.derived.table())
-        return "\n".join(lines) + printing.table(self, **kwargs)
+        """A text table of what this solution holds.
 
-    def budget(self, var, display_units=None, depth=float("inf")):
-        """Build and return a Budget breakdown for a variable.
-
-        Parameters
-        ----------
-        var : Variable or VarKey
-            The top-level budget variable (e.g. ``aircraft.m_total``).
-        display_units : str, optional
-            Units for all displayed values.  Defaults to the variable's units.
-        depth : int or float, optional
-            Maximum expansion depth. ``depth=0`` returns only the top variable
-            with no children. ``depth=1`` expands one level of submodels.
-            Defaults to ``float('inf')`` (fully recursive).
-
-        Returns
-        -------
-        Budget
-            Call ``.text()`` or ``print(sol.budget(...))`` to display.
+        Constraints and the cost's expression belong to the model, so the table
+        that shows them is model.table(sol).
         """
-        return build_budget(self, var, display_units, depth=depth)
-
-    def cost_breakdown(self) -> str:
-        "printable visualization of cost breakdown"
-        return bdtable_gen("cost")(self, set())
-
-    def model_sens_breakdown(self) -> str:
-        "printable visualization of model sensitivity breakdown"
-        return bdtable_gen("model sensitivities")(self, set())
+        lines = []
+        if "tables" not in kwargs and self.derived is not None:
+            lines.append(self.derived.table())
+        return "\n".join(lines) + printing.table(self, **kwargs)
 
 
 class SolutionSequence(list[Solution]):
@@ -380,9 +323,5 @@ class SolutionSequence(list[Solution]):
             pickle.dump(self, fil, **pickleargs)
 
     def table(self, **kwargs):
-        "Per legacy, prints breakdowns then Solution.table"
+        "A text table of what these solutions hold; model.table(sols) adds more."
         return printing.table(self, **kwargs)
-
-    def summary(self, **kwargs):
-        "Print a summary table"
-        return printing.table(self, tables=SUMMARY_TABLES, **kwargs)

@@ -57,7 +57,7 @@ constraints += [
 print("SINGLE\n======")
 m = Model(D, constraints)
 sol = m.solve(verbosity=0)
-print(sol.summary())
+print(m.table(sol))
 # save solution to a file and retrieve it
 sol.save("solution.pkl")
 print("\n" + sol.diff(sol))
@@ -68,7 +68,7 @@ sweeps = {
     V: [45.0, 55, 45, 55],
 }
 sweepsol = m.sweep(sweeps, verbosity=0)
-print(sweepsol.summary())
+print(m.table(sweepsol))
 with open("solution.pkl", "rb") as fil:
     sol_loaded = pickle.load(fil)
 print(sweepsol.diff(sol_loaded))

@@ -61,6 +61,11 @@ length : 0.5        plot side parallel to river
 ...constants
      L : 1     (-2) total fence length
 
+Most Sensitive Constraints
+--------------------------
+FencePlot
++2 : L ≥ 2⋅w + length
+
 === 3. Beam Cross-Section ===
 
          ┃┓
@@ -87,6 +92,11 @@ d : 1.732       beam depth
 w : 1           beam width
 ...constants
 R : 1      (-4) log radius
+
+Most Sensitive Constraints
+--------------------------
+BeamCrossSection
++2 : R² ≥ (d/2)² + (w/2)²
 
 === 4. Box from Sheet ===
 
@@ -130,6 +140,14 @@ length : 0.6667       box length
 ...constants
      L : 1       (-3) tin sheet side length
 
+Most Sensitive Constraints
+--------------------------
+BoxFromSheet
++1.5 : L ≥ length + 2⋅cy
++1.5 : L ≥ w + 2⋅cx
++0.5 : cx ≥ h
++0.5 : cy ≥ h
+
 === 5. Work/Sleep Allocation ===
 
            ┃┓
@@ -169,3 +187,10 @@ tw : 14               hours spent working
  p : 0.5    (-1.111)  pay rate per unit productivity
 te : 3      (+0.3571) hours required for eating
  c : 5      (+0.1111) cost of new records per hour
+
+Most Sensitive Constraints
+--------------------------
+WorkSleep
++2.857  : tw + ts + to ≤ 24
++1.111  : p⋅tw^1.5⋅ts^0.75⋅tm^0.1 ≥ s + c⋅tm
++0.3571 : to ≥ te

@@ -10,4 +10,4 @@ num = Variable("numerator")
 m = Model(x + num / x)
 sols = m.sweep({num: np.linspace(0.5, 7, 11)}, verbosity=0)
 
-print(sols.table())
+print(m.table(sols))

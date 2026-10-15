@@ -22,7 +22,7 @@ from gpkit import (
 )
 from gpkit.constraints.bounded import Bounded
 from gpkit.constraints.loose import Loose
-from gpkit.constraints.set import audit_solution, keyed_constraints
+from gpkit.constraints.set import audit_solution, constraint_keys, keyed_constraints
 from gpkit.constraints.tight import Tight
 from gpkit.solutions import SolveStatus
 from gpkit.tests.conftest import run_threads
@@ -150,17 +150,68 @@ class TestSolution:
         assert sol[x] / 3.0 == pytest.approx(1.0, abs=1e-3)
 
 
+class TestSolutionHoldsNoModel:
+    """A solution holds refs and numbers; what only the model knows, it supplies.
+
+    Constraint text and the cost expression live in the model, so any view that
+    shows them takes the model -- model.table(sol) -- and the solution's own
+    table shows what a solution holds (#283).
+    """
+
+    @staticmethod
+    def _solved():
+        x = Variable("x", "m")
+        x_min = Variable("x_{min}", 2, "m")
+        m = Model(x, [x >= x_min])
+        return m, m.solve(verbosity=0)
+
+    def test_no_live_model_objects(self):
+        _, sol = self._solved()
+        assert not hasattr(sol.sens, "constraints")
+        assert "cost function" not in sol.meta
+
+    def test_solution_table_shows_what_a_solution_holds(self):
+        _, sol = self._solved()
+        table = sol.table()
+        assert "cost : 2 [m]" in table
+        assert "Most Sensitive Constraints" not in table
+
+    def test_model_table_adds_constraints_and_the_cost_expression(self):
+        m, sol = self._solved()
+        table = m.table(sol)
+        assert "x : 2 [m]" in table.split("Optimal Cost")[1]
+        assert "+1 : x ≥ x_{min}" in table
+
+    def test_model_table_of_a_sweep(self):
+        x = Variable("x")
+        x_min = Variable("x_{min}", 1)
+        m = Model(x, [x >= x_min])
+        sols = m.sweep({x_min: [1, 2]}, verbosity=0)
+        assert "x ≥ x_{min}" in m.table(sols)
+
+    def test_model_budget(self):
+        total, a, b = Variable("total"), Variable("a", 1), Variable("b", 2)
+        m = Model(total, [total >= a + b])
+        sol = m.solve(verbosity=0)
+        assert m.budget(sol, total).to_dict()
+
+    def test_breakdowns_take_the_model(self):
+        m, sol = self._solved()
+        assert breakdowns.Breakdowns(m, sol).lines("cost")
+
+
 def test_tables_for_a_model_with_no_constraints():
     """Unconstrained posynomial minimization is a classical GP, and its
     solution must print: with no constraints there are no sensitivities to
     attribute, so the model-sensitivity breakdown has nothing to lay out."""
     x, y = Variable("x"), Variable("y")
-    sol = Model(x + 1 / x + y + 1 / y, []).solve(verbosity=0)
+    m = Model(x + 1 / x + y + 1 / y, [])
+    sol = m.solve(verbosity=0)
     assert sol.cost == pytest.approx(4, rel=1e-4)
-    assert not sol.sens.constraints
-    assert not sol.model_sens_breakdown()
+    assert not sol.sens.constraints_by_key
+    assert not breakdowns.Breakdowns(m, sol).lines("model sensitivities")
     assert sol.table()
-    assert sol.summary()
+    assert m.table(sol)
 
 
 def test_concurrent_tables_dont_corrupt_stdout(monkeypatch):
@@ -174,7 +225,8 @@ def test_concurrent_tables_dont_corrupt_stdout(monkeypatch):
     inside the breakdown puts all four threads there at the same moment.
     """
     x, y = Variable("x"), Variable("y")
-    sol = Model(x + y, [x >= 2, y >= 3 * x]).solve(verbosity=0)
+    m = Model(x + y, [x >= 2, y >= 3 * x])
+    sol = m.solve(verbosity=0)
 
     real_graph = breakdowns.graph
     barrier = threading.Barrier(4)
@@ -190,7 +242,7 @@ def test_concurrent_tables_dont_corrupt_stdout(monkeypatch):
 
     real_stdout = sys.stdout
     try:
-        run_threads(lambda _: sol.table())
+        run_threads(lambda _: m.table(sol))
     finally:
         leaked = sys.stdout is not real_stdout
         if leaked:
@@ -294,30 +346,30 @@ def _bounded_sol():
 class TestAuditsReadByKey:
     """Tight, Loose and Bounded check a solution through constraint keys.
 
-    A solution holds refs and numbers (#283), so a check about a constraint's
-    sensitivity joins through the key the model gives that constraint rather
-    than through the live object.  Emptying the object-keyed map shows which.
+    A solution holds refs and numbers (#283), so a check about a constraint
+    joins through the key the model gives that constraint, and names it by
+    that key.  Each test audits a solution afresh, with only the model's keys.
     """
 
     @staticmethod
-    def _without_objects(sol):
-        sens = dataclasses.replace(sol.sens, constraints={})
-        return dataclasses.replace(sol, sens=sens, meta={"warnings": {}})
+    def _unaudited(sol):
+        return dataclasses.replace(sol, meta={"warnings": {}})
 
     def test_loose(self):
         x = Variable("x")
         x_min = Variable("x_{min}", 2)
         m = Model(x, [Loose([x >= x_min]), x >= 1])
-        sol = self._without_objects(m.solve(verbosity=0))
+        sol = self._unaudited(m.solve(verbosity=0))
         audit_solution(m, sol)
         (w,) = sol.meta["warnings"]["Unexpectedly Tight Constraints"]
         assert w["value"] == pytest.approx(+1, abs=1e-3)
+        assert w["subject"] == constraint_keys(m)[m[0][0]]
 
     def test_bounded(self):
         x = Variable("x")
         y = Variable("y")
         m = Model(x * y, Bounded([x * y**1.01 >= 100], lower=0.001))
-        sol = self._without_objects(m.solve(verbosity=0))
+        sol = self._unaudited(m.solve(verbosity=0))
         audit_solution(m, sol)
         bounds = sol.meta["boundedness"]
         assert bounds["sensitive to lower bound of 0.001"] == {x.key}
@@ -338,7 +390,7 @@ class TestAuditsReadByKey:
                 return [self.part]
 
         m = _Whole()
-        sol = self._without_objects(m.solve(verbosity=0))
+        sol = self._unaudited(m.solve(verbosity=0))
         audit_solution(m, sol)
         assert "Unexpectedly Tight Constraints" in sol.meta["warnings"]
 
@@ -370,12 +422,10 @@ class TestModelSensitivities:
 
 
 class TestConstraintSensitivitiesByKey:
-    """Per-constraint sensitivities a consumer outside the process can read.
+    """Per-constraint sensitivities, keyed as to_ir() and the report key them.
 
-    sens.constraints is keyed by live constraint objects, which is right in
-    process and meaningless once serialized -- and is the solution's only handle
-    on the objects themselves.  sens.constraints_by_key carries the same numbers
-    under the key to_ir() and the report dict both use.
+    The key is the solution's only name for a constraint; the model is what
+    joins it back to the constraint itself.
     """
 
     def test_keys_are_the_report_keys(self):
@@ -388,15 +438,6 @@ class TestConstraintSensitivitiesByKey:
         for child in report["children"]:
             entries += [c for g in child["constraint_groups"] for c in g["constraints"]]
         assert {e["key"] for e in entries} == refs
-
-    def test_agrees_with_the_object_keyed_map(self):
-        "Same numbers, reached by key instead of by object."
-        m = _sens_model()
-        sol = m.solve(verbosity=0)
-        for key, c in keyed_constraints(m):
-            assert sol.sens.constraints_by_key[key] == pytest.approx(
-                sol.sens.constraints[c]
-            )
 
     def test_is_json_serializable(self):
         "The point of the key: the numbers survive leaving the process."

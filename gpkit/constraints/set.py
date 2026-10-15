@@ -120,29 +120,36 @@ def own_keyed_constraints(model):
         )
 
 
-def senss_by_id(cset, solution) -> dict:
-    """{id(constraint): sensitivity} for every leaf of cset, joined by key.
+def constraint_senss(cset, solution) -> dict:
+    """{constraint: sensitivity} for cset's leaf constraints, joined by key.
 
-    A solution names a constraint by its ConstraintKey; only the model can say
-    which object that key belongs to.  Keyed by id() because two constraints
-    with the same math are still two constraints.
+    A solution names a constraint only by its ConstraintKey; the model is what
+    says which constraint a key belongs to, so anything needing the constraint
+    itself -- its text, its sides -- joins through here.  Constraints hash by
+    identity, so two with the same math stay two.
     """
     senss = solution.sens.constraints_by_key
-    return {id(c): senss.get(k, 0.0) for k, c in keyed_constraints(cset)}
+    return {c: senss[k] for k, c in keyed_constraints(cset) if k in senss}
+
+
+def constraint_keys(cset) -> dict:
+    "{constraint: ConstraintKey} for cset's leaf constraints."
+    return {c: k for k, c in keyed_constraints(cset)}
 
 
 def audit_solution(cset, solution):
     """Run every audit cset's constraint sets make of the solution.
 
-    An audit checks the optimum's constraint sensitivities against something
-    its set states about them -- that a dual vanishes, that no artificial bound
-    binds -- and records what it finds in the solution's meta.  Run from the
-    root, which is the only place that can say how each constraint is keyed.
+    An audit checks the optimum against something its set states about it --
+    that a constraint is active, that a dual vanishes, that no artificial bound
+    binds -- and records what it finds in the solution's meta, naming each
+    constraint by key.  Run from the root, which is the only place that can say
+    how each constraint is keyed.
     """
-    senss = senss_by_id(cset, solution)
+    keys = constraint_keys(cset)
     for node in _walk_sets(cset):
         if hasattr(node, "audit"):
-            node.audit(solution, senss)
+            node.audit(solution, keys)
 
 
 def _walk_sets(items):
