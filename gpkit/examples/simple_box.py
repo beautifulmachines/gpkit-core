@@ -34,4 +34,4 @@ class Box(Model):
 
 if __name__ == "__main__":
     m = Box()
-    print(m.solve(verbosity=0).table())
+    print(m.table(m.solve(verbosity=0)))

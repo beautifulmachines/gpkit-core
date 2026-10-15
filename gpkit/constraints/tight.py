@@ -15,9 +15,8 @@ class Tight(ConstraintSet):
         self.reltol = reltol or self.reltol
         self.__dict__.update(kwargs)  # NOTE: for Berk's use in labelling
 
-    def process_result(self, result):
+    def audit(self, result, keys):
         "Checks that all constraints are satisfied with equality"
-        super().process_result(result)
         for constraint in self.flat():
             with SignomialsEnabled():
                 leftval = constraint.left.sub(result.variables).value
@@ -32,6 +31,6 @@ class Tight(ConstraintSet):
                     f"{leftval:.4g} {constraint.oper} {rightval:.4g} : {cstr}",
                     result,
                     "Unexpectedly Loose Constraints",
-                    subject=constraint,
+                    subject=keys.get(constraint),
                     value=rel_diff,
                 )

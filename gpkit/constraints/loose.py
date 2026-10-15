@@ -14,17 +14,19 @@ class Loose(ConstraintSet):
         super().__init__(constraints)
         self.senstol = senstol or self.senstol
 
-    def audit(self, result, senss):
+    def audit(self, result, keys):
         "Checks that every constraint's sensitivity is (nearly) zero"
+        senss = result.sens.constraints_by_key
         for constraint in self.flat():
-            c_senss = senss.get(id(constraint), 0)
+            key = keys.get(constraint)
+            c_senss = senss.get(key, 0)
             if c_senss >= self.senstol:
                 cstr = constraint.str_without({"units", "lineage"})
                 appendsolwarning(
                     f"{c_senss:+6.2g} : {cstr}",
                     result,
                     "Unexpectedly Tight Constraints",
-                    subject=constraint,
+                    subject=key,
                     value=c_senss,
                 )
                 if self.raiseerror:

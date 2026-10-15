@@ -116,13 +116,12 @@ class ConstraintsRelaxed(ConstraintSet):
             original_substitutions,
         )
 
-    def process_result(self, result):
+    def audit(self, result, keys):
         "Warns if any constraints were relaxed"
-        super().process_result(result)
-        self.check_relaxed(result)
+        self.check_relaxed(result, keys)
 
-    def check_relaxed(self, result):
-        "Adds relaxation warnings to the result"
+    def check_relaxed(self, result, keys):
+        "Adds relaxation warnings to the result, each naming its relaxed constraint"
         relaxed = get_relaxed(
             result.primal[self.relaxvars],
             range(len(self["relaxed constraints"])),
@@ -159,7 +158,7 @@ class ConstraintsRelaxed(ConstraintSet):
                 msg,
                 result,
                 "Relaxed Constraints",
-                subject=oldconstraint,
+                subject=keys.get(newconstraint),
                 value=relaxval,
             )
 

@@ -3,12 +3,16 @@
 from collections import Counter, defaultdict
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, replace
+from functools import partial
 from typing import Any
 
 import numpy as np
 
+from .constraints.set import constraint_senss
 from .ir import diff_solutions
+from .units import Quantity
 from .util.repr_conventions import unitstr
+from .util.small_scripts import mag, try_str_without
 from .varmap import is_veckey
 
 Item = tuple[Any, Any]
@@ -172,15 +176,30 @@ class SectionSpec:
         return w
 
 
+def _cost_items(sol, model=None) -> dict:
+    """The cost, named by its expression where a model supplies one.
+
+    A solution holds the cost's value and units; only the model knows what
+    expression it is the value of.
+    """
+    name = "cost" if model is None else model.cost.str_without("units")
+    return {name: sol.cost}
+
+
 class Cost(SectionSpec):
     title = "Optimal Cost"
-    source = staticmethod(lambda sol: {sol.meta["cost function"]: sol.cost.magnitude})
+    source = staticmethod(_cost_items)
+
+    def items_from(self, ctx):
+        return ctx.items(partial(_cost_items, model=ctx.model))
 
     def row_from(self, item):
         """Extract [name, value, unit] for cost display."""
-        key, val = item
-        name = key.str_without("units") if key else "cost"
-        return [f"{name} :", self._fmt_val(val), _unitstr(key)]
+        name, val = item
+        return [f"{name} :", self._fmt_val(val.magnitude), _unitstr(val)]
+
+    def _width_array(self, v):
+        return v.magnitude
 
 
 class Warnings(SectionSpec):
@@ -471,12 +490,22 @@ class Constraints(SectionSpec):
     sortkey = staticmethod(lambda x: (-rounded_mag(x[1]), str(x[0])))
     col_sep = " : "
     pm = "+"
-    source = ItemSource("sens.constraints")
+
+    def items_from(self, ctx):
+        "Each constraint with its sensitivity: the model has the constraints."
+        if ctx.model is None:
+            raise ValueError(
+                f"'{self.title}' shows constraints, which a solution holds only by"
+                " key; render it with the model, as model.table(sol)."
+            )
+        return ctx.items(partial(constraint_senss, ctx.model))
 
     def row_from(self, item):
         """Extract [sens, constraint_str] for constraint tables."""
         constraint, sens = item
-        constrstr = constraint.str_without({"units", "lineage"})
+        constrstr = try_str_without(constraint, {"units", "lineage"})
+        if " at 0x" in constrstr:  # a custom constraint's default repr
+            constrstr = constrstr[: constrstr.find(" at 0x")] + ">"
         valstr = self._fmt_val(sens)
         return [valstr, constrstr]
 
@@ -551,16 +580,17 @@ class DiffSection(SectionSpec):
 
 class DiffCost(DiffSection):
     title = "Cost Change"
-    source = staticmethod(Cost.source)
+    source = staticmethod(_cost_items)  # a diff holds no model, so "cost" names it
     diff_section = "cost"
     filterfun = None  # the headline number, reported even when it did not move
     pm = "+"
 
     def row_from(self, item):
-        key, row = item
-        name = key.str_without("units") if key else "cost"
-        u = unitstr(key, into="%s", dimless="")
-        return [f"{name} :", self._pctstr(row), self._bothstr(row, u)]
+        name, row = item
+        units = unitstr(row.new, into="%s", dimless="")
+        old_units = unitstr(row.old, into="%s", dimless="")
+        row = replace(row, new=mag(row.new), old=mag(row.old), old_units=old_units)
+        return [f"{name} :", self._pctstr(row), self._bothstr(row, units)]
 
 
 class DiffFreeVariables(DiffSection):
@@ -699,6 +729,7 @@ class SolutionContext:
     """Adapter that exposes a single Solution's printable items."""
 
     sol: Any
+    model: Any = None  # supplies what the solution holds only by key
 
     def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
         "Get the items associated with a particular attribute (source)"
@@ -717,6 +748,7 @@ class SequenceContext:
     """Adapter that stacks printable items across a sequence of Solutions."""
 
     sols: Sequence[Any]  # sequence of Solution-like objects
+    model: Any = None  # supplies what the solutions hold only by key
 
     def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
         "Items for a given attribute are stacked across self.sols"
@@ -744,7 +776,7 @@ class SequenceContext:
             for k, v in items:
                 cols[k].append(v)
 
-        return [(k, np.asarray(cols[k])) for k in keys0]
+        return [(k, _stacked(cols[k])) for k in keys0]
 
     def warning_items(self) -> Iterable[tuple[str, list[str]]]:
         """Merge warnings from all solutions into a single mapping."""
@@ -808,6 +840,13 @@ class DiffContext:
         return out
 
 
+def _stacked(values: list):
+    "One array of values; a Quantity's units stay with it."
+    if isinstance(values[0], Quantity):
+        return Quantity.from_sequence(values)
+    return np.asarray(values)
+
+
 def _display_units(key) -> str:
     "The units to print a baseline value in -- its own, not the scenario's."
     return "" if key is None else unitstr(key, into="%s", dimless="")
@@ -860,20 +899,27 @@ def _stack_rel(rels: list[dict], key, varset, scalar: bool):
     return stacked[0] if scalar else np.array(stacked)
 
 
+SOLUTION_TABLES = ("sweeps", "cost", "warnings", "solution")
+MODEL_TABLES = (*SOLUTION_TABLES, "tightest constraints")
+
+
 def table(
     obj: Any,  # Solution or SolutionSequence
-    tables: tuple[str, ...] = (
-        "sweeps",
-        "cost",
-        "warnings",
-        "solution",
-        "tightest constraints",
-    ),
+    tables: tuple[str, ...] = SOLUTION_TABLES,
+    *,
+    model=None,
     **options,
 ) -> str:
-    """Render a simple text table for a Solution or SolutionSequence."""
+    """Render a simple text table for a Solution or SolutionSequence.
+
+    Constraint sections need the model the solution came from, since a
+    solution holds its constraints only by key.
+    """
     opt = PrintOptions(**options)
-    ctx = SolutionContext(obj) if _looks_like_solution(obj) else SequenceContext(obj)
+    if _looks_like_solution(obj):
+        ctx = SolutionContext(obj, model)
+    else:
+        ctx = SequenceContext(obj, model)
     blocks: list[str] = []
     for table_name in tables:
         sec = SECTION_SPECS[table_name](options=opt)

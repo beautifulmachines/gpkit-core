@@ -8,7 +8,7 @@ exponent +1.
 
 Usage example::
 
-    m = solution.budget("m_total")
+    m = model.budget(solution, model.m_total)
     print(m.text())
     print(m.markdown())
 """
@@ -18,6 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from .ast_nodes import ExprNode, VarNode
+from .constraints.set import constraint_senss
 from .units import DimensionalityError, qty
 from .util.repr_conventions import MUL
 from .varkey import VarKey
@@ -141,7 +142,7 @@ def _physical_coeff(exp, coeff, hmap_units):
 # ---------------------------------------------------------------------------
 
 
-def find_budget_constraints(vk, solution):
+def find_budget_constraints(vk, csenss):
     """Find constraints where *vk* has exponent +1 as the sole gt variable.
 
     A budget constraint has the form ``vk >= sum_of_terms`` — *vk* alone on
@@ -151,9 +152,9 @@ def find_budget_constraints(vk, solution):
     ----------
     vk : VarKey or Variable
         The variable to look for as the budget root.
-    solution : Solution
-        Scanned for candidate constraints and their sensitivities; its
-        sens.constraints is keyed by the constraint objects themselves.
+    csenss : dict
+        {constraint: sensitivity}, as constraint_senss(model, solution) joins
+        them: the constraints to scan, with how much each one binds.
 
     Returns
     -------
@@ -162,7 +163,7 @@ def find_budget_constraints(vk, solution):
     """
     vk = getattr(vk, "key", vk)
     matches = []
-    for c, sens in solution.sens.constraints.items():
+    for c, sens in csenss.items():
         gt, lt = _get_gt_lt(c)
         if gt is None or len(gt.hmap) != 1:
             continue
@@ -476,6 +477,7 @@ class _BudgetCtx:
     """Shared context passed through recursive budget-building calls."""
 
     solution: object
+    csenss: dict  # {constraint: sensitivity}, joined through the model
     display_units: str
     level_units: str = ""
     visited: frozenset = field(default_factory=frozenset)
@@ -521,7 +523,7 @@ def _make_term(mon, hmap_units, ast_labels, ast_is_var, ctx):
 
 def _attach_sub_budget(node, child_vk, ctx):
     "Recursively attach sub-budget children to *node* if a budget constraint exists."
-    sub_matches = find_budget_constraints(child_vk, ctx.solution)
+    sub_matches = find_budget_constraints(child_vk, ctx.csenss)
     if len(sub_matches) > 1:
         sub_matches = _drop_nonbinding(sub_matches)
     if not sub_matches or len(sub_matches) > 1:
@@ -531,6 +533,7 @@ def _attach_sub_budget(node, child_vk, ctx):
     child_units = child_vk.unitrepr if child_vk.unitrepr != "-" else "dimensionless"
     sub_ctx = _BudgetCtx(
         solution=ctx.solution,
+        csenss=ctx.csenss,
         display_units=ctx.display_units,
         level_units=child_units,
         visited=ctx.visited | {child_vk},
@@ -635,7 +638,7 @@ def _build_children(top_vk, lt, constraint, ctx):
     reverse-engineer it from child fractions.
     """
     total_val = float(ctx.solution[top_vk].to(ctx.level_units).magnitude)
-    is_tight = abs(ctx.solution.sens.constraints.get(constraint, 0.0)) > 1e-5
+    is_tight = abs(ctx.csenss.get(constraint, 0.0)) > 1e-5
     ast_labels, ast_is_var = _ast_label_map(
         lt, strip_prefix=top_vk.lineagestr() if top_vk.lineage else None
     )
@@ -716,13 +719,15 @@ def _trim_to_depth(nodes, remaining_depth):
         _trim_to_depth(node.children, remaining_depth - 1)
 
 
-def build_budget(solution, var, display_units=None, depth=float("inf")):
+def build_budget(model, solution, var, display_units=None, depth=float("inf")):
     """Build a :class:`Budget` for a variable by scanning the solved constraints.
 
     Parameters
     ----------
+    model : Model
+        The model solved, which holds the constraints a budget is read from.
     solution : Solution
-        A solved GPKit solution.
+        A solution of *model*.
     var : Variable or VarKey
         The top-level budget variable (e.g. ``model.m_total``).
     display_units : str, optional
@@ -751,7 +756,8 @@ def build_budget(solution, var, display_units=None, depth=float("inf")):
     if display_units is None:
         display_units = top_vk.unitrepr if top_vk.unitrepr != "-" else "dimensionless"
 
-    matches = find_budget_constraints(top_vk, solution)
+    csenss = constraint_senss(model, solution)
+    matches = find_budget_constraints(top_vk, csenss)
     if not matches:
         raise ValueError(
             f"No budget constraint found for {top_vk!r}. "
@@ -783,6 +789,7 @@ def build_budget(solution, var, display_units=None, depth=float("inf")):
 
     ctx = _BudgetCtx(
         solution=solution,
+        csenss=csenss,
         display_units=display_units,
         level_units=display_units,
         visited=frozenset({top_vk}),

@@ -5,7 +5,7 @@ from gpkit.examples.uav import UAV
 
 m = UAV()
 sol = m.solve(verbosity=0)
-bds = Breakdowns(sol)
+bds = Breakdowns(m, sol)
 
 print("Cost breakdown (as seen in solution tables)")
 print("==============")

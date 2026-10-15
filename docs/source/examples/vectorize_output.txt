@@ -21,6 +21,11 @@ Solution
 --------
 Test
 x : 1
+
+Most Sensitive Constraints
+--------------------------
+Test
++1 : x ≥ 1
 __________
 
 VECTORIZED
@@ -54,3 +59,11 @@ Solution
 --------
 Test
 x[:] : [ 1  2  1 ]
+
+Most Sensitive Constraints
+--------------------------
++1 : x[1] ≥ 2
+
+Test
++1 : x[0] ≥ 1
++1 : x[2] ≥ 1

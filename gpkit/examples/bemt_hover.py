@@ -85,4 +85,4 @@ m = BEMTHover(N=5)
 sol = m.solve(verbosity=0)
 
 if __name__ == "__main__":
-    print(sol.table())
+    print(m.table(sol))

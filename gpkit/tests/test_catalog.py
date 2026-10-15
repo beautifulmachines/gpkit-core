@@ -210,7 +210,7 @@ def run_catalog_snapshots(model_entry, start):
     outdir = Path(start).resolve().parent / "snapshots"
 
     _write_snapshot(outdir / f"{entry_id}.structure.txt", structure_digest(m))
-    _write_snapshot(outdir / f"{entry_id}.solution.txt", _solve(m).table())
+    _write_snapshot(outdir / f"{entry_id}.solution.txt", m.table(_solve(m)))
 
 
 try:

@@ -17,7 +17,6 @@ choose how much margin to carry.
 """
 
 from gpkit import MarginObjective, Model, Variable
-from gpkit.budgets import build_budget
 
 
 class Spar(Model):
@@ -68,5 +67,5 @@ class GrowthAllowance(Model):
 if __name__ == "__main__":
     model = GrowthAllowance()
     sol = model.solve(verbosity=0)
-    print(build_budget(sol, model.m).text())
+    print(model.budget(sol, model.m).text())
     print(sol.derived.table(sol.sens.variables))
