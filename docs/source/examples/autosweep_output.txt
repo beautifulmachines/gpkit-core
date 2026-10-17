@@ -13,6 +13,10 @@ cost upper bound:
 Solved after 3 passes, cost logtol +/-0
 Table of solutions used in the autosweep:
 
+Swept Variables
+---------------
+w : [ 1   3   10 ] [m]
+
 Optimal Cost
 ------------
 A² : [ 0.333  1      123   ] [m⁴]

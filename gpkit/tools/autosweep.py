@@ -5,7 +5,7 @@ from time import time
 import numpy as np
 
 from ..exceptions import InvalidGPConstraint
-from ..solutions import SolutionSequence
+from ..solutions import Sweep
 from ..util.small_classes import Count
 from ..util.small_scripts import mag
 
@@ -148,7 +148,7 @@ class BinarySweepTree:
     @property
     def solarray(self):
         "Returns a solution array of all the solutions in an autosweep"
-        return SolutionSequence(self.sollist)
+        return Sweep(self.sollist, (self.sweptvar,))
 
     def save(self, filename="autosweep.p"):
         """Pickles the autosweep and saves it to a file.
@@ -168,7 +168,7 @@ class BinarySweepTree:
 
 
 class SolutionOracle:
-    "Acts like a Solution/SolutionSequence for autosweeps"
+    "Acts like a Solution/Sweep for autosweeps"
 
     def __init__(self, bst, sampled_at):
         self.sampled_at = sampled_at

@@ -476,7 +476,9 @@ class Sweeps(SectionSpec):
     title = "Swept Variables"
     align = "><<<"
     sortkey = staticmethod(lambda x: str(x[0]))
-    source = staticmethod(lambda s: getattr(s, "meta", {}).get("sweep_point", {}))
+
+    def items_from(self, ctx):
+        return ctx.sweep_items()
 
     def row_from(self, item):
         """Extract [name, value, unit, label] for swept variable tables."""
@@ -760,6 +762,10 @@ class SequenceContext:
 
         return self._stack(_items_one_sol)
 
+    def sweep_items(self) -> Iterable[Item]:
+        "Each swept variable's values, which the solutions hold as constants."
+        return self._stack(lambda sol: ((k, sol.constants[k]) for k in self.sols.swept))
+
     def _stack(self, get_items: Callable[[Any], Iterable[Item]]) -> list[Item]:
         """Strict stacking: keys (and their order) must match across all sols."""
         if not self.sols:
@@ -772,7 +778,7 @@ class SequenceContext:
         for s in self.sols[1:]:
             items = list(get_items(s))
             if tuple(k for k, _ in items) != keys0:
-                raise ValueError("SolutionSequence key mismatch")
+                raise ValueError("Sweep key mismatch")
             for k, v in items:
                 cols[k].append(v)
 
@@ -899,27 +905,30 @@ def _stack_rel(rels: list[dict], key, varset, scalar: bool):
     return stacked[0] if scalar else np.array(stacked)
 
 
-SOLUTION_TABLES = ("sweeps", "cost", "warnings", "solution")
-MODEL_TABLES = (*SOLUTION_TABLES, "tightest constraints")
-
-
 def table(
-    obj: Any,  # Solution or SolutionSequence
-    tables: tuple[str, ...] = SOLUTION_TABLES,
+    obj: Any,  # Solution or Sweep
+    tables: tuple[str, ...] | None = None,
     *,
     model=None,
     **options,
 ) -> str:
-    """Render a simple text table for a Solution or SolutionSequence.
+    """Render a simple text table for a Solution or Sweep.
 
-    Constraint sections need the model the solution came from, since a
-    solution holds its constraints only by key.
+    By default it shows what obj has to show: a sweep's swept variables, and
+    the constraints only when given the model, since a solution holds those
+    only by key.
     """
     opt = PrintOptions(**options)
-    if _looks_like_solution(obj):
-        ctx = SolutionContext(obj, model)
-    else:
-        ctx = SequenceContext(obj, model)
+    is_sweep = not _looks_like_solution(obj)
+    ctx = SequenceContext(obj, model) if is_sweep else SolutionContext(obj, model)
+    if tables is None:
+        tables = (
+            *(("sweeps",) if is_sweep else ()),
+            "cost",
+            "warnings",
+            "solution",
+            *(("tightest constraints",) if model is not None else ()),
+        )
     blocks: list[str] = []
     for table_name in tables:
         sec = SECTION_SPECS[table_name](options=opt)

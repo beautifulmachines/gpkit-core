@@ -283,19 +283,16 @@ class Solution:
         return "\n".join(lines) + printing.table(self, **kwargs)
 
 
-class SolutionSequence(list[Solution]):
-    """
-    Ordered collection of Solution objects all sharing same underlying model.
+class Sweep(list[Solution]):
+    """Solutions of one model, each at a different value of the swept variables.
+
+    `swept` names those variables; each solution holds its value of them in
+    `constants`, so the sweep records what was varied and nothing twice.
     """
 
-    def __init__(self, iterable=()):
-        super().__init__()
-        for s in iterable:
-            self.append(s)
-
-    def append(self, sol: Solution) -> None:
-        "Standard list append, with integrity check"
-        super().append(sol)
+    def __init__(self, solutions=(), swept=()):
+        super().__init__(solutions)
+        self.swept = tuple(swept)
 
     # ----------------------------------------------------------------
     # Convenience utilities (runtime helpers, minimal API)
@@ -306,8 +303,8 @@ class SolutionSequence(list[Solution]):
 
     def __repr__(self) -> str:
         if not self:
-            return "SolutionSequence([])"
-        return f"SolutionSequence(n={len(self)})"
+            return "Sweep([])"
+        return f"Sweep(n={len(self)})"
 
     def plot(self, var):
         "Eventual plotting capability"
@@ -318,7 +315,7 @@ class SolutionSequence(list[Solution]):
         return printing.diff(self, baseline, **kwargs)
 
     def save(self, filename, **pickleargs):
-        "Pickle the SolutionSequence and save it to filename"
+        "Pickle the Sweep and save it to filename"
         with open(filename, "wb") as fil:
             pickle.dump(self, fil, **pickleargs)
 
