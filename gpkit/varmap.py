@@ -292,12 +292,6 @@ class VarMap(MutableMapping):
         del self._data[key]
         self._varset.discard(key)
 
-    def vector_parent_items(self):
-        "items(), with a vector's elements collapsed into one veckey item"
-        return (
-            (key, self[key]) for key in self._varset.vector_parent_keys() if key in self
-        )
-
     def __iter__(self):
         return iter(self._data)
 

@@ -74,6 +74,15 @@ class TestSolutionSections:
             "  sens ( +0.1  +0.2  +0.3 )"
         )
 
+    def test_an_element_without_a_value_shows_as_nan(self):
+        "An element no constraint mentions is never solved for."
+        v = VectorVariable(3, "v", "m")
+        L = Variable("L", 1, "m")
+        sol = Model(v[0] + v[2], [v[0] >= L, v[2] >= 2 * L]).solve(verbosity=0)
+        assert sol.table(tables=["freevariables"]).split("\n")[2:] == [
+            "v[:] : [ 1    nan  2   ] [m]"
+        ]
+
     def test_slack_constraints_are_the_ones_that_never_bind(self, trip):
         sol = trip.solve(verbosity=0)
         text = trip.table(sol, tables=["slack constraints"])
