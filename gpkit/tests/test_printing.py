@@ -137,6 +137,23 @@ class TestSweepSections:
         )
 
 
+class TestModelDiff:
+    "A diff holds no model, so only the model can name the cost by its expression."
+
+    def test_a_solution_diff_names_the_cost_cost(self, farther):
+        new, baseline = farther
+        assert "cost : +10%" in new.diff(baseline)
+
+    def test_the_models_diff_names_the_cost_by_its_expression(self, trip, farther):
+        new, baseline = farther
+        assert "Trip.x + Trip.w⋅Trip.Leg.v[:].sum() : +10%" in trip.diff(new, baseline)
+
+    def test_the_models_diff_takes_a_sweep(self, trip):
+        baseline = trip.solve(verbosity=0)
+        sweep = trip.sweep({trip.leg.tau: [2, 4]}, verbosity=0)
+        assert "Trip.x + Trip.w⋅Trip.Leg.v[:].sum() :" in trip.diff(sweep, baseline)
+
+
 class TestDiffVectors:
     """A diff pairs each row with the baseline's row for the same quantity.
 
