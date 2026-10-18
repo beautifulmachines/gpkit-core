@@ -69,7 +69,7 @@ class TestSolutionSections:
             "c : 2 [s]    (~0)   slack bound\n"
             "\n"
             "Trip.Leg\n"
-            "tau : 2 [s] (-0.2) leg time\n"
+            " tau : 2 [s] (-0.2) leg time\n"
             "d[:] : [ 1     2     3    ] [m] distance\n"
             "  sens ( +0.1  +0.2  +0.3 )"
         )
@@ -152,6 +152,27 @@ class TestModelDiff:
         baseline = trip.solve(verbosity=0)
         sweep = trip.sweep({trip.leg.tau: [2, 4]}, verbosity=0)
         assert "Trip.x + Trip.w⋅Trip.Leg.v[:].sum() :" in trip.diff(sweep, baseline)
+
+
+class TestDiffTolerance:
+    """The table moves what sol.almost_equal says moved, and nothing else.
+
+    A solver returns an unchanged value to within rounding, not exactly.
+    """
+
+    def test_an_unchanged_variable_has_no_row(self, farther):
+        new, baseline = farther
+        rows = new.diff(baseline).split("\n")
+        assert not [r for r in rows if r.startswith("x :")]
+
+    def test_an_unchanged_element_reads_zero(self, farther):
+        new, baseline = farther
+        (row,) = [r for r in new.diff(baseline).split("\n") if r.startswith("v[:]")]
+        assert row.split()[2:6] == ["[", "+0%", "+0%", "+33.3%"]
+
+    def test_tol_decides_what_moved(self, farther):
+        new, baseline = farther
+        assert "v[:]" not in new.diff(baseline, tol=0.5)
 
 
 class TestDiffVectors:

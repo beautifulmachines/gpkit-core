@@ -367,17 +367,16 @@ class Constants(SectionSpec):
         """Render one model group: scalars column-aligned, vectors as two lines."""
         scalar_items = [(k, v) for k, v in model_items if not np.shape(v[0])]
         vector_items = [(k, v) for k, v in model_items if np.shape(v[0])]
-        lines = []
-        if scalar_items:
-            rows = [self.row_from(item) for item in scalar_items]
-            lines.extend(_format_aligned_columns(rows, self.align, self.col_sep))
+        # one name width for the group, so every row's colon lines up
+        name_w = max(len(self._name(k)) for k, _ in model_items)
         if vector_items:
-            name_w = max(
-                *(len(self._name(k)) for k, _ in vector_items),
-                len("sens") - 2,
-            )
-            for ref, (val, sens) in vector_items:
-                lines.extend(self._fmt_vector_item(ref, val, sens, name_w))
+            name_w = max(name_w, len("sens") - 2)
+        rows = [self.row_from(item) for item in scalar_items]
+        for row in rows:
+            row[0] = row[0].rjust(name_w + 2)
+        lines = _format_aligned_columns(rows, self.align, self.col_sep)
+        for ref, (val, sens) in vector_items:
+            lines.extend(self._fmt_vector_item(ref, val, sens, name_w))
         return lines
 
     def row_from(self, item):
@@ -778,6 +777,7 @@ class Documents:
     is_sweep: bool
     swept: tuple[str, ...] = ()  # refs of what a sweep varied
     baseline: dict | None = None
+    tol: float = 0.0  # a comparison within it is no change, as almost_equal says
 
     def items(self, source) -> list[Item]:
         "(ref, value) for each row of source, which reads one document."
@@ -839,11 +839,15 @@ class Documents:
         "One value per document, as a sweep's array or a single solution's own."
         return np.array(values) if self.is_sweep else values[0]
 
+    def _moved(self, rel: float) -> float:
+        "rel, or 0 where it is within tol: a solver returns no number exactly."
+        return 0.0 if abs(rel) <= self.tol else rel
+
     def cost_diff(self) -> DiffRow:
         "The cost's comparison, which pairs by position: a solution has one cost."
         rels = [diff_solutions(self.baseline, doc)["cost"] for doc in self.docs]
         return DiffRow(
-            rel=self._across([r.get("rel", float("nan")) for r in rels]),
+            rel=self._across([self._moved(r.get("rel", float("nan"))) for r in rels]),
             new=self.cost(),
             old=self.baseline["cost"]["value"],
             units=self.cost_units(),
@@ -870,7 +874,10 @@ class Documents:
             units = self.display.units  # the baseline's own, not the scenario's
             return ref, DiffRow(rel, new, old, units(ref), units(spelled.get(ref, ref)))
 
-        rels = [rows(p.get("matched", {})) for p in parts]
+        rels = [
+            rows({r: self._moved(v) for r, v in p.get("matched", {}).items()})
+            for p in parts
+        ]
         old_rows = rows(source(self.baseline))
         nan = float("nan")
         out = [
@@ -908,7 +915,7 @@ def _diff_part(diff: dict, section: str) -> dict:
     return part.get("variables", {}) if section == "sensitivities" else part
 
 
-def _documents(obj, model=None, baseline=None) -> Documents:
+def _documents(obj, model=None, baseline=None, tol=0.0) -> Documents:
     "The documents and display for a Solution or Sweep, against a baseline if any."
     is_sweep = not _looks_like_solution(obj)
     sols = list(obj) if is_sweep else [obj]
@@ -919,6 +926,7 @@ def _documents(obj, model=None, baseline=None) -> Documents:
         is_sweep=is_sweep,
         swept=tuple(vk.ref for vk in getattr(obj, "swept", ())),
         baseline=None if baseline is None else baseline.to_ir(),
+        tol=tol,
     )
 
 
@@ -954,13 +962,17 @@ def table(
     return "\n\n".join(blocks)
 
 
-def diff(obj, baseline, tables=("cost", "freevariables"), *, model=None, **options):
+def diff(
+    obj, baseline, tables=("cost", "freevariables"), *, model=None, tol=1e-6, **options
+):
     """Render text tables of differences between obj and baseline.
 
-    The cost is named by its expression when given the model, else "cost".
+    The cost is named by its expression when given the model, else "cost".  A
+    number moved only beyond tol -- relative for values, absolute for
+    sensitivities -- which is what sol.almost_equal(baseline, tol) asks.
     """
     opt = PrintOptions(**options)
-    ctx = _documents(obj, model, baseline)
+    ctx = _documents(obj, model, baseline, tol)
     blocks = []
     for name in tables:
         sec = DIFF_SECTION_SPECS[name](options=opt, display=ctx.display)

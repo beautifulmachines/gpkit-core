@@ -98,6 +98,14 @@ class TestSubstitutions:
         assert seen == [Substitutions, Substitutions]
 
 
+@pytest.fixture(name="q")
+def fixture_q(vm):
+    "A 3-vector registered in vm, with no values yet."
+    q = VectorVariable(3, "q", "m")
+    vm.register_keys(VarSet([e.key for e in q]))
+    return q
+
+
 class TestPartlyValuedVectors:
     """A vector is here on the same terms as a scalar: when it holds a value (#55).
 
@@ -105,33 +113,20 @@ class TestPartlyValuedVectors:
     and the two are deliberately different sizes.
     """
 
-    @staticmethod
-    def _partly_valued():
-        "A 3-vector with values at 0 and 2, and its middle element unvalued."
-        q = VectorVariable(3, "q", "m")
-        vm = VarMap()
-        vm.register_keys(VarSet([e.key for e in q]))
-        vm[q[0].key] = 1.0
-        vm[q[2].key] = 3.0
-        return q, vm
-
-    def test_a_partly_valued_vector_reads_with_nan_in_the_gap(self):
+    def test_a_partly_valued_vector_reads_with_nan_in_the_gap(self, vm, q):
         "nan is already how an unregistered element reads, so a gap reads alike."
-        q, vm = self._partly_valued()
+        vm[q[0].key], vm[q[2].key] = 1.0, 3.0
         value = vm[q.key]
         assert [value[0], value[2]] == [1.0, 3.0]
         assert np.isnan(value[1])
 
-    def test_a_partly_valued_vector_is_in_the_map(self):
+    def test_a_partly_valued_vector_is_in_the_map(self, vm, q):
         "Its values are here, so claiming otherwise would be a lie."
-        q, vm = self._partly_valued()
+        vm[q[0].key] = 1.0
         assert q.key in vm
 
-    def test_a_vector_with_no_values_is_absent(self):
+    def test_a_vector_with_no_values_is_absent(self, vm, q):
         "Registered names alone are not items -- the reported bug, on a vector."
-        q = VectorVariable(3, "q", "m")
-        vm = VarMap()
-        vm.register_keys(VarSet([e.key for e in q]))
         assert q.key not in vm
         with pytest.raises(KeyError):
             _ = vm[q.key]
