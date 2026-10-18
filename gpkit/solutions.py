@@ -271,16 +271,16 @@ class Solution:
             out[category] = [{"message": w["message"], **_subject_ir(w)} for w in warns]
         return out
 
-    def table(self, **kwargs) -> str:
-        """A text table of what this solution holds.
+    def table(self, fmt="text", **kwargs) -> str:
+        """A table of what this solution holds, as text or markdown ("md").
 
         Constraints and the cost's expression belong to the model, so the table
         that shows them is model.table(sol).
         """
         lines = []
-        if "tables" not in kwargs and self.derived is not None:
+        if fmt == "text" and "tables" not in kwargs and self.derived is not None:
             lines.append(self.derived.table())
-        return "\n".join(lines) + printing.table(self, **kwargs)
+        return "\n".join(lines) + printing.table(self, fmt=fmt, **kwargs)
 
 
 class Sweep(list[Solution]):
