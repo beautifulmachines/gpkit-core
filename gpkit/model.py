@@ -414,6 +414,14 @@ class Model(CostedConstraintSet):
         table = printing.table(solution, model=self, **kwargs)
         return "\n".join(lines) + table
 
+    def diff(self, solution, baseline, **kwargs):
+        """A text table of how solution differs from baseline, naming the cost.
+
+        Takes a Solution or a Sweep; sol.diff(baseline) is the same table, with
+        the cost named only "cost", since a solution holds no expression for it.
+        """
+        return printing.diff(solution, baseline, model=self, **kwargs)
+
     def budget(self, solution, var, display_units=None, depth=float("inf")):
         """The Budget breaking var down, read from this model's constraints.
 

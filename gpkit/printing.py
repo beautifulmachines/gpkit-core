@@ -1,19 +1,16 @@
 "printing functionality for gpkit objects"
 
 from collections import Counter, defaultdict
-from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, replace
-from functools import partial
 from typing import Any
 
 import numpy as np
 
-from .constraints.set import constraint_senss
+from .constraints.set import keyed_constraints
 from .ir import diff_solutions
 from .units import Quantity
 from .util.repr_conventions import unitstr
-from .util.small_scripts import mag, try_str_without
-from .varmap import is_veckey
+from .util.small_scripts import try_str_without
 
 Item = tuple[Any, Any]
 
@@ -30,11 +27,79 @@ class PrintOptions:
     condition_table: Any = None  # dict[str, Model] for ConditionTable section
 
 
-@dataclass(frozen=True, slots=True)
-class ItemSource:
-    "Attribute path to retrieve a Mapping holding Items"
+class Display:
+    """How a table shows what a solution document names only by ref.
 
-    path: str
+    The documents carry the numbers; this carries what a reader sees for each
+    ref -- name, units, label, model heading -- and each constraint's text.
+    It reads them from the live keys and model, the one place a table does.
+    """
+
+    def __init__(self, solutions, model=None):
+        self._keys = {}
+        for sol in solutions:
+            for vmap in (sol.primal, sol.constants, sol.sens.variables):
+                for vk in vmap:
+                    self._keys[vk.ref] = vk
+                    if vk.veckey is not None:
+                        self._keys[vk.veckey.ref] = vk.veckey
+        self.has_model = model is not None
+        # a solution holds the cost's value; only the model knows its expression
+        self.cost_name = "cost" if model is None else model.cost.str_without("units")
+        self._constraints = (
+            {} if model is None else {k.ref: c for k, c in keyed_constraints(model)}
+        )
+
+    def name(self, ref) -> str:
+        return self._keys[ref].str_without("lineage")
+
+    def units(self, ref) -> str:
+        return unitstr(self._keys[ref], dimless="")
+
+    def label(self, ref) -> str:
+        return self._keys[ref].label or ""
+
+    def heading(self, ref) -> str:
+        "The model a row is shown under; none for what no model owns."
+        obj = self._keys.get(ref) or self._constraints.get(ref)
+        return obj.lineagestr() if hasattr(obj, "lineagestr") else ""
+
+    def vector(self, ref):
+        "(parent ref, index, shape) for a vector element, else None."
+        vk = self._keys.get(ref)
+        if vk is None or vk.veckey is None:
+            return None
+        return vk.veckey.ref, vk.idx, vk.shape
+
+    def has_constraint(self, ref) -> bool:
+        return ref in self._constraints
+
+    def constraint(self, ref) -> str:
+        text = try_str_without(self._constraints[ref], {"units", "lineage"})
+        if " at 0x" in text:  # a custom constraint's default repr
+            text = text[: text.find(" at 0x")] + ">"
+        return text
+
+
+def _primal(doc) -> dict:
+    return {ref: entry["value"] for ref, entry in doc["primal"].items()}
+
+
+def _constants(doc) -> dict:
+    return {ref: entry["value"] for ref, entry in doc.get("constants", {}).items()}
+
+
+def _variable_senss(doc) -> dict:
+    return doc["sensitivities"]["variables"]
+
+
+def _constraint_senss(doc) -> dict:
+    return doc["sensitivities"]["constraints"]
+
+
+def _cost_units(doc) -> str:
+    "The cost's units for display, from the document's own spelling of them."
+    return unitstr(Quantity(1, doc["cost"].get("units", "")), dimless="")
 
 
 @dataclass(frozen=True, slots=True)
@@ -44,17 +109,14 @@ class DiffRow:
     The comparison is read from ir.diff_solutions rather than recomputed here, so
     the table and sol.almost_equal agree by construction.  rel is nan where no
     ratio exists -- a quantity only one side has, or one that grew away from zero.
+    Each value carries its own units, which need not be the other's.
     """
 
     rel: Any
     new: Any
     old: Any
-    old_units: str = ""  # the baseline's own units, which need not be the new ones
-
-    @property
-    def shape(self):
-        "Drives the section machinery's scalar-vs-vector handling."
-        return np.shape(self.rel)
+    units: str = ""
+    old_units: str = ""
 
     @property
     def no_ratio(self) -> bool:
@@ -73,11 +135,12 @@ class SectionSpec:
     source = None
     title: str = "Untitled Section"
 
-    def __init__(self, options: PrintOptions):
+    def __init__(self, options: PrintOptions, display: Display):
         self.options = options
+        self.display = display
 
     def items_from(self, ctx):
-        "Return iterable of items given SolContext. Item defs are section-specific"
+        "Return iterable of items given the Documents. Item defs are section-specific"
         if self.source is None:
             raise NotImplementedError
         return ctx.items(self.source)
@@ -89,34 +152,27 @@ class SectionSpec:
     def _auto_vecwidth_rowspec(self, items):
         "Return a copy of this with vec_width set automatically for items"
         if self.align_vecs and self.options.vec_width is None:
-            lengths = {np.shape(v) for _, v in items if np.shape(v)}
+            shapes = (np.shape(self._width_array(v)) for _, v in items)
+            lengths = {shape for shape in shapes if shape}
             if len(lengths) == 1:
                 width = self._max_val_width(items)
                 newopt = replace(self.options, vec_width=width)
-                return self.__class__(options=newopt)
+                return self.__class__(options=newopt, display=self.display)
         return self
 
     def format(self, ctx) -> list[str]:
-        "Output this section's lines given a solution or solution context"
+        "Output this section's lines given the Documents"
         items = [item for item in self.items_from(ctx) if self._passes_filter(item)]
         if self.group_by_model:
-            bymod = _group_items_by_model(items)
+            bymod = self._by_heading(items)
         else:
             bymod = {"": items}
 
-        # process each model group
         lines = []
         for modelname, model_items in sorted(bymod.items()):
-            # 1. sort
             if self.sortkey:
                 model_items.sort(key=self.sortkey)
-            # auto-compute width and replace option, if required
-            rowspec = self._auto_vecwidth_rowspec(model_items)
-            # 2. extract rows
-            rows = [rowspec.row_from(item) for item in model_items]
-            # 3. Align columns
-            model_lines = _format_aligned_columns(rows, self.align, self.col_sep)
-            # add model header
+            model_lines = self._format_model_group(model_items)
             if modelname and model_lines:
                 lines.append(f"{modelname}")
             lines.extend(model_lines)
@@ -132,6 +188,26 @@ class SectionSpec:
         title_lines = [self.title, "-" * len(self.title)]
         assert lines[-1] == ""
         return title_lines + lines[:-1]
+
+    def _format_model_group(self, model_items) -> list[str]:
+        "One model's rows, aligned in columns."
+        rowspec = self._auto_vecwidth_rowspec(model_items)
+        rows = [rowspec.row_from(item) for item in model_items]
+        return _format_aligned_columns(rows, self.align, self.col_sep)
+
+    def _by_heading(self, items):
+        "items grouped under the model each is shown in"
+        out = defaultdict(list)
+        for ref, val in items:
+            out[self.display.heading(ref)].append((ref, val))
+        return out
+
+    def _name(self, ref) -> str:
+        return self.display.name(ref)
+
+    def _unitstr(self, ref) -> str:
+        units = self.display.units(ref)
+        return f"[{units}]" if units else ""
 
     def _fmt_one(self, x, p, suff="") -> str:
         "Format a single scalar element for vector display."
@@ -176,30 +252,20 @@ class SectionSpec:
         return w
 
 
-def _cost_items(sol, model=None) -> dict:
-    """The cost, named by its expression where a model supplies one.
-
-    A solution holds the cost's value and units; only the model knows what
-    expression it is the value of.
-    """
-    name = "cost" if model is None else model.cost.str_without("units")
-    return {name: sol.cost}
-
-
 class Cost(SectionSpec):
     title = "Optimal Cost"
-    source = staticmethod(_cost_items)
+    group_by_model = False  # the whole model's, though its name may match a ref
 
     def items_from(self, ctx):
-        return ctx.items(partial(_cost_items, model=ctx.model))
+        return [(self.display.cost_name, (ctx.cost(), ctx.cost_units()))]
 
     def row_from(self, item):
         """Extract [name, value, unit] for cost display."""
-        name, val = item
-        return [f"{name} :", self._fmt_val(val.magnitude), _unitstr(val)]
+        name, (val, units) = item
+        return [f"{name} :", self._fmt_val(val), f"[{units}]" if units else ""]
 
     def _width_array(self, v):
-        return v.magnitude
+        return v[0]
 
 
 class Warnings(SectionSpec):
@@ -215,43 +281,38 @@ class Warnings(SectionSpec):
         return ctx.warning_items()
 
 
-def _warnings_single(sol):
-    "a single solution's warning messages, by category"
-    warns = getattr(sol, "meta", {}).get("warnings", {})
-    return {name: [w["message"] for w in ws] for name, ws in warns.items() if ws}
-
-
 class FreeVariables(SectionSpec):
     title = "Free Variables"
     align = "><<<"
-    sortkey = staticmethod(lambda x: str(x[0]))
-    source = ItemSource("primal")
+    source = staticmethod(_primal)
+
+    def sortkey(self, item):
+        return self._name(item[0])
 
     def row_from(self, item):
         """Extract [name, value, unit, label] for variable tables."""
-        key, val = item
-        name = key.str_without("lineage")
-        label = key.label
-        return [f"{name} :", self._fmt_val(val), _unitstr(key), label]
+        ref, val = item
+        label = self.display.label(ref)
+        return [f"{self._name(ref)} :", self._fmt_val(val), self._unitstr(ref), label]
 
 
 class Constants(SectionSpec):
     title = "Fixed Variables"
     align = "><<<<"  # name(R), value(L), unit(L), sens-in-parens(L), label(L)
-    sortkey = staticmethod(lambda x: (-rounded_mag(x[1][1]), str(x[0])))
     nearzero_tol = 1e-7
     _fmt_unit_w = 0  # overridden per-group by SolutionSection._format_model_group
     _fmt_col_widths = (
         None  # overridden per-group by SolutionSection._format_model_group
     )
 
+    def sortkey(self, item):
+        return (-rounded_mag(item[1][1]), self._name(item[0]))
+
     def items_from(self, ctx):
-        """Yield (varkey, (value, sensitivity)) for each fixed variable."""
-        constants = list(ctx.items(ItemSource("constants")))
-        sens_dict = dict(ctx.items(ItemSource("sens.variables")))
-        for key, val in constants:
-            sens = sens_dict.get(key, 0.0)
-            yield (key, (val, sens))
+        """Yield (ref, (value, sensitivity)) for each fixed variable."""
+        sens_dict = dict(ctx.items(_variable_senss))
+        for ref, val in ctx.items(_constants):
+            yield (ref, (val, sens_dict.get(ref, 0.0)))
 
     def _fmt_one_sens(self, x, p) -> str:
         """Format a single sensitivity element: ~0 if near-zero, else +x."""
@@ -286,7 +347,7 @@ class Constants(SectionSpec):
         sens_body = "  ".join(s.ljust(w) for s, w in zip(sens_strs, widths))
         return f"[ {val_body}{dots} ]", f"( {sens_body}{dots} )"
 
-    def _fmt_vector_item(self, key, val, sens, name_w) -> list[str]:
+    def _fmt_vector_item(self, ref, val, sens, name_w) -> list[str]:
         """Format a vector constant as two lines: values then sensitivities below."""
         flat_val = np.asarray(val).ravel()
         flat_sens = (
@@ -295,9 +356,9 @@ class Constants(SectionSpec):
             else np.full(flat_val.shape, float(sens))
         )
         val_vec, sens_vec = self._fmt_vec_pair(flat_val, flat_sens)
-        name_col = f"{key.str_without('lineage'):>{name_w}} :"
-        unit = _unitstr(key).ljust(self._fmt_unit_w)
-        parts = [name_col, val_vec, unit, key.label or ""]
+        name_col = f"{self._name(ref):>{name_w}} :"
+        unit = self._unitstr(ref).ljust(self._fmt_unit_w)
+        parts = [name_col, val_vec, unit, self.display.label(ref)]
         line1 = self.col_sep.join(x for x in parts if x).rstrip()
         sens_col = f"{'sens':>{name_w + 2}}"
         return [line1, f"{sens_col}{self.col_sep}{sens_vec}"]
@@ -306,52 +367,27 @@ class Constants(SectionSpec):
         """Render one model group: scalars column-aligned, vectors as two lines."""
         scalar_items = [(k, v) for k, v in model_items if not np.shape(v[0])]
         vector_items = [(k, v) for k, v in model_items if np.shape(v[0])]
-        lines = []
-        if scalar_items:
-            rows = [self.row_from(item) for item in scalar_items]
-            lines.extend(_format_aligned_columns(rows, self.align, self.col_sep))
+        # one name width for the group, so every row's colon lines up
+        name_w = max(len(self._name(k)) for k, _ in model_items)
         if vector_items:
-            name_w = max(
-                *(len(k.str_without("lineage")) for k, _ in vector_items),
-                len("sens") - 2,
-            )
-            for key, (val, sens) in vector_items:
-                lines.extend(self._fmt_vector_item(key, val, sens, name_w))
+            name_w = max(name_w, len("sens") - 2)
+        rows = [self.row_from(item) for item in scalar_items]
+        for row in rows:
+            row[0] = row[0].rjust(name_w + 2)
+        lines = _format_aligned_columns(rows, self.align, self.col_sep)
+        for ref, (val, sens) in vector_items:
+            lines.extend(self._fmt_vector_item(ref, val, sens, name_w))
         return lines
-
-    def format(self, ctx) -> list[str]:
-        """Override to render vector constants as two vertically-aligned lines."""
-        items = [item for item in self.items_from(ctx) if self._passes_filter(item)]
-        bymod = _group_items_by_model(items) if self.group_by_model else {"": items}
-        lines = []
-        for modelname, model_items in sorted(bymod.items()):
-            if self.sortkey:
-                model_items.sort(key=self.sortkey)
-            model_lines = self._format_model_group(model_items)
-            if modelname and model_lines:
-                lines.append(modelname)
-            lines.extend(model_lines)
-            lines.append("")
-        if not lines:
-            if self.options.empty is not None:
-                lines += [str(self.options.empty), ""]
-            else:
-                return lines
-        title_lines = [self.title, "-" * len(self.title)]
-        assert lines[-1] == ""
-        return title_lines + lines[:-1]
 
     def row_from(self, item):
         """Return [name, value, unit, (sensitivity), label] row for scalars."""
-        key, (val, sens) = item
-        name = key.str_without("lineage")
-        label = key.label
+        ref, (val, sens) = item
         return [
-            f"{name} :",
+            f"{self._name(ref)} :",
             self._fmt_val(val),
-            _unitstr(key),
+            self._unitstr(ref),
             self._fmt_sens(sens),
-            label or "",
+            self.display.label(ref),
         ]
 
 
@@ -367,12 +403,12 @@ class SolutionSection(Constants):
     sortkey = None  # sorting is handled per sub-group in _format_model_group
 
     def items_from(self, ctx):
-        """Yield (varkey, (value, sensitivity)) for all variables.
+        """Yield (ref, (value, sensitivity)) for all variables.
 
         Free variables use None as a sentinel for the sensitivity field.
         """
-        for key, val in ctx.items(ItemSource("primal")):
-            yield (key, (val, None))
+        for ref, val in ctx.items(_primal):
+            yield (ref, (val, None))
         yield from super().items_from(ctx)  # fixed vars with sensitivities
 
     def _vec_col_widths(self, vec_items):
@@ -408,38 +444,40 @@ class SolutionSection(Constants):
 
     def _format_model_group(self, model_items) -> list[str]:
         """Free vars (alphabetical) then fixed vars (by magnitude)."""
+        by_name = lambda x: self._name(x[0])
+        by_sens = super().sortkey
         scalar_free = sorted(
             [(k, v) for k, v in model_items if v[1] is None and not np.shape(v[0])],
-            key=lambda x: str(x[0]),
+            key=by_name,
         )
         scalar_fixed = sorted(
             [(k, v) for k, v in model_items if v[1] is not None and not np.shape(v[0])],
-            key=lambda x: (-rounded_mag(x[1][1]), str(x[0])),
+            key=by_sens,
         )
         vec_free = sorted(
             [(k, v) for k, v in model_items if v[1] is None and np.shape(v[0])],
-            key=lambda x: str(x[0]),
+            key=by_name,
         )
         vec_fixed = sorted(
             [(k, v) for k, v in model_items if v[1] is not None and np.shape(v[0])],
-            key=lambda x: (-rounded_mag(x[1][1]), str(x[0])),
+            key=by_sens,
         )
-        name_w = max((len(k.str_without("lineage")) for k, _ in model_items), default=0)
+        name_w = max((len(self._name(k)) for k, _ in model_items), default=0)
         vw = self._max_val_width([(k, v[0]) for k, v in vec_free])
         # Instance attrs communicate formatting to _fmt_vector_item/_fmt_vec_pair.
         self._fmt_unit_w = max(
-            (len(_unitstr(k)) for k, _ in vec_free + vec_fixed), default=0
+            (len(self._unitstr(k)) for k, _ in vec_free + vec_fixed), default=0
         )
         # Run all scalars together for shared column widths, split at the boundary.
         aligned = (
             _format_aligned_columns(
                 [
                     [
-                        f"{k.str_without('lineage'):>{name_w}} :",
+                        f"{self._name(k):>{name_w}} :",
                         self._fmt_val(v[0]),
-                        _unitstr(k),
+                        self._unitstr(k),
                         "" if v[1] is None else self._fmt_sens(v[1]),
-                        k.label or "",
+                        self.display.label(k),
                     ]
                     for k, v in scalar_free + scalar_fixed
                 ],
@@ -450,15 +488,15 @@ class SolutionSection(Constants):
             else []
         )
         lines = list(aligned[: len(scalar_free)])
-        for key, (val, _) in vec_free:
+        for ref, (val, _) in vec_free:
             lines.append(
                 self.col_sep.join(
                     x
                     for x in [
-                        f"{key.str_without('lineage'):>{name_w}} :",
+                        f"{self._name(ref):>{name_w}} :",
                         self._fmt_free_vec(val, vw),
-                        _unitstr(key).ljust(self._fmt_unit_w),
-                        key.label or "",
+                        self._unitstr(ref).ljust(self._fmt_unit_w),
+                        self.display.label(ref),
                     ]
                     if x
                 ).rstrip()
@@ -467,49 +505,43 @@ class SolutionSection(Constants):
             lines.append("...constants")
         lines.extend(aligned[len(scalar_free) :])
         self._fmt_col_widths = self._vec_col_widths(vec_fixed)
-        for key, (val, sens) in vec_fixed:
-            lines.extend(super()._fmt_vector_item(key, val, sens, name_w))
+        for ref, (val, sens) in vec_fixed:
+            lines.extend(super()._fmt_vector_item(ref, val, sens, name_w))
         return lines
 
 
-class Sweeps(SectionSpec):
+class Sweeps(FreeVariables):
     title = "Swept Variables"
-    align = "><<<"
-    sortkey = staticmethod(lambda x: str(x[0]))
 
     def items_from(self, ctx):
         return ctx.sweep_items()
 
-    def row_from(self, item):
-        """Extract [name, value, unit, label] for swept variable tables."""
-        key, val = item
-        name = key.str_without("lineage")
-        label = key.label
-        return [f"{name} :", self._fmt_val(val), _unitstr(key), label]
-
 
 class Constraints(SectionSpec):
-    sortkey = staticmethod(lambda x: (-rounded_mag(x[1]), str(x[0])))
     col_sep = " : "
     pm = "+"
 
+    def sortkey(self, item):
+        return (-rounded_mag(item[1]), self.display.constraint(item[0]))
+
     def items_from(self, ctx):
         "Each constraint with its sensitivity: the model has the constraints."
-        if ctx.model is None:
+        if not self.display.has_model:
             raise ValueError(
                 f"'{self.title}' shows constraints, which a solution holds only by"
                 " key; render it with the model, as model.table(sol)."
             )
-        return ctx.items(partial(constraint_senss, ctx.model))
+        return ctx.items(self._modeled)
+
+    def _modeled(self, doc) -> dict:
+        "The sensitivities of the constraints the model has."
+        senss = _constraint_senss(doc)
+        return {ref: s for ref, s in senss.items() if self.display.has_constraint(ref)}
 
     def row_from(self, item):
         """Extract [sens, constraint_str] for constraint tables."""
-        constraint, sens = item
-        constrstr = try_str_without(constraint, {"units", "lineage"})
-        if " at 0x" in constrstr:  # a custom constraint's default repr
-            constrstr = constrstr[: constrstr.find(" at 0x")] + ">"
-        valstr = self._fmt_val(sens)
-        return [valstr, constrstr]
+        ref, sens = item
+        return [self._fmt_val(sens), self.display.constraint(ref)]
 
 
 class TightConstraints(Constraints):
@@ -544,9 +576,11 @@ class DiffSection(SectionSpec):
     "A section whose numbers come from ir.diff_solutions."
 
     diff_section = None  # which part of that output supplies this section's rel
-    sortkey = staticmethod(lambda kv: (-rounded_mag(_rel_magnitude(kv[1])), str(kv[0])))
     # an unchanged quantity says nothing; a missing ratio is itself worth a row
     filterfun = staticmethod(lambda kv: _rel_magnitude(kv[1]) != 0)
+
+    def sortkey(self, item):
+        return (-rounded_mag(_rel_magnitude(item[1])), self._name(item[0]))
 
     def items_from(self, ctx):
         return ctx.diff_items(self.source, self.diff_section)
@@ -569,48 +603,47 @@ class DiffSection(SectionSpec):
             return ""  # a rewritten objective, say: the two values speak for it
         return self._fmt_val(np.asarray(row.rel) * 100, suff="%")
 
-    def _bothstr(self, row, units) -> str:
+    def _bothstr(self, row) -> str:
         "Both values, each with its own units, which need not be the same ones."
         if row.new is None or row.old is None or np.shape(row.rel):
             return ""
-        return f"({row.new:.4g}{units} vs {row.old:.4g}{row.old_units})"
+        return f"({row.new:.4g}{row.units} vs {row.old:.4g}{row.old_units})"
 
-    def _relstr(self, row, units) -> str:
-        parts = (self._pctstr(row), self._bothstr(row, units))
+    def _relstr(self, row) -> str:
+        parts = (self._pctstr(row), self._bothstr(row))
         return "  ".join(p for p in parts if p)
 
 
 class DiffCost(DiffSection):
     title = "Cost Change"
-    source = staticmethod(_cost_items)  # a diff holds no model, so "cost" names it
-    diff_section = "cost"
     filterfun = None  # the headline number, reported even when it did not move
+    sortkey = None  # one row, named by no ref
+    group_by_model = False
     pm = "+"
+
+    def items_from(self, ctx):
+        return [(self.display.cost_name, ctx.cost_diff())]
 
     def row_from(self, item):
         name, row = item
-        units = unitstr(row.new, into="%s", dimless="")
-        old_units = unitstr(row.old, into="%s", dimless="")
-        row = replace(row, new=mag(row.new), old=mag(row.old), old_units=old_units)
-        return [f"{name} :", self._pctstr(row), self._bothstr(row, units)]
+        return [f"{name} :", self._pctstr(row), self._bothstr(row)]
 
 
 class DiffFreeVariables(DiffSection):
     title = "Free Variable Changes"
-    source = staticmethod(FreeVariables.source)
+    source = staticmethod(_primal)
     diff_section = "primal"
     pm = "+"
     align = "><<"
 
     def row_from(self, item):
-        key, row = item
-        u = unitstr(key, into="%s", dimless="")
-        return [f"{key.str_without('lineage')} :", self._relstr(row, u), key.label]
+        ref, row = item
+        return [f"{self._name(ref)} :", self._relstr(row), self.display.label(ref)]
 
 
 class DiffConstants(DiffFreeVariables):
     title = "Constant Changes"
-    source = ItemSource("constants")
+    source = staticmethod(_constants)
     diff_section = "constants"
 
 
@@ -622,17 +655,20 @@ class DiffSensitivities(DiffSection):
     """
 
     title = "Sensitivity Changes"
-    source = ItemSource("sens.variables")
+    source = staticmethod(_variable_senss)
     diff_section = "sensitivities"
     pm = "+"
     align = "><<"
 
     def row_from(self, item):
-        key, row = item
-        diffstr = self._fmt_val(row.rel)
-        if not np.shape(row.rel):
-            diffstr += f"  ({row.new:+.4g} vs {row.old:+.4g})"
-        return [f"{key.str_without('lineage')} :", diffstr, key.label]
+        ref, row = item
+        if row.new is None or row.old is None:
+            diffstr = self._pctstr(row)
+        else:
+            diffstr = self._fmt_val(row.rel)
+            if not np.shape(row.rel):
+                diffstr += f"  ({row.new:+.4g} vs {row.old:+.4g})"
+        return [f"{self._name(ref)} :", diffstr, self.display.label(ref)]
 
 
 class ConditionTable(SectionSpec):
@@ -650,22 +686,22 @@ class ConditionTable(SectionSpec):
     def row_from(self, item):
         raise NotImplementedError  # ConditionTable uses format() directly
 
-    def _collect_condition_data(self, sol, conditions):
+    def _collect_condition_data(self, doc, conditions):
+        values = {**_primal(doc), **_constants(doc)}
         col_data: dict[str, dict[str, tuple[float, str, str]]] = {}
         all_names: list[str] = []
         seen_names: set[str] = set()
         for cname, model in conditions.items():
             col_data[cname] = {}
             for vk in sorted(model.vks, key=lambda v: v.name):
-                if vk in sol.primal:
-                    val = sol.primal[vk]
-                elif vk in sol.constants:
-                    val = sol.constants[vk]
-                else:
+                if vk.ref not in values:
                     continue
-                if np.shape(val):
-                    continue
-                col_data[cname][vk.name] = (float(val), _unitstr(vk), vk.label or "")
+                entry = (
+                    values[vk.ref],
+                    self._unitstr(vk.ref),
+                    self.display.label(vk.ref),
+                )
+                col_data[cname][vk.name] = entry
                 if vk.name not in seen_names:
                     all_names.append(vk.name)
                     seen_names.add(vk.name)
@@ -691,7 +727,8 @@ class ConditionTable(SectionSpec):
         conditions = self.options.condition_table
         if not conditions:
             return []
-        col_data, all_names = self._collect_condition_data(ctx.sol, conditions)
+        (doc,) = ctx.docs
+        col_data, all_names = self._collect_condition_data(doc, conditions)
         cnames = list(conditions.keys())
         rows = [["Variable", "Units"] + cnames + ["Label"]]
         for name in all_names:
@@ -727,182 +764,170 @@ DIFF_SECTION_SPECS = {
 
 
 @dataclass(frozen=True, slots=True)
-class SolutionContext:
-    """Adapter that exposes a single Solution's printable items."""
+class Documents:
+    """The solution IR documents a table reads its numbers from.
 
-    sol: Any
-    model: Any = None  # supplies what the solution holds only by key
-
-    def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
-        "Get the items associated with a particular attribute (source)"
-        if isinstance(source, ItemSource):
-            obj = _resolve_attrpath(self.sol, source.path)
-            return getattr(obj, "vector_parent_items", obj.items)()
-        return source(self.sol).items()
-
-    def warning_items(self) -> Iterable[tuple[str, list[str]]]:
-        """Return flattened warning messages keyed by warning name."""
-        return _warnings_single(self.sol).items()
-
-
-@dataclass(frozen=True, slots=True)
-class SequenceContext:
-    """Adapter that stacks printable items across a sequence of Solutions."""
-
-    sols: Sequence[Any]  # sequence of Solution-like objects
-    model: Any = None  # supplies what the solutions hold only by key
-
-    def items(self, source: [ItemSource, Callable]) -> Iterable[Item]:
-        "Items for a given attribute are stacked across self.sols"
-
-        def _items_one_sol(sol):
-            if isinstance(source, ItemSource):
-                return _resolve_attrpath(sol, source.path).items()
-            return source(sol).items()
-
-        return self._stack(_items_one_sol)
-
-    def sweep_items(self) -> Iterable[Item]:
-        "Each swept variable's values, which the solutions hold as constants."
-        return self._stack(lambda sol: ((k, sol.constants[k]) for k in self.sols.swept))
-
-    def _stack(self, get_items: Callable[[Any], Iterable[Item]]) -> list[Item]:
-        """Strict stacking: keys (and their order) must match across all sols."""
-        if not self.sols:
-            return []
-
-        first = list(get_items(self.sols[0]))
-        keys0 = tuple(k for k, _ in first)
-        cols = {k: [v] for k, v in first}  # k -> list of values, seeded with sol[0]
-
-        for s in self.sols[1:]:
-            items = list(get_items(s))
-            if tuple(k for k, _ in items) != keys0:
-                raise ValueError("Sweep key mismatch")
-            for k, v in items:
-                cols[k].append(v)
-
-        return [(k, _stacked(cols[k])) for k in keys0]
-
-    def warning_items(self) -> Iterable[tuple[str, list[str]]]:
-        """Merge warnings from all solutions into a single mapping."""
-        counts = defaultdict(Counter)
-        n = len(self.sols)
-        for s in self.sols:
-            for name, warn_list in _warnings_single(s).items():
-                for entry in warn_list:
-                    counts[name][entry] += 1
-        items = defaultdict(list)
-        for name, cnt in counts.items():
-            for w, c in cnt.items():
-                items[name].append(f"{w}  (in {c} of {n} solutions)")
-        return items.items()
-
-
-@dataclass(frozen=True, slots=True)
-class DiffContext:
-    """Adapter that provides (key, DiffRow) items.
-
-    The numbers come from ir.diff_solutions over the two solutions' IR, and the
-    live keys come from the solutions themselves -- refs to compare with, objects
-    to name and label with.  A sequence is N one-to-one diffs with their ratios
-    stacked, which enables sweep comparisons.
+    One document, or a sweep's many: a single solution shows each vector as one
+    row, while a sweep already spends its columns on solutions, so it shows each
+    element as a row of its own.  A diff adds the baseline it compares against.
     """
 
-    new: Any  # SolutionContext or SequenceContext
-    baseline: Any  # Solution-like
+    docs: list[dict]
+    display: Display
+    is_sweep: bool
+    swept: tuple[str, ...] = ()  # refs of what a sweep varied
+    baseline: dict | None = None
+    tol: float = 0.0  # a comparison within it is no change, as almost_equal says
 
-    @property
-    def _scenarios(self) -> list:
-        "The solutions on the new side: one, or a sweep's many."
-        return list(getattr(self.new, "sols", None) or [self.new.sol])
+    def items(self, source) -> list[Item]:
+        "(ref, value) for each row of source, which reads one document."
+        return self._rows([source(doc) for doc in self.docs])
 
-    def diff_items(self, source, section: str) -> Iterable[Item]:
-        "Items are (key, DiffRow), one per key the new side shows."
-        baseline_ir = self.baseline.to_ir()
-        diffs = [diff_solutions(baseline_ir, s.to_ir()) for s in self._scenarios]
-        rels = [_rel_by_scenario_ref(d, section) for d in diffs]
+    def cost(self):
+        return self._rows([{"cost": doc["cost"]["value"]} for doc in self.docs])[0][1]
 
-        new_items = list(self.new.items(source))
-        old_items = dict(SolutionContext(self.baseline).items(source))
-        varset = self.baseline.primal.varset
-        # A solution has exactly one cost, so its value pairs by position -- keying
-        # on the expression would fail the moment the objective is rewritten, which
-        # a scenario may legitimately do, and nothing can be "dropped" either.
-        is_cost = section == "cost"
-        out = []
-        for key, value in new_items:
-            rel = _stack_rel(rels, key, varset, scalar=len(diffs) == 1)
-            old_key, old = _baseline_entry(old_items, key, positional=is_cost)
-            out.append((key, DiffRow(rel, value, old, _display_units(old_key))))
-        if is_cost:
-            return out
-        shown = {key for key, _ in new_items}
-        for key, value in old_items.items():  # dropped, not merely unchanged
-            if key not in shown:
-                out.append(
-                    (key, DiffRow(float("nan"), None, value, _display_units(key)))
-                )
+    def cost_units(self) -> str:
+        return _cost_units(self.docs[0])
+
+    def sweep_items(self) -> list[Item]:
+        "Each swept variable's values, which the solutions hold as constants."
+        return self.items(lambda doc: {ref: _constants(doc)[ref] for ref in self.swept})
+
+    def warning_items(self) -> list[tuple[str, list[str]]]:
+        "Warning messages by category; a sweep's say how many solutions had each."
+        if not self.is_sweep:
+            (doc,) = self.docs
+            return list(_warning_messages(doc).items())
+        counts = defaultdict(Counter)
+        n = len(self.docs)
+        for doc in self.docs:
+            for name, messages in _warning_messages(doc).items():
+                counts[name].update(messages)
+        return [
+            (name, [f"{w}  (in {c} of {n} solutions)" for w, c in cnt.items()])
+            for name, cnt in counts.items()
+        ]
+
+    def _rows(self, per_doc: list[dict]) -> list[Item]:
+        if not self.is_sweep:
+            (values,) = per_doc
+            return list(self._grouped(values).items())
+        return _stack(per_doc)
+
+    def _row_ref(self, ref):
+        "The row a ref shows in: its vector's, unless each element has its own."
+        vec = None if self.is_sweep else self.display.vector(ref)
+        return ref if vec is None else vec[0]
+
+    def _grouped(self, values: dict) -> dict:
+        """values as one document's rows, a vector's elements gathered into one.
+
+        The IR carries elements only, so showing a vector as one row is this
+        step; an element with no value is nan.
+        """
+        out = {}
+        for ref, value in values.items():
+            row = self._row_ref(ref)
+            if row == ref:
+                out[ref] = value
+                continue
+            _, idx, shape = self.display.vector(ref)
+            out.setdefault(row, np.full(shape, np.nan))[idx] = value
         return out
 
+    def _across(self, values: list):
+        "One value per document, as a sweep's array or a single solution's own."
+        return np.array(values) if self.is_sweep else values[0]
 
-def _stacked(values: list):
-    "One array of values; a Quantity's units stay with it."
-    if isinstance(values[0], Quantity):
-        return Quantity.from_sequence(values)
-    return np.asarray(values)
+    def _moved(self, rel: float) -> float:
+        "rel, or 0 where it is within tol: a solver returns no number exactly."
+        return 0.0 if abs(rel) <= self.tol else rel
+
+    def cost_diff(self) -> DiffRow:
+        "The cost's comparison, which pairs by position: a solution has one cost."
+        rels = [diff_solutions(self.baseline, doc)["cost"] for doc in self.docs]
+        return DiffRow(
+            rel=self._across([self._moved(r.get("rel", float("nan"))) for r in rels]),
+            new=self.cost(),
+            old=self.baseline["cost"]["value"],
+            units=self.cost_units(),
+            old_units=_cost_units(self.baseline),
+        )
+
+    def diff_items(self, source, section: str) -> list[Item]:
+        """(ref, DiffRow), one per row of either side, paired as the diff paired them.
+
+        diff_solutions matches a redeclared unit's two refs; renaming the
+        baseline's to the scenario's before grouping pairs their rows too.
+        """
+        diffs = [diff_solutions(self.baseline, doc) for doc in self.docs]
+        parts = [_diff_part(diff, section) for diff in diffs]
+        renamed = {
+            o: n for p in parts for o, n in p.get("units_redeclared", {}).items()
+        }
+        spelled = {self._row_ref(n): self._row_ref(o) for o, n in renamed.items()}
+
+        def rows(values):
+            return self._grouped({renamed.get(r, r): v for r, v in values.items()})
+
+        def row(ref, rel, new, old):
+            units = self.display.units  # the baseline's own, not the scenario's
+            return ref, DiffRow(rel, new, old, units(ref), units(spelled.get(ref, ref)))
+
+        rels = [
+            rows({r: self._moved(v) for r, v in p.get("matched", {}).items()})
+            for p in parts
+        ]
+        old_rows = rows(source(self.baseline))
+        nan = float("nan")
+        out = [
+            row(
+                ref,
+                self._across([r.get(ref, nan) for r in rels]),
+                value,
+                old_rows.pop(ref, None),
+            )
+            for ref, value in self.items(source)
+        ]  # then what was dropped, not merely unchanged
+        return out + [row(ref, nan, None, old) for ref, old in old_rows.items()]
 
 
-def _display_units(key) -> str:
-    "The units to print a baseline value in -- its own, not the scenario's."
-    return "" if key is None else unitstr(key, into="%s", dimless="")
+def _warning_messages(doc) -> dict:
+    "a solution document's warning messages, by category"
+    warns = doc["meta"].get("warnings", {})
+    return {name: [w["message"] for w in ws] for name, ws in warns.items() if ws}
 
 
-def _baseline_entry(old_items: dict, key, positional: bool):
-    "The baseline's (key, value) for a scenario key, or (None, None) if it has none."
-    if positional:
-        return next(iter(old_items.items()), (None, None))
-    return (key, old_items[key]) if key in old_items else (None, None)
+def _stack(per_doc: list[dict]) -> list[Item]:
+    """Strict stacking: keys (and their order) must match across all documents."""
+    if not per_doc:
+        return []
+    keys0 = tuple(per_doc[0])
+    for values in per_doc[1:]:
+        if tuple(values) != keys0:
+            raise ValueError("Sweep key mismatch")
+    return [(k, np.array([values[k] for values in per_doc])) for k in keys0]
 
 
-def _rel_by_scenario_ref(diff: dict, section: str) -> dict:
-    """One diff's comparisons, keyed by the ref the scenario uses.
-
-    diff_solutions keys by the baseline's ref; the table walks the new side, so a
-    redeclared unit has to be followed to the scenario's spelling.
-    """
-    if section == "cost":  # one scalar, under the name _stack_rel looks it up by
-        return {"cost": diff["cost"].get("rel", float("nan"))}
+def _diff_part(diff: dict, section: str) -> dict:
+    "The part of a diff_solutions output that compares one section."
     part = diff.get(section, {})
-    if section == "sensitivities":
-        part = part.get("variables", {})
-    redeclared = part.get("units_redeclared", {})
-    return {
-        redeclared.get(ref, ref): value
-        for ref, value in part.get("matched", {}).items()
-    }
+    return part.get("variables", {}) if section == "sensitivities" else part
 
 
-def _stack_rel(rels: list[dict], key, varset, scalar: bool):
-    """This key's comparison, across however many scenarios there are.
-
-    A vector shows one row per parent, so its elements' numbers are gathered back
-    into the parent's shape -- the IR carries elements only, by design.
-    """
-    nan = float("nan")
-
-    def one(rel: dict):
-        # Only the cost's key is an expression rather than a VarKey, so it alone
-        # has no ref; the diff files its comparison under "cost".
-        ref = getattr(key, "ref", "cost")
-        elements = varset.by_vec(key) if is_veckey(key) else None
-        if elements is None or not elements.size:
-            return rel.get(ref, nan)
-        flat = [rel.get(getattr(vk, "ref", None), nan) for vk in elements.flat]
-        return np.array(flat).reshape(elements.shape)
-
-    stacked = [one(rel) for rel in rels]
-    return stacked[0] if scalar else np.array(stacked)
+def _documents(obj, model=None, baseline=None, tol=0.0) -> Documents:
+    "The documents and display for a Solution or Sweep, against a baseline if any."
+    is_sweep = not _looks_like_solution(obj)
+    sols = list(obj) if is_sweep else [obj]
+    display = Display(sols + ([baseline] if baseline is not None else []), model)
+    return Documents(
+        docs=[sol.to_ir() for sol in sols],
+        display=display,
+        is_sweep=is_sweep,
+        swept=tuple(vk.ref for vk in getattr(obj, "swept", ())),
+        baseline=None if baseline is None else baseline.to_ir(),
+        tol=tol,
+    )
 
 
 def table(
@@ -919,11 +944,10 @@ def table(
     only by key.
     """
     opt = PrintOptions(**options)
-    is_sweep = not _looks_like_solution(obj)
-    ctx = SequenceContext(obj, model) if is_sweep else SolutionContext(obj, model)
+    ctx = _documents(obj, model)
     if tables is None:
         tables = (
-            *(("sweeps",) if is_sweep else ()),
+            *(("sweeps",) if ctx.is_sweep else ()),
             "cost",
             "warnings",
             "solution",
@@ -931,24 +955,27 @@ def table(
         )
     blocks: list[str] = []
     for table_name in tables:
-        sec = SECTION_SPECS[table_name](options=opt)
+        sec = SECTION_SPECS[table_name](options=opt, display=ctx.display)
         sec_lines = sec.format(ctx)
         if sec_lines:
             blocks.append("\n".join(sec_lines))
     return "\n\n".join(blocks)
 
 
-def diff(obj, baseline, tables=("cost", "freevariables"), **options):
-    "Render text tables of differences between obj and baseline"
-    opt = PrintOptions(**options)
-    new_ctx = (
-        SolutionContext(obj) if _looks_like_solution(obj) else SequenceContext(obj)
-    )
-    ctx = DiffContext(new=new_ctx, baseline=baseline)
+def diff(
+    obj, baseline, tables=("cost", "freevariables"), *, model=None, tol=1e-6, **options
+):
+    """Render text tables of differences between obj and baseline.
 
+    The cost is named by its expression when given the model, else "cost".  A
+    number moved only beyond tol -- relative for values, absolute for
+    sensitivities -- which is what sol.almost_equal(baseline, tol) asks.
+    """
+    opt = PrintOptions(**options)
+    ctx = _documents(obj, model, baseline, tol)
     blocks = []
     for name in tables:
-        sec = DIFF_SECTION_SPECS[name](options=opt)
+        sec = DIFF_SECTION_SPECS[name](options=opt, display=ctx.display)
         lines = sec.format(ctx)
         if lines:
             blocks.append("\n".join(lines))
@@ -992,31 +1019,8 @@ def _format_aligned_columns(
     return formatted
 
 
-def _unitstr(key) -> str:
-    return unitstr(key, into="[%s]", dimless="")
-
-
-def _resolve_attrpath(obj: Any, path: str) -> Any:
-    """Resolve a dotted attribute path (e.g. 'sens.variables')."""
-    for name in path.split("."):
-        obj = getattr(obj, name)
-    return obj
-
-
 def rounded_mag(val, nround=8):
     "get the magnitude of a (vector or scalar) for stable sorting purposes"
     if np.isnan(val).all():
         return np.nan
     return round(np.nanmax(np.absolute(val)), nround)
-
-
-def _group_items_by_model(items):
-    """Group VarMap items by model string
-    Input: iterable of (VarKey, value) pairs
-    Output: mapping model_str: iterable of (VarKey, value) pairs
-    """
-    out = defaultdict(list)
-    for key, val in items:
-        mod = key.lineagestr() if hasattr(key, "lineagestr") else ""
-        out[mod].append((key, val))
-    return out
