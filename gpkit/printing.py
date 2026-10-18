@@ -19,6 +19,7 @@ Item = tuple[Any, Any]
 class PrintOptions:
     "container for printing options"
 
+    fmt: str = "text"  # or "md"
     empty: str | None = None  # output (e.g. "(none)") for empty sections
     precision: int = 4
     topn: int | None = None  # truncation per-group
@@ -127,6 +128,7 @@ class SectionSpec:
     align = None
     align_vecs = True  # aligns vectors if all same length
     col_sep = " "
+    columns: tuple[tuple[str, str], ...] = ()  # (header, text form) for each cell
     filterfun = None
     filter_reduce = staticmethod(any)
     group_by_model = True
@@ -145,9 +147,14 @@ class SectionSpec:
             raise NotImplementedError
         return ctx.items(self.source)
 
-    def row_from(self, item):
-        "Convert a section-specific 'item' to a row, i.e. List[str]"
+    def cells(self, item) -> list[str]:
+        "item's row, one cell per column; each format lays them out its own way"
         raise NotImplementedError
+
+    def row_from(self, item):
+        "The text row: each cell in its column's text form, an empty one left empty."
+        cells = zip(self.columns, self.cells(item))
+        return [form.format(cell) if cell else "" for (_, form), cell in cells]
 
     def _auto_vecwidth_rowspec(self, items):
         "Return a copy of this with vec_width set automatically for items"
@@ -160,18 +167,29 @@ class SectionSpec:
                 return self.__class__(options=newopt, display=self.display)
         return self
 
-    def format(self, ctx) -> list[str]:
-        "Output this section's lines given the Documents"
+    def _groups(self, ctx):
+        "(heading, items) for each model, in heading order, the items sorted."
         items = [item for item in self.items_from(ctx) if self._passes_filter(item)]
-        if self.group_by_model:
-            bymod = self._by_heading(items)
-        else:
-            bymod = {"": items}
-
-        lines = []
-        for modelname, model_items in sorted(bymod.items()):
+        bymod = self._by_heading(items) if self.group_by_model else {"": items}
+        for heading, model_items in sorted(bymod.items()):
             if self.sortkey:
                 model_items.sort(key=self.sortkey)
+            yield heading, model_items
+
+    def markdown(self, ctx) -> list[str]:
+        "This section in markdown: a pipe table under each model's heading."
+        lines = []
+        for heading, items in self._groups(ctx):
+            if heading:
+                lines += [f"**{_md_escape(heading)}**", ""]
+            rows = [[_md_cell(cell) for cell in self.cells(i)] for i in items]
+            lines += [*_md_table([h for h, _ in self.columns], rows), ""]
+        return [f"### {self.title}", "", *lines[:-1]] if lines else []
+
+    def format(self, ctx) -> list[str]:
+        "Output this section's lines given the Documents"
+        lines = []
+        for modelname, model_items in self._groups(ctx):
             model_lines = self._format_model_group(model_items)
             if modelname and model_lines:
                 lines.append(f"{modelname}")
@@ -213,14 +231,16 @@ class SectionSpec:
         "Format a single scalar element for vector display."
         return f"{x:{self.pm}.{p - 1}g}{suff}".replace("+nan", "nan")
 
-    def _fmt_val(self, val, suff="") -> str:
+    def _fmt_val(self, val, suff="", one=None) -> str:
+        "val, a vector's elements each formatted by one, if given"
         n = self.options.vecn
         p = self.options.precision
         w = self.options.vec_width or 0
         if np.shape(val):
+            one = one or (lambda x: self._fmt_one(x, p, suff))
             flat = np.asarray(val).ravel()
             shown = flat[:n]
-            body = "  ".join(self._fmt_one(x, p, suff).ljust(w) for x in shown)
+            body = "  ".join(one(x).ljust(w) for x in shown)
             dots = " ..." if flat.size > n else ""
             return f"[ {body}{dots} ]"
         return f"{val:{self.pm}.{p}g}{suff}"
@@ -252,17 +272,21 @@ class SectionSpec:
         return w
 
 
+VARIABLE, VALUE, UNITS = ("Variable", "{} :"), ("Value", "{}"), ("Units", "[{}]")
+SENSITIVITY, LABEL = ("Sensitivity", "({})"), ("Label", "{}")
+
+
 class Cost(SectionSpec):
     title = "Optimal Cost"
+    columns = (("Cost", "{} :"), VALUE, UNITS)
     group_by_model = False  # the whole model's, though its name may match a ref
 
     def items_from(self, ctx):
         return [(self.display.cost_name, (ctx.cost(), ctx.cost_units()))]
 
-    def row_from(self, item):
-        """Extract [name, value, unit] for cost display."""
+    def cells(self, item):
         name, (val, units) = item
-        return [f"{name} :", self._fmt_val(val), f"[{units}]" if units else ""]
+        return [name, self._fmt_val(val), units]
 
     def _width_array(self, v):
         return v[0]
@@ -270,10 +294,10 @@ class Cost(SectionSpec):
 
 class Warnings(SectionSpec):
     title = "WARNINGS"
+    columns = (("Warning", "{}"),)
     align_vecs = False
 
-    def row_from(self, item):
-        """Extract [warning_type, details] for warning display."""
+    def cells(self, item):
         warning_type, warning_list = item
         return [f"{warning_type}:\n" + "\n".join(warning_list)]
 
@@ -283,21 +307,22 @@ class Warnings(SectionSpec):
 
 class FreeVariables(SectionSpec):
     title = "Free Variables"
+    columns = (VARIABLE, VALUE, UNITS, LABEL)
     align = "><<<"
     source = staticmethod(_primal)
 
     def sortkey(self, item):
         return self._name(item[0])
 
-    def row_from(self, item):
-        """Extract [name, value, unit, label] for variable tables."""
+    def cells(self, item):
         ref, val = item
-        label = self.display.label(ref)
-        return [f"{self._name(ref)} :", self._fmt_val(val), self._unitstr(ref), label]
+        d = self.display
+        return [d.name(ref), self._fmt_val(val), d.units(ref), d.label(ref)]
 
 
 class Constants(SectionSpec):
     title = "Fixed Variables"
+    columns = (VARIABLE, VALUE, UNITS, SENSITIVITY, LABEL)
     align = "><<<<"  # name(R), value(L), unit(L), sens-in-parens(L), label(L)
     nearzero_tol = 1e-7
     _fmt_unit_w = 0  # overridden per-group by SolutionSection._format_model_group
@@ -319,13 +344,6 @@ class Constants(SectionSpec):
         if abs(x) < self.nearzero_tol:
             return "~0"
         return f"{x:+.{p - 1}g}".replace("+nan", "nan")
-
-    def _fmt_sens(self, sens) -> str:
-        """Format scalar sensitivity as (+x) or (~0)."""
-        if abs(sens) < self.nearzero_tol:
-            return "(~0)"
-        p = self.options.precision
-        return f"({sens:+.{p}g})"
 
     def _fmt_vec_pair(self, flat_val, flat_sens):
         """Build aligned value/sensitivity vector strings.
@@ -379,16 +397,19 @@ class Constants(SectionSpec):
             lines.extend(self._fmt_vector_item(ref, val, sens, name_w))
         return lines
 
-    def row_from(self, item):
-        """Return [name, value, unit, (sensitivity), label] row for scalars."""
+    def cells(self, item):
+        "A vector's sensitivities share a cell, as its values do."
         ref, (val, sens) = item
-        return [
-            f"{self._name(ref)} :",
-            self._fmt_val(val),
-            self._unitstr(ref),
-            self._fmt_sens(sens),
-            self.display.label(ref),
-        ]
+        p = self.options.precision
+        if sens is None:  # a free variable, in SolutionSection
+            senstr = ""
+        elif np.shape(val):
+            sens = np.broadcast_to(sens, np.shape(val))
+            senstr = self._fmt_val(sens, one=lambda x: self._fmt_one_sens(x, p))
+        else:
+            senstr = self._fmt_one_sens(sens, p + 1)
+        d = self.display
+        return [d.name(ref), self._fmt_val(val), d.units(ref), senstr, d.label(ref)]
 
 
 class SolutionSection(Constants):
@@ -400,7 +421,11 @@ class SolutionSection(Constants):
     """
 
     title = "Solution"
-    sortkey = None  # sorting is handled per sub-group in _format_model_group
+
+    def sortkey(self, item):
+        "free variables by name, then fixed ones by sensitivity"
+        ref, (_, sens) = item
+        return (0, self._name(ref)) if sens is None else (1, *super().sortkey(item))
 
     def items_from(self, ctx):
         """Yield (ref, (value, sensitivity)) for all variables.
@@ -444,24 +469,16 @@ class SolutionSection(Constants):
 
     def _format_model_group(self, model_items) -> list[str]:
         """Free vars (alphabetical) then fixed vars (by magnitude)."""
-        by_name = lambda x: self._name(x[0])
-        by_sens = super().sortkey
-        scalar_free = sorted(
-            [(k, v) for k, v in model_items if v[1] is None and not np.shape(v[0])],
-            key=by_name,
-        )
-        scalar_fixed = sorted(
-            [(k, v) for k, v in model_items if v[1] is not None and not np.shape(v[0])],
-            key=by_sens,
-        )
-        vec_free = sorted(
-            [(k, v) for k, v in model_items if v[1] is None and np.shape(v[0])],
-            key=by_name,
-        )
-        vec_fixed = sorted(
-            [(k, v) for k, v in model_items if v[1] is not None and np.shape(v[0])],
-            key=by_sens,
-        )
+
+        def part(free, vector):  # in sortkey's order, as the items arrive
+            return [
+                (k, v)
+                for k, v in model_items
+                if (v[1] is None) == free and bool(np.shape(v[0])) == vector
+            ]
+
+        scalar_free, scalar_fixed = part(True, False), part(False, False)
+        vec_free, vec_fixed = part(True, True), part(False, True)
         name_w = max((len(self._name(k)) for k, _ in model_items), default=0)
         vw = self._max_val_width([(k, v[0]) for k, v in vec_free])
         # Instance attrs communicate formatting to _fmt_vector_item/_fmt_vec_pair.
@@ -469,24 +486,10 @@ class SolutionSection(Constants):
             (len(self._unitstr(k)) for k, _ in vec_free + vec_fixed), default=0
         )
         # Run all scalars together for shared column widths, split at the boundary.
-        aligned = (
-            _format_aligned_columns(
-                [
-                    [
-                        f"{self._name(k):>{name_w}} :",
-                        self._fmt_val(v[0]),
-                        self._unitstr(k),
-                        "" if v[1] is None else self._fmt_sens(v[1]),
-                        self.display.label(k),
-                    ]
-                    for k, v in scalar_free + scalar_fixed
-                ],
-                self.align,
-                self.col_sep,
-            )
-            if scalar_free or scalar_fixed
-            else []
-        )
+        rows = [self.row_from(item) for item in scalar_free + scalar_fixed]
+        for row in rows:
+            row[0] = row[0].rjust(name_w + 2)
+        aligned = _format_aligned_columns(rows, self.align, self.col_sep)
         lines = list(aligned[: len(scalar_free)])
         for ref, (val, _) in vec_free:
             lines.append(
@@ -518,6 +521,7 @@ class Sweeps(FreeVariables):
 
 
 class Constraints(SectionSpec):
+    columns = (("Sensitivity", "{}"), ("Constraint", "{}"))
     col_sep = " : "
     pm = "+"
 
@@ -538,8 +542,7 @@ class Constraints(SectionSpec):
         senss = _constraint_senss(doc)
         return {ref: s for ref, s in senss.items() if self.display.has_constraint(ref)}
 
-    def row_from(self, item):
-        """Extract [sens, constraint_str] for constraint tables."""
+    def cells(self, item):
         ref, sens = item
         return [self._fmt_val(sens), self.display.constraint(ref)]
 
@@ -585,10 +588,6 @@ class DiffSection(SectionSpec):
     def items_from(self, ctx):
         return ctx.diff_items(self.source, self.diff_section)
 
-    def row_from(self, item):
-        "still abstract at this level"
-        raise NotImplementedError
-
     def _width_array(self, v):
         "Use relative change when inferring widths for diff-style sections."
         return v.rel
@@ -614,8 +613,12 @@ class DiffSection(SectionSpec):
         return "  ".join(p for p in parts if p)
 
 
+CHANGE = ("Change", "{}")
+
+
 class DiffCost(DiffSection):
     title = "Cost Change"
+    columns = (Cost.columns[0], CHANGE, ("Values", "{}"))
     filterfun = None  # the headline number, reported even when it did not move
     sortkey = None  # one row, named by no ref
     group_by_model = False
@@ -624,21 +627,22 @@ class DiffCost(DiffSection):
     def items_from(self, ctx):
         return [(self.display.cost_name, ctx.cost_diff())]
 
-    def row_from(self, item):
+    def cells(self, item):
         name, row = item
-        return [f"{name} :", self._pctstr(row), self._bothstr(row)]
+        return [name, self._pctstr(row), self._bothstr(row)]
 
 
 class DiffFreeVariables(DiffSection):
     title = "Free Variable Changes"
+    columns = (VARIABLE, CHANGE, LABEL)
     source = staticmethod(_primal)
     diff_section = "primal"
     pm = "+"
     align = "><<"
 
-    def row_from(self, item):
+    def cells(self, item):
         ref, row = item
-        return [f"{self._name(ref)} :", self._relstr(row), self.display.label(ref)]
+        return [self._name(ref), self._relstr(row), self.display.label(ref)]
 
 
 class DiffConstants(DiffFreeVariables):
@@ -655,12 +659,13 @@ class DiffSensitivities(DiffSection):
     """
 
     title = "Sensitivity Changes"
+    columns = (VARIABLE, CHANGE, LABEL)
     source = staticmethod(_variable_senss)
     diff_section = "sensitivities"
     pm = "+"
     align = "><<"
 
-    def row_from(self, item):
+    def cells(self, item):
         ref, row = item
         if row.new is None or row.old is None:
             diffstr = self._pctstr(row)
@@ -668,7 +673,7 @@ class DiffSensitivities(DiffSection):
             diffstr = self._fmt_val(row.rel)
             if not np.shape(row.rel):
                 diffstr += f"  ({row.new:+.4g} vs {row.old:+.4g})"
-        return [f"{self._name(ref)} :", diffstr, self.display.label(ref)]
+        return [self._name(ref), diffstr, self.display.label(ref)]
 
 
 class ConditionTable(SectionSpec):
@@ -682,9 +687,6 @@ class ConditionTable(SectionSpec):
     """
 
     title = "Condition Comparison"
-
-    def row_from(self, item):
-        raise NotImplementedError  # ConditionTable uses format() directly
 
     def _collect_condition_data(self, doc, conditions):
         values = {**_primal(doc), **_constants(doc)}
@@ -723,7 +725,8 @@ class ConditionTable(SectionSpec):
             return None  # suppress when identical across all conditions
         return [name, unitlabel] + vals + [label]
 
-    def format(self, ctx) -> list[str]:
+    def _rows(self, ctx) -> list[list[str]]:
+        "The header, then a row per variable; none if no variable differs."
         conditions = self.options.condition_table
         if not conditions:
             return []
@@ -735,11 +738,21 @@ class ConditionTable(SectionSpec):
             row = self._build_row(name, cnames, col_data, self.options.precision)
             if row is not None:
                 rows.append(row)
-        if len(rows) == 1:  # header only
+        return rows if len(rows) > 1 else []
+
+    def format(self, ctx) -> list[str]:
+        if not (rows := self._rows(ctx)):
             return []
         lines = [self.title, "-" * len(self.title), ""]
         lines.extend(_format_aligned_columns(rows, None, "  "))
         return lines
+
+    def markdown(self, ctx) -> list[str]:
+        if not (rows := self._rows(ctx)):
+            return []
+        header, *rows = rows
+        cells = [[_md_cell(cell) for cell in row] for row in rows]
+        return [f"### {self.title}", "", *_md_table(header, cells)]
 
 
 SECTION_SPECS = {
@@ -937,13 +950,12 @@ def table(
     model=None,
     **options,
 ) -> str:
-    """Render a simple text table for a Solution or Sweep.
+    """Render a table for a Solution or Sweep, as text or as markdown ("md").
 
     By default it shows what obj has to show: a sweep's swept variables, and
     the constraints only when given the model, since a solution holds those
     only by key.
     """
-    opt = PrintOptions(**options)
     ctx = _documents(obj, model)
     if tables is None:
         tables = (
@@ -953,30 +965,30 @@ def table(
             "solution",
             *(("tightest constraints",) if model is not None else ()),
         )
-    blocks: list[str] = []
-    for table_name in tables:
-        sec = SECTION_SPECS[table_name](options=opt, display=ctx.display)
-        sec_lines = sec.format(ctx)
-        if sec_lines:
-            blocks.append("\n".join(sec_lines))
-    return "\n\n".join(blocks)
+    return _render(SECTION_SPECS, tables, ctx, PrintOptions(**options))
 
 
 def diff(
     obj, baseline, tables=("cost", "freevariables"), *, model=None, tol=1e-6, **options
 ):
-    """Render text tables of differences between obj and baseline.
+    """Render tables of differences between obj and baseline.
 
     The cost is named by its expression when given the model, else "cost".  A
     number moved only beyond tol -- relative for values, absolute for
     sensitivities -- which is what sol.almost_equal(baseline, tol) asks.
     """
-    opt = PrintOptions(**options)
     ctx = _documents(obj, model, baseline, tol)
+    return _render(DIFF_SECTION_SPECS, tables, ctx, PrintOptions(**options))
+
+
+def _render(specs, tables, ctx, opt) -> str:
+    "The named sections, as text or markdown, a blank line between each."
+    if opt.fmt not in ("text", "md"):
+        raise ValueError(f"fmt is 'text' or 'md', not {opt.fmt!r}")
     blocks = []
     for name in tables:
-        sec = DIFF_SECTION_SPECS[name](options=opt, display=ctx.display)
-        lines = sec.format(ctx)
+        sec = specs[name](options=opt, display=ctx.display)
+        lines = sec.format(ctx) if opt.fmt == "text" else sec.markdown(ctx)
         if lines:
             blocks.append("\n".join(lines))
     return "\n\n".join(blocks)
@@ -1017,6 +1029,27 @@ def _format_aligned_columns(
         formatted.append(line.rstrip())
 
     return formatted
+
+
+def _md_escape(text: str) -> str:
+    r"""Escape characters that have special meaning in markdown pipe tables."""
+    for ch in ("\\", "|", "*", "_", "`", "~", "[", "]", "<", ">", "%", "^"):
+        text = text.replace(ch, "\\" + ch)
+    return text
+
+
+def _md_cell(text: str) -> str:
+    "text escaped for a pipe table, where a cell is one line"
+    return _md_escape(text).replace("\n", "<br>")
+
+
+def _md_table(header, rows) -> list[str]:
+    "Pipe-table lines for cells already in markdown."
+
+    def line(cells):
+        return "| " + " | ".join(cells) + " |"
+
+    return [line(header), line("-" * max(len(h), 3) for h in header), *map(line, rows)]
 
 
 def rounded_mag(val, nround=8):

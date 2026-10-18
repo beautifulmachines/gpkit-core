@@ -398,15 +398,16 @@ class Model(CostedConstraintSet):
         ir = build_report_ir(self, solution=solution)
         return render_report(ir, fmt=fmt, front_matter=front_matter, toc=toc)
 
-    def table(self, solution, **kwargs):
-        """A text table of solution, with what only this model can say about it.
+    def table(self, solution, fmt="text", **kwargs):
+        """A table of solution, with what only this model can say about it.
 
         A solution holds values and sensitivities; the cost expression and the
         constraints those sensitivities belong to are this model's.  Takes a
-        Solution or a Sweep.
+        Solution or a Sweep.  As markdown (fmt="md") it is the sections only:
+        the breakdowns are text art, kept only until budgets replace them.
         """
-        if "tables" in kwargs or isinstance(solution, Sweep):
-            return printing.table(solution, model=self, **kwargs)
+        if fmt != "text" or "tables" in kwargs or isinstance(solution, Sweep):
+            return printing.table(solution, model=self, fmt=fmt, **kwargs)
         bds = Breakdowns(self, solution)
         lines = bds.lines("cost") + bds.lines("model sensitivities") + [""]
         if solution.derived is not None:

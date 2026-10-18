@@ -137,6 +137,127 @@ class TestSweepSections:
         )
 
 
+class TestMarkdown:
+    "fmt='md' is the same rows as the text, one pipe table per model."
+
+    def test_free_and_fixed_variables(self, trip):
+        sol = trip.solve(verbosity=0)
+        tables = ["cost", "freevariables", "constants"]
+        assert trip.table(sol, tables=tables, fmt="md") == (
+            "### Optimal Cost\n"
+            "\n"
+            "| Cost | Value | Units |\n"
+            "| ---- | ----- | ----- |\n"
+            "| Trip.x + Trip.w⋅Trip.Leg.v\\[:\\].sum() | 5 | s |\n"
+            "\n"
+            "### Free Variables\n"
+            "\n"
+            "**Trip**\n"
+            "\n"
+            "| Variable | Value | Units | Label |\n"
+            "| -------- | ----- | ----- | ----- |\n"
+            "| x | 2 | s | free time |\n"
+            "\n"
+            "**Trip.Leg**\n"
+            "\n"
+            "| Variable | Value | Units | Label |\n"
+            "| -------- | ----- | ----- | ----- |\n"
+            "| v\\[:\\] | \\[ 0.5  1  1.5 \\] | m/s | speed |\n"
+            "\n"
+            "### Fixed Variables\n"
+            "\n"
+            "**Trip**\n"
+            "\n"
+            "| Variable | Value | Units | Sensitivity | Label |\n"
+            "| -------- | ----- | ----- | ----------- | ----- |\n"
+            "| w | 1 | s²/m | +0.6 | speed weight |\n"
+            "| c | 2 | s | \\~0 | slack bound |\n"
+            "\n"
+            "**Trip.Leg**\n"
+            "\n"
+            "| Variable | Value | Units | Sensitivity | Label |\n"
+            "| -------- | ----- | ----- | ----------- | ----- |\n"
+            "| d\\[:\\] | \\[ 1  2  3 \\] | m | \\[ +0.1  +0.2  +0.3 \\] | distance |\n"
+            "| tau | 2 | s | -0.2 | leg time |"
+        )
+
+    def test_constraints(self, trip):
+        sol = trip.solve(verbosity=0)
+        assert trip.table(sol, tables=["tightest constraints"], fmt="md") == (
+            "### Most Sensitive Constraints\n"
+            "\n"
+            "**Trip**\n"
+            "\n"
+            "| Sensitivity | Constraint |\n"
+            "| ----------- | ---------- |\n"
+            "| +0.4 | x ≥ tau |\n"
+            "\n"
+            "**Trip.Leg**\n"
+            "\n"
+            "| Sensitivity | Constraint |\n"
+            "| ----------- | ---------- |\n"
+            "| +0.3 | v\\[2\\] ≥ d\\[2\\]/tau |\n"
+            "| +0.2 | v\\[1\\] ≥ d\\[1\\]/tau |\n"
+            "| +0.1 | v\\[0\\] ≥ d\\[0\\]/tau |"
+        )
+
+    def test_a_sweep_stacks_each_element(self, trip):
+        sweep = trip.sweep({trip.leg.tau: [2, 4]}, verbosity=0)
+        assert trip.table(sweep, tables=["sweeps", "freevariables"], fmt="md") == (
+            "### Swept Variables\n"
+            "\n"
+            "**Trip.Leg**\n"
+            "\n"
+            "| Variable | Value | Units | Label |\n"
+            "| -------- | ----- | ----- | ----- |\n"
+            "| tau | \\[ 2  4 \\] | s | leg time |\n"
+            "\n"
+            "### Free Variables\n"
+            "\n"
+            "**Trip**\n"
+            "\n"
+            "| Variable | Value | Units | Label |\n"
+            "| -------- | ----- | ----- | ----- |\n"
+            "| x | \\[ 2  4 \\] | s | free time |\n"
+            "\n"
+            "**Trip.Leg**\n"
+            "\n"
+            "| Variable | Value | Units | Label |\n"
+            "| -------- | ----- | ----- | ----- |\n"
+            "| v\\[0\\] | \\[ 0.5  0.25 \\] | m/s | speed |\n"
+            "| v\\[1\\] | \\[ 1  0.5 \\] | m/s | speed |\n"
+            "| v\\[2\\] | \\[ 1.5  0.75 \\] | m/s | speed |"
+        )
+
+    def test_a_diff(self, trip, farther):
+        new, baseline = farther
+        assert trip.diff(new, baseline, fmt="md") == (
+            "### Cost Change\n"
+            "\n"
+            "| Cost | Change | Values |\n"
+            "| ---- | ------ | ------ |\n"
+            "| Trip.x + Trip.w⋅Trip.Leg.v\\[:\\].sum() | +10\\% | (5.5s vs 5s) |\n"
+            "\n"
+            "### Free Variable Changes\n"
+            "\n"
+            "**Trip.Leg**\n"
+            "\n"
+            "| Variable | Change | Label |\n"
+            "| -------- | ------ | ----- |\n"
+            "| v\\[:\\] | \\[ +0\\%  +0\\%  +33.3\\% \\] | speed |"
+        )
+
+    def test_the_models_table_is_its_sections_only(self, trip):
+        "Breakdowns are text art, kept only until budgets replace them."
+        sol = trip.solve(verbosity=0)
+        assert trip.table(sol, fmt="md").startswith("### Optimal Cost\n")
+
+    def test_an_unknown_format_is_an_error(self, trip):
+        sol = trip.solve(verbosity=0)
+        with pytest.raises(ValueError, match="html"):
+            sol.table(fmt="html")
+
+
 class TestModelDiff:
     "A diff holds no model, so only the model can name the cost by its expression."
 

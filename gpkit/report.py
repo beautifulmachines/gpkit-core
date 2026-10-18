@@ -13,7 +13,7 @@ import numpy as np
 from .constraints.set import constraint_varkeys, own_keyed_constraints
 from .display import DisplayScope
 from .model import Model as _Model
-from .printing import _format_aligned_columns
+from .printing import _format_aligned_columns, _md_escape, _md_table
 from .util.repr_conventions import unitstr
 from .util.small_classes import Quantity
 from .varinfo import VarKind, classify_variables
@@ -623,13 +623,6 @@ def _split_constraint_str(c_str: str):
 # ── Markdown renderer ────────────────────────────────────────────────────────
 
 
-def _md_escape(text: str) -> str:
-    r"""Escape characters that have special meaning in markdown pipe tables."""
-    for ch in ("\\", "|", "*", "_", "`", "~", "[", "]", "<", ">", "%", "^"):
-        text = text.replace(ch, "\\" + ch)
-    return text
-
-
 def _md_var_table(variables: list, include_sensitivity: bool = False) -> list:
     "Markdown pipe-table lines for a variable section."
     has_source = any(ve.source for ve in variables)
@@ -637,8 +630,7 @@ def _md_var_table(variables: list, include_sensitivity: bool = False) -> list:
     if include_sensitivity:
         cols.append("Sensitivity")
     cols.append("Label")
-    sep = ["-" * max(len(c), 3) for c in cols]
-    lines = ["| " + " | ".join(cols) + " |", "| " + " | ".join(sep) + " |"]
+    rows = []
     for ve in variables:
         name_cell = f"${ve.latex}$" if ve.latex else _md_escape(ve.name)
         cells = [name_cell]
@@ -648,8 +640,8 @@ def _md_var_table(variables: list, include_sensitivity: bool = False) -> list:
         if include_sensitivity:
             cells.append(_fmt_sensitivity(ve.sensitivity))
         cells.append(_md_escape(ve.label))
-        lines.append("| " + " | ".join(cells) + " |")
-    return lines
+        rows.append(cells)
+    return _md_table(cols, rows)
 
 
 def _md_prose_lines(ir: "ReportSection") -> list:
