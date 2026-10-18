@@ -22,12 +22,12 @@ from .nomials.substitution import is_linked
 from .programs.gp import GeometricProgram
 from .programs.prog_factories import progify, solvify
 from .programs.sgp import SequentialGeometricProgram
-from .solutions import SolutionSequence
+from .solutions import Sweep
 from .tools.autosweep import autosweep_1d
 from .util.globals import NamedVariables, Vectorize
 from .var import Var
 from .varinfo import classify_variables
-from .varmap import FrozenVarSet, Substitutions, VarMap
+from .varmap import FrozenVarSet, Substitutions
 
 
 class Model(CostedConstraintSet):
@@ -403,16 +403,15 @@ class Model(CostedConstraintSet):
 
         A solution holds values and sensitivities; the cost expression and the
         constraints those sensitivities belong to are this model's.  Takes a
-        Solution or a SolutionSequence (a sweep).
+        Solution or a Sweep.
         """
-        if "tables" in kwargs or isinstance(solution, SolutionSequence):
-            kwargs.setdefault("tables", printing.MODEL_TABLES)
+        if "tables" in kwargs or isinstance(solution, Sweep):
             return printing.table(solution, model=self, **kwargs)
         bds = Breakdowns(self, solution)
         lines = bds.lines("cost") + bds.lines("model sensitivities") + [""]
         if solution.derived is not None:
             lines.append(solution.derived.table())
-        table = printing.table(solution, printing.MODEL_TABLES, model=self, **kwargs)
+        table = printing.table(solution, model=self, **kwargs)
         return "\n".join(lines) + table
 
     def budget(self, solution, var, display_units=None, depth=float("inf")):
@@ -440,11 +439,11 @@ class Model(CostedConstraintSet):
     localsolve = solvify(progify(SequentialGeometricProgram, "localsolve"))
 
     def sweep(self, sweepvals, skipfailures=False, **solveargs):
-        "Sweeps {var: values} in-sync across one dim. Returns SolutionSequence"
+        "Sweeps {var: values} in-sync across one dim. Returns a Sweep"
         return self._sweep(self.solve, sweepvals, skipfailures, **solveargs)
 
     def localsweep(self, sweepvals, skipfailures=False, **solveargs):
-        "Sweeps {var: values} in-sync across one dim. Returns SolutionSequence"
+        "Sweeps {var: values} in-sync across one dim. Returns a Sweep"
         return self._sweep(self.localsolve, sweepvals, skipfailures, **solveargs)
 
     def _validate_sweep(self, sweepvals):
@@ -461,7 +460,7 @@ class Model(CostedConstraintSet):
 
     def _sweep(self, solvefn, sweepvals, skipfailures, **solveargs):
         "Runs sweep using solvefn (either self.solve or self.localsolve)"
-        sols = SolutionSequence()
+        sols = []
         self._validate_sweep(sweepvals)
         lengths = {len(vals) for vals in sweepvals.values()}
         if len(lengths) != 1:
@@ -475,10 +474,6 @@ class Model(CostedConstraintSet):
             self.substitutions.update(sweepsubs)
             try:
                 sols.append(solvefn(**solveargs))
-                sp = VarMap()
-                sp.register_keys(self.varkeys)
-                sp.update(sweepsubs)
-                sols[-1].meta["sweep_point"] = sp
             except Infeasible as err:
                 if not skipfailures:
                     raise RuntimeWarning(
@@ -492,7 +487,8 @@ class Model(CostedConstraintSet):
         if solveargs.get("verbosity", 1) > 0:
             print(f"Sweeping took {time() - tic:.3g} seconds.")
 
-        return sols
+        swept = {vk for var in sweepvals for vk in self.varkeys.keys(var)}
+        return Sweep(sols, sorted(swept, key=lambda vk: vk.ref))
 
     def autosweep(self, sweeps, tol=0.01, samplepoints=100, **solveargs):
         """Autosweeps {var: (start, end)} pairs in sweeps to tol.

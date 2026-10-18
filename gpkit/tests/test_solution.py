@@ -24,7 +24,7 @@ from gpkit.constraints.bounded import Bounded
 from gpkit.constraints.loose import Loose
 from gpkit.constraints.set import audit_solution, constraint_keys, keyed_constraints
 from gpkit.constraints.tight import Tight
-from gpkit.solutions import SolveStatus
+from gpkit.solutions import SolveStatus, Sweep
 from gpkit.tests.conftest import run_threads
 from gpkit.util.small_classes import Quantity, Strings
 
@@ -198,6 +198,43 @@ class TestSolutionHoldsNoModel:
     def test_breakdowns_take_the_model(self):
         m, sol = self._solved()
         assert breakdowns.Breakdowns(m, sol).lines("cost")
+
+
+class TestSweep:
+    """A sweep records which variables it swept; each solution holds their values.
+
+    What was varied is a property of the sequence, not of any one solution, so
+    it is stated once on the Sweep rather than stamped into every solution.
+    """
+
+    def test_a_sweep_names_what_it_swept(self):
+        x, c = Variable("x"), Variable("c", 1)
+        m = Model(x, [x >= c])
+        sweep = m.sweep({c: [1, 2]}, verbosity=0)
+        assert isinstance(sweep, Sweep)
+        assert sweep.swept == (c.key,)
+        assert [sol.constants[c] for sol in sweep] == [1, 2]
+        assert all("sweep_point" not in sol.meta for sol in sweep)
+
+    def test_a_swept_vector_names_its_elements(self):
+        x, y = Variable("x"), VectorVariable(2, "y")
+        m = Model(x, [x >= y.prod()])
+        sweep = m.sweep({"y": [[1, 2], [3, 4]]}, verbosity=0)
+        assert set(sweep.swept) == {y[0].key, y[1].key}
+
+    def test_skipped_failures_leave_what_was_swept(self):
+        x, x_min = Variable("x"), Variable("x_{min}", 1)
+        m = Model(x, [x <= 1, x >= x_min])
+        sweep = m.sweep({x_min: [1, 2]}, verbosity=0, skipfailures=True)
+        assert len(sweep) == 1
+        assert "x_{min} : [ 1 ]" in sweep.table()
+
+    def test_an_autosweep_names_what_it_swept(self):
+        x, c = Variable("x"), Variable("c", 1)
+        m = Model(x, [x >= c])
+        sweep = m.autosweep({c: (1, 4)}, verbosity=0).bst.solarray
+        assert sweep.swept == (c.key,)
+        assert "Swept Variables" in sweep.table()
 
 
 def test_tables_for_a_model_with_no_constraints():
