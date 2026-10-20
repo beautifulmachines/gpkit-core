@@ -2,14 +2,16 @@
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass, replace
+from functools import cache
 from typing import Any
 
 import numpy as np
 
 from .constraints.set import keyed_constraints
+from .display.naming import decorated
 from .ir import diff_solutions
 from .units import Quantity
-from .util.repr_conventions import unitstr
+from .util.repr_conventions import lineagestr, unitstr
 from .util.small_scripts import try_str_without
 
 Item = tuple[Any, Any]
@@ -33,17 +35,12 @@ class Display:
 
     The documents carry the numbers; this carries what a reader sees for each
     ref -- name, units, label, model heading -- and each constraint's text.
-    It reads them from the live keys and model, the one place a table does.
+    Variables it reads from entries in the model IR's `variables` format, so a
+    table with a model and one without render them through the same code.
     """
 
-    def __init__(self, solutions, model=None):
-        self._keys = {}
-        for sol in solutions:
-            for vmap in (sol.primal, sol.constants, sol.sens.variables):
-                for vk in vmap:
-                    self._keys[vk.ref] = vk
-                    if vk.veckey is not None:
-                        self._keys[vk.veckey.ref] = vk.veckey
+    def __init__(self, entries, model=None):
+        self.entries = entries
         self.has_model = model is not None
         # a solution holds the cost's value; only the model knows its expression
         self.cost_name = "cost" if model is None else model.cost.str_without("units")
@@ -52,25 +49,21 @@ class Display:
         )
 
     def name(self, ref) -> str:
-        return self._keys[ref].str_without("lineage")
+        entry = self.entries[ref]
+        return decorated(entry["name"], entry.get("idx"), entry.get("shape"))
 
     def units(self, ref) -> str:
-        return unitstr(self._keys[ref], dimless="")
+        return _units(self.entries[ref].get("units", ""))
 
     def label(self, ref) -> str:
-        return self._keys[ref].label or ""
+        return self.entries[ref].get("label", "")
 
     def heading(self, ref) -> str:
         "The model a row is shown under; none for what no model owns."
-        obj = self._keys.get(ref) or self._constraints.get(ref)
-        return obj.lineagestr() if hasattr(obj, "lineagestr") else ""
-
-    def vector(self, ref):
-        "(parent ref, index, shape) for a vector element, else None."
-        vk = self._keys.get(ref)
-        if vk is None or vk.veckey is None:
-            return None
-        return vk.veckey.ref, vk.idx, vk.shape
+        if ref in self.entries:
+            return lineagestr(tuple(map(tuple, self.entries[ref].get("lineage", ()))))
+        constraint = self._constraints.get(ref)
+        return constraint.lineagestr() if hasattr(constraint, "lineagestr") else ""
 
     def has_constraint(self, ref) -> bool:
         return ref in self._constraints
@@ -98,9 +91,31 @@ def _constraint_senss(doc) -> dict:
     return doc["sensitivities"]["constraints"]
 
 
+@cache
+def _units(spelling: str) -> str:
+    "Units for display, from any spelling a document carries of them."
+    return unitstr(Quantity(1, spelling), dimless="")
+
+
 def _cost_units(doc) -> str:
     "The cost's units for display, from the document's own spelling of them."
-    return unitstr(Quantity(1, doc["cost"].get("units", "")), dimless="")
+    return _units(doc["cost"].get("units", ""))
+
+
+def _variable_entries(solutions) -> dict:
+    """Entries for the keys solutions hold and their vectors, as the model IR has.
+
+    VarKey.to_ir is what the model IR's `variables` is built from, so a table
+    without a model names its rows exactly as one with a model does.
+    """
+    keys = {}
+    for sol in solutions:
+        for vmap in (sol.primal, sol.constants, sol.sens.variables):
+            for vk in vmap:
+                keys[vk.ref] = vk
+                if vk.veckey is not None:
+                    keys[vk.veckey.ref] = vk.veckey
+    return {ref: vk.to_ir() for ref, vk in keys.items()}
 
 
 @dataclass(frozen=True, slots=True)
@@ -695,18 +710,14 @@ class ConditionTable(SectionSpec):
         seen_names: set[str] = set()
         for cname, model in conditions.items():
             col_data[cname] = {}
-            for vk in sorted(model.vks, key=lambda v: v.name):
-                if vk.ref not in values:
-                    continue
-                entry = (
-                    values[vk.ref],
-                    self._unitstr(vk.ref),
-                    self.display.label(vk.ref),
-                )
-                col_data[cname][vk.name] = entry
-                if vk.name not in seen_names:
-                    all_names.append(vk.name)
-                    seen_names.add(vk.name)
+            refs = [vk.ref for vk in model.vks if vk.ref in values]
+            for ref in sorted(refs, key=lambda r: self.display.entries[r]["name"]):
+                name = self.display.entries[ref]["name"]
+                entry = (values[ref], self._unitstr(ref), self.display.label(ref))
+                col_data[cname][name] = entry
+                if name not in seen_names:
+                    all_names.append(name)
+                    seen_names.add(name)
         return col_data, all_names
 
     def _build_row(self, name, cnames, col_data, p):
@@ -797,7 +808,7 @@ class Documents:
         return self._rows([source(doc) for doc in self.docs])
 
     def cost(self):
-        return self._rows([{"cost": doc["cost"]["value"]} for doc in self.docs])[0][1]
+        return self._across([doc["cost"]["value"] for doc in self.docs])
 
     def cost_units(self) -> str:
         return _cost_units(self.docs[0])
@@ -827,25 +838,23 @@ class Documents:
             return list(self._grouped(values).items())
         return _stack(per_doc)
 
-    def _row_ref(self, ref):
-        "The row a ref shows in: its vector's, unless each element has its own."
-        vec = None if self.is_sweep else self.display.vector(ref)
-        return ref if vec is None else vec[0]
-
     def _grouped(self, values: dict) -> dict:
         """values as one document's rows, a vector's elements gathered into one.
 
         The IR carries elements only, so showing a vector as one row is this
-        step; an element with no value is nan.
+        step; an element with no value is nan.  A sweep's columns are already
+        its solutions, so there each element keeps a row of its own.
         """
+        if self.is_sweep:
+            return dict(values)
         out = {}
         for ref, value in values.items():
-            row = self._row_ref(ref)
-            if row == ref:
+            entry = self.display.entries.get(ref, {})  # none for a constraint
+            if "veckey_ref" not in entry:
                 out[ref] = value
                 continue
-            _, idx, shape = self.display.vector(ref)
-            out.setdefault(row, np.full(shape, np.nan))[idx] = value
+            row = out.setdefault(entry["veckey_ref"], np.full(entry["shape"], np.nan))
+            row[tuple(entry["idx"])] = value
         return out
 
     def _across(self, values: list):
@@ -878,7 +887,11 @@ class Documents:
         renamed = {
             o: n for p in parts for o, n in p.get("units_redeclared", {}).items()
         }
-        spelled = {self._row_ref(n): self._row_ref(o) for o, n in renamed.items()}
+        spelled = {}  # each row's ref, to the baseline's ref for that row
+        for old, new in renamed.items():
+            spelled[new] = old
+            if vec := self.display.entries[new].get("veckey_ref"):
+                spelled[vec] = self.display.entries[old]["veckey_ref"]
 
         def rows(values):
             return self._grouped({renamed.get(r, r): v for r, v in values.items()})
@@ -932,7 +945,12 @@ def _documents(obj, model=None, baseline=None, tol=0.0) -> Documents:
     "The documents and display for a Solution or Sweep, against a baseline if any."
     is_sweep = not _looks_like_solution(obj)
     sols = list(obj) if is_sweep else [obj]
-    display = Display(sols + ([baseline] if baseline is not None else []), model)
+    # model.vks.to_ir() is the model IR's `variables`, without serializing every
+    # constraint to get it -- which a custom constraint may not support
+    entries = _variable_entries(sols) if model is None else model.vks.to_ir()
+    if baseline is not None:  # which may be a solution of another model
+        entries = {**_variable_entries([baseline]), **entries}
+    display = Display(entries, model)
     return Documents(
         docs=[sol.to_ir() for sol in sols],
         display=display,

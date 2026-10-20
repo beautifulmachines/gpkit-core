@@ -37,6 +37,17 @@ def _segments(lineage: Lineage, modelnums: bool = True) -> list[str]:
     ]
 
 
+def decorated(name: str, idx=None, shape=(), excluded=()) -> str:
+    "name with the index suffix a vector element or vector parent displays."
+    if "idx" in excluded:
+        return name
+    if idx:
+        return name + f"[{','.join(map(str, idx))}]"
+    if "vec" not in excluded and shape:
+        return name + "[:]"
+    return name
+
+
 def _kept(path: Lineage, depth: int) -> Lineage:
     "The last `depth` segments of a path."
     return path[len(path) - depth :] if depth else ()
