@@ -5,7 +5,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from .display.naming import DisplayScope
+from .display.naming import DisplayScope, decorated
 from .units import qty
 from .util.repr_conventions import ReprMixin, latexify, merge_subscript
 from .util.small_classes import Count
@@ -164,7 +164,7 @@ class VarKey(ReprMixin):
     def str_without(self, excluded=()):  # noqa: PLR0912
         "Returns string without certain fields (such as 'lineage')."
         if isinstance(excluded, DisplayScope):
-            return self._decorate(excluded.name(self), excluded)
+            return decorated(excluded.name(self), self.idx, self.shape, excluded)
         name = self.name
         if "lineage" not in excluded and self.lineage:
             namespace = self.lineagestr("modelnums" not in excluded).split(".")
@@ -194,17 +194,7 @@ class VarKey(ReprMixin):
                         namespace = None
             if namespace:
                 name = ".".join(namespace) + "." + name
-        return self._decorate(name, excluded)
-
-    def _decorate(self, name, excluded):
-        "Append the index suffix a vector element or vector parent displays."
-        if "idx" in excluded:
-            return name
-        if self.idx:
-            return name + f"[{','.join(map(str, self.idx))}]"
-        if "vec" not in excluded and self.shape:
-            return name + "[:]"
-        return name
+        return decorated(name, self.idx, self.shape, excluded)
 
     __repr__ = str_without
 

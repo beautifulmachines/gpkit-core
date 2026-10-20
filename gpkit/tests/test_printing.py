@@ -4,10 +4,13 @@ The model has a unique optimum with round numbers, so a table's text is
 stable across solvers and can be compared exactly.
 """
 
+import json
+
 import numpy as np
 import pytest
 
 from gpkit import Model, Variable, VectorVariable
+from gpkit.printing import Display
 
 
 class Leg(Model):
@@ -90,6 +93,21 @@ class TestSolutionSections:
         assert lines[:3] == ["Insensitive Constraints (below 1e-05)", "-" * 37, "Trip"]
         # the sensitivity is solver noise, so only the constraint is compared
         assert [line.split(" : ")[1] for line in lines[3:]] == ["x ≥ c/10"]
+
+
+class TestDisplay:
+    "A row's name, units, label and heading come from a plain variable entry."
+
+    def test_rows_read_the_model_irs_variable_entries(self, trip):
+        entries = json.loads(json.dumps(trip.to_ir()["variables"]))
+        display = Display(entries)
+        element = trip.leg.v[0].key
+        for ref, name in [(element.ref, "v[0]"), (element.veckey.ref, "v[:]")]:
+            assert display.name(ref) == name
+            assert display.units(ref) == "m/s"
+            assert display.label(ref) == "speed"
+            assert display.heading(ref) == "Trip.Leg"
+        assert display.units(trip.w.key.ref) == "s²/m"
 
 
 class TestSweepSections:
