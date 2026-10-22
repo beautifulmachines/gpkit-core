@@ -315,9 +315,9 @@ class TestConstraintEntries:
             "SingleSignomialEquality",
             "PosynomialInequality",
         ]
-        by_key = {c["key"]: c["type"] for c in m.to_ir()["constraints"]}
+        constraints = m.to_ir()["constraints"]
         for entry in entries:
-            assert entry["type"] == by_key[entry["key"]]
+            assert entry["type"] == constraints[entry["key"]]["type"]
 
     def test_a_bare_child_model_in_a_group_stays_the_childs(self):
         """A child model is one item in a group, not a container to walk into.
@@ -1052,3 +1052,33 @@ class TestVectorRendering:
     def test_latex_whole_vector_wears_the_arrow(self):
         md = self._model().report(fmt="md")
         assert r"$\vec{c}$" in md
+
+
+class TestVectorConstraintRows:
+    """A vector constraint is one row, naming the elements the solution keys by.
+
+    The solution IR carries a sensitivity per element, as it carries a value per
+    element of a vector variable, so the row says which keys are its own.
+    """
+
+    @pytest.fixture(name="m")
+    def fixture_m(self):
+        q = VectorVariable(3, "q", "m")
+        c = VectorVariable(3, "c", [1, 2, 3], "m")
+        W = Variable("W", "m")
+        return Model(W, [W >= q.sum(), q >= c])
+
+    def test_is_one_row(self, m):
+        entries = _constraints(m.report(fmt="dict"))
+        assert [e["key"] for e in entries] == ["[0]", "[1]#3"]
+        assert entries[1]["type"] == "ArrayConstraint"
+
+    def test_names_its_elements_in_idx_order(self, m):
+        scalar, vector = _constraints(m.report(fmt="dict"))
+        assert vector["element_keys"] == ["[1][0]#3", "[1][1]#3", "[1][2]#3"]
+        assert "element_keys" not in scalar
+
+    def test_its_element_keys_join_the_solution(self, m):
+        (_, vector) = _constraints(m.report(fmt="dict"))
+        senss = m.solve(verbosity=0).to_ir()["sensitivities"]["constraints"]
+        assert all(key in senss for key in vector["element_keys"])

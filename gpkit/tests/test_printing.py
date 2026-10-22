@@ -86,6 +86,12 @@ class TestSolutionSections:
             "v[:] : [ 1    nan  2   ] [m]"
         ]
 
+    def test_a_vector_constraint_is_one_row(self, trip):
+        "Its sensitivities are per element, gathered as a vector variable's values are."
+        sol = trip.solve(verbosity=0)
+        lines = trip.table(sol, tables=["tightest constraints"]).split("\n")
+        assert lines[-2:] == ["Trip.Leg", "[ +0.1  +0.2  +0.3 ] : v[:] ≥ d[:]/tau"]
+
     def test_slack_constraints_are_the_ones_that_never_bind(self, trip):
         sol = trip.solve(verbosity=0)
         text = trip.table(sol, tables=["slack constraints"])

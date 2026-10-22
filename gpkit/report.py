@@ -10,7 +10,11 @@ from typing import Any
 
 import numpy as np
 
-from .constraints.set import constraint_varkeys, own_keyed_constraints
+from .constraints.set import (
+    constraint_varkeys,
+    own_keyed_constraints,
+    solver_constraints,
+)
 from .display import DisplayScope
 from .model import Model as _Model
 from .printing import _format_aligned_columns, _md_escape, _md_table
@@ -170,17 +174,22 @@ def _constraint_dict(c, key, scope) -> dict:
     str and latex name variables from the same scope, so the two forms of a
     constraint always agree.  key and type are what to_ir() records for the
     same constraint, so a consumer reads one name and one vocabulary from both.
+    A vector constraint also names its elements, which are what a solution
+    keys its sensitivities by.
     """
     try:
         latex = c.latex(scope)
     except AttributeError:
         latex = str(c)
-    return {
+    out = {
         "str": _render_constraint(c, scope),
         "latex": latex,
         "key": key.ref,
         "type": type(c).__name__,
     }
+    if key.shape:
+        out["element_keys"] = [key.element(idx).ref for idx, _ in solver_constraints(c)]
+    return out
 
 
 # ── Core builder helpers ──────────────────────────────────────────────────────
@@ -250,11 +259,12 @@ def _build_split_var_entries(
 def _build_constraint_groups(model) -> list[CGroup]:
     """Build CGroup list from model.cgroups or a single unnamed group.
 
-    CGroup.constraints holds the leaf (single-equation) constraints this model
-    owns, in canonical order -- child models keep their own for their own
-    sections, and containers like Tight, Loose or SignomialEquality are walked
-    through, so every item accepts .latex(excluded, aligned=True). Raw objects
-    are stored; renderers call str() or .latex().
+    CGroup.constraints holds the written (single-equation) constraints this
+    model owns, in canonical order -- child models keep their own for their own
+    sections, containers like Tight, Loose or SignomialEquality are walked
+    through, and a vector constraint is one item, so every item accepts
+    .latex(excluded, aligned=True). Raw objects are stored; renderers call str()
+    or .latex().
 
     Keys come from own_keyed_constraints, the same call the IR names constraints
     with, so the two cannot name a constraint differently.

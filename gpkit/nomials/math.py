@@ -217,7 +217,7 @@ class Signomial(Nomial):
         if isinstance(other, np.ndarray):
             from .array import NomialArray  # noqa: PLC0415
 
-            return NomialArray(self, ast=self.ast) * other
+            return NomialArray(self, ast=to_ast(self)) * other
         if isinstance(other, Numbers):
             if not other:  # other is zero
                 return other

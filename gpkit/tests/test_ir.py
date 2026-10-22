@@ -581,18 +581,17 @@ class TestConstraintIR:
         assert ir["oper"] == "="
 
     def test_array_constraint_to_ir(self):
-        """ArrayConstraint serializes as list of element constraints."""
+        """ArrayConstraint serializes the relation as written, not its elements."""
         x = VectorVariable(3, "x")
         y = VectorVariable(3, "y")
         c = x >= y
         assert isinstance(c, ArrayConstraint)
 
-        ir_list = c.to_ir()
-        assert isinstance(ir_list, list)
-        assert len(ir_list) == 3
-        for ir_dict in ir_list:
-            assert ir_dict["type"] == "PosynomialInequality"
-            assert ir_dict["oper"] == ">="
+        ir = c.to_ir()
+        assert ir["type"] == "ArrayConstraint"
+        assert ir["oper"] == ">="
+        assert ir["shape"] == [3]
+        assert ir["left"] == {"ast": {"node": "var", "ref": x.key.ref}}
 
     def test_slice_in_ast_serializes(self):
         """A slice in the AST (e.g. from arr[:j].sum()) serializes.
@@ -836,6 +835,85 @@ class TestModelIR:
         assert json.loads(json.dumps(ir)) == ir
 
 
+class _VecIR(Model):
+    "a scalar constraint, one vector constraint written once, then another scalar"
+
+    def setup(self):
+        self.W = Variable("W", "m")
+        self.q = VectorVariable(3, "q", "m")
+        self.c = VectorVariable(3, "c", [1, 2, 3], "m")
+        W_max = Variable("W_max", 100, "m")
+        return [self.W >= self.q.sum(), self.q >= self.c, self.W <= W_max]
+
+
+class TestVectorConstraintIR:
+    """Constraints in the IR are keyed by ref, on two levels, as variables are.
+
+    A GP is a bag of variables and constraints; ordering them is gpkit's job,
+    so neither is identified by position. A vector constraint's entry holds
+    what was written, and its elements hold what the solver gets.
+    """
+
+    PARENT = "_VecIR[1]#3"
+
+    @pytest.fixture(name="ir")
+    def fixture_ir(self):
+        return _VecIR().to_ir()
+
+    def test_constraints_are_keyed_by_ref(self, ir):
+        elements = {f"_VecIR[1][{i}]#3" for i in range(3)}
+        assert set(ir["constraints"]) == {"_VecIR[0]", self.PARENT, "_VecIR[2]"} | (
+            elements
+        )
+
+    def test_the_tree_lists_written_constraints_in_written_order(self, ir):
+        tree = ir["model_tree"]
+        assert tree["constraints"] == ["_VecIR[0]", self.PARENT, "_VecIR[2]"]
+        assert "constraint_indices" not in tree
+
+    def test_a_vector_constraint_holds_its_written_form(self, ir):
+        parent = ir["constraints"][self.PARENT]
+        assert parent["type"] == "ArrayConstraint"
+        assert parent["oper"] == ">="
+        assert parent["shape"] == [3]
+        for side in ("left", "right"):
+            assert "ast" in parent[side]
+            assert "terms" not in parent[side]  # the math is its elements'
+
+    def test_its_elements_hold_the_solver_relations(self, ir):
+        for i in range(3):
+            element = ir["constraints"][f"_VecIR[1][{i}]#3"]
+            assert element["type"] == "PosynomialInequality"
+            assert element["idx"] == [i]
+            assert element["shape"] == [3]
+            assert element["veckey_ref"] == self.PARENT
+            assert "terms" in element["left"]
+
+    def test_a_broadcast_scalar_keeps_its_written_form(self):
+        "2*q >= x wraps x to broadcast it; the written side is still just x."
+        q = VectorVariable(3, "q")
+        x = Variable("x", 1)
+        ir = Model(q.sum(), [2 * q >= x]).to_ir()
+        (parent,) = [c for c in ir["constraints"].values() if "veckey_ref" not in c]
+        assert parent["right"]["ast"] == {"node": "var", "ref": x.key.ref}
+
+    def test_a_scalar_variable_times_a_vector_is_written_as_itself(self):
+        "rho*V promotes rho to an array to multiply; the written form is still rho."
+        rho, V = Variable("rho"), VectorVariable(3, "V")
+        product = rho * V
+        assert product.ast.children[0] == VarNode(rho.key)
+
+    def test_the_solution_names_only_solver_relations(self, ir):
+        "Like primal, its sensitivities are per element; the model IR groups them."
+        sol = _VecIR().solve(verbosity=0).to_ir()
+        for section in ("constraints", "terms"):
+            for ref in sol["sensitivities"][section]:
+                assert ir["constraints"][ref]["type"] != "ArrayConstraint", ref
+
+    def test_json_serialization(self, ir):
+        assert json.loads(json.dumps(ir)) == ir
+
+
 class TestModelTree:
     """Tests for model_tree structural metadata in the IR."""
 
@@ -849,8 +927,7 @@ class TestModelTree:
 
         assert tree["class"] == "Model"
         assert tree["children"] == []
-        assert len(tree["constraint_indices"]) == 2
-        assert tree["constraint_indices"] == [0, 1]
+        assert tree["constraints"] == ["[0]", "[1]"]
         # All variables should appear in the root node
         assert sorted(tree["variables"]) == sorted(ir["variables"].keys())
 
@@ -916,7 +993,7 @@ class TestModelTree:
         assert sub1["variables"][0].endswith(".m")
 
     def test_constraint_ownership(self):
-        """Constraint indices correctly map to the flat constraint list."""
+        """Each node lists the constraints it wrote, by the ref the IR keys them by."""
 
         class Top(Model):
             """Top-level model for constraint ownership tests."""
@@ -931,16 +1008,12 @@ class TestModelTree:
         ir = m.to_ir()
         tree = ir["model_tree"]
 
-        # Top owns constraint 0 (y >= 2), Sub owns constraint 1 (m >= 1)
-        assert tree["constraint_indices"] == [0]
-        sub_tree = tree["children"][0]
-        assert sub_tree["constraint_indices"] == [0 + 1]  # == [1]
-
-        # All constraint indices should cover the full flat list
-        all_indices = set(tree["constraint_indices"])
-        for child in tree["children"]:
-            all_indices.update(child["constraint_indices"])
-        assert all_indices == set(range(len(ir["constraints"])))
+        # Top owns y >= 2, Sub owns m >= 1; each numbers its own from 0
+        (top_ref,) = tree["constraints"]
+        (sub_ref,) = tree["children"][0]["constraints"]
+        assert top_ref.startswith("Top") and top_ref.endswith("[0]")
+        assert sub_ref.startswith("Top.Sub") and sub_ref.endswith("[0]")
+        assert {top_ref, sub_ref} == set(ir["constraints"])
 
     @pytest.mark.parametrize("build", [Aircraft, Duty])
     def test_variable_ownership(self, build):
@@ -1128,8 +1201,12 @@ class TestSolutionIR:
         m, sol = _solved()
         ir = sol.to_ir()
         model_ir = m.to_ir()
+        # a sensitivity per relation the solver got, so every entry but the
+        # vector constraints as written, whose relations are their elements
         assert set(ir["sensitivities"]["constraints"]) == {
-            c["key"] for c in model_ir["constraints"]
+            ref
+            for ref, c in model_ir["constraints"].items()
+            if c["type"] != "ArrayConstraint"
         }
         assert set(ir["sensitivities"]["variables"]) <= set(model_ir["variables"])
 
@@ -1141,10 +1218,10 @@ class TestSolutionIR:
         """
         m, sol = _solved()
         terms = sol.to_ir()["sensitivities"]["terms"]
-        by_key = {c["key"]: c for c in m.to_ir()["constraints"]}
+        constraints = m.to_ir()["constraints"]
         assert terms  # the model has posynomial constraints
         for ref, nu in terms.items():
-            c = by_key[ref]
+            c = constraints[ref]
             sides = (len(c["left"]["terms"]), len(c["right"]["terms"]))
             assert len(nu) in sides
 

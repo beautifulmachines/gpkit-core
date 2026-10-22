@@ -33,11 +33,12 @@ def array_constraint(symbol, func):
 
     def wrapped_func(self, other):
         "Creates array constraint from vectorized operator."
+        written = other  # what the constraint says, before broadcasting it
         if not isinstance(other, NomialArray):
             other = NomialArray(other)
         result = vecfunc(self, other)
         return ArrayConstraint(
-            result, getattr(self, "key", self), symbol, getattr(other, "key", other)
+            result, getattr(self, "key", self), symbol, getattr(written, "key", written)
         )
 
     return wrapped_func

@@ -129,6 +129,24 @@ def constraint_to_expr(constraint_ir, name_fn=_ref_to_name):
     return f"{left} {oper} {right}"
 
 
+def _written_exprs(refs, constraints, name_fn=_ref_to_name):
+    """The constraints at refs as TOML strings, each as it was written.
+
+    A vector constraint is one line.  If a side was never written as one
+    expression (an array assembled element by element) only its elements' math
+    is known, so each element is a line of its own.
+    """
+    for ref in refs:
+        c = constraints[ref]
+        written = all("ast" in c[side] for side in ("left", "right"))
+        if c["type"] != "ArrayConstraint" or written:
+            yield constraint_to_expr(c, name_fn)
+            continue
+        for element in constraints.values():
+            if element.get("veckey_ref") == ref:
+                yield constraint_to_expr(element, name_fn)
+
+
 def _nomial_ir_to_expr(nomial_ir, name_fn=_ref_to_name):
     """Render a nomial IR dict to an expression string.
 
@@ -427,11 +445,11 @@ def _emit_single_model(ir, lines):
     direction, cost_str = _format_objective(cost_ir)
     lines.append(f"objective = {_quote(f'{direction}: {cost_str}')}")
 
-    constraints = ir.get("constraints", [])
-    if constraints:
+    refs = ir["model_tree"]["constraints"]
+    if refs:
         lines.append("constraints = [")
-        for c in constraints:
-            lines.append(f"  {_quote(constraint_to_expr(c))},")
+        for expr in _written_exprs(refs, ir["constraints"]):
+            lines.append(f"  {_quote(expr)},")
         lines.append("]")
 
 
@@ -440,7 +458,7 @@ def _emit_multi_model(ir, lines):
     tree = ir["model_tree"]
     variables = ir.get("variables", {})
     substitutions = ir.get("substitutions", {})
-    constraints = ir.get("constraints", [])
+    constraints = ir["constraints"]
 
     model_ids = _assign_model_ids(tree)
     ref_to_model_id = _build_ref_to_model_id(tree, model_ids)
@@ -526,11 +544,10 @@ def _emit_model_section(  # noqa: PLR0913, PLR0917
         lines.append(f"submodels = [{child_str}]")
 
     # Constraints
-    node_constraints = [all_constraints[i] for i in node.get("constraint_indices", [])]
-    if node_constraints:
+    if node["constraints"]:
         lines.append("constraints = [")
-        for c in node_constraints:
-            lines.append(f"  {_quote(constraint_to_expr(c, name_fn))},")
+        for expr in _written_exprs(node["constraints"], all_constraints, name_fn):
+            lines.append(f"  {_quote(expr)},")
         lines.append("]")
 
     # Last, because a TOML key belongs to the most recently opened table: this
