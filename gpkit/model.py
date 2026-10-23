@@ -8,7 +8,12 @@ from . import printing
 from .breakdowns import Breakdowns
 from .budgets import build_budget
 from .constraints.costed import CostedConstraintSet
-from .constraints.set import build_model_tree, constraint_keys, keyed_constraints
+from .constraints.set import (
+    build_model_tree,
+    constraint_keys,
+    solver_constraints,
+    written_keyed_constraints,
+)
 from .exceptions import (
     AmbiguousVariable,
     Infeasible,
@@ -313,14 +318,18 @@ class Model(CostedConstraintSet):
         # Serialize cost
         cost_ir = self.cost.to_ir()
 
-        # keyed_constraints walks walk_owned, so this list and model_tree's
-        # indices stay one enumeration; each entry carries its own key as well,
-        # so a consumer can name a constraint without counting list positions.
-        constraints_ir = []
-        for key, c in keyed_constraints(self):
-            c_ir = c.to_ir()
-            c_ir["key"] = key.ref
-            constraints_ir.append(c_ir)
+        constraints_ir = {}
+        for _, key, c in written_keyed_constraints(self):
+            constraints_ir[key.ref] = {**c.to_ir(), **key.to_ir()}
+            for idx, element in solver_constraints(c):
+                if idx is None:
+                    continue
+                # a vector constraint's elements: the relations the solver gets
+                element_key = key.element(idx)
+                constraints_ir[element_key.ref] = {
+                    **element.to_ir(),
+                    **element_key.to_ir(),
+                }
 
         # Serialize substitutions; linked (callable-computed) vars get null
         subs_ir = {}

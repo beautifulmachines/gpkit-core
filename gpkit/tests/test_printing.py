@@ -86,6 +86,19 @@ class TestSolutionSections:
             "v[:] : [ 1    nan  2   ] [m]"
         ]
 
+    def test_a_vector_constraint_is_one_row(self, trip):
+        "Its sensitivities are per element, gathered as a vector variable's values are."
+        sol = trip.solve(verbosity=0)
+        lines = trip.table(sol, tables=["tightest constraints"]).split("\n")
+        assert lines[-2:] == ["Trip.Leg", "[ +0.1  +0.2  +0.3 ] : v[:] ≥ d[:]/tau"]
+
+    def test_a_vanishing_sensitivity_reads_near_zero(self):
+        "As in the fixed variables' column, and without widening its neighbours."
+        x = VectorVariable(3, "x")
+        m = Model(x[0] + x[2], [x >= 1, x[1] <= 2])  # nothing presses on x[1]
+        lines = m.table(m.solve(verbosity=0), tables=["tightest constraints"])
+        assert lines.split("\n")[-1] == "[ +0.5  ~0    +0.5 ] : x[:] ≥ 1"
+
     def test_slack_constraints_are_the_ones_that_never_bind(self, trip):
         sol = trip.solve(verbosity=0)
         text = trip.table(sol, tables=["slack constraints"])
@@ -214,9 +227,7 @@ class TestMarkdown:
             "\n"
             "| Sensitivity | Constraint |\n"
             "| ----------- | ---------- |\n"
-            "| +0.3 | v\\[2\\] ≥ d\\[2\\]/tau |\n"
-            "| +0.2 | v\\[1\\] ≥ d\\[1\\]/tau |\n"
-            "| +0.1 | v\\[0\\] ≥ d\\[0\\]/tau |"
+            "| \\[ +0.1  +0.2  +0.3 \\] | v\\[:\\] ≥ d\\[:\\]/tau |"
         )
 
     def test_a_sweep_stacks_each_element(self, trip):

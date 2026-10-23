@@ -8,6 +8,7 @@ import numpy as np
 
 from ..constraintkey import ConstraintKey
 from ..nomials import NomialArray, Variable
+from ..nomials.constraints import ArrayConstraint
 from ..util.repr_conventions import ReprMixin, also_excluding, lineagestr
 from ..util.small_scripts import try_str_without
 from ..varkey import lineage_display_context
@@ -50,18 +51,25 @@ def flatiter(iterable, yield_if_hasattr=None):
 
 
 def walk_owned(cset):
-    """Yield (owner, constraint) for every leaf constraint, in canonical order.
+    """Yield (owner, constraint) for every written constraint, in canonical order.
 
     Ownership changes only at a model's _children; every other container is
     descended through, so what sits inside a wrapper or a list is owned by the
-    model holding it.
+    model holding it.  A vector constraint is one written constraint, not a
+    container: `solver_constraints` expands it into the relations it stands for.
 
-    This is the one definition of constraint order.  The IR's flat constraint
-    list is this walk's enumeration, model_tree's constraint_indices are it
-    grouped by owner, and a report section's constraints are it filtered by
-    owner, so the three cannot drift apart.
+    This is the one definition of constraint order.  The constraints keyed in
+    to_ir(), model_tree's per-node lists and a report section's constraints are
+    all this walk, so they cannot drift apart.
     """
     yield from _walk_owned(cset, cset)
+
+
+def solver_constraints(constraint):
+    "(idx, scalar constraint) for each relation a written one stands for."
+    if isinstance(constraint, ArrayConstraint):
+        return constraint.elements()
+    return [(None, constraint)]
 
 
 def _walk_owned(items, owner):
@@ -72,7 +80,7 @@ def _walk_owned(items, owner):
     for item in items:
         if any(item is child for child in children) and getattr(item, "lineage", None):
             yield from _walk_owned(item, item)
-        elif not hasattr(item, "__iter__"):
+        elif not hasattr(item, "__iter__") or isinstance(item, ArrayConstraint):
             yield owner, item
         elif isinstance(item, np.ndarray):
             yield from _walk_owned(item.flat, owner)
@@ -80,25 +88,23 @@ def _walk_owned(items, owner):
             yield from _walk_owned(item, owner)
 
 
-def constraint_indices(model) -> dict:
-    """Map id(owner) -> the flat constraint indices that owner holds.
-
-    The index is the constraint's position in walk_owned, which is what
-    to_ir()'s flat list is enumerated by, so it addresses a constraint in the
-    IR, in model_tree, in a report section and in a solve's sensitivities
-    alike.  Keyed by id() because Models are unhashable.
-    """
-    indices: dict = {}
-    for i, (owner, _) in enumerate(walk_owned(model)):
-        indices.setdefault(id(owner), []).append(i)
-    return indices
+def written_keyed_constraints(cset):
+    "Yield (owner, ConstraintKey, constraint) for every written constraint."
+    for owner in _owners(cset):
+        for _, pairs in own_keyed_constraints(owner):
+            for key, c in pairs:
+                yield owner, key, c
 
 
 def keyed_constraints(cset):
-    "Yield (ConstraintKey, constraint) for every leaf constraint, in canonical order."
-    for owner in _owners(cset):
-        for _, pairs in own_keyed_constraints(owner):
-            yield from pairs
+    """Yield (ConstraintKey, constraint) for every relation the solver gets.
+
+    A vector constraint's elements are keyed under it, so a solve's
+    sensitivities -- one per relation -- name which element they belong to.
+    """
+    for _, key, c in written_keyed_constraints(cset):
+        for idx, element in solver_constraints(c):
+            yield (key if idx is None else key.element(idx)), element
 
 
 def own_keyed_constraints(model):
@@ -107,17 +113,27 @@ def own_keyed_constraints(model):
     One group labelled "" when the model declared no named ones.  The only place
     a constraint's key is formed, so the IR and the report cannot name one
     differently; a model names its own, with nothing threaded down the tree.
+    The constraints are as written: a vector constraint is one, keyed with its
+    shape.
     """
     path = tuple(lineagestr(model.lineage).split(".")) if model.lineage else ()
     groups = getattr(model, "cgroups", None)
     for label, items in (groups if groups is not None else {"": None}).items():
+        prefix = (*path, label) if label else path
         yield (
             label,
             [
-                (ConstraintKey(path=(*path, label) if label else path, index=i), c)
+                (ConstraintKey(prefix, i, shape=_vector_shape(c)), c)
                 for i, c in enumerate(own_constraints(model, items))
             ],
         )
+
+
+def _vector_shape(constraint) -> tuple:
+    "A vector constraint's shape; () for a scalar one."
+    if isinstance(constraint, ArrayConstraint):
+        return constraint.constraints.shape
+    return ()
 
 
 def constraint_senss(cset, solution) -> dict:
@@ -173,7 +189,7 @@ def _owners(cset):
 
 
 def own_constraints(model, items=None):
-    """The leaf constraints model holds itself, in canonical order.
+    """The written constraints model holds itself, in canonical order.
 
     Its child models' constraints are theirs, not its own.  Pass *items* to ask
     the same of one named group's contents rather than the whole model.  Costs
@@ -193,8 +209,9 @@ def constraint_varkeys(constraints) -> set:
     """
     vkeys: set = set()
     for c in constraints:
-        if hasattr(c, "vks"):
-            vkeys.update(c.vks)
+        for _, scalar in solver_constraints(c):
+            if hasattr(scalar, "vks"):
+                vkeys.update(scalar.vks)
     return vkeys
 
 
@@ -411,8 +428,9 @@ def build_model_tree(model):
     """Build model_tree structure from a Model's explicit _children graph.
 
     Uses model._children (populated during __init__) as the authoritative
-    source for child detection.  Constraint indices come from walk_owned:
-    they are its enumeration, grouped by the owner it reports.
+    source for child detection.  Each node lists the refs of the constraints
+    it wrote, in written order: identity is the ref, as it is for variables,
+    and the order is only how they were written down.
 
     Parameters
     ----------
@@ -422,10 +440,12 @@ def build_model_tree(model):
     Returns
     -------
     dict
-        model_tree with class, instance_id, variables, constraint_indices,
-        and children for each model node.
+        model_tree with class, instance_id, variables, constraints, and
+        children for each model node.
     """
-    indices = constraint_indices(model)
+    written: dict = {}  # id(owner) -> refs; ids because Models are unhashable
+    for owner, key, _ in written_keyed_constraints(model):
+        written.setdefault(id(owner), []).append(key.ref)
     all_claimed_vars = set()  # vars claimed by any node
 
     def _walk(cset):
@@ -450,7 +470,7 @@ def build_model_tree(model):
             "class": class_name,
             "instance_id": instance_id,
             "variables": owned_vars,
-            "constraint_indices": indices.get(id(cset), []),
+            "constraints": written.get(id(cset), []),
             "children": [_walk(child) for child in getattr(cset, "_children", ())],
         }
 

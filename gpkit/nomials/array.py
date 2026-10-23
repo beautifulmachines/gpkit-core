@@ -12,7 +12,7 @@ from operator import eq, ge, le, xor
 
 import numpy as np
 
-from ..ast_nodes import ExprNode, to_ast
+from ..ast_nodes import expr, to_ast
 from ..util.repr_conventions import ReprMixin
 from ..util.small_classes import EMPTY_HV, HashVector
 from ..util.small_scripts import try_str_without
@@ -33,11 +33,12 @@ def array_constraint(symbol, func):
 
     def wrapped_func(self, other):
         "Creates array constraint from vectorized operator."
+        written = other  # what the constraint says, before broadcasting it
         if not isinstance(other, NomialArray):
             other = NomialArray(other)
         result = vecfunc(self, other)
         return ArrayConstraint(
-            result, getattr(self, "key", self), symbol, getattr(other, "key", other)
+            result, getattr(self, "key", self), symbol, getattr(written, "key", written)
         )
 
     return wrapped_func
@@ -59,25 +60,23 @@ class NomialArray(ReprMixin, np.ndarray):
         astorder = (self, other) if not reverse_order else (other, self)
         return NomialArray(
             np.ndarray.__mul__(self, other),
-            ast=ExprNode("mul", tuple(to_ast(x) for x in astorder)),
+            ast=expr("mul", tuple(to_ast(x) for x in astorder)),
         )
 
     def __truediv__(self, other):
         return NomialArray(
             np.ndarray.__truediv__(self, other),
-            ast=ExprNode("div", (to_ast(self), to_ast(other))),
+            ast=expr("div", (to_ast(self), to_ast(other))),
         )
 
     def __rtruediv__(self, other):
         result = np.ndarray.__mul__(self**-1, other)
-        return NomialArray(result, ast=ExprNode("div", (to_ast(other), to_ast(self))))
+        return NomialArray(result, ast=expr("div", (to_ast(other), to_ast(self))))
 
     def __add__(self, other, *, reverse_order=False):
         astorder = (self, other) if not reverse_order else (other, self)
         result = np.ndarray.__add__(self, other)
-        return NomialArray(
-            result, ast=ExprNode("add", tuple(to_ast(x) for x in astorder))
-        )
+        return NomialArray(result, ast=expr("add", tuple(to_ast(x) for x in astorder)))
 
     def __rmul__(self, other):
         return self.__mul__(other, reverse_order=True)
@@ -87,17 +86,17 @@ class NomialArray(ReprMixin, np.ndarray):
 
     def __pow__(self, expo):
         result = np.ndarray.__pow__(self, expo)
-        return NomialArray(result, ast=ExprNode("pow", (to_ast(self), expo)))
+        return NomialArray(result, ast=expr("pow", (to_ast(self), expo)))
 
     def __neg__(self):
         result = np.ndarray.__neg__(self)
-        return NomialArray(result, ast=ExprNode("neg", (to_ast(self),)))
+        return NomialArray(result, ast=expr("neg", (to_ast(self),)))
 
     def __getitem__(self, idxs):
         out = np.ndarray.__getitem__(self, idxs)
         if not getattr(out, "shape", None):
             return out
-        return NomialArray(out, ast=ExprNode("index", (to_ast(self), idxs)))
+        return NomialArray(out, ast=expr("index", (to_ast(self), idxs)))
 
     def str_without(self, excluded=()):
         "Returns string without certain fields (such as 'lineage')."
@@ -184,7 +183,7 @@ class NomialArray(ReprMixin, np.ndarray):
                 elif hmap.units and p and not np.isnan(p):
                     p /= float(hmap.units)
                 hmap[EMPTY_HV] = p + hmap.get(EMPTY_HV, 0)
-        return Signomial(hmap, ast=ExprNode("sum", (to_ast(self),)))
+        return Signomial(hmap, ast=expr("sum", (to_ast(self),)))
 
     def prod(self, *args, **kwargs):
         "Returns a product. O(N) if no arguments and only contains monomials."
@@ -204,4 +203,4 @@ class NomialArray(ReprMixin, np.ndarray):
             if m.units:
                 hmap.units = (hmap.units or 1) * m.units
         hmap[exp] = c
-        return Signomial(hmap, ast=ExprNode("prod", (to_ast(self),)))
+        return Signomial(hmap, ast=expr("prod", (to_ast(self),)))

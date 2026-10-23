@@ -10,7 +10,12 @@ from time import time
 
 import numpy as np
 
-from ..constraints.set import ConstraintSet, keyed_constraints, walk_owned
+from ..constraints.set import (
+    ConstraintSet,
+    keyed_constraints,
+    solver_constraints,
+    walk_owned,
+)
 from ..exceptions import (
     DualInfeasible,
     Infeasible,
@@ -78,9 +83,10 @@ def _senss_by_model(model, constraint_senss) -> dict:
     if model is None:
         return {}
     senss = defaultdict(float)
-    for owner, c in walk_owned(model):
-        if c in constraint_senss:
-            senss[lineagestr(owner)] += abs(constraint_senss[c])
+    for owner, written in walk_owned(model):
+        for _, c in solver_constraints(written):
+            if c in constraint_senss:
+                senss[lineagestr(owner)] += abs(constraint_senss[c])
     return dict(senss)
 
 

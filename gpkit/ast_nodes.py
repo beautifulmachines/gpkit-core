@@ -180,12 +180,25 @@ class ExprNode(ASTNode):
         return {
             "node": "expr",
             "op": self.op,
-            "children": [_child_to_ir(c) for c in self.children],
+            "children": [ast_to_ir(c) for c in self.children],
         }
 
 
-def _child_to_ir(child):
-    "Serialize an AST child (node or raw value) to IR."
+def expr(op, children):
+    """The ExprNode applying op to its operands' ASTs, or None if one has none.
+
+    An expression is written only if all of it was: an operand assembled
+    element by element, whose to_ast() is None, leaves the whole without an AST
+    rather than with one holding something no renderer or reader can follow.
+    """
+    children = tuple(children)
+    if any(c is None for c in children):
+        return None  # an operand has no AST, so neither does the expression
+    return ExprNode(op, children)
+
+
+def ast_to_ir(child):
+    "Serialize an AST node or raw value to IR; the inverse of ast_from_ir."
     if isinstance(child, ASTNode):
         return child.to_ir()
     if isinstance(child, (int, float)):
@@ -198,7 +211,7 @@ def _child_to_ir(child):
             "step": child.step,
         }
     if isinstance(child, tuple):
-        return {"node": "tuple", "items": [_child_to_ir(el) for el in child]}
+        return {"node": "tuple", "items": [ast_to_ir(el) for el in child]}
     # numpy scalars and similar numeric types
     try:
         return float(child)
@@ -276,7 +289,8 @@ def to_ast(obj):
 
     Used by math.py and array.py when building ASTs for nomial operations.
     Returns VarNode for Variables, the existing .ast for nomials that have one,
-    or the object unchanged (raw numbers, index specs, etc. for strify to handle).
+    None for a nomial or array that has none -- it was never written as one
+    expression -- or the object unchanged (raw numbers, index specs, etc.).
     """
     if isinstance(obj, ASTNode):
         return obj
@@ -307,4 +321,6 @@ def to_ast(obj):
             pass
     if hasattr(obj, "key"):
         return VarNode(obj.key)
-    return obj
+    # a nomial or array that got this far was never written as one expression
+    unwritten = hasattr(obj, "hmap") or isinstance(obj, np.ndarray)
+    return None if unwritten else obj

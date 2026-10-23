@@ -3,6 +3,10 @@
 from operator import eq, ge, le
 from typing import ClassVar
 
+import numpy as np
+
+from ..ast_nodes import ast_to_ir, to_ast
+from ..util.globals import NamedVariables
 from ..util.repr_conventions import UNICODE_EXPONENTS, ReprMixin
 from ..util.small_scripts import try_str_without
 
@@ -50,27 +54,45 @@ class SingleEquationConstraint(ReprMixin):
 
 
 class ArrayConstraint(SingleEquationConstraint, list):
-    """A ConstraintSet for prettier array-constraint printing.
+    """One written relation between arrays, standing for one per element.
 
-    When created by NomialArray `left` and `right` are likely to be
-    be either NomialArrays or Varkeys of VectorVariables.
+    `left` and `right` are the sides as written -- usually NomialArrays or the
+    veckeys of VectorVariables -- and `constraints` holds the scalar constraint
+    for each element, which is what reaches the solver.
     """
 
     def __init__(self, constraints, left, oper, right):
         self.constraints = constraints
+        self.lineage = tuple(NamedVariables.lineage)
         list.__init__(self, constraints)
         SingleEquationConstraint.__init__(self, left, oper, right)
 
     def __iter__(self):
         yield from self.constraints.flat
 
+    def elements(self):
+        "(idx, constraint) for each element, in the order the solver gets them."
+        return np.ndenumerate(self.constraints)
+
     def lines_without(self, excluded):
         "Returns lines for indentation in hierarchical printing."
         return self.str_without(excluded).split("\n")
 
     def to_ir(self):
-        "Serialize as a list of element constraint IR dicts."
-        return [c.to_ir() for c in self.constraints.flat]
+        """Serialize the relation as written; its elements serialize themselves.
+
+        A side has an AST only if all of it was written: an array assembled
+        element by element, as NomialArray([x, y]), was never one expression,
+        whether it is the whole side or only part of one.
+        """
+        ir = {"type": "ArrayConstraint", "oper": self.oper}
+        ir["shape"] = list(self.constraints.shape)
+        if self.lineage:
+            ir["lineage"] = [[name, num] for name, num in self.lineage]
+        for name, side in (("left", self.left), ("right", self.right)):
+            ast = to_ast(side)
+            ir[name] = {} if ast is None else {"ast": ast_to_ir(ast)}
+        return ir
 
     def __bool__(self):
         "Allows the use of '=' NomialArrays as truth elements."

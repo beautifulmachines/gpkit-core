@@ -140,14 +140,22 @@ def run_catalog_to_ir(model_entry):
     dangling = sorted(set(ir.get("substitutions", {})) - set(ir["variables"]))
     assert not dangling, f"substitutions name undeclared variables: {dangling}"
 
-    def tree_indices(node):
-        yield from node["constraint_indices"]
+    def tree_refs(node):
+        yield from node["constraints"]
         for child in node["children"]:
-            yield from tree_indices(child)
+            yield from tree_refs(child)
 
-    # every constraint claimed by exactly one node, which is what lets a
-    # consumer join model_tree against the flat constraints list
-    assert sorted(tree_indices(ir["model_tree"])) == list(range(len(ir["constraints"])))
+    # every written constraint claimed by exactly one node, and every element
+    # belonging to one of them, which is what lets a consumer join the two
+    constraints = ir["constraints"]
+    written = [ref for ref, c in constraints.items() if "veckey_ref" not in c]
+    claimed = list(tree_refs(ir["model_tree"]))
+    assert sorted(claimed) == sorted(written)
+    assert all(
+        constraints[c["veckey_ref"]]["shape"] == c["shape"]
+        for c in constraints.values()
+        if "veckey_ref" in c
+    )
 
 
 def run_catalog_toml_roundtrip(model_entry):

@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 
-from .constraints.set import keyed_constraints
+from .constraints.set import keyed_constraints, written_keyed_constraints
 from .display.naming import decorated
 from .ir import diff_solutions
 from .units import Quantity
@@ -37,6 +37,8 @@ class Display:
     ref -- name, units, label, model heading -- and each constraint's text.
     Variables it reads from entries in the model IR's `variables` format, so a
     table with a model and one without render them through the same code.
+    Constraint entries are their keys' IR, which places an element in its
+    vector constraint as a variable's entry places it in its vector.
     """
 
     def __init__(self, entries, model=None):
@@ -44,9 +46,17 @@ class Display:
         self.has_model = model is not None
         # a solution holds the cost's value; only the model knows its expression
         self.cost_name = "cost" if model is None else model.cost.str_without("units")
-        self._constraints = (
-            {} if model is None else {k.ref: c for k, c in keyed_constraints(model)}
-        )
+        self.constraint_entries, self._constraints = {}, {}
+        if model is not None:
+            for key, c in keyed_constraints(model):  # what a solution keys by
+                self.constraint_entries[key.ref] = key.to_ir()
+                self._constraints[key.ref] = c
+            for _, key, c in written_keyed_constraints(model):  # what a row shows
+                self._constraints[key.ref] = c
+
+    def entry(self, ref) -> dict:
+        "ref's IR entry, a variable's or a constraint's; empty for neither."
+        return self.entries.get(ref) or self.constraint_entries.get(ref, {})
 
     def name(self, ref) -> str:
         entry = self.entries[ref]
@@ -242,9 +252,21 @@ class SectionSpec:
         units = self.display.units(ref)
         return f"[{units}]" if units else ""
 
-    def _fmt_one(self, x, p, suff="") -> str:
-        "Format a single scalar element for vector display."
-        return f"{x:{self.pm}.{p - 1}g}{suff}".replace("+nan", "nan")
+    def _fmt_one(self, x, p) -> str:
+        "Format a single number, a vector's element or a scalar, at p-1 digits."
+        return f"{x:{self.pm}.{p - 1}g}".replace("+nan", "nan")
+
+    nearzero_tol = 1e-7
+
+    def _fmt_one_sens(self, x, p) -> str:
+        """A sensitivity, signed, or ~0 where it vanishes.
+
+        A primal value can be tiny at any scale; a sensitivity is a dimensionless
+        dual, so a fixed tolerance separates "does not matter" from solver noise.
+        """
+        if abs(x) < self.nearzero_tol:
+            return "~0"
+        return f"{x:+.{p - 1}g}".replace("+nan", "nan")
 
     def _fmt_val(self, val, suff="", one=None) -> str:
         "val, a vector's elements each formatted by one, if given"
@@ -252,13 +274,13 @@ class SectionSpec:
         p = self.options.precision
         w = self.options.vec_width or 0
         if np.shape(val):
-            one = one or (lambda x: self._fmt_one(x, p, suff))
+            one = one or (lambda x: self._fmt_one(x, p) + suff)
             flat = np.asarray(val).ravel()
             shown = flat[:n]
             body = "  ".join(one(x).ljust(w) for x in shown)
             dots = " ..." if flat.size > n else ""
             return f"[ {body}{dots} ]"
-        return f"{val:{self.pm}.{p}g}{suff}"
+        return self._fmt_one(val, p + 1) + suff
 
     def _passes_filter(self, item) -> bool:
         if self.filterfun is None:
@@ -283,7 +305,7 @@ class SectionSpec:
             if not np.shape(arr):
                 continue
             flat = np.asarray(arr).ravel()
-            w = max(w, *(len(f"{el:{self.pm}.{p - 1}g}") for el in flat))
+            w = max(w, *(len(self._fmt_one(el, p)) for el in flat))
         return w
 
 
@@ -339,7 +361,6 @@ class Constants(SectionSpec):
     title = "Fixed Variables"
     columns = (VARIABLE, VALUE, UNITS, SENSITIVITY, LABEL)
     align = "><<<<"  # name(R), value(L), unit(L), sens-in-parens(L), label(L)
-    nearzero_tol = 1e-7
     _fmt_unit_w = 0  # overridden per-group by SolutionSection._format_model_group
     _fmt_col_widths = (
         None  # overridden per-group by SolutionSection._format_model_group
@@ -353,12 +374,6 @@ class Constants(SectionSpec):
         sens_dict = dict(ctx.items(_variable_senss))
         for ref, val in ctx.items(_constants):
             yield (ref, (val, sens_dict.get(ref, 0.0)))
-
-    def _fmt_one_sens(self, x, p) -> str:
-        """Format a single sensitivity element: ~0 if near-zero, else +x."""
-        if abs(x) < self.nearzero_tol:
-            return "~0"
-        return f"{x:+.{p - 1}g}".replace("+nan", "nan")
 
     def _fmt_vec_pair(self, flat_val, flat_sens):
         """Build aligned value/sensitivity vector strings.
@@ -538,7 +553,10 @@ class Sweeps(FreeVariables):
 class Constraints(SectionSpec):
     columns = (("Sensitivity", "{}"), ("Constraint", "{}"))
     col_sep = " : "
-    pm = "+"
+
+    def _fmt_one(self, x, p):
+        "Every number this section shows is a sensitivity."
+        return self._fmt_one_sens(x, p)
 
     def sortkey(self, item):
         return (-rounded_mag(item[1]), self.display.constraint(item[0]))
@@ -849,7 +867,7 @@ class Documents:
             return dict(values)
         out = {}
         for ref, value in values.items():
-            entry = self.display.entries.get(ref, {})  # none for a constraint
+            entry = self.display.entry(ref)
             if "veckey_ref" not in entry:
                 out[ref] = value
                 continue

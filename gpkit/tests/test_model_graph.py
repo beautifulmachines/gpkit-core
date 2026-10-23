@@ -5,8 +5,14 @@ import pytest
 from gpkit import Model, SignomialEquality, SignomialsEnabled, Variable
 from gpkit.constraints.bounded import Bounded
 from gpkit.constraints.loose import Loose
-from gpkit.constraints.set import build_model_tree, walk_owned
+from gpkit.constraints.set import (
+    build_model_tree,
+    solver_constraints,
+    walk_owned,
+    written_keyed_constraints,
+)
 from gpkit.constraints.tight import Tight
+from gpkit.examples.pipeline import Pipeline
 from gpkit.examples.uav import UAV
 from gpkit.exceptions import AmbiguousVariable, VariableNotFound
 from gpkit.report import build_report_ir
@@ -396,7 +402,7 @@ class _WrappedTop(Model):
 
 
 def _shown(model):
-    "The leaf constraints model's own report section shows."
+    "The written constraints model's own report section shows."
     return [
         c for cg in build_report_ir(model).constraint_groups for c in cg.constraints
     ]
@@ -428,57 +434,53 @@ class TestConstraintWalk:
         assert len(shown) == len(list(m.flat()))
         assert all(any(c is s for s in shown) for c in m.flat())
 
-    @pytest.mark.parametrize("build", [UAV, _WrappedTop])
-    def test_report_and_model_tree_index_the_same_walk(self, build):
-        """A node's report constraints are the ones its indices point at.
+    @pytest.mark.parametrize("build", [UAV, _WrappedTop, Pipeline])
+    def test_report_and_model_tree_name_the_same_constraints(self, build):
+        """A node's report constraints are the ones its model_tree node lists.
 
-        constraint_indices index into to_ir()'s flat constraint list, and the
-        report shows each node's own constraints; both come from one walk, so
-        node by node they must name the same constraints.
+        Both come from one walk, so node by node they must name the same
+        constraints, by the same refs, in the same written order.
         """
         m = build()
-        flat = list(m.flat())
         tree = build_model_tree(m)
 
         def check(node, model):
-            shown = _shown(model)
-            at_indices = [flat[i] for i in node["constraint_indices"]]
-            assert len(shown) == len(at_indices)
-            assert all(a is b for a, b in zip(shown, at_indices))
+            groups = build_report_ir(model).constraint_groups
+            assert [k.ref for cg in groups for k in cg.keys] == node["constraints"]
             for child_node, child in zip(node["children"], model.submodels):
                 check(child_node, child)
 
         check(tree, m)
 
-    @pytest.mark.parametrize("build", [UAV, _WrappedTop])
+    @pytest.mark.parametrize("build", [UAV, _WrappedTop, Pipeline])
     def test_every_constraint_is_owned_exactly_once(self, build):
-        "The walk partitions the flat list across the model tree."
+        "The walk partitions the written constraints across the model tree."
         m = build()
         tree = build_model_tree(m)
         seen = []
 
         def collect(node):
-            seen.extend(node["constraint_indices"])
+            seen.extend(node["constraints"])
             for child in node["children"]:
                 collect(child)
 
         collect(tree)
-        assert sorted(seen) == list(range(len(list(m.flat()))))
+        written = [key.ref for _, key, _ in written_keyed_constraints(m)]
+        assert sorted(seen) == sorted(written)
         assert len(seen) == len(set(seen))
 
-    @pytest.mark.parametrize("build", [UAV, _WrappedTop])
+    @pytest.mark.parametrize("build", [UAV, _WrappedTop, Pipeline])
     def test_flat_and_walk_owned_stay_in_step(self, build):
-        """.flat() and walk_owned enumerate the same constraints in the same order.
+        """.flat() and walk_owned reach the same relations in the same order.
 
         They are separate recursions answering different questions -- .flat()
-        can stop early at a container implementing a protocol, walk_owned tags
-        each leaf with its owner.  to_ir()'s constraint list and its indices
-        come from walk_owned while a user iterates .flat(), so the two agreeing
-        is what lets an index mean the same thing to both.
+        is what the solver gets, walk_owned what each model wrote, a vector
+        constraint as one -- so expanding the walk's vector constraints into
+        their elements has to give .flat() back exactly.
         """
         m = build()
-        walked = [c for _, c in walk_owned(m)]
+        expanded = [s for _, c in walk_owned(m) for _, s in solver_constraints(c)]
         flat = list(m.flat())
-        assert len(walked) == len(flat)
-        assert all(a is b for a, b in zip(walked, flat))
-        assert not any(hasattr(c, "__iter__") for c in walked)
+        assert len(expanded) == len(flat)
+        assert all(a is b for a, b in zip(expanded, flat))
+        assert not any(hasattr(c, "__iter__") for c in expanded)

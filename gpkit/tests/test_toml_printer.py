@@ -464,6 +464,30 @@ class TestVectorizedSubmodel:
             mag(m1.solve(verbosity=0).cost), rel=1e-5
         )
 
+    def test_a_constraint_written_once_is_written_back_once(self):
+        "Vectorize makes it a vector constraint; it is still one relation (#141)."
+        doc = tomllib.loads(to_toml(self._duty_model()))
+        assert doc["models"]["Condition"]["constraints"] == ["P >= Q*k"]
+
+
+class TestVectorConstraints:
+    """A vector constraint is written back as written, not as its elements (#141)."""
+
+    def _model(self):
+        q = VectorVariable(3, "q", "m")
+        c = VectorVariable(3, "c", [1, 2, 3], "m")
+        W = Variable("W", "m")
+        return Model(W, [W >= q.sum(), q >= c])
+
+    def test_is_one_line(self):
+        doc = tomllib.loads(to_toml(self._model()))
+        assert doc["model"]["constraints"] == ["W >= sum(q)", "q >= c"]
+
+    def test_round_trip_keeps_every_constraint_key(self):
+        m1 = self._model()
+        m2 = load_toml(to_toml(m1))
+        assert set(m2.to_ir()["constraints"]) == set(m1.to_ir()["constraints"])
+
 
 # ---------------------------------------------------------------------------
 # Vector constant values
