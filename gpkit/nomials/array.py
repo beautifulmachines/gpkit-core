@@ -14,7 +14,7 @@ import numpy as np
 
 from ..ast_nodes import expr, to_ast
 from ..util.repr_conventions import ReprMixin
-from ..util.small_classes import EMPTY_HV, HashVector
+from ..util.small_classes import EMPTY_HV, HashVector, Numbers
 from ..util.small_scripts import try_str_without
 from .constraints import ArrayConstraint
 from .map import NomialMap
@@ -25,6 +25,11 @@ from .math import Signomial
 def vec_recurse(element, function, *args, **kwargs):
     "Vectorizes function with particular args and kwargs"
     return function(element, *args, **kwargs)
+
+
+def _elementwise(ufunc, op, left, right):
+    "left op right, each element computed and the whole recorded in written order."
+    return NomialArray(ufunc(left, right), ast=expr(op, (to_ast(left), to_ast(right))))
 
 
 def array_constraint(symbol, func):
@@ -56,33 +61,50 @@ class NomialArray(ReprMixin, np.ndarray):
     >>> px = gpkit.NomialArray([1, x, x**2])
     """
 
-    def __mul__(self, other, *, reverse_order=False):
-        astorder = (self, other) if not reverse_order else (other, self)
-        return NomialArray(
-            np.ndarray.__mul__(self, other),
-            ast=expr("mul", tuple(to_ast(x) for x in astorder)),
-        )
-
-    def __truediv__(self, other):
-        return NomialArray(
-            np.ndarray.__truediv__(self, other),
-            ast=expr("div", (to_ast(self), to_ast(other))),
-        )
-
-    def __rtruediv__(self, other):
-        result = np.ndarray.__mul__(self**-1, other)
-        return NomialArray(result, ast=expr("div", (to_ast(other), to_ast(self))))
-
-    def __add__(self, other, *, reverse_order=False):
-        astorder = (self, other) if not reverse_order else (other, self)
-        result = np.ndarray.__add__(self, other)
-        return NomialArray(result, ast=expr("add", tuple(to_ast(x) for x in astorder)))
+    def __mul__(self, other):
+        return _elementwise(np.multiply, "mul", self, other)
 
     def __rmul__(self, other):
-        return self.__mul__(other, reverse_order=True)
+        return _elementwise(np.multiply, "mul", other, self)
+
+    def __truediv__(self, other):
+        return _elementwise(np.true_divide, "div", self, other)
+
+    def __rtruediv__(self, other):
+        return _elementwise(np.true_divide, "div", other, self)
+
+    def __add__(self, other):
+        if isinstance(other, Numbers) and other == 0:
+            return self  # as Signomial does, so sum() records no leading 0
+        return _elementwise(np.add, "add", self, other)
 
     def __radd__(self, other):
-        return self.__add__(other, reverse_order=True)
+        if isinstance(other, Numbers) and other == 0:
+            return self
+        return _elementwise(np.add, "add", other, self)
+
+    def __sub__(self, other):
+        "Elementwise, so each element's __sub__ says whether subtracting is allowed."
+        ast = expr("add", (to_ast(self), expr("neg", (to_ast(other),))))
+        return NomialArray(np.subtract(self, other), ast=ast)
+
+    def __rsub__(self, other):
+        ast = expr("add", (to_ast(other), expr("neg", (to_ast(self),))))
+        return NomialArray(np.subtract(other, self), ast=ast)
+
+    # In-place ops rebind, as they do for scalars, instead of writing into the
+    # array: it may be a VectorVariable's own, and the AST has to follow too.
+    def __iadd__(self, other):
+        return self + other
+
+    def __isub__(self, other):
+        return self - other
+
+    def __imul__(self, other):
+        return self * other
+
+    def __itruediv__(self, other):
+        return self / other
 
     def __pow__(self, expo):
         result = np.ndarray.__pow__(self, expo)

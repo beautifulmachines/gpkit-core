@@ -917,8 +917,8 @@ class TestVectorConstraintIR:
         assert parent["right"] == {}
         toml_doc = tomllib.loads(to_toml(m))
         assert toml_doc["model"]["constraints"][:2] == [
-            "q[0] >= x**0.5*2",
-            "q[1] >= y**0.5*2",
+            "q[0] >= 2*x**0.5",
+            "q[1] >= 2*y**0.5",
         ]
 
     def test_a_scalar_variable_times_a_vector_is_written_as_itself(self):
