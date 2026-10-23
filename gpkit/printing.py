@@ -252,9 +252,21 @@ class SectionSpec:
         units = self.display.units(ref)
         return f"[{units}]" if units else ""
 
-    def _fmt_one(self, x, p, suff="") -> str:
-        "Format a single scalar element for vector display."
-        return f"{x:{self.pm}.{p - 1}g}{suff}".replace("+nan", "nan")
+    def _fmt_one(self, x, p) -> str:
+        "Format a single number, a vector's element or a scalar, at p-1 digits."
+        return f"{x:{self.pm}.{p - 1}g}".replace("+nan", "nan")
+
+    nearzero_tol = 1e-7
+
+    def _fmt_one_sens(self, x, p) -> str:
+        """A sensitivity, signed, or ~0 where it vanishes.
+
+        A primal value can be tiny at any scale; a sensitivity is a dimensionless
+        dual, so a fixed tolerance separates "does not matter" from solver noise.
+        """
+        if abs(x) < self.nearzero_tol:
+            return "~0"
+        return f"{x:+.{p - 1}g}".replace("+nan", "nan")
 
     def _fmt_val(self, val, suff="", one=None) -> str:
         "val, a vector's elements each formatted by one, if given"
@@ -262,13 +274,13 @@ class SectionSpec:
         p = self.options.precision
         w = self.options.vec_width or 0
         if np.shape(val):
-            one = one or (lambda x: self._fmt_one(x, p, suff))
+            one = one or (lambda x: self._fmt_one(x, p) + suff)
             flat = np.asarray(val).ravel()
             shown = flat[:n]
             body = "  ".join(one(x).ljust(w) for x in shown)
             dots = " ..." if flat.size > n else ""
             return f"[ {body}{dots} ]"
-        return f"{val:{self.pm}.{p}g}{suff}"
+        return self._fmt_one(val, p + 1) + suff
 
     def _passes_filter(self, item) -> bool:
         if self.filterfun is None:
@@ -293,7 +305,7 @@ class SectionSpec:
             if not np.shape(arr):
                 continue
             flat = np.asarray(arr).ravel()
-            w = max(w, *(len(f"{el:{self.pm}.{p - 1}g}") for el in flat))
+            w = max(w, *(len(self._fmt_one(el, p)) for el in flat))
         return w
 
 
@@ -349,7 +361,6 @@ class Constants(SectionSpec):
     title = "Fixed Variables"
     columns = (VARIABLE, VALUE, UNITS, SENSITIVITY, LABEL)
     align = "><<<<"  # name(R), value(L), unit(L), sens-in-parens(L), label(L)
-    nearzero_tol = 1e-7
     _fmt_unit_w = 0  # overridden per-group by SolutionSection._format_model_group
     _fmt_col_widths = (
         None  # overridden per-group by SolutionSection._format_model_group
@@ -363,12 +374,6 @@ class Constants(SectionSpec):
         sens_dict = dict(ctx.items(_variable_senss))
         for ref, val in ctx.items(_constants):
             yield (ref, (val, sens_dict.get(ref, 0.0)))
-
-    def _fmt_one_sens(self, x, p) -> str:
-        """Format a single sensitivity element: ~0 if near-zero, else +x."""
-        if abs(x) < self.nearzero_tol:
-            return "~0"
-        return f"{x:+.{p - 1}g}".replace("+nan", "nan")
 
     def _fmt_vec_pair(self, flat_val, flat_sens):
         """Build aligned value/sensitivity vector strings.
@@ -548,7 +553,10 @@ class Sweeps(FreeVariables):
 class Constraints(SectionSpec):
     columns = (("Sensitivity", "{}"), ("Constraint", "{}"))
     col_sep = " : "
-    pm = "+"
+
+    def _fmt_one(self, x, p):
+        "Every number this section shows is a sensitivity."
+        return self._fmt_one_sens(x, p)
 
     def sortkey(self, item):
         return (-rounded_mag(item[1]), self.display.constraint(item[0]))

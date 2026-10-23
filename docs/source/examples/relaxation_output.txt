@@ -132,9 +132,9 @@ C[:] : [ 1  2 ]
 
 Most Sensitive Constraints
 --------------------------
-+1                       : x_min ≤ C[1]⋅x
-+0.99                    : x ≤ C[0]⋅x_max
-[ +0.01      +2.65e-09 ] : C[:] ≥ 1
++1               : x_min ≤ C[1]⋅x
++0.99            : x ≤ C[0]⋅x_max
+[ +0.01  ~0    ] : C[:] ≥ 1
 
 With constants relaxed individually
 ===================================
