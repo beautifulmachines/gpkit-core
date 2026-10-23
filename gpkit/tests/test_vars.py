@@ -48,7 +48,7 @@ class TestVarKey:
         y = VectorVariable(2, "y")
         assert y[0].key.latex() == "{\\vec{y}}_{0}"
 
-    def test_ast(self):  # noqa: PLR0915
+    def test_ast(self):
         if sys.platform[:3] == "win":  # pragma: no cover
             return
 
@@ -62,16 +62,18 @@ class TestVarKey:
         a = VectorVariable((3, 2), "a")
 
         assert str(3 * (x + y) * z) == "3⋅(x[:] + y[:])⋅z[:]"
+        # a numeric array was never written as one expression, so an expression
+        # using one has no AST either, and shows its elements
         nni = 3
         ii = np.tile(np.arange(1, nni + 1), a.shape[1:] + (1,)).T
-        assert str(w * NomialArray(ii) / nni)[:4] == "w⋅[["
-        assert str(w * NomialArray(ii) / nni)[-4:] == "]]/3"
-        assert str(NomialArray(ii) * w / nni)[:2] == "[["
-        assert str(NomialArray(ii) * w / nni)[-6:] == "]]⋅w/3"
-        assert str(w * ii / nni)[:4] == "w⋅[["
-        assert str(w * ii / nni)[-4:] == "]]/3"
-        assert str(w * (ii / nni))[:4] == "w⋅[["
-        assert str(w * (ii / nni))[-2:] == "]]"
+        for e in (
+            w * NomialArray(ii) / nni,
+            NomialArray(ii) * w / nni,
+            w * ii / nni,
+            w * (ii / nni),
+        ):
+            assert e.ast is None
+            assert str(e).startswith("[[")
         assert str(w >= (x[0] * t + x[1] * u) / v) == "w ≥ (x[0]⋅t + x[1]⋅u)/v"
         assert str(x) == "x[:]"
         assert str(x * 2) == "x[:]⋅2"
@@ -102,13 +104,10 @@ class TestVarKey:
         gstrafter = str(g)
         assert gstrbefore == gstrafter
 
+        # a constant vector belongs in a named, fixed VectorVariable; an anonymous
+        # array is never written, so the side using one shows its elements
         cstr = str(2 * a >= a + np.ones((3, 2)) / 2)
-        assert (
-            cstr
-            == """2⋅a[:] ≥ a[:] + [[0.5 0.5]
-           [0.5 0.5]
-           [0.5 0.5]]"""
-        )
+        assert cstr.startswith("2⋅a[:] ≥ [[a[0,0] + 0.5")
 
     def test_eq_neq(self):
         """Test boolean equality operators"""

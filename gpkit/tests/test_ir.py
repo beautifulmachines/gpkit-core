@@ -2,6 +2,7 @@
 
 import dataclasses
 import json
+import tomllib
 
 import numpy as np
 import pytest
@@ -9,6 +10,7 @@ import pytest
 import gpkit
 from gpkit import (
     Model,
+    NomialArray,
     SignomialsEnabled,
     Var,
     Variable,
@@ -896,6 +898,28 @@ class TestVectorConstraintIR:
         ir = Model(q.sum(), [2 * q >= x]).to_ir()
         (parent,) = [c for c in ir["constraints"].values() if "veckey_ref" not in c]
         assert parent["right"]["ast"] == {"node": "var", "ref": x.key.ref}
+
+    def test_a_side_only_partly_written_has_no_written_form(self):
+        """An array assembled element by element, used inside an expression.
+
+        The expression has an AST, but part of it was never written as one, so
+        only the elements' math is known -- as gassolar's gust loads have it.
+        """
+        q, x, y = VectorVariable(2, "q"), Variable("x"), Variable("y")
+        assembled = NomialArray([x**0.5, y**0.5])
+        m = Model(q.sum(), [q >= 2 * assembled, x >= 1, y >= 1])
+        (parent,) = [
+            c
+            for c in m.to_ir()["constraints"].values()
+            if "shape" in c and "idx" not in c
+        ]
+        assert parent["left"] == {"ast": {"node": "var", "ref": q.key.ref}}
+        assert parent["right"] == {}
+        toml_doc = tomllib.loads(to_toml(m))
+        assert toml_doc["model"]["constraints"][:2] == [
+            "q[0] >= x**0.5*2",
+            "q[1] >= y**0.5*2",
+        ]
 
     def test_a_scalar_variable_times_a_vector_is_written_as_itself(self):
         "rho*V promotes rho to an array to multiply; the written form is still rho."

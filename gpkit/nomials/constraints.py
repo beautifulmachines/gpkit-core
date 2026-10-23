@@ -5,10 +5,9 @@ from typing import ClassVar
 
 import numpy as np
 
-from ..ast_nodes import ASTNode, ConstNode, to_ast
+from ..ast_nodes import ast_to_ir, to_ast
 from ..util.globals import NamedVariables
 from ..util.repr_conventions import UNICODE_EXPONENTS, ReprMixin
-from ..util.small_classes import Numbers
 from ..util.small_scripts import try_str_without
 
 
@@ -82,16 +81,17 @@ class ArrayConstraint(SingleEquationConstraint, list):
     def to_ir(self):
         """Serialize the relation as written; its elements serialize themselves.
 
-        A side keeps its AST only if it has one: an array assembled element by
-        element, as NomialArray([x, y]), was never written as one expression.
+        A side has an AST only if all of it was written: an array assembled
+        element by element, as NomialArray([x, y]), was never one expression,
+        whether it is the whole side or only part of one.
         """
         ir = {"type": "ArrayConstraint", "oper": self.oper}
         ir["shape"] = list(self.constraints.shape)
         if self.lineage:
             ir["lineage"] = [[name, num] for name, num in self.lineage]
         for name, side in (("left", self.left), ("right", self.right)):
-            ast = ConstNode(float(side)) if isinstance(side, Numbers) else to_ast(side)
-            ir[name] = {"ast": ast.to_ir()} if isinstance(ast, ASTNode) else {}
+            ast = to_ast(side)
+            ir[name] = {} if ast is None else {"ast": ast_to_ir(ast)}
         return ir
 
     def __bool__(self):

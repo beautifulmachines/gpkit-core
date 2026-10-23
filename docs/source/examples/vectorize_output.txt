@@ -65,5 +65,4 @@ Most Sensitive Constraints
 +1 : x[1] ≥ 2
 
 Test
-+1 : x[0] ≥ 1
-+1 : x[2] ≥ 1
+[ +1         +3.82e-07  +1        ] : x[:] ≥ 1

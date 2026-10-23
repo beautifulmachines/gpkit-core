@@ -146,8 +146,15 @@ class TestVectorConstraintKey:
         assert of_three != of_four
 
     def test_serializes_to_the_ir(self):
+        "An element names its vector constraint, as a VarKey element its veckey."
         k = ConstraintKey(path=("Wing",), index=1, idx=(2,), shape=(3,))
-        assert k.to_ir() == {"path": ["Wing"], "index": 1, "idx": [2], "shape": [3]}
+        assert k.to_ir() == {
+            "path": ["Wing"],
+            "index": 1,
+            "idx": [2],
+            "shape": [3],
+            "veckey_ref": "Wing[1]#3",
+        }
 
 
 class TestKeyedConstraints:

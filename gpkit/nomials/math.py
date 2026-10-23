@@ -6,7 +6,7 @@ from typing import ClassVar
 import numpy as np
 
 from .. import units
-from ..ast_nodes import ExprNode, to_ast
+from ..ast_nodes import expr, to_ast
 from ..exceptions import InvalidGPConstraint, InvalidPosynomial, PrimalInfeasible
 from ..units import DimensionalityError
 from ..util.globals import NamedVariables, SignomialsEnabled
@@ -206,7 +206,7 @@ class Signomial(Nomial):
                 astorder = tuple(reversed(astorder))
             return Signomial(
                 self.hmap + other_hmap,
-                ast=ExprNode("add", tuple(to_ast(x) for x in astorder)),
+                ast=expr("add", tuple(to_ast(x) for x in astorder)),
             )
         return NotImplemented
 
@@ -223,9 +223,7 @@ class Signomial(Nomial):
                 return other
             hmap = mag(other) * self.hmap
             hmap.units_of_product(self.hmap.units, other)
-            return Signomial(
-                hmap, ast=ExprNode("mul", tuple(to_ast(x) for x in astorder))
-            )
+            return Signomial(hmap, ast=expr("mul", tuple(to_ast(x) for x in astorder)))
         if isinstance(other, Signomial):
             hmap = NomialMap()
             for exp_s, c_s in self.hmap.items():
@@ -237,16 +235,14 @@ class Signomial(Nomial):
                     elif accumulated:
                         del hmap[exp]
             hmap.units_of_product(self.hmap.units, other.hmap.units)
-            return Signomial(
-                hmap, ast=ExprNode("mul", tuple(to_ast(x) for x in astorder))
-            )
+            return Signomial(hmap, ast=expr("mul", tuple(to_ast(x) for x in astorder)))
         return NotImplemented
 
     def __truediv__(self, other):
         "Support the / operator in Python 2.x"
         if isinstance(other, Numbers):
             out = self * other**-1
-            return Signomial(out.hmap, ast=ExprNode("div", (to_ast(self), other)))
+            return Signomial(out.hmap, ast=expr("div", (to_ast(self), other)))
         if isinstance(other, Monomial):
             return other.__rtruediv__(self)
         return NotImplemented
@@ -258,13 +254,13 @@ class Signomial(Nomial):
             while expo > 0:
                 p *= self
                 expo -= 1
-            return Signomial(p.hmap, ast=ExprNode("pow", (to_ast(self), original_expo)))
+            return Signomial(p.hmap, ast=expr("pow", (to_ast(self), original_expo)))
         return NotImplemented
 
     def __neg__(self):
         if SignomialsEnabled:
             out = -1 * self
-            return Signomial(out.hmap, ast=ExprNode("neg", (to_ast(self),)))
+            return Signomial(out.hmap, ast=expr("neg", (to_ast(self),)))
         return NotImplemented
 
     def __sub__(self, other):
@@ -331,9 +327,7 @@ class Monomial(Posynomial):
         "Divide other by this Monomial"
         if isinstance(other, Numbers | Signomial):
             out = other * self**-1
-            return Signomial(
-                out.hmap, ast=ExprNode("div", (to_ast(other), to_ast(self)))
-            )
+            return Signomial(out.hmap, ast=expr("div", (to_ast(other), to_ast(self))))
         return NotImplemented
 
     def __pow__(self, expo):
@@ -345,7 +339,7 @@ class Monomial(Posynomial):
                 hmap.units = self.hmap.units**expo
             else:
                 hmap.units = None
-            return Monomial(hmap, ast=ExprNode("pow", (to_ast(self), expo)))
+            return Monomial(hmap, ast=expr("pow", (to_ast(self), expo)))
         return NotImplemented
 
     def __eq__(self, other):

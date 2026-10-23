@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 
-from .constraints.set import keyed_constraints
+from .constraints.set import keyed_constraints, written_keyed_constraints
 from .display.naming import decorated
 from .ir import diff_solutions
 from .units import Quantity
@@ -37,6 +37,8 @@ class Display:
     ref -- name, units, label, model heading -- and each constraint's text.
     Variables it reads from entries in the model IR's `variables` format, so a
     table with a model and one without render them through the same code.
+    Constraint entries are their keys' IR, which places an element in its
+    vector constraint as a variable's entry places it in its vector.
     """
 
     def __init__(self, entries, model=None):
@@ -44,9 +46,17 @@ class Display:
         self.has_model = model is not None
         # a solution holds the cost's value; only the model knows its expression
         self.cost_name = "cost" if model is None else model.cost.str_without("units")
-        self._constraints = (
-            {} if model is None else {k.ref: c for k, c in keyed_constraints(model)}
-        )
+        self.constraint_entries, self._constraints = {}, {}
+        if model is not None:
+            for key, c in keyed_constraints(model):  # what a solution keys by
+                self.constraint_entries[key.ref] = key.to_ir()
+                self._constraints[key.ref] = c
+            for _, key, c in written_keyed_constraints(model):  # what a row shows
+                self._constraints[key.ref] = c
+
+    def entry(self, ref) -> dict:
+        "ref's IR entry, a variable's or a constraint's; empty for neither."
+        return self.entries.get(ref) or self.constraint_entries.get(ref, {})
 
     def name(self, ref) -> str:
         entry = self.entries[ref]
@@ -849,7 +859,7 @@ class Documents:
             return dict(values)
         out = {}
         for ref, value in values.items():
-            entry = self.display.entries.get(ref, {})  # none for a constraint
+            entry = self.display.entry(ref)
             if "veckey_ref" not in entry:
                 out[ref] = value
                 continue

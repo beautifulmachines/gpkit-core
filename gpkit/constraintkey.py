@@ -80,6 +80,7 @@ class ConstraintKey(ReprMixin):
         ir = {"path": list(self.path), "index": self.index}
         if self.idx is not None:
             ir["idx"] = list(self.idx)
+            ir["veckey_ref"] = self.veckey.ref
         if self.shape:
             ir["shape"] = list(self.shape)
         return ir

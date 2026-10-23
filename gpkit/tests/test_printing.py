@@ -220,9 +220,7 @@ class TestMarkdown:
             "\n"
             "| Sensitivity | Constraint |\n"
             "| ----------- | ---------- |\n"
-            "| +0.3 | v\\[2\\] ≥ d\\[2\\]/tau |\n"
-            "| +0.2 | v\\[1\\] ≥ d\\[1\\]/tau |\n"
-            "| +0.1 | v\\[0\\] ≥ d\\[0\\]/tau |"
+            "| \\[ +0.1  +0.2  +0.3 \\] | v\\[:\\] ≥ d\\[:\\]/tau |"
         )
 
     def test_a_sweep_stacks_each_element(self, trip):

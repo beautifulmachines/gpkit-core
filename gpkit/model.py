@@ -320,16 +320,15 @@ class Model(CostedConstraintSet):
 
         constraints_ir = {}
         for _, key, c in written_keyed_constraints(self):
-            constraints_ir[key.ref] = c.to_ir()
+            constraints_ir[key.ref] = {**c.to_ir(), **key.to_ir()}
             for idx, element in solver_constraints(c):
                 if idx is None:
                     continue
                 # a vector constraint's elements: the relations the solver gets
-                constraints_ir[key.element(idx).ref] = {
+                element_key = key.element(idx)
+                constraints_ir[element_key.ref] = {
                     **element.to_ir(),
-                    "idx": list(idx),
-                    "shape": list(key.shape),
-                    "veckey_ref": key.ref,
+                    **element_key.to_ir(),
                 }
 
         # Serialize substitutions; linked (callable-computed) vars get null
