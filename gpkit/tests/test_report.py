@@ -1084,6 +1084,13 @@ class TestVectorConstraintRows:
         senss = m.solve(verbosity=0).to_ir()["sensitivities"]["constraints"]
         assert all(key in senss for key in vector["element_keys"])
 
+    def test_its_latex_is_the_relation_as_written(self):
+        "Typeset from the written expression, as str is, not from each element."
+        q, x = VectorVariable(3, "q"), VectorVariable(3, "x")
+        m = Model(q.sum(), [q >= x + x**2 / 2, x >= 1])
+        (vector, _) = _constraints(m.report(fmt="dict"))
+        assert vector["latex"] == r"\vec{q} \geq \vec{x} + \frac{\vec{x}^{2}}{2}"
+
     def test_one_never_written_as_a_vector_is_its_elements(self):
         "An array assembled element by element has no vector form to show."
         q, x, y = VectorVariable(2, "q"), Variable("x"), Variable("y")

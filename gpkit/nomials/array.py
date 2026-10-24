@@ -138,11 +138,16 @@ class NomialArray(ReprMixin, np.ndarray):
         return f"[{joined}]"
 
     def latex(self, excluded=()):
-        "Returns latex representation without certain fields."
+        "Returns latex representation without certain fields, as str_without does."
+        if "ast" not in excluded and self.ast:
+            return self.ast.latex(excluded)
         units = self.latex_unitstr() if "units" not in excluded else ""
         if hasattr(self, "key"):
             return self.key.latex(excluded) + units
-        return np.ndarray.__str__(self)
+        joined = ", ".join(
+            try_str_without(el, excluded, latex=True) for el in self.flat
+        )
+        return rf"\left[{joined}\right]"
 
     def __hash__(self):
         return reduce(xor, map(hash, self.flat), 0)
