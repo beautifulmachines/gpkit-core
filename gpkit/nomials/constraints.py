@@ -74,9 +74,16 @@ class ArrayConstraint(SingleEquationConstraint, list):
         "(idx, constraint) for each element, in the order the solver gets them."
         return np.ndenumerate(self.constraints)
 
+    @property
+    def written(self) -> bool:
+        "Whether both sides have a written form, so it prints as one vector line."
+        return to_ast(self.left) is not None and to_ast(self.right) is not None
+
     def lines_without(self, excluded):
-        "Returns lines for indentation in hierarchical printing."
-        return self.str_without(excluded).split("\n")
+        "Lines for hierarchical printing: the relation if written, else each element."
+        if self.written:
+            return self.str_without(excluded).split("\n")
+        return [try_str_without(c, excluded) for _, c in self.elements()]
 
     def to_ir(self):
         """Serialize the relation as written; its elements serialize themselves.

@@ -84,6 +84,34 @@ Because ``own_varkeys`` holds elements, a model that declares a vector's element
 vector: ``build_model_tree`` claims both, so every ref in ``to_ir()["variables"]`` belongs to
 exactly one ``model_tree`` node.
 
+Vector constraints
+------------------
+
+Comparing arrays, directly or through ``Vectorize``, writes one *vector constraint*: one relation
+standing for one solver relation per element. Like a vector variable it has two levels of key,
+``Wing[1]#3`` for the relation and ``Wing[1][2]#3`` for an element, and a solution reports a
+sensitivity per element.
+
+It prints as written when both sides were written as expressions:
+
+.. code-block:: python
+
+    q >= c                # q[:] ≥ c[:]
+    w >= x*q + y*q**2     # w[:] ≥ x⋅q[:] + y⋅q[:]²
+
+A side assembled element by element has no vector form to print, so the constraint prints, and
+writes to TOML, one element per line. It is still one vector constraint, with the same keys:
+
+.. code-block:: python
+
+    q >= NomialArray([x, y**2, 2*z])        # q[0] ≥ x,  q[1] ≥ y²,  q[2] ≥ 2⋅z
+    w >= NomialArray([x*q, y*q**2]).sum(0)  # a stacked list of terms, as a fit builds
+    q >= x*np.array([1, 2, 3])              # a numeric array
+
+To print the vector, write the expression out (``x*q + y*q**2`` rather than stacking the terms).
+A constant vector belongs in a fixed ``VectorVariable``, which also gives it a name and a
+sensitivity.
+
 
 Multipoint analysis modeling
 ============================

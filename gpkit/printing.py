@@ -7,7 +7,7 @@ from typing import Any
 
 import numpy as np
 
-from .constraints.set import keyed_constraints, written_keyed_constraints
+from .constraints.set import shown_as, solver_constraints, written_keyed_constraints
 from .display.naming import decorated
 from .ir import diff_solutions
 from .units import Quantity
@@ -47,12 +47,14 @@ class Display:
         # a solution holds the cost's value; only the model knows its expression
         self.cost_name = "cost" if model is None else model.cost.str_without("units")
         self.constraint_entries, self._constraints = {}, {}
-        if model is not None:
-            for key, c in keyed_constraints(model):  # what a solution keys by
-                self.constraint_entries[key.ref] = key.to_ir()
-                self._constraints[key.ref] = c
-            for _, key, c in written_keyed_constraints(model):  # what a row shows
-                self._constraints[key.ref] = c
+        for _, key, c in written_keyed_constraints(model) if model else ():
+            rows = dict(shown_as(key, c))  # what the table's rows show
+            self._constraints.update((k.ref, row) for k, row in rows.items())
+            for idx, element in solver_constraints(c):  # what a solution keys by
+                element_key = key if idx is None else key.element(idx)
+                self._constraints[element_key.ref] = element
+                if idx is not None and key in rows:  # gathered into its vector's row
+                    self.constraint_entries[element_key.ref] = element_key.to_ir()
 
     def entry(self, ref) -> dict:
         "ref's IR entry, a variable's or a constraint's; empty for neither."
@@ -578,6 +580,26 @@ class Constraints(SectionSpec):
     def cells(self, item):
         ref, sens = item
         return [self._fmt_val(sens), self.display.constraint(ref)]
+
+    def _format_model_group(self, model_items) -> list[str]:
+        """Rows in sensitivity order, scalars and vectors each aligned on their own.
+
+        A vector's sensitivities are far wider than a scalar's, so one shared
+        column would push every scalar row's constraint far to the right.
+        """
+        rowspec = self._auto_vecwidth_rowspec(model_items)
+        rows = [rowspec.row_from(item) for item in model_items]
+        lines = [""] * len(rows)
+        for vector in (False, True):
+            at = [
+                i for i, (_, s) in enumerate(model_items) if bool(np.shape(s)) == vector
+            ]
+            aligned = _format_aligned_columns(
+                [rows[i] for i in at], self.align, self.col_sep
+            )
+            for i, line in zip(at, aligned):
+                lines[i] = line
+        return lines
 
 
 class TightConstraints(Constraints):

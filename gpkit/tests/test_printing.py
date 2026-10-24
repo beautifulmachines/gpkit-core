@@ -9,7 +9,7 @@ import json
 import numpy as np
 import pytest
 
-from gpkit import Model, Variable, VectorVariable
+from gpkit import Model, NomialArray, Variable, VectorVariable
 from gpkit.printing import Display
 
 
@@ -91,6 +91,26 @@ class TestSolutionSections:
         sol = trip.solve(verbosity=0)
         lines = trip.table(sol, tables=["tightest constraints"]).split("\n")
         assert lines[-2:] == ["Trip.Leg", "[ +0.1  +0.2  +0.3 ] : v[:] ≥ d[:]/tau"]
+
+    def test_one_never_written_as_a_vector_is_its_elements(self):
+        "With no vector form to print, each element is a row, as TOML writes it."
+        q, x, y = VectorVariable(2, "q"), Variable("x"), Variable("y")
+        m = Model(q.sum(), [q >= 2 * NomialArray([x**0.5, y**0.5]), x >= 1, y >= 1])
+        text = m.table(m.solve(verbosity=0), tables=["tightest constraints"])
+        assert text.split("\n")[2:4] == [
+            "+0.5  : q[0] ≥ 2⋅x^0.5",
+            "+0.5  : q[1] ≥ 2⋅y^0.5",
+        ]
+
+    def test_scalar_and_vector_rows_align_separately(self):
+        "A vector's sensitivities are far wider; scalar rows keep their own column."
+        x, y = VectorVariable(3, "x"), Variable("y")
+        m = Model(y, [y >= x.sum(), x >= 1])
+        lines = m.table(m.solve(verbosity=0), tables=["tightest constraints"])
+        assert lines.split("\n")[2:] == [
+            "+1 : y ≥ x[:].sum()",
+            "[ +0.333  +0.333  +0.333 ] : x[:] ≥ 1",
+        ]
 
     def test_a_vanishing_sensitivity_reads_near_zero(self):
         "As in the fixed variables' column, and without widening its neighbours."

@@ -8,6 +8,7 @@ import pytest
 import gpkit
 from gpkit import (
     Model,
+    NomialArray,
     SignomialEquality,
     SignomialsEnabled,
     Var,
@@ -1082,3 +1083,12 @@ class TestVectorConstraintRows:
         (_, vector) = _constraints(m.report(fmt="dict"))
         senss = m.solve(verbosity=0).to_ir()["sensitivities"]["constraints"]
         assert all(key in senss for key in vector["element_keys"])
+
+    def test_one_never_written_as_a_vector_is_its_elements(self):
+        "An array assembled element by element has no vector form to show."
+        q, x, y = VectorVariable(2, "q"), Variable("x"), Variable("y")
+        m = Model(q.sum(), [q >= 2 * NomialArray([x**0.5, y**0.5]), x >= 1, y >= 1])
+        rows = _constraints(m.report(fmt="dict"))[:2]
+        assert [r["str"] for r in rows] == ["q[0] ≥ 2⋅x^0.5", "q[1] ≥ 2⋅y^0.5"]
+        assert [r["key"] for r in rows] == ["[0][0]#2", "[0][1]#2"]
+        assert all("element_keys" not in r for r in rows)
