@@ -111,6 +111,16 @@ class TestGP:
         # solver will fail and attempt to debug
         m.solve(verbosity=0, solver=solver)
 
+    def test_same_exponents_different_coefficients(self, solver):
+        "x >= 2 and x >= 5 share exponents but are not duplicates"
+        x = Variable("x")
+        y = Variable("y")
+        z = Variable("z")
+        m = Model(x / (y * z), [x >= 2, 2 * y + 2 * z <= 1, x >= 5])
+        sol = m.solve(verbosity=0, solver=solver)
+        assert sol[x] == pytest.approx(5, abs=10 ** (-get_ndig(solver)))
+        assert sol.cost == pytest.approx(80, abs=10 ** (-get_ndig(solver)))
+
     def test_sigeq(self, solver):
         x = Variable("x")
         y = VectorVariable(1, "y")

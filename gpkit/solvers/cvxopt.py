@@ -47,20 +47,20 @@ def optimize(prob, meq_idxs, use_leqs=True, **kwargs):  # noqa: PLR0912, PLR0915
     lse_mons, lin_mons, leq_mons = [], [], []
     lse_posys, lin_posys, leq_posys = [], [], []
     constraint_hashes = set()
-    for i, n_monomials in enumerate(prob.k):
-        start = sum(prob.k[:i])
-        mons = prob.m_idxs[i]
+    for i, mons in enumerate(prob.m_idxs):
         A_m = A[mons, :].tocoo()
-        chash = hash((prob.c[i], tuple(A_m.data), tuple(A_m.row), tuple(A_m.col)))
+        chash = hash(
+            (tuple(log_c[mons]), tuple(A_m.data), tuple(A_m.row), tuple(A_m.col))
+        )
         if chash in constraint_hashes:
             continue  # already got it
         if i:  # skip cost posy
             constraint_hashes.add(chash)
-        if use_leqs and start in meq_idxs.all:
-            if start in meq_idxs.first_half:
+        if use_leqs and mons.start in meq_idxs.all:
+            if mons.start in meq_idxs.first_half:
                 leq_posys.append(i)
                 leq_mons.extend(mons)
-        elif i != 0 and n_monomials == 1:
+        elif i != 0 and len(mons) == 1:
             lin_mons.extend(mons)
             lin_posys.append(i)
         else:
@@ -86,7 +86,7 @@ def optimize(prob, meq_idxs, use_leqs=True, **kwargs):  # noqa: PLR0912, PLR0915
             tc="d",
         )
         kwargs["h"] = matrix(-log_c_lin)
-    k_lse = [prob.k[i] for i in lse_posys]
+    k_lse = [len(prob.m_idxs[i]) for i in lse_posys]
     A_lse = A[lse_mons, :].tocoo()
     log_c_lse = log_c[lse_mons]
     F = spmatrix(
