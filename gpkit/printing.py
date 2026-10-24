@@ -46,19 +46,27 @@ class Display:
         self.has_model = model is not None
         # a solution holds the cost's value; only the model knows its expression
         self.cost_name = "cost" if model is None else model.cost.str_without("units")
-        self.constraint_entries, self._constraints = {}, {}
-        for _, key, c in written_keyed_constraints(model) if model else ():
+        self._gathered, self._constraints = (
+            {},
+            {},
+        )  # _gathered: element ref -> its key IR
+        constraints = () if model is None else written_keyed_constraints(model)
+        for _, key, c in constraints:
             rows = dict(shown_as(key, c))  # what the table's rows show
             self._constraints.update((k.ref, row) for k, row in rows.items())
             for idx, element in solver_constraints(c):  # what a solution keys by
                 element_key = key if idx is None else key.element(idx)
                 self._constraints[element_key.ref] = element
-                if idx is not None and key in rows:  # gathered into its vector's row
-                    self.constraint_entries[element_key.ref] = element_key.to_ir()
+                if idx is not None and key in rows:  # its vector prints as one row
+                    self._gathered[element_key.ref] = element_key.to_ir()
 
     def entry(self, ref) -> dict:
-        "ref's IR entry, a variable's or a constraint's; empty for neither."
-        return self.entries.get(ref) or self.constraint_entries.get(ref, {})
+        """The IR entry that says which vector's row ref gathers into, if any.
+
+        A variable's entry, or a vector constraint element's when the vector
+        prints as one row; empty otherwise, so the ref is a row of its own.
+        """
+        return self.entries.get(ref) or self._gathered.get(ref, {})
 
     def name(self, ref) -> str:
         entry = self.entries[ref]
