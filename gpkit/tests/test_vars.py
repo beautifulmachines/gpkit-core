@@ -11,12 +11,14 @@ from gpkit import (
     ArrayVariable,
     Monomial,
     NomialArray,
+    SignomialsEnabled,
     Variable,
     VarKey,
     Vectorize,
     VectorVariable,
 )
 from gpkit.nomials import Variable as PlainVariable
+from gpkit.tools import te_exp_minus1
 
 
 class TestVarKey:
@@ -455,6 +457,47 @@ class TestArrayVariable:
         """Make sure string looks something like a numpy array"""
         x = ArrayVariable((2, 4), "x")
         assert str(x) == "x[:]"
+
+
+class TestArrayArithmeticAsWritten:
+    """An array expression records what was written, as a scalar one does."""
+
+    def test_in_place_ops_record_the_whole_expression(self):
+        q, r = VectorVariable(3, "q"), VectorVariable(3, "r")
+        res = 2 * q
+        res += r
+        assert res.ast == (2 * q + r).ast
+        res *= r
+        assert res.ast == ((2 * q + r) * r).ast
+        res /= 3
+        assert res.ast == ((2 * q + r) * r / 3).ast
+        with SignomialsEnabled():
+            res -= q
+            assert res.ast == ((2 * q + r) * r / 3 - q).ast
+
+    def test_in_place_ops_leave_the_original_alone(self):
+        "res = q; res += r rebinds res, as for scalars, rather than rewriting q."
+        q, r = VectorVariable(3, "q"), VectorVariable(3, "r")
+        res = q
+        res += r
+        assert str(q) == "q[:]"
+        assert str(q[0]) == "q[0]"
+
+    def test_a_taylor_expansion_keeps_every_term(self):
+        "te_exp_minus1 starts from 0 and adds with +=: both used to lose terms."
+        z = VectorVariable(3, "z")
+        assert te_exp_minus1(z, 3).ast == (z**1 / 1 + z**2 / 2 + z**3 / 6).ast
+
+    def test_adding_zero_adds_nothing(self):
+        "As Signomial does, so sum() over an array's rows has no leading 0."
+        q, a = VectorVariable(3, "q"), VectorVariable((2, 3), "a")
+        assert str(0 + q) == "q[:]"
+        assert str(sum(a)) == "a[0] + a[1]"
+
+    def test_reflected_ops_build_elements_in_written_order(self):
+        q = VectorVariable(3, "q")
+        assert str((2 * q)[0]) == "2⋅q[0]"
+        assert str((1 + q)[0]) == "1 + q[0]"
 
 
 class TestVarKeyLatex:

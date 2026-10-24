@@ -129,6 +129,17 @@ def own_keyed_constraints(model):
         )
 
 
+def shown_as(key, constraint) -> list:
+    """(key, constraint) for each row a written constraint is shown as.
+
+    Itself, unless it is a vector constraint with a side never written as one
+    expression: then only its elements can be printed, so each is a row.
+    """
+    if isinstance(constraint, ArrayConstraint) and not constraint.written:
+        return [(key.element(idx), c) for idx, c in constraint.elements()]
+    return [(key, constraint)]
+
+
 def _vector_shape(constraint) -> tuple:
     "A vector constraint's shape; () for a scalar one."
     if isinstance(constraint, ArrayConstraint):

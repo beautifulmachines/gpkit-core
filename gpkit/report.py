@@ -13,10 +13,12 @@ import numpy as np
 from .constraints.set import (
     constraint_varkeys,
     own_keyed_constraints,
+    shown_as,
     solver_constraints,
 )
 from .display import DisplayScope
 from .model import Model as _Model
+from .nomials.constraints import ArrayConstraint
 from .printing import _format_aligned_columns, _md_escape, _md_table
 from .util.repr_conventions import unitstr
 from .util.small_classes import Quantity
@@ -187,7 +189,7 @@ def _constraint_dict(c, key, scope) -> dict:
         "key": key.ref,
         "type": type(c).__name__,
     }
-    if key.shape:
+    if isinstance(c, ArrayConstraint):
         out["element_keys"] = [key.element(idx).ref for idx, _ in solver_constraints(c)]
     return out
 
@@ -262,7 +264,8 @@ def _build_constraint_groups(model) -> list[CGroup]:
     CGroup.constraints holds the written (single-equation) constraints this
     model owns, in canonical order -- child models keep their own for their own
     sections, containers like Tight, Loose or SignomialEquality are walked
-    through, and a vector constraint is one item, so every item accepts
+    through, and a vector constraint is one item (or its elements, if a side was
+    never written as one expression: shown_as), so every item accepts
     .latex(excluded, aligned=True). Raw objects are stored; renderers call str()
     or .latex().
 
@@ -270,11 +273,12 @@ def _build_constraint_groups(model) -> list[CGroup]:
     with, so the two cannot name a constraint differently.
     """
     named = model.cgroups is not None
-    return [
-        CGroup(label, [c for _, c in pairs], [k for k, _ in pairs])
-        for label, pairs in own_keyed_constraints(model)
-        if pairs or named  # an empty group is still a group if it was named
-    ]
+    groups = []
+    for label, pairs in own_keyed_constraints(model):
+        if pairs or named:  # an empty group is still a group if it was named
+            rows = [row for key, c in pairs for row in shown_as(key, c)]
+            groups.append(CGroup(label, [c for _, c in rows], [k for k, _ in rows]))
+    return groups
 
 
 def _build_objective(model, solution) -> dict:

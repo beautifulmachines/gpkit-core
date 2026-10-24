@@ -94,9 +94,9 @@ L_span : 12        [m]   (+0.6118) support spacing
 Most Sensitive Constraints
 --------------------------
 Pipeline
-+1                            : LCC ≥ C + C + C_nrg
-+0.8022                       : sigma ≥ p_sys⋅D/(2⋅t) + 4⋅M/(3.14⋅D²⋅t)
-+0.1525                       : C_nrg ≥ c_nrg⋅(P[:]⋅hours[:]).sum()
++1      : LCC ≥ C + C + C_nrg
++0.8022 : sigma ≥ p_sys⋅D/(2⋅t) + 4⋅M/(3.14⋅D²⋅t)
++0.1525 : C_nrg ≥ c_nrg⋅(P[:]⋅hours[:]).sum()
 [ ~0       ~0       +0.0966 ] : P[:] ≤ P_rated
 
 Pipeline.Pipe
