@@ -31,8 +31,9 @@ def find_siblings(names=()):
 
 def run_one(repo: Path) -> bool:
     "Run repo's tests against local gpkit-core. Returns True if they passed and left a clean tree."
+    # No path argument, so each repo's own testpaths decide what runs.
     result = subprocess.run(
-        ["uv", "run", "--with-editable", str(REPO), "pytest", "tests/", "-q"],
+        ["uv", "run", "--with-editable", str(REPO), "pytest", "-q"],
         cwd=repo,
         capture_output=True,
         text=True,
