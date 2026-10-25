@@ -5,7 +5,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from .display.naming import DisplayScope, decorated
+from .display.naming import DisplayScope, decorated, marks_vector
 from .units import qty
 from .util.repr_conventions import ReprMixin, latexify, merge_subscript
 from .util.small_classes import Count
@@ -246,11 +246,8 @@ class VarKey(ReprMixin):
         "Returns latex representation."
         if isinstance(excluded, DisplayScope):
             return self._latex_scoped(excluded)
-        name = latexify(self.name)
-        if "vec" not in excluded and "idx" not in excluded and self.shape:
-            name = "\\vec{%s}" % name
-        if "idx" not in excluded and self.idx:
-            name = "{%s}_{%s}" % (name, ",".join(map(str, self.idx)))
+        name = latexify(self.name, marks_vector(self.idx, self.shape, excluded))
+        parts = []  # path first, then index, as _latex_scoped composes them
         if "lineage" not in excluded and self.lineage:
             namespace = _strip_magic_prefix(list(self.lineage), excluded)
             # Respect lineage_display_context depth (mirrors str_without)
@@ -260,30 +257,23 @@ class VarKey(ReprMixin):
                 depth = lineage_map.get(self.veckey)
             if depth is not None:
                 namespace = namespace[-depth:] if depth > 0 else []
-            # Merge lineage into any existing subscript (name first, lineage last)
             if namespace:
-                lineage_sub = ",".join(
-                    r"\text{" + n.lower() + "}" for n, _ in namespace
+                parts.append(
+                    ",".join(r"\text{" + n.lower() + "}" for n, _ in namespace)
                 )
-                name = merge_subscript(name, lineage_sub)
-        return name
+        if "idx" not in excluded and self.idx:
+            parts.append(",".join(map(str, self.idx)))
+        return merge_subscript(name, ",".join(parts)) if parts else name
 
     def _latex_scoped(self, scope):
         """Latex name composed in the same order str_without uses.
 
         Both parts share the subscript, latex's prefix slot, in the order text
         writes them: path first, then index -- so `Spar.c[1]` sets as
-        {c}_{spar,1}.  A whole vector wears the arrow that "[:]" stands for in
-        text; an element is identified by its index instead.
+        {c}_{spar,1}.  A whole vector is set bold where text writes "[:]"; an
+        element is a scalar, identified by its index instead.
         """
-        name = latexify(self.name)
-        if (
-            self.shape
-            and not self.idx
-            and "vec" not in scope.excluded
-            and "idx" not in scope.excluded
-        ):
-            name = "\\vec{%s}" % name
+        name = latexify(self.name, marks_vector(self.idx, self.shape, scope.excluded))
         parts = [p for p in (scope.latex_path(self),) if p]
         if self.idx and "idx" not in scope.excluded:
             parts.append(",".join(map(str, self.idx)))

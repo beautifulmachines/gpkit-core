@@ -37,13 +37,18 @@ def _segments(lineage: Lineage, modelnums: bool = True) -> list[str]:
     ]
 
 
+def marks_vector(idx, shape, excluded) -> bool:
+    'Whether a name displays as a whole vector: "[:]" in text, bold in latex.'
+    return bool(shape) and not idx and "vec" not in excluded and "idx" not in excluded
+
+
 def decorated(name: str, idx=None, shape=(), excluded=()) -> str:
     "name with the index suffix a vector element or vector parent displays."
     if "idx" in excluded:
         return name
     if idx:
         return name + f"[{','.join(map(str, idx))}]"
-    if "vec" not in excluded and shape:
+    if marks_vector(idx, shape, excluded):
         return name + "[:]"
     return name
 

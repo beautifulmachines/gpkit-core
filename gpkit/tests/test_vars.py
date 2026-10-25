@@ -46,9 +46,10 @@ class TestVarKey:
             VarKey("x", name="y")
         assert isinstance(x.latex(), str)
         assert isinstance(x.latex_unitstr(), str)
-        # test index latex printing
+        # an element is a scalar: its index, not bold
         y = VectorVariable(2, "y")
-        assert y[0].key.latex() == "{\\vec{y}}_{0}"
+        assert y.key.latex() == r"\boldsymbol{y}"
+        assert y[0].key.latex() == "{y}_{0}"
 
     def test_ast(self):
         if sys.platform[:3] == "win":  # pragma: no cover

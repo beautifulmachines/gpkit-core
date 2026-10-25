@@ -165,6 +165,16 @@ def extract_subscript(name: str):
     return None
 
 
+def _latexify_symbol(raw: str, bold: bool) -> str:
+    "A name's base symbol: Greek, one italic letter, or a multi-letter name set upright."
+    if raw in _GREEK:
+        return r"\boldsymbol{%s}" % _GREEK[raw] if bold else _GREEK[raw]
+    if len(raw) == 1:
+        return r"\boldsymbol{%s}" % raw if bold else raw
+    # \boldsymbol leaves \text regular, so an upright name bolds as \textbf
+    return (r"\textbf{%s}" if bold else r"\text{%s}") % raw
+
+
 def merge_subscript(name: str, sub: str) -> str:
     "Append sub to name's existing LaTeX subscript, or give it a new one."
     extracted = extract_subscript(name)
@@ -174,7 +184,7 @@ def merge_subscript(name: str, sub: str) -> str:
     return "{%s}_{%s}" % (name, sub)
 
 
-def latexify(name: str) -> str:
+def latexify(name: str, bold: bool = False) -> str:
     """Convert a variable name to a LaTeX base string.
 
     - Pure Greek: 'rho' -> r'\\rho'
@@ -183,16 +193,19 @@ def latexify(name: str) -> str:
     - Multi-part subscript: 'A_one_two' -> r'A_{\\text{one},\\text{two}}'
     - Math function + arg: 'tan_alpha' -> r'\\tan{\\alpha}'
     - Already escaped (starts with '\\'): return as-is
+
+    *bold* sets the base symbol bold, as a vector's is (ISO 80000-2): operators,
+    accents and subscripts stay regular.  A name written in LaTeX is not parsed,
+    so it is bolded whole.
     """
-    if name.startswith("\\"):
-        return name  # already LaTeX — do not double-convert
+    if name.startswith("\\"):  # already LaTeX — do not double-convert
+        return r"\boldsymbol{%s}" % name if bold else name
     if "_" in name:
         parts = name.split("_", 1)
         if parts[0] in _LATEX_PREFIXES:
-            arg = latexify(parts[1])
+            arg = latexify(parts[1], bold)
             return "\\" + parts[0] + "{" + arg + "}"
-        raw = parts[0]
-        base = _GREEK.get(raw, raw if len(raw) == 1 else r"\text{" + raw + "}")
+        base = _latexify_symbol(parts[0], bold)
         if not parts[1]:  # trailing underscore (e.g. "lambda_") — strip it
             return base
         # Flatten all underscore-separated tokens into a single comma-separated
@@ -200,7 +213,7 @@ def latexify(name: str) -> str:
         # each token is rendered independently as a Greek symbol or \text{}.
         sub = ",".join(_latexify_sub_token(t) for t in parts[1].split("_"))
         return base + "_{" + sub + "}"
-    return _GREEK.get(name, name if len(name) == 1 else r"\text{" + name + "}")
+    return _latexify_symbol(name, bold)
 
 
 def strify(val, excluded):
