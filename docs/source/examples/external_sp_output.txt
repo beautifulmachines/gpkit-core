@@ -1,7 +1,7 @@
 
          ┃┓
     Cost╺┫┃
- (0.707) ┃┣╸0.785
+ (0.707) ┃┣╸0.7854
          ┃┛
 
 
@@ -12,7 +12,7 @@
  Model╺┫┛
        ┃┓
        ┃┃
-       ┃┣╸x ≥ 0.785
+       ┃┣╸x ≥ 0.7854
        ┃┛
 
 
@@ -27,5 +27,5 @@ y : 0.7071
 
 Most Sensitive Constraints
 --------------------------
-+1 : x ≥ 0.785
++1 : x ≥ 0.7854
 +1 : <gpkit.examples.external_constraint.ExternalConstraint object>

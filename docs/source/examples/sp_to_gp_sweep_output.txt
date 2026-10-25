@@ -73,7 +73,7 @@ Solution
 
 Most Sensitive Constraints
 --------------------------
-[ +1.38      +1.14      +1.15     ] : C_D ≥ (CDA0)/S + k⋅C_f⋅(\frac{S}{S_{wet}}) + C_L²/(3.14⋅A⋅e)
+[ +1.38      +1.14      +1.15     ] : C_D ≥ (CDA0)/S + k⋅C_f⋅(\frac{S}{S_{wet}}) + C_L²/(3.142⋅A⋅e)
 [ +1.38      +1.14      +1.15     ] : D ≥ 0.5⋅\rho⋅S⋅C_D⋅V²
 [ +1.38      +1.14      +1.15     ] : T_{flight} ≥ Range/V
 [ +1.38      +1.14      +1.15     ] : W_f ≥ TSFC⋅T_{flight}⋅D

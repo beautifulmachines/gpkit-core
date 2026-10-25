@@ -32,6 +32,7 @@ from gpkit.constraints.bounded import Bounded
 from gpkit.constraints.relax import ConstantsRelaxed
 from gpkit.constraints.set import build_model_tree
 from gpkit.constraints.tight import Tight
+from gpkit.display.render import LATEX, TEXT, render, varkey_names
 from gpkit.exceptions import IRVersionError
 from gpkit.ir import IR_VERSION, check_ir_version
 from gpkit.nomials.map import NomialMap
@@ -43,6 +44,13 @@ from gpkit.nomials.math import (
     SingleSignomialEquality,
 )
 from gpkit.tests.test_margin_objective import SimpleMarginModel
+
+
+def _text(node, fmt=TEXT):
+    "node rendered with each variable named as it names itself."
+    return render(node, fmt, varkey_names(node, (), latex=fmt is LATEX))
+
+
 from gpkit.toml import to_toml
 from gpkit.units import qty, units, ureg
 from gpkit.util.small_classes import EMPTY_HV, HashVector
@@ -165,15 +173,14 @@ class TestASTNodes:
         assert isinstance(node, VarNode)
         assert node.varkey is x.key
 
-    def test_varnode_str_without(self):
+    def test_varnode_renders_its_name(self):
         x = Variable("x")
-        node = VarNode(x.key)
-        assert node.str_without() == "x"
+        assert _text(VarNode(x.key)) == "x"
 
     def test_constnode(self):
         node = ConstNode(3.14)
         assert node.value == 3.14
-        assert node.str_without() == "3.14"
+        assert _text(node) == "3.14"
 
     def test_exprnode_add(self):
         x = Variable("x")
@@ -348,13 +355,10 @@ class TestASTNodeIR:
         assert node.value == pytest.approx(np.pi)
 
     def test_pinode_str(self):
-        node = PiNode()
-        s = node.str_without()
-        assert s in ("π", "PI")
+        assert _text(PiNode()) in ("π", "PI")
 
     def test_pinode_latex(self):
-        node = PiNode()
-        assert node.latex() == r"\pi"
+        assert _text(PiNode(), LATEX) == r"\pi"
 
     def test_pinode_ir_roundtrip(self):
         node = PiNode()
@@ -418,7 +422,7 @@ class TestASTNodeIR:
         ir2 = json.loads(json_str)
         registry = self._var_registry(x, y)
         ast2 = ast_from_ir(ir2, registry)
-        assert ast2.str_without() == result.ast.str_without()
+        assert _text(ast2) == _text(result.ast)
 
 
 class TestNomialMapIR:

@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 
 from .ast_nodes import ExprNode, VarNode
 from .constraints.set import constraint_senss
+from .display.render import TEXT, render, varkey_names
 from .units import DimensionalityError, qty
 from .util.repr_conventions import MUL
 from .varkey import VarKey
@@ -107,7 +108,7 @@ def _ast_label_map(lt, strip_prefix=None):
     for term in _collect_sum_terms(lt.ast):
         vks = _vks_of_ast_term(term)
         if vks:
-            labels[vks] = term.str_without(excluded)
+            labels[vks] = render(term, TEXT, varkey_names(term, excluded))
             is_var[vks] = isinstance(term, VarNode)
     return labels, is_var
 

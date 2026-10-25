@@ -45,7 +45,7 @@
   cons (Geometry)  tau ≤ 0.15
   cons (Geometry)  nu^3.94 ≥ 0.86⋅p^-2.38 + 0.14⋅p^0.56
   cons (Root bending stress)  M_rbar ≥ W_design⋅A⋅p/(24⋅W_ref)
-  cons (Root bending stress)  0.423⋅w⋅tau²⋅t_cap ≥ I_cap⋅k_shear + 0.92⋅w⋅tau⋅t_cap²
+  cons (Root bending stress)  0.4232⋅w⋅tau²⋅t_cap ≥ I_cap⋅k_shear + 0.92⋅w⋅tau⋅t_cap²
   cons (Root bending stress)  N_lift⋅M_rbar⋅A⋅q²⋅tau⋅EI_ref/(S⋅I_cap⋅sigma_max) ≤ 8
   cons (Root bending stress)  A⋅W_design⋅N_lift⋅q²/(tau⋅S⋅t_web⋅sigma_max_shear) ≤ 12
   cons (Weight rollup)  W_cap ≥ 8⋅rho_alum⋅g⋅w⋅t_cap⋅S^1.5⋅nu/(3⋅A^0.5)
@@ -120,7 +120,7 @@
   fixed mu  [UAV.Mission.Outbound.FlightState]
   fixed rho  [UAV.Mission.Outbound.FlightState]
   cons  Re = rho/mu⋅V⋅(S/A)^0.5
-  cons  2.56⋅C_L^5.881/(Re^1.541⋅tau^3.319⋅C_Dp^2.617) + 3.82e-09⋅tau^6.229/(C_L^0.914⋅Re^1.379⋅C_Dp^9.57) + 0.00215⋅Re^0.1441⋅tau^0.03325/(C_L^0.0079⋅C_Dp^0.7337) + 1.19e+04⋅C_L^9.783⋅tau^1.764/(Re^0.998⋅C_Dp^0.909) + 6.14e-06⋅C_L^6.535/(Re^0.995⋅tau^0.521⋅C_Dp^5.192) ≤ 1
+  cons  2.556⋅C_L^5.881/(Re^1.541⋅tau^3.319⋅C_Dp^2.617) + 3.823e-09⋅tau^6.229/(C_L^0.914⋅Re^1.379⋅C_Dp^9.57) + 0.002151⋅Re^0.1441⋅tau^0.03325/(C_L^0.0079⋅C_Dp^0.7337) + 1.19e+04⋅C_L^9.783⋅tau^1.764/(Re^0.998⋅C_Dp^0.909) + 6.143e-06⋅C_L^6.535/(Re^0.995⋅tau^0.521⋅C_Dp^5.192) ≤ 1
 [UAV.Mission.Outbound.AircraftPerf.PropulsionPerf]
   free  eta_0
   free  eta_i
@@ -177,7 +177,7 @@
   fixed mu  [UAV.Mission.Return.FlightState]
   fixed rho  [UAV.Mission.Return.FlightState]
   cons  Re = rho/mu⋅V⋅(S/A)^0.5
-  cons  2.56⋅C_L^5.881/(Re^1.541⋅tau^3.319⋅C_Dp^2.617) + 3.82e-09⋅tau^6.229/(C_L^0.914⋅Re^1.379⋅C_Dp^9.57) + 0.00215⋅Re^0.1441⋅tau^0.03325/(C_L^0.0079⋅C_Dp^0.7337) + 1.19e+04⋅C_L^9.783⋅tau^1.764/(Re^0.998⋅C_Dp^0.909) + 6.14e-06⋅C_L^6.535/(Re^0.995⋅tau^0.521⋅C_Dp^5.192) ≤ 1
+  cons  2.556⋅C_L^5.881/(Re^1.541⋅tau^3.319⋅C_Dp^2.617) + 3.823e-09⋅tau^6.229/(C_L^0.914⋅Re^1.379⋅C_Dp^9.57) + 0.002151⋅Re^0.1441⋅tau^0.03325/(C_L^0.0079⋅C_Dp^0.7337) + 1.19e+04⋅C_L^9.783⋅tau^1.764/(Re^0.998⋅C_Dp^0.909) + 6.143e-06⋅C_L^6.535/(Re^0.995⋅tau^0.521⋅C_Dp^5.192) ≤ 1
 [UAV.Mission.Return.AircraftPerf.PropulsionPerf]
   free  eta_0
   free  eta_i
@@ -231,7 +231,7 @@
   fixed mu  [UAV.Mission.SprintCondition.FlightState]
   fixed rho  [UAV.Mission.SprintCondition.FlightState]
   cons  Re = rho/mu⋅V⋅(S/A)^0.5
-  cons  2.56⋅C_L^5.881/(Re^1.541⋅tau^3.319⋅C_Dp^2.617) + 3.82e-09⋅tau^6.229/(C_L^0.914⋅Re^1.379⋅C_Dp^9.57) + 0.00215⋅Re^0.1441⋅tau^0.03325/(C_L^0.0079⋅C_Dp^0.7337) + 1.19e+04⋅C_L^9.783⋅tau^1.764/(Re^0.998⋅C_Dp^0.909) + 6.14e-06⋅C_L^6.535/(Re^0.995⋅tau^0.521⋅C_Dp^5.192) ≤ 1
+  cons  2.556⋅C_L^5.881/(Re^1.541⋅tau^3.319⋅C_Dp^2.617) + 3.823e-09⋅tau^6.229/(C_L^0.914⋅Re^1.379⋅C_Dp^9.57) + 0.002151⋅Re^0.1441⋅tau^0.03325/(C_L^0.0079⋅C_Dp^0.7337) + 1.19e+04⋅C_L^9.783⋅tau^1.764/(Re^0.998⋅C_Dp^0.909) + 6.143e-06⋅C_L^6.535/(Re^0.995⋅tau^0.521⋅C_Dp^5.192) ≤ 1
 [UAV.Mission.SprintCondition.AircraftPerf.PropulsionPerf]
   free  eta_0
   free  eta_i

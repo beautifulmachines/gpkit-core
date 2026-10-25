@@ -637,9 +637,9 @@ class TestSP:
         sys.stdout = old_stdout
         assert stringout.getvalue() == (
             f"Warning: SignomialConstraint {m1[0]!s} became the "
-            "tautological constraint 0 <= 3 + x after substitution.\n"
+            "tautological constraint 0 <= x + 3 after substitution.\n"
             f"Warning: SignomialConstraint {m1[0]!s} became the "
-            "tautological constraint 0 <= 3 + x after substitution.\n"
+            "tautological constraint 0 <= x + 3 after substitution.\n"
         )
 
     def test_tautological(self, solver):
@@ -662,9 +662,9 @@ class TestSP:
         sys.stdout = old_stdout
         assert stringout.getvalue() == (
             f"Warning: SignomialConstraint {m1[0]!s} became the "
-            "tautological constraint 0 <= 1 + x after substitution.\n"
+            "tautological constraint 0 <= x + 1 after substitution.\n"
             f"Warning: SignomialConstraint {m2[0]!s} became the "
-            "tautological constraint 0 <= 1 + x after substitution.\n"
+            "tautological constraint 0 <= x + 1 after substitution.\n"
         )
 
     def test_impossible(self, solver):

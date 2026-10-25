@@ -74,9 +74,11 @@ class TestVarKey:
             NomialArray(ii) * w / nni,
             w * ii / nni,
             w * (ii / nni),
+            y * [1, 2, 3],  # a list operand is a numeric array too
+            y + [1, 2, 3],
         ):
             assert e.ast is None
-            assert str(e).startswith("[[")
+            assert str(e).startswith("[")
         assert str(w >= (x[0] * t + x[1] * u) / v) == "w ≥ (x[0]⋅t + x[1]⋅u)/v"
         assert str(x) == "x[:]"
         assert str(x * 2) == "x[:]⋅2"
@@ -94,18 +96,12 @@ class TestVarKey:
         assert str(x[:2]) == "x[:2]"
         assert str(x[:]) == "x[:]"
         assert str(x[1:]) == "x[1:]"
-        assert str(y * [1, 2, 3]) == "y[:]⋅[1, 2, 3]"
-        assert str(x[:2] == (y * [1, 2, 3])[:2]) == "x[:2] = (y[:]⋅[1, 2, 3])[:2]"
-        assert str(y + [1, 2, 3]) == "y[:] + [1, 2, 3]"
-        assert str(x == y + [1, 2, 3]) == "x[:] = y[:] + [1, 2, 3]"
-        assert str(x >= y + [1, 2, 3]) == "x[:] ≥ y[:] + [1, 2, 3]"
         assert str(a[:, 0]) == "a[:,0]"
         assert str(a[2, :]) == "a[2,:]"
         g = 1 + 3 * a[2, 0] ** 2
-        gstrbefore = str(g)
+        assert str(g) == "1 + 3⋅a[2,0]²"  # as written
         g.ast = None
-        gstrafter = str(g)
-        assert gstrbefore == gstrafter
+        assert str(g) == "3⋅a[2,0]² + 1"  # from its terms: by ref, constants last
 
         # a constant vector belongs in a named, fixed VectorVariable; an anonymous
         # array is never written, so the side using one shows its elements
@@ -171,13 +167,6 @@ class TestVarKey:
         an iterable, not NoneType."""
         x = VarKey("x")
         assert x.models == ()
-
-    def test_parse_ast_no_ast(self):
-        """Regression: parse_ast on a bare VarKey (ast is None).
-        Previously crashed with TypeError: cannot unpack non-iterable
-        NoneType object."""
-        x = VarKey("x")
-        assert x.parse_ast() == "x"
 
     def test_models_with_lineage(self):
         """models property extracts model names from lineage tuples."""

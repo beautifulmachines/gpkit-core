@@ -1,13 +1,14 @@
 "Generate TOML model specs from gpkit Models or IR dicts."
 
 import re
-import types
+from typing import NamedTuple
 
 import numpy as np
 
-from ..ast_nodes import ast_from_ir
+from ..ast_nodes import ast_from_ir, ast_from_terms
+from ..display.render import TOML, render
+from ..display.render import exact_number as _format_number
 from ..ir import check_ir_version
-from ..util.repr_conventions import _toml_format_number as _format_number
 
 # ---------------------------------------------------------------------------
 # Ref string → Python variable name
@@ -59,51 +60,33 @@ def _quote(text):
 
 
 def ast_to_expr(node, name_fn=_ref_to_name):
-    """Convert a gpkit AST node to a plain expression string.
-
-    Accepts VarNode, ConstNode, ExprNode (from gpkit's ast_nodes),
-    IR dicts (from to_ir() JSON), or raw numbers.
-
-    Produces TOML-compatible syntax: ``*`` for multiply, ``**`` for power.
-    Dispatch lives on the AST node classes themselves (ASTNode.to_toml_expr,
-    gpkit/ast_nodes.py) — this just normalizes non-node inputs (raw numbers,
-    IR dicts) before delegating.
+    """An AST node, its IR dict, or a raw number, in TOML expression syntax.
 
     name_fn : ref -> str, default _ref_to_name (bare name, no qualification).
-    Multi-model emission passes a resolver that qualifies a VarNode as
-    "Model.name" when it belongs to a different model than the one whose
-    constraint/objective is currently being rendered (see
-    _make_name_resolver) — otherwise a cross-model reference like
-    self.engine.W would print as a bare "W" indistinguishable from a local
-    variable of the same name.
+    Multi-model emission passes a resolver that qualifies a variable as
+    "Model.name" when another model owns it (see _make_name_resolver), so a
+    cross-model reference like self.engine.W does not print as a bare "W".
     """
-    # Raw numbers (e.g. exponents in pow, coefficients)
-    if isinstance(node, (int, float)):
-        return _format_number(node)
-
-    # IR dict — reconstruct an AST node first, then dispatch on it below
     if isinstance(node, dict):
         node = ast_from_ir(node, _RefNameRegistry())
+    return render(node, TOML, name_fn)
 
-    if hasattr(node, "to_toml_expr"):
-        return node.to_toml_expr(name_fn)
 
-    # Numpy scalars etc.
-    if hasattr(node, "__float__"):
-        return _format_number(float(node))
+class _Ref(NamedTuple):
+    "Stands in for a VarKey where rendering needs only its ref."
 
-    raise ValueError(f"Cannot render AST node: {type(node).__name__}: {node!r}")
+    ref: str
 
 
 class _RefNameRegistry(dict):
     """Minimal registry mapping IR var refs back to objects with a .ref attr.
 
     ast_from_ir expects a registry mapping ref → VarKey.  We only need the
-    .ref attribute for rendering, so we use SimpleNamespace stubs.
+    .ref attribute for rendering, so we use _Ref stubs.
     """
 
     def __missing__(self, ref):
-        stub = types.SimpleNamespace(ref=ref)
+        stub = _Ref(ref)
         self[ref] = stub
         return stub
 
@@ -112,20 +95,12 @@ class _RefNameRegistry(dict):
 # Constraint → expression string
 # ---------------------------------------------------------------------------
 
-# NOTE: gpkit stores equality as "=" internally, but TOML/Python uses "==".
-# This is a gpkit-core inconsistency we should eventually fix upstream
-# (track in a separate issue). For now we map here.
-_OPER_MAP = {"=": "=="}
-
 
 def constraint_to_expr(constraint_ir, name_fn=_ref_to_name):
     """Convert an IR constraint dict to a TOML constraint string."""
-    oper = constraint_ir["oper"]
-    oper = _OPER_MAP.get(oper, oper)
-
+    oper = TOML.relation(constraint_ir["oper"])
     left = _nomial_ir_to_expr(constraint_ir["left"], name_fn)
     right = _nomial_ir_to_expr(constraint_ir["right"], name_fn)
-
     return f"{left} {oper} {right}"
 
 
@@ -148,36 +123,16 @@ def _written_exprs(refs, constraints, name_fn=_ref_to_name):
 
 
 def _nomial_ir_to_expr(nomial_ir, name_fn=_ref_to_name):
-    """Render a nomial IR dict to an expression string.
-
-    Uses the AST when available (for expressions built from operations).
-    For leaf nodes (bare Variables and numeric constants), renders directly
-    from the terms — these are the only cases that lack an AST.
-    """
+    "A nomial IR dict as written, or from its terms if it never was."
     ast = nomial_ir.get("ast")
     if ast is not None:
         return ast_to_expr(ast, name_fn)
-
-    # Leaf cases only: bare Variable or numeric Monomial
-    terms = nomial_ir["terms"]
-    if len(terms) == 1:
-        term = terms[0]
-        coeff = term["coeff"]
-        exps = term.get("exps", {})
-        if not exps:
-            # Pure numeric constant
-            return _format_number(coeff)
-        if coeff == 1.0 and len(exps) == 1:
-            ref, exp = next(iter(exps.items()))
-            if exp == 1:
-                # Bare variable reference
-                return name_fn(ref)
-
-    raise ValueError(
-        f"Nomial IR has no AST and is not a trivial leaf node "
-        f"(type={nomial_ir.get('type')}). This likely indicates a gap "
-        f"in gpkit's AST tracking."
+    registry = _RefNameRegistry()
+    terms = (
+        ({registry[ref]: x for ref, x in term.get("exps", {}).items()}, term["coeff"])
+        for term in nomial_ir["terms"]
     )
+    return render(ast_from_terms(terms), TOML, name_fn)
 
 
 def _is_reciprocal(ast_dict):

@@ -17,9 +17,9 @@
           ┃┓      ┓
           ┃┃      ┣╸C ≥ c_mat⋅W
           ┃┃      ┛
-          ┃┣╸Pipe ┣╸W ≥ rho_m⋅3.14⋅D⋅t⋅L
+          ┃┣╸Pipe ┣╸W ≥ rho_m⋅3.142⋅D⋅t⋅L
           ┃┃      ┛
-          ┃┛      ┣╸A = 0.785⋅D²
+          ┃┛      ┣╸A = 0.7854⋅D²
           ┃┓          ┣╸Q[2] ≤ V[2]⋅A
           ┃┃          ┣╸P[2] ≥ dp[2]⋅Q[2]/eta
           ┃┣╸PipeFlow ┓
@@ -30,7 +30,7 @@
           ┃┣╸LCC ≥ Pipe.C + Pump.C + C_nrg
           ┃┛
           ┃┓
-          ┃┣╸sigma ≥ p_sys⋅D/(2⋅t) + 4⋅M/(3.14⋅D²⋅t)
+          ┃┣╸sigma ≥ p_sys⋅D/(2⋅t) + 4⋅M/(3.142⋅D²⋅t)
           ┃┛
           ┃┣╸SpanLoading╶⎨
           ┃┣╸[3 terms]
@@ -95,14 +95,14 @@ Most Sensitive Constraints
 --------------------------
 Pipeline
 +1      : LCC ≥ C + C + C_nrg
-+0.8022 : sigma ≥ p_sys⋅D/(2⋅t) + 4⋅M/(3.14⋅D²⋅t)
++0.8022 : sigma ≥ p_sys⋅D/(2⋅t) + 4⋅M/(3.142⋅D²⋅t)
 +0.1525 : C_nrg ≥ c_nrg⋅(P[:]⋅hours[:]).sum()
 [ ~0       ~0       +0.0966 ] : P[:] ≤ P_rated
 
 Pipeline.Pipe
 +0.7509 : C ≥ c_mat⋅W
-+0.7509 : W ≥ rho_m⋅3.14⋅D⋅t⋅L
-+0.1939 : A = 0.785⋅D²
++0.7509 : W ≥ rho_m⋅3.142⋅D⋅t⋅L
++0.1939 : A = 0.7854⋅D²
 
 Pipeline.PipeFlow
 [ +0.0624   +0.116    +0.27    ] : Q[:] ≤ V[:]⋅A
@@ -115,4 +115,4 @@ Pipeline.Pump
 +0.0966 : C ≥ c_unit⋅P_rated
 
 Pipeline.SpanLoading
-+0.3059 : M ≥ (rho_m⋅3.14⋅D⋅t⋅9.81⋅[m/s²] + rho⋅A⋅9.81⋅[m/s²])⋅L_span²/8
++0.3059 : M ≥ (rho_m⋅3.142⋅D⋅t⋅9.81⋅[m/s²] + rho⋅A⋅9.81⋅[m/s²])⋅L_span²/8

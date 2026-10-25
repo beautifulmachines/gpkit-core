@@ -1,42 +1,9 @@
 "The shared non-mathematical backbone of all Nomials"
 
-from ..util.repr_conventions import MUL, UNICODE_EXPONENTS, also_excluding
+from ..ast_nodes import ast_from_terms, to_ast
+from ..display.render import LATEX, TEXT, render, varkey_names
 from ..util.small_classes import FixedScalar, Numbers
 from .data import NomialData
-
-
-def nomial_latex_helper(c, pos_vars, neg_vars):
-    """Combines (varlatex, exponent) tuples,
-    separated by positive vs negative exponent, into a single latex string."""
-    pvarstrs = [
-        f"{varl}^{{{x:.2g}}}" if f"{x:.2g}" != "1" else varl for (varl, x) in pos_vars
-    ]
-    nvarstrs = [
-        f"{varl}^{{{-x:.2g}}}" if f"{-x:.2g}" != "1" else varl for (varl, x) in neg_vars
-    ]
-    pvarstr = " ".join(sorted(pvarstrs))
-    nvarstr = " ".join(sorted(nvarstrs))
-    cstr = f"{c:.2g}"
-    if pos_vars and cstr in ["1", "-1"]:
-        cstr = cstr[:-1]
-    else:
-        cstr = f"{c:.4g}"
-        if "e" in cstr:  # use exponential notation
-            idx = cstr.index("e")
-            cstr = f"{cstr[:idx]} \\times 10^{{int(cstr[idx + 1:])}}"
-
-    if pos_vars and neg_vars:
-        if cstr in (
-            "",
-            "-",
-        ):  # coefficient is ±1; sign (or nothing) before the fraction
-            return f"{cstr}\\frac{{{pvarstr}}}{{{nvarstr}}}"
-        return f"\\frac{{{cstr} {pvarstr}}}{{{nvarstr}}}"  # numeric coeff in numerator
-    if neg_vars and not pos_vars:
-        return f"\\frac{{{cstr}}}{{{nvarstr}}}"
-    if pos_vars:
-        return f"{cstr}{pvarstr}"
-    return f"{cstr}"
 
 
 class Nomial(NomialData):
@@ -44,86 +11,38 @@ class Nomial(NomialData):
 
     sub = None
 
-    def str_without(self, excluded=()):  # noqa: PLR0912
+    def _rendered(self, fmt, excluded, unit_literals):
+        """This nomial in fmt: as written, or from its terms if it never was.
+
+        The terms also stand in when the written form renders empty, which
+        happens when it was only unit literals and the caller prints the units.
+        """
+        for tree in (to_ast(self), ast_from_terms(self.hmap.items())):
+            if tree is None:
+                continue
+            names = varkey_names(tree, excluded, latex=fmt is LATEX)
+            text = render(tree, fmt, names, unit_literals)
+            if text:
+                return text
+        return ""
+
+    def str_without(self, excluded=()):
         "String representation, excluding fields ('units', varkey attributes)"
         units = "" if "units" in excluded else self.unitstr(" [%s]")
         if hasattr(self, "key"):
             return self.key.str_without(excluded) + units
-        if "ast" not in excluded and self.ast:
-            # As in .latex: suppress the inner UnitsNode only when appending our
-            # own suffix, so a constant's units show once rather than twice.
-            inner = excluded if not units else also_excluding(excluded, "ast_units")
-            aststr = self.parse_ast(inner)
-            if aststr:
-                return aststr + units
-            # Nothing left: the AST was only unit literals, which `units` now
-            # carries. The hmap below keeps the coefficient.
-        mstrs = []
-        for exp, c in self.hmap.items():
-            pvarstrs, nvarstrs = [], []
-            for var, x in sorted(exp.items(), key=lambda vx: (vx[1], str(vx[0]))):
-                if not x:
-                    continue
-                if x > 0:
-                    varstrlist = pvarstrs
-                else:
-                    x = -x
-                    varstrlist = nvarstrs
-                varstr = var.str_without(excluded)
-                if UNICODE_EXPONENTS and int(x) == x and 2 <= x <= 9:
-                    x = int(x)
-                    if x in (2, 3):
-                        varstr += chr(176 + x)
-                    elif x in (4, 5, 6, 7, 8, 9):
-                        varstr += chr(8304 + x)
-                elif x != 1:
-                    varstr += f"^{x:.2g}"
-                varstrlist.append(varstr)
-            numerator_strings = pvarstrs
-            cstr = f"{c:.3g}"
-            if cstr == "-1":
-                cstr = "-"
-            if numerator_strings and cstr == "1":
-                mstr = MUL.join(pvarstrs)
-            else:
-                mstr = MUL.join([cstr] + pvarstrs)
-            if nvarstrs:
-                mstr = mstr + "/" + "/".join(nvarstrs)
-            mstrs.append(mstr)
-        return " + ".join(sorted(mstrs)) + units
+        # with a units suffix, unit literals would show the units twice
+        return self._rendered(TEXT, excluded, unit_literals=not units) + units
 
     def latex(self, excluded=()):
         "Latex representation, parsing `excluded` just as .str_without does"
         if hasattr(self, "key"):
             return self.key.latex(excluded)
-        if "ast" not in excluded and self.ast:
-            if "units" in excluded:
-                # Pass excluded through so UnitsNode renders its dimensional context.
-                # UnitsNode represents a constant's physical units, not a variable
-                # annotation, so it is intentionally not suppressed here.
-                return self.ast.latex(excluded)
-            # Suppress UnitsNode via "ast_units" sentinel so it doesn't appear
-            # alongside the Monomial unitstr we append below (avoids double units).
-            excluded_inner = also_excluding(excluded, "ast_units")
-            ast_latex = self.ast.latex(excluded_inner)
+        units = ""
+        if "units" not in excluded:
             units = self.unitstr(r"\mathrm{~\left[ %s \right]}", ":L~")
-            units_tf = units.replace("frac", "tfrac").replace(r"\cdot", r"\cdot ")
-            return ast_latex + units_tf
-        mstrs = []
-        for exp, c in self.hmap.items():
-            pos_vars, neg_vars = [], []
-            for var, x in exp.items():
-                if x > 0:
-                    pos_vars.append((var.latex(excluded), x))
-                elif x < 0:
-                    neg_vars.append((var.latex(excluded), x))
-            mstrs.append(nomial_latex_helper(c, pos_vars, neg_vars))
-
-        if "units" in excluded:
-            return " + ".join(sorted(mstrs))
-        units = self.unitstr(r"\mathrm{~\left[ %s \right]}", ":L~")
-        units_tf = units.replace("frac", "tfrac").replace(r"\cdot", r"\cdot ")
-        return " + ".join(sorted(mstrs)) + units_tf
+            units = units.replace("frac", "tfrac").replace(r"\cdot", r"\cdot ")
+        return self._rendered(LATEX, excluded, unit_literals=not units) + units
 
     @property
     def value(self):
