@@ -17,6 +17,7 @@ from .constraints.set import (
     solver_constraints,
 )
 from .display import DisplayScope
+from .display.render import LATEX, LATEX_ALIGNED, TEXT, render
 from .model import Model as _Model
 from .nomials.constraints import ArrayConstraint
 from .printing import _format_aligned_columns, _md_escape, _md_table
@@ -69,7 +70,7 @@ class CGroup:
     """
 
     label: str  # "" for unnamed groups
-    constraints: list  # raw constraint objects; str_without() or str() fallback
+    constraints: list  # raw constraint objects, shown through render()
     keys: list  # one ConstraintKey per constraint, same order
 
 
@@ -162,14 +163,6 @@ def _serialize_value(val: Any) -> Any:
 # ── Constraint rendering ──────────────────────────────────────────────────────
 
 
-def _render_constraint(c, scope) -> str:
-    "Render a constraint, naming its variables as scope says to."
-    try:
-        return c.str_without(scope)
-    except AttributeError:
-        return str(c)
-
-
 def _constraint_dict(c, key, scope) -> dict:
     """One constraint as JSON: how to print it, how to typeset it, what it is.
 
@@ -179,13 +172,9 @@ def _constraint_dict(c, key, scope) -> dict:
     A vector constraint also names its elements, which are what a solution
     keys its sensitivities by.
     """
-    try:
-        latex = c.latex(scope)
-    except AttributeError:
-        latex = str(c)
     out = {
-        "str": _render_constraint(c, scope),
-        "latex": latex,
+        "str": render(c, TEXT, scope),
+        "latex": render(c, LATEX, scope),
         "key": key.ref,
         "type": type(c).__name__,
     }
@@ -265,9 +254,8 @@ def _build_constraint_groups(model) -> list[CGroup]:
     model owns, in canonical order -- child models keep their own for their own
     sections, containers like Tight, Loose or SignomialEquality are walked
     through, and a vector constraint is one item (or its elements, if a side was
-    never written as one expression: shown_as), so every item accepts
-    .latex(excluded, aligned=True). Raw objects are stored; renderers call str()
-    or .latex().
+    never written as one expression: shown_as). Raw objects are stored; the
+    renderers call gpkit.display.render on them.
 
     Keys come from own_keyed_constraints, the same call the IR names constraints
     with, so the two cannot name a constraint differently.
@@ -300,8 +288,8 @@ def _build_objective(model, solution) -> dict:
     obj = model.objective_info(solution=solution)
     excluded = {"units", "lineage"}
     return {
-        "objective_str": obj.expr.str_without(excluded),
-        "objective_latex": obj.expr.latex(excluded),
+        "objective_str": render(obj.expr, TEXT, excluded),
+        "objective_latex": render(obj.expr, LATEX, excluded),
         "objective_label": (obj.variable.label or "") if obj.variable else "",
         "objective_value": obj.value,
         "objective_units": obj.units,
@@ -325,7 +313,7 @@ def _model_stats(model) -> dict:
     if model.cost.vks:
         obj = model.objective_info()
         excluded = {"units", "lineage"}
-        obj_latex = obj.expr.latex(excluded)
+        obj_latex = render(obj.expr, LATEX, excluded)
         obj_label = (obj.variable.label or "") if obj.variable else ""
         obj_direction = obj.sense
     else:
@@ -540,7 +528,7 @@ def _text_constraint_rows(constraints: list, scope=None) -> list:
     names carry their full lineage.
     """
     scope = (scope or DisplayScope()).also_excluding("units")
-    c_rows = [_split_constraint_str(_render_constraint(c, scope)) for c in constraints]
+    c_rows = [_split_constraint_str(render(c, TEXT, scope)) for c in constraints]
     return _format_aligned_columns(c_rows, "<<", "  ")
 
 
@@ -713,11 +701,7 @@ def render_markdown(ir: "ReportSection", level: int = 1) -> str:
         lines.append("")
         lines.append("$$\\begin{aligned}")
         for c in cg.constraints:
-            if hasattr(c, "latex"):
-                c_latex = c.latex(scope, aligned=True)
-            else:
-                c_latex = str(c)
-            lines.append(f"{c_latex} \\\\")
+            lines.append(f"{render(c, LATEX_ALIGNED, scope)} \\\\")
         lines.append("\\end{aligned}$$")
         lines.append("")
 

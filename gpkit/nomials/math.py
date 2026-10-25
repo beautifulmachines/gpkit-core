@@ -6,7 +6,7 @@ from typing import ClassVar
 import numpy as np
 
 from .. import units
-from ..ast_nodes import expr, to_ast
+from ..ast_nodes import expr, to_ast, written_ast
 from ..exceptions import InvalidGPConstraint, InvalidPosynomial, PrimalInfeasible
 from ..units import DimensionalityError
 from ..util.globals import NamedVariables, SignomialsEnabled
@@ -76,7 +76,7 @@ class Signomial(Nomial):
         "Serialize this nomial to an IR dict."
         ir = self.hmap.to_ir()
         ir["type"] = self.__class__.__name__
-        ast = to_ast(self)  # a bare variable or constant was written too
+        ast = written_ast(self)  # a bare variable or constant was written too
         if ast is not None:
             ir["ast"] = ast.to_ir()
         return ir

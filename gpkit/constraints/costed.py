@@ -4,6 +4,7 @@ from collections import namedtuple
 
 import numpy as np
 
+from ..display.render import LATEX, TEXT, render
 from ..nomials import Variable
 from ..util.repr_conventions import lineagestr, unitstr
 from ..util.small_scripts import maybe_flatten
@@ -70,7 +71,7 @@ class CostedConstraintSet(ConstraintSet):
                 "",
                 "Cost Function",
                 "-------------",
-                " " + self.cost.str_without(excluded),
+                " " + render(self.cost, TEXT, excluded),
                 "",
                 "Constraints",
                 "-----------",
@@ -87,7 +88,7 @@ class CostedConstraintSet(ConstraintSet):
         return "\n".join(
             [
                 "\\text{minimize}",
-                f"    & {self.cost.latex(excluded)} \\\\",
+                f"    & {render(self.cost, LATEX, excluded)} \\\\",
                 "\\text{subject to}",
             ]
         )

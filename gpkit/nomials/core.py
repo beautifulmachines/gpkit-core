@@ -1,48 +1,14 @@
 "The shared non-mathematical backbone of all Nomials"
 
-from ..ast_nodes import ast_from_terms, to_ast
-from ..display.render import LATEX, TEXT, render, varkey_names
+from ..display.render import Rendered
 from ..util.small_classes import FixedScalar, Numbers
 from .data import NomialData
 
 
-class Nomial(NomialData):
+class Nomial(Rendered, NomialData):
     "Shared non-mathematical properties of all nomials"
 
     sub = None
-
-    def _rendered(self, fmt, excluded, unit_literals):
-        """This nomial in fmt: as written, or from its terms if it never was.
-
-        The terms also stand in when the written form renders empty, which
-        happens when it was only unit literals and the caller prints the units.
-        """
-        for tree in (to_ast(self), ast_from_terms(self.hmap.items())):
-            if tree is None:
-                continue
-            names = varkey_names(tree, excluded, latex=fmt is LATEX)
-            text = render(tree, fmt, names, unit_literals)
-            if text:
-                return text
-        return ""
-
-    def str_without(self, excluded=()):
-        "String representation, excluding fields ('units', varkey attributes)"
-        units = "" if "units" in excluded else self.unitstr(" [%s]")
-        if hasattr(self, "key"):
-            return self.key.str_without(excluded) + units
-        # with a units suffix, unit literals would show the units twice
-        return self._rendered(TEXT, excluded, unit_literals=not units) + units
-
-    def latex(self, excluded=()):
-        "Latex representation, parsing `excluded` just as .str_without does"
-        if hasattr(self, "key"):
-            return self.key.latex(excluded)
-        units = ""
-        if "units" not in excluded:
-            units = self.unitstr(r"\mathrm{~\left[ %s \right]}", ":L~")
-            units = units.replace("frac", "tfrac").replace(r"\cdot", r"\cdot ")
-        return self._rendered(LATEX, excluded, unit_literals=not units) + units
 
     @property
     def value(self):

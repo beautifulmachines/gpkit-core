@@ -1,5 +1,6 @@
 "Implements Tight"
 
+from ..display.render import TEXT, render
 from ..util.globals import SignomialsEnabled
 from ..util.small_scripts import appendsolwarning, mag
 from .set import ConstraintSet
@@ -26,7 +27,7 @@ class Tight(ConstraintSet):
                 if hasattr(leftval, "magnitude"):
                     rightval = rightval.to(leftval.units).magnitude
                     leftval = leftval.magnitude
-                cstr = constraint.str_without({"units", "lineage"})
+                cstr = render(constraint, TEXT, {"units", "lineage"})
                 appendsolwarning(
                     f"{leftval:.4g} {constraint.oper} {rightval:.4g} : {cstr}",
                     result,

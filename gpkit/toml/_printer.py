@@ -1,12 +1,11 @@
 "Generate TOML model specs from gpkit Models or IR dicts."
 
 import re
-from typing import NamedTuple
 
 import numpy as np
 
 from ..ast_nodes import ast_from_ir, ast_from_terms
-from ..display.render import TOML, render
+from ..display.render import TOML, render_ast
 from ..display.render import exact_number as _format_number
 from ..ir import check_ir_version
 
@@ -67,28 +66,7 @@ def ast_to_expr(node, name_fn=_ref_to_name):
     "Model.name" when another model owns it (see _make_name_resolver), so a
     cross-model reference like self.engine.W does not print as a bare "W".
     """
-    if isinstance(node, dict):
-        node = ast_from_ir(node, _RefNameRegistry())
-    return render(node, TOML, name_fn)
-
-
-class _Ref(NamedTuple):
-    "Stands in for a VarKey where rendering needs only its ref."
-
-    ref: str
-
-
-class _RefNameRegistry(dict):
-    """Minimal registry mapping IR var refs back to objects with a .ref attr.
-
-    ast_from_ir expects a registry mapping ref → VarKey.  We only need the
-    .ref attribute for rendering, so we use _Ref stubs.
-    """
-
-    def __missing__(self, ref):
-        stub = _Ref(ref)
-        self[ref] = stub
-        return stub
+    return render_ast(ast_from_ir(node), TOML, name_fn)
 
 
 # ---------------------------------------------------------------------------
@@ -127,12 +105,7 @@ def _nomial_ir_to_expr(nomial_ir, name_fn=_ref_to_name):
     ast = nomial_ir.get("ast")
     if ast is not None:
         return ast_to_expr(ast, name_fn)
-    registry = _RefNameRegistry()
-    terms = (
-        ({registry[ref]: x for ref, x in term.get("exps", {}).items()}, term["coeff"])
-        for term in nomial_ir["terms"]
-    )
-    return render(ast_from_terms(terms), TOML, name_fn)
+    return render_ast(ast_from_terms(nomial_ir["terms"]), TOML, name_fn)
 
 
 def _is_reciprocal(ast_dict):

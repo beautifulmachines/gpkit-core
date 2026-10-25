@@ -7,8 +7,7 @@ import pytest
 from gpkit.constraints.set import ConstraintSet
 from gpkit.display import DisplayScope
 from gpkit.display.naming import latex_path_label
-from gpkit.nomials.constraints import SingleEquationConstraint
-from gpkit.nomials.core import Nomial
+from gpkit.display.render import render
 from gpkit.util.repr_conventions import also_excluding
 from gpkit.varkey import VarKey
 
@@ -339,12 +338,9 @@ class TestFormatFlags:
     @pytest.mark.parametrize(
         "method",
         [
-            SingleEquationConstraint.str_without,
-            SingleEquationConstraint.latex,
+            render,
             ConstraintSet.str_without,
             ConstraintSet.latex,
-            Nomial.str_without,
-            Nomial.latex,
             VarKey.str_without,
             VarKey.latex,
         ],
@@ -356,13 +352,7 @@ class TestFormatFlags:
         moment it reaches also_excluding()."""
         default = inspect.signature(method).parameters["excluded"].default
         assert not isinstance(default, str)
-        assert set(default) <= set(also_excluding(default, "ast_units"))
-
-    def test_scope_is_hashable_for_render_caches(self):
-        """parse_ast caches rendered strings keyed on the threaded context."""
-        S = VarKey("S", lineage=WING)
-        scope = DisplayScope(anchor=WING, shown=[S], excluded={"units"})
-        assert {scope: 1}[scope] == 1
+        assert set(default) <= set(also_excluding(default, "units"))
 
 
 class TestVarKeyComposition:

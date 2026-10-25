@@ -11,6 +11,7 @@ from ipywidgets import Layout
 
 from .. import GPCOLORS, Model
 from ..constraints import ArrayConstraint
+from ..display.render import TEXT, render
 from ..repr_conventions import lineagestr, unitstr
 from ..varkey import lineage_display_context
 from ..varmap import get_lineage_map
@@ -112,7 +113,7 @@ class Sankey:
                 total_sens += self.linkfixed(cset, target)
         elif isinstance(cset, ArrayConstraint) and cset.constraints.size > 1:
             switchedtarget = target
-            cstr = cset.str_without(["lineage", "units"]).replace("[:]", "")
+            cstr = render(cset, TEXT, ["lineage", "units"]).replace("[:]", "")
             label = cstr if len(cstr) <= 30 else "%s ..." % cstr[:30]
             target = self.add_node(target, label, "constraint")
             subarray = True
@@ -137,7 +138,7 @@ class Sankey:
                 elif vk in cset.v_ss:
                     total_sens = cset.v_ss[vk] or EPS
             if not labeled:
-                cstr = cset.str_without(["lineage", "units"])
+                cstr = render(cset, TEXT, ["lineage", "units"])
                 label = cstr if len(cstr) <= 30 else "%s ..." % cstr[:30]
                 tag = "subarray" if subarray else "constraint"
                 source = self.add_node(target, label, tag)

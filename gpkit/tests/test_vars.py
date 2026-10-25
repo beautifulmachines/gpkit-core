@@ -88,7 +88,8 @@ class TestVarKey:
         assert str(x / 2) == "x[:]/2"
         assert str(2 / x) == "2/x[:]"
         assert str(x**3) == "x[:]³"
-        assert str(-x) == "-x[:]"
+        with SignomialsEnabled():
+            assert str(-x) == "-x[:]"
         assert str(x / y / z) == "x[:]/y[:]/z[:]"
         assert str(x / (y / z)) == "x[:]/(y[:]/z[:])"
         assert str(x <= y) == "x[:] ≤ y[:]"

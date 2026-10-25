@@ -17,9 +17,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 
-from .ast_nodes import ExprNode, VarNode
+from .ast_nodes import ExprNode, VarNode, variables_of, written_ast
 from .constraints.set import constraint_senss
-from .display.render import TEXT, render, varkey_names
+from .display.render import TEXT, names_of, render_ast
 from .units import DimensionalityError, qty
 from .util.repr_conventions import MUL
 from .varkey import VarKey
@@ -72,17 +72,17 @@ def _collect_sum_terms(node):
     return [node]
 
 
-def _vks_of_ast_term(node):
+def _vks_of_ast_term(node, variables):
     """Return frozenset of VarKeys referenced in a monomial AST term."""
     if isinstance(node, VarNode):
-        return frozenset({node.varkey})
+        return frozenset({variables[node.ref]})
     if isinstance(node, ExprNode) and node.op in ("mul", "div"):
         vks = set()
         for child in node.children:
-            vks.update(_vks_of_ast_term(child))
+            vks.update(_vks_of_ast_term(child, variables))
         return frozenset(vks)
     if isinstance(node, ExprNode) and node.op == "pow":
-        return _vks_of_ast_term(node.children[0])
+        return _vks_of_ast_term(node.children[0], variables)
     return frozenset()
 
 
@@ -98,17 +98,20 @@ def _ast_label_map(lt, strip_prefix=None):
     When *strip_prefix* is given (a lineagestr of the parent model), that
     prefix is removed from variable names so only the relative path is shown.
     """
-    if lt.ast is None:
+    variables = variables_of(lt)
+    tree = written_ast(lt, variables) if lt.ast is not None else None
+    if tree is None:
         return {}, {}
     excluded = ["units"]
     if strip_prefix:
         excluded.append(f":MAGIC:{strip_prefix}")
+    names = names_of(variables, TEXT, excluded)
     labels = {}
     is_var = {}
-    for term in _collect_sum_terms(lt.ast):
-        vks = _vks_of_ast_term(term)
+    for term in _collect_sum_terms(tree):
+        vks = _vks_of_ast_term(term, variables)
         if vks:
-            labels[vks] = render(term, TEXT, varkey_names(term, excluded))
+            labels[vks] = render_ast(term, TEXT, names)
             is_var[vks] = isinstance(term, VarNode)
     return labels, is_var
 

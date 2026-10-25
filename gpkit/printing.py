@@ -9,10 +9,10 @@ import numpy as np
 
 from .constraints.set import shown_as, solver_constraints, written_keyed_constraints
 from .display.naming import decorated
+from .display.render import TEXT, render
 from .ir import diff_solutions
 from .units import Quantity
 from .util.repr_conventions import lineagestr, unitstr
-from .util.small_scripts import try_str_without
 
 Item = tuple[Any, Any]
 
@@ -45,7 +45,9 @@ class Display:
         self.entries = entries
         self.has_model = model is not None
         # a solution holds the cost's value; only the model knows its expression
-        self.cost_name = "cost" if model is None else model.cost.str_without("units")
+        self.cost_name = (
+            "cost" if model is None else render(model.cost, TEXT, {"units"})
+        )
         self._gathered, self._constraints = (
             {},
             {},
@@ -89,7 +91,7 @@ class Display:
         return ref in self._constraints
 
     def constraint(self, ref) -> str:
-        text = try_str_without(self._constraints[ref], {"units", "lineage"})
+        text = render(self._constraints[ref], TEXT, {"units", "lineage"})
         if " at 0x" in text:  # a custom constraint's default repr
             text = text[: text.find(" at 0x")] + ">"
         return text

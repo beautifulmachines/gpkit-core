@@ -47,12 +47,10 @@ class TestAstToExpr:
     """AST node rendering to plain expression strings."""
 
     def test_var_node(self):
-        vk = VarKey(name="x")
-        assert ast_to_expr(VarNode(vk)) == "x"
+        assert ast_to_expr(VarNode(VarKey(name="x").ref)) == "x"
 
     def test_var_node_with_units(self):
-        vk = VarKey(name="h", units="ft")
-        assert ast_to_expr(VarNode(vk)) == "h"
+        assert ast_to_expr(VarNode(VarKey(name="h", units="ft").ref)) == "h"
 
     def test_const_node(self):
         assert ast_to_expr(ConstNode(2.0)) == "2"
@@ -69,25 +67,19 @@ class TestAstToExpr:
         assert ast_to_expr(node) == "1 + 2"
 
     def test_mul(self):
-        x = VarNode(VarKey(name="x"))
-        y = VarNode(VarKey(name="y"))
-        node = ExprNode("mul", (x, y))
+        node = ExprNode("mul", (VarNode("x"), VarNode("y")))
         assert ast_to_expr(node) == "x*y"
 
     def test_mul_drops_1(self):
-        x = VarNode(VarKey(name="x"))
-        node = ExprNode("mul", (ConstNode(1.0), x))
+        node = ExprNode("mul", (ConstNode(1.0), VarNode("x")))
         assert ast_to_expr(node) == "x"
 
     def test_div(self):
-        x = VarNode(VarKey(name="x"))
-        y = VarNode(VarKey(name="y"))
-        node = ExprNode("div", (x, y))
+        node = ExprNode("div", (VarNode("x"), VarNode("y")))
         assert ast_to_expr(node) == "x/y"
 
     def test_pow(self):
-        x = VarNode(VarKey(name="x"))
-        node = ExprNode("pow", (x, 2))
+        node = ExprNode("pow", (VarNode("x"), 2))
         assert ast_to_expr(node) == "x**2"
 
     def test_neg(self):
@@ -126,8 +118,7 @@ class TestAstToExpr:
     def test_div_by_units_node_preserves_literal(self):
         """x / (1*units.W) must keep the units() literal, not simplify it
         away — the division may carry a real unit-conversion factor."""
-        x = VarNode(VarKey(name="x"))
-        node = ExprNode("div", (x, UnitsNode(units("W").hmap.units)))
+        node = ExprNode("div", (VarNode("x"), UnitsNode(units("W").hmap.units)))
         assert ast_to_expr(node) == "x/units('W')"
 
 

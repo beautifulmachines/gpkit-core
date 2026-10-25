@@ -7,10 +7,10 @@ from functools import cached_property
 import numpy as np
 
 from ..constraintkey import ConstraintKey
+from ..display.render import LATEX, TEXT, render
 from ..nomials import NomialArray, Variable
 from ..nomials.constraints import ArrayConstraint
 from ..util.repr_conventions import ReprMixin, also_excluding, lineagestr
-from ..util.small_scripts import try_str_without
 from ..varkey import lineage_display_context
 from ..varmap import EMPTY_VARSET, Substitutions, VarSet, _collision_depths
 
@@ -426,7 +426,10 @@ class ConstraintSet(list, ReprMixin):
             if hasattr(self, "_rootlatex"):
                 lines.append(self._rootlatex(excluded))
         for constraint in self:
-            cstr = try_str_without(constraint, excluded, latex=True)
+            if isinstance(constraint, ConstraintSet):
+                cstr = constraint.latex(excluded)
+            else:
+                cstr = render(constraint, LATEX, excluded)
             if cstr[:6] != "    & ":  # require indentation
                 cstr = "    & " + cstr + " \\\\"
             lines.append(cstr)
@@ -507,10 +510,14 @@ def recursively_line(iterable, excluded):
         named_constraints = {i: k for k, i in iterable.idxlookup.items()}
     lines = []
     for i, constraint in enumerate(iterable):
-        if hasattr(constraint, "lines_without"):
+        if isinstance(constraint, ArrayConstraint):
+            # one line as written, or a line per element if it never was
+            rows = [constraint] if constraint.written else constraint.constraints.flat
+            clines = [render(row, TEXT, excluded) for row in rows]
+        elif hasattr(constraint, "lines_without"):
             clines = constraint.lines_without(excluded)
         elif not hasattr(constraint, "__iter__"):
-            clines = try_str_without(constraint, excluded).split("\n")
+            clines = render(constraint, TEXT, excluded).split("\n")
         elif iterable is constraint:
             clines = ["(constraint contained itself)"]
         else:

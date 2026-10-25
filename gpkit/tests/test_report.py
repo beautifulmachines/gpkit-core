@@ -17,6 +17,7 @@ from gpkit import (
 )
 from gpkit.constraintkey import ConstraintKey
 from gpkit.constraints.tight import Tight
+from gpkit.display.render import LATEX, render
 from gpkit.report import (
     CGroup,
     ReportSection,
@@ -226,7 +227,7 @@ class TestReportDataclasses:
         assert restored["constraint_groups"][0]["label"] == "Aero"
 
     def test_to_dict_non_constraint_object_in_cgroup(self):
-        """to_dict() falls back to str() for objects without str_without()."""
+        """to_dict() shows an object render() does not know as its str()."""
         cg = CGroup(
             label="Raw", constraints=[("x", ">=", "1")], keys=[ConstraintKey(index=0)]
         )
@@ -297,7 +298,11 @@ class TestConstraintEntries:
         "Both forms come from the section's scope, so they name variables alike."
         m = _IdParent()
         child_ir = build_report_ir(m).children[0]
-        raw = [c.latex() for cg in child_ir.constraint_groups for c in cg.constraints]
+        raw = [
+            render(c, LATEX)
+            for cg in child_ir.constraint_groups
+            for c in cg.constraints
+        ]
         entries = _constraints(m.report(fmt="dict")["children"][0])
         for entry, unscoped in zip(entries, raw, strict=True):
             assert "\\geq" in entry["latex"]  # the LaTeX form, not the text one

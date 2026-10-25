@@ -13,10 +13,9 @@ from operator import eq, ge, le, xor
 import numpy as np
 
 from ..ast_nodes import expr, to_ast
-from ..display.render import LATEX, TEXT, render, varkey_names
+from ..display.render import Rendered
 from ..util.repr_conventions import ReprMixin
 from ..util.small_classes import EMPTY_HV, HashVector, Numbers
-from ..util.small_scripts import try_str_without
 from .constraints import ArrayConstraint
 from .map import NomialMap
 from .math import Signomial
@@ -50,7 +49,7 @@ def array_constraint(symbol, func):
     return wrapped_func
 
 
-class NomialArray(ReprMixin, np.ndarray):
+class NomialArray(Rendered, ReprMixin, np.ndarray):
     """A Numpy array with elementwise inequalities and substitutions.
 
     Arguments
@@ -120,35 +119,6 @@ class NomialArray(ReprMixin, np.ndarray):
         if not getattr(out, "shape", None):
             return out
         return NomialArray(out, ast=expr("index", (to_ast(self), idxs)))
-
-    def str_without(self, excluded=()):
-        "Returns string without certain fields (such as 'lineage')."
-        if self.ast:
-            return render(self.ast, TEXT, varkey_names(self.ast, excluded))
-        if "key" not in excluded and hasattr(self, "key"):
-            return self.key.str_without(excluded)
-        if not self.shape:
-            return try_str_without(self.flatten()[0], excluded)
-
-        joined = ", ".join(
-            [
-                try_str_without(np.ndarray.__getitem__(self, i), excluded)
-                for i in range(self.shape[0])
-            ]
-        )
-        return f"[{joined}]"
-
-    def latex(self, excluded=()):
-        "Returns latex representation without certain fields, as str_without does."
-        if self.ast:
-            return render(self.ast, LATEX, varkey_names(self.ast, excluded, latex=True))
-        units = self.latex_unitstr() if "units" not in excluded else ""
-        if hasattr(self, "key"):
-            return self.key.latex(excluded) + units
-        joined = ", ".join(
-            try_str_without(el, excluded, latex=True) for el in self.flat
-        )
-        return rf"\left[{joined}\right]"
 
     def __hash__(self):
         return reduce(xor, map(hash, self.flat), 0)

@@ -5,30 +5,19 @@ from typing import ClassVar
 
 import numpy as np
 
-from ..ast_nodes import ast_to_ir, to_ast
-from ..display.render import LATEX, TEXT
+from ..ast_nodes import ast_to_ir, written_ast
+from ..display.render import Rendered
 from ..util.globals import NamedVariables
 from ..util.repr_conventions import ReprMixin
-from ..util.small_scripts import try_str_without
 
 
-class SingleEquationConstraint(ReprMixin):
+class SingleEquationConstraint(Rendered, ReprMixin):
     "Constraint expressible in a single equation."
 
     func_opers: ClassVar = {"<=": le, ">=": ge, "=": eq}
 
     def __init__(self, left, oper, right):
         self.left, self.oper, self.right = left, oper, right
-
-    def str_without(self, excluded=("units",)):
-        "String representation without attributes in excluded list"
-        leftstr = try_str_without(self.left, excluded)
-        rightstr = try_str_without(self.right, excluded)
-        rlines = rightstr.split("\n")
-        if len(rlines) > 1:
-            indent = len("%s %s " % (leftstr.split("\n")[-1], self.oper))
-            rightstr = ("\n" + " " * indent).join(rlines)
-        return f"{leftstr} {TEXT.relation(self.oper)} {rightstr}"
 
     def to_ir(self):
         "Serialize the common constraint structure to an IR dict."
@@ -37,15 +26,6 @@ class SingleEquationConstraint(ReprMixin):
             "left": self.left.to_ir(),
             "right": self.right.to_ir(),
         }
-
-    def latex(self, excluded=("units",), aligned=False):
-        "Latex representation without attributes in excluded list"
-        lhs = try_str_without(self.left, excluded, latex=True)
-        op = LATEX.relation(self.oper)
-        rhs = try_str_without(self.right, excluded, latex=True)
-        if aligned:
-            return f"{lhs} &{op} {rhs}"
-        return f"{lhs} {op} {rhs}"
 
 
 class ArrayConstraint(SingleEquationConstraint, list):
@@ -72,13 +52,7 @@ class ArrayConstraint(SingleEquationConstraint, list):
     @property
     def written(self) -> bool:
         "Whether both sides have a written form, so it prints as one vector line."
-        return to_ast(self.left) is not None and to_ast(self.right) is not None
-
-    def lines_without(self, excluded):
-        "Lines for hierarchical printing: the relation if written, else each element."
-        if self.written:
-            return self.str_without(excluded).split("\n")
-        return [try_str_without(c, excluded) for _, c in self.elements()]
+        return all(written_ast(side) is not None for side in (self.left, self.right))
 
     def to_ir(self):
         """Serialize the relation as written; its elements serialize themselves.
@@ -92,7 +66,7 @@ class ArrayConstraint(SingleEquationConstraint, list):
         if self.lineage:
             ir["lineage"] = [[name, num] for name, num in self.lineage]
         for name, side in (("left", self.left), ("right", self.right)):
-            ast = to_ast(side)
+            ast = written_ast(side)
             ir[name] = {} if ast is None else {"ast": ast_to_ir(ast)}
         return ir
 
