@@ -6,16 +6,15 @@ from typing import ClassVar
 import numpy as np
 
 from ..ast_nodes import ast_to_ir, to_ast
+from ..display.render import LATEX, TEXT
 from ..util.globals import NamedVariables
-from ..util.repr_conventions import UNICODE_EXPONENTS, ReprMixin
+from ..util.repr_conventions import ReprMixin
 from ..util.small_scripts import try_str_without
 
 
 class SingleEquationConstraint(ReprMixin):
     "Constraint expressible in a single equation."
 
-    latex_opers: ClassVar = {"<=": "\\leq", ">=": "\\geq", "=": "="}
-    unicode_opers: ClassVar = {"<=": "≤", ">=": "≥", "=": "="}
     func_opers: ClassVar = {"<=": le, ">=": ge, "=": eq}
 
     def __init__(self, left, oper, right):
@@ -29,11 +28,7 @@ class SingleEquationConstraint(ReprMixin):
         if len(rlines) > 1:
             indent = len("%s %s " % (leftstr.split("\n")[-1], self.oper))
             rightstr = ("\n" + " " * indent).join(rlines)
-        if UNICODE_EXPONENTS:
-            oper = self.unicode_opers[self.oper]
-        else:
-            oper = self.oper
-        return f"{leftstr} {oper} {rightstr}"
+        return f"{leftstr} {TEXT.relation(self.oper)} {rightstr}"
 
     def to_ir(self):
         "Serialize the common constraint structure to an IR dict."
@@ -46,7 +41,7 @@ class SingleEquationConstraint(ReprMixin):
     def latex(self, excluded=("units",), aligned=False):
         "Latex representation without attributes in excluded list"
         lhs = try_str_without(self.left, excluded, latex=True)
-        op = self.latex_opers[self.oper]
+        op = LATEX.relation(self.oper)
         rhs = try_str_without(self.right, excluded, latex=True)
         if aligned:
             return f"{lhs} &{op} {rhs}"

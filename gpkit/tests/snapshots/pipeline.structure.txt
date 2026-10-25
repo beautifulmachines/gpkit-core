@@ -12,7 +12,7 @@
   fixed p_sys
   fixed hours[:]
   fixed sigma
-  cons  sigma ≥ p_sys⋅D/(2⋅t) + 4⋅M/(3.14⋅D²⋅t)
+  cons  sigma ≥ p_sys⋅D/(2⋅t) + 4⋅M/(3.142⋅D²⋅t)
   cons  P[:] ≤ P_rated
   cons  C_nrg ≥ c_nrg⋅(P[:]⋅hours[:]).sum()
   cons  LCC ≥ Pipe.C + Pump.C + C_nrg
@@ -30,9 +30,9 @@
   fixed rho_m
   fixed sigma
   fixed t_min
-  cons (Geometry)  A = 0.785⋅D²
+  cons (Geometry)  A = 0.7854⋅D²
   cons (Geometry)  t ≥ t_min
-  cons (Mass)  W ≥ rho_m⋅3.14⋅D⋅t⋅L
+  cons (Mass)  W ≥ rho_m⋅3.142⋅D⋅t⋅L
   cons (Cost)  C ≥ c_mat⋅W
 [Pipeline.Pump]
   free  C
@@ -67,4 +67,4 @@
   fixed L_span
   fixed rho  [Pipeline.Fluid]
   fixed rho_m  [Pipeline.Pipe]
-  cons  M ≥ (rho_m⋅3.14⋅D⋅t⋅9.81⋅[m/s²] + rho⋅A⋅9.81⋅[m/s²])⋅L_span²/8
+  cons  M ≥ (rho_m⋅3.142⋅D⋅t⋅9.81⋅[m/s²] + rho⋅A⋅9.81⋅[m/s²])⋅L_span²/8

@@ -7,11 +7,11 @@ import pytest
 
 from gpkit import Model, Variable, Vectorize, VectorVariable, units
 from gpkit.ast_nodes import ConstNode, ExprNode, UnitsNode, VarNode
+from gpkit.display.render import exact_number
 from gpkit.examples.uav import UAV
 from gpkit.toml import load_toml
 from gpkit.toml._printer import _ref_to_name, ast_to_expr, to_toml
 from gpkit.util.globals import NamedVariables
-from gpkit.util.repr_conventions import _toml_format_number
 from gpkit.util.small_scripts import mag
 from gpkit.varkey import VarKey
 
@@ -30,12 +30,12 @@ class TestNumberFormatting:
         "value", [0.1, 1 / 3, 1.23456789, 1.2345678901234e-7, 6.02214076e23, 2.5]
     )
     def test_exact(self, value):
-        assert float(_toml_format_number(value)) == value
+        assert float(exact_number(value)) == value
 
     @pytest.mark.parametrize("value", [2, 2.0, -3.0, 0])
     def test_integral_values_stay_readable(self, value):
         "An integral number reads as an integer, so exponents print as x**2."
-        assert _toml_format_number(value) == str(int(value))
+        assert exact_number(value) == str(int(value))
 
 
 # ---------------------------------------------------------------------------

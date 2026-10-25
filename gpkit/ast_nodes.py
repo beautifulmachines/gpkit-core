@@ -3,21 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from functools import reduce
 from typing import TYPE_CHECKING
 
 import numpy as np
 
 from .exceptions import IRSerializationError
 from .units import ureg
-from .util.repr_conventions import (
-    PI_STR,
-    _render_ast_node,
-    _render_ast_node_latex,
-    _render_ast_node_toml,
-    _toml_format_number,
-    latex_unitstr,
-    unitstr,
-)
 
 if TYPE_CHECKING:
     from .varkey import VarKey
@@ -25,11 +17,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class ASTNode:
-    """Base class for all AST nodes."""
-
-    def str_without(self, excluded=()):
-        "Render this node as a string, for integration with strify/parse_ast."
-        raise NotImplementedError
+    """Base class for all AST nodes. gpkit.display.render renders them."""
 
     def to_ir(self):
         "Serialize this AST node to an IR dict."
@@ -47,17 +35,6 @@ class VarNode(ASTNode):
         "Qualified path string for IR serialization."
         return self.varkey.ref
 
-    def str_without(self, excluded=()):
-        return self.varkey.str_without(excluded)
-
-    def latex(self, excluded=()):
-        "Render this variable node as a LaTeX string."
-        return self.varkey.latex(excluded)
-
-    def to_toml_expr(self, name_fn):
-        "Render this variable node as TOML/Python expression syntax."
-        return name_fn(self.ref)
-
     def to_ir(self):
         return {"node": "var", "ref": self.ref}
 
@@ -67,17 +44,6 @@ class ConstNode(ASTNode):
     """A numeric constant in the expression tree."""
 
     value: float
-
-    def str_without(self, excluded=()):  # noqa: ARG002
-        return f"{self.value:.3g}"
-
-    def latex(self, _excluded=()):
-        "Render this constant as a LaTeX string."
-        return f"{self.value:.4g}"
-
-    def to_toml_expr(self, _name_fn):
-        "Render this constant as TOML/Python expression syntax."
-        return _toml_format_number(self.value)
 
     def to_ir(self):
         return {"node": "const", "value": self.value}
@@ -94,12 +60,6 @@ class PiNode(ConstNode):
 
     value: float = field(default_factory=lambda: np.pi)
 
-    def str_without(self, excluded=()):  # noqa: ARG002
-        return PI_STR
-
-    def latex(self, _excluded=()):
-        return r"\pi"
-
     def to_ir(self):
         return {"node": "pi"}
 
@@ -108,42 +68,13 @@ class PiNode(ConstNode):
 class UnitsNode(ASTNode):
     """A pure-units leaf in the expression tree (e.g. units.m, units.lbf).
 
-    Renders as the unit string so that expressions like ``4 * units.m``
-    display the physical units of the constant to the reader.
+    Rendered as its units, so ``4 * units.m`` shows what the 4 measures.  TOML
+    writes it as a unit literal, never as 1: its units can differ in scale from
+    a neighboring variable's (a kW variable over a bare 1 W carries a factor of
+    1000), so dropping it would change the solved values on reload.
     """
 
     units: object  # pint Quantity
-
-    def str_without(self, excluded=()):
-        # Suppressed by "ast_units", as in .latex below, not by plain "units":
-        # a constant's dimensional context is not a variable annotation.
-        if "ast_units" in excluded:
-            return ""
-        return unitstr(self.units, "[%s]")
-
-    def latex(self, excluded=()):
-        "Render this units node as a LaTeX string."
-        # Suppressed by "ast_units" (used when Nomial.latex appends unit suffix
-        # separately), but not by plain "units" (which only suppresses variable
-        # unit annotations — constants must always show their dimensional context).
-        if "ast_units" in excluded:
-            return ""
-        return latex_unitstr(self.units).lstrip("~")
-
-    def to_toml_expr(self, _name_fn):
-        """Render this units node as TOML/Python expression syntax.
-
-        Must round-trip as a real unit literal, not be dropped: the units
-        it carries can differ in scale from a neighboring variable's
-        declared units (e.g. dividing a kW variable by a bare 1 W constant
-        folds in a real x1000 conversion factor), so collapsing it to "1"
-        would silently change the model's solved values on reload, not
-        just its cosmetic unit display. Compact ("~C") form avoids
-        embedded spaces inside the quoted TOML string; single-quoted since
-        the surrounding constraint/objective line is itself double-quoted.
-        """
-        unit_str = f"{self.units.units:~C}"
-        return f"units('{unit_str}')"
 
     def to_ir(self):
         return {"node": "units", "units": str(self.units)}
@@ -165,17 +96,6 @@ class ExprNode(ASTNode):
     op: str
     children: tuple
 
-    def str_without(self, excluded=()):
-        return _render_ast_node(self, excluded)
-
-    def latex(self, excluded=()):
-        "Render this expression node as a LaTeX string."
-        return _render_ast_node_latex(self, excluded)
-
-    def to_toml_expr(self, name_fn):
-        "Render this expression node as TOML/Python expression syntax."
-        return _render_ast_node_toml(self, name_fn)
-
     def to_ir(self):
         return {
             "node": "expr",
@@ -195,6 +115,60 @@ def expr(op, children):
     if any(c is None for c in children):
         return None  # an operand has no AST, so neither does the expression
     return ExprNode(op, children)
+
+
+def varnodes(node):
+    "Every VarNode in a tree."
+    if isinstance(node, VarNode):
+        yield node
+    elif isinstance(node, ExprNode):
+        for child in node.children:
+            yield from varnodes(child)
+
+
+def _term_order(term):
+    "Sort key for a term: its variables' refs and exponents, constants last."
+    exps, _ = term
+    powers = sorted((k.ref, x) for k, x in exps.items() if x)
+    return (not powers, powers)
+
+
+def _product(factors):
+    return reduce(lambda a, b: ExprNode("mul", (a, b)), factors)
+
+
+def ast_from_terms(terms):
+    """The AST of a sum of monomials, for math with no written form.
+
+    terms are (exps, coeff) pairs, exps mapping each variable (anything with a
+    .ref) to its exponent: an hmap's items, or the IR's terms.  Variables with
+    negative exponents form the denominator, so 2*x/y reads as written.
+
+    Terms and factors are sorted by ref, constants last, since an hmap's order
+    depends on how it was built.
+    """
+    monomials = []
+    for exps, coeff in sorted(terms, key=_term_order):
+        exps = sorted(exps.items(), key=lambda kx: kx[0].ref)
+        num = [
+            VarNode(k) if x == 1 else ExprNode("pow", (VarNode(k), x))
+            for k, x in exps
+            if x > 0
+        ]
+        den = [
+            VarNode(k) if x == -1 else ExprNode("pow", (VarNode(k), -x))
+            for k, x in exps
+            if x < 0
+        ]
+        if abs(coeff) != 1 or not num:
+            num.insert(0, ConstNode(float(abs(coeff))))
+        mono = _product(num)
+        for factor in den:  # x/y/z, which LaTeX sets as one fraction
+            mono = ExprNode("div", (mono, factor))
+        monomials.append(ExprNode("neg", (mono,)) if coeff < 0 else mono)
+    if not monomials:
+        return ConstNode(0.0)
+    return reduce(lambda a, b: ExprNode("add", (a, b)), monomials)
 
 
 def ast_to_ir(child):
@@ -321,6 +295,7 @@ def to_ast(obj):
             pass
     if hasattr(obj, "key"):
         return VarNode(obj.key)
-    # a nomial or array that got this far was never written as one expression
-    unwritten = hasattr(obj, "hmap") or isinstance(obj, np.ndarray)
+    # a nomial or array that got this far was never written as one expression;
+    # a list or tuple operand is an array too, as in y * [1, 2, 3]
+    unwritten = hasattr(obj, "hmap") or isinstance(obj, (np.ndarray, list, tuple))
     return None if unwritten else obj

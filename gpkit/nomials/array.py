@@ -13,6 +13,7 @@ from operator import eq, ge, le, xor
 import numpy as np
 
 from ..ast_nodes import expr, to_ast
+from ..display.render import LATEX, TEXT, render, varkey_names
 from ..util.repr_conventions import ReprMixin
 from ..util.small_classes import EMPTY_HV, HashVector, Numbers
 from ..util.small_scripts import try_str_without
@@ -122,8 +123,8 @@ class NomialArray(ReprMixin, np.ndarray):
 
     def str_without(self, excluded=()):
         "Returns string without certain fields (such as 'lineage')."
-        if "ast" not in excluded and self.ast:
-            return self.parse_ast(excluded)
+        if self.ast:
+            return render(self.ast, TEXT, varkey_names(self.ast, excluded))
         if "key" not in excluded and hasattr(self, "key"):
             return self.key.str_without(excluded)
         if not self.shape:
@@ -139,8 +140,8 @@ class NomialArray(ReprMixin, np.ndarray):
 
     def latex(self, excluded=()):
         "Returns latex representation without certain fields, as str_without does."
-        if "ast" not in excluded and self.ast:
-            return self.ast.latex(excluded)
+        if self.ast:
+            return render(self.ast, LATEX, varkey_names(self.ast, excluded, latex=True))
         units = self.latex_unitstr() if "units" not in excluded else ""
         if hasattr(self, "key"):
             return self.key.latex(excluded) + units

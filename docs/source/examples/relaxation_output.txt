@@ -141,7 +141,7 @@ With constants relaxed individually
 
 Cost Function
 -------------
- x^0.01⋅Relax.x_max⋅Relax.x_min
+ Relax.x_max⋅Relax.x_min⋅x^0.01
 
 Constraints
 -----------
@@ -186,7 +186,7 @@ Constraints
 
 Optimal Cost
 ------------
-x^0.01⋅Relax.x_max⋅Relax.x_min : 2
+Relax.x_max⋅Relax.x_min⋅x^0.01 : 2
 
 WARNINGS
 --------

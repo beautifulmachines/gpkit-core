@@ -16,7 +16,7 @@
   fixed R_min
   fixed rho
   fixed xi[:]
-  cons  A = 3.14⋅R²
+  cons  A = 3.142⋅R²
   cons  R ≤ R_max
   cons  R ≥ R_min
   cons  Omega ≤ Omega_max

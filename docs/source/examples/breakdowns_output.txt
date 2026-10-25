@@ -82,7 +82,7 @@ Model sensitivity breakdowns (note the two methods of access)
           ┃┃      ┛
           ┃┃      ┣╸2⋅q ≥ 1 + p
           ┃┃      ┛
-          ┃┣╸Wing ┣╸0.423⋅w⋅tau²⋅t_cap ≥ I_cap⋅k_shear + 0.92⋅w⋅tau⋅t_cap²
+          ┃┣╸Wing ┣╸0.4232⋅w⋅tau²⋅t_cap ≥ I_cap⋅k_shear + 0.92⋅w⋅tau⋅t_cap²
           ┃┃      ┣╸M_rbar ≥ W_design⋅A⋅p/(24⋅W_ref)
           ┃┃      ┣╸N_lift⋅M_rbar⋅A⋅q²⋅tau⋅EI_ref/(S⋅I_cap⋅sigma_max) ≤ 8
           ┃┃      ┣╸W/f_wadd ≥ W_cap + W_web
@@ -128,7 +128,7 @@ Exhaustive variable breakdown traces (and configuration arguments)
  F                                                     ×0.125
  G   S                                                = 29m²
  H                                                     ^1.5
- J   2.67⋅g⋅nu⋅rho_alum⋅t_cap⋅w/A^0.5                  ×27.8kg/m²/s²  [free factor]
+ J   2.667⋅nu⋅rho_alum⋅t_cap⋅w⋅g/A^0.5                 ×27.8kg/m²/s²  [free factor]
  K   W_cap                                            = 4,347N
  M   f_wadd                                            ×2, fixed
 
@@ -143,7 +143,7 @@ Wing.W (8,965N)
       W_cap (4,347N)
         which in: W_cap ≥ 8⋅rho_alum⋅g⋅w⋅t_cap⋅S^1.5⋅nu/(3⋅A^0.5) (sensitivity +0.32)
         breaks down into:
-          { through a factor of 2.67⋅g⋅nu⋅rho_alum⋅t_cap⋅w/A^0.5 (27.8kg/m²/s²) }
+          { through a factor of 2.667⋅nu⋅rho_alum⋅t_cap⋅w⋅g/A^0.5 (27.8kg/m²/s²) }
           { through a power of 1.5 }
           S (29m²)
             which in: N_lift⋅M_rbar⋅A⋅q²⋅tau⋅EI_ref/(S⋅I_cap⋅sigma_max) ≤ 8 (sensitivity +0.35)
@@ -151,8 +151,8 @@ Wing.W (8,965N)
             breaks down into:
               { through a factor of 1e-06⋅A⋅EI_ref⋅M_rbar⋅N_lift⋅q²/I_cap/sigma_max (1,546m²) }
               tau (0.15)
-                which in: 0.423⋅w⋅tau²⋅t_cap ≥ I_cap⋅k_shear + 0.92⋅w⋅tau⋅t_cap² (sensitivity +0.37)
-                { through a factor of 1.54 (1.54) }
+                which in: 0.4232⋅w⋅tau²⋅t_cap ≥ I_cap⋅k_shear + 0.92⋅w⋅tau⋅t_cap² (sensitivity +0.37)
+                { through a factor of 1.537 (1.54) }
                 { through a power of 2 }
                 breaks down into 2 monomials:
                   1) forming 93% of the RHS and 90% of the total:
@@ -175,7 +175,7 @@ Wing.W (8,965N)
       W_cap (4,347N)
         which in: W_cap ≥ 8⋅rho_alum⋅g⋅w⋅t_cap⋅S^1.5⋅nu/(3⋅A^0.5) (sensitivity +0.32)
         breaks down into:
-          { through a factor of 2.67⋅g⋅nu⋅rho_alum⋅t_cap⋅w/A^0.5 (27.8kg/m²/s²) }
+          { through a factor of 2.667⋅nu⋅rho_alum⋅t_cap⋅w⋅g/A^0.5 (27.8kg/m²/s²) }
           { through a power of 1.5 }
           S (29m²)
             which in: N_lift⋅M_rbar⋅A⋅q²⋅tau⋅EI_ref/(S⋅I_cap⋅sigma_max) ≤ 8 (sensitivity +0.35)

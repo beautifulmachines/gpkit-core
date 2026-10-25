@@ -76,8 +76,9 @@ class Signomial(Nomial):
         "Serialize this nomial to an IR dict."
         ir = self.hmap.to_ir()
         ir["type"] = self.__class__.__name__
-        if self.ast is not None and hasattr(self.ast, "to_ir"):
-            ir["ast"] = self.ast.to_ir()
+        ast = to_ast(self)  # a bare variable or constant was written too
+        if ast is not None:
+            ir["ast"] = ast.to_ir()
         return ir
 
     def diff(self, var):
