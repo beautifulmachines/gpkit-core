@@ -37,6 +37,11 @@ def _segments(lineage: Lineage, modelnums: bool = True) -> list[str]:
     ]
 
 
+def latex_path_label(names) -> str:
+    "Model names as latex subscript content; a class name may hold `_`, escaped."
+    return ",".join(r"\text{%s}" % n.lower().replace("_", r"\_") for n in names)
+
+
 def marks_vector(idx, shape, excluded) -> bool:
     'Whether a name displays as a whole vector: "[:]" in text, bold in latex.'
     return bool(shape) and not idx and "vec" not in excluded and "idx" not in excluded
@@ -202,8 +207,7 @@ class DisplayScope:
         key = vk.veckey or vk
         if "lineage" in self.excluded:
             return ""
-        segments = _segments(self.path(key), modelnums=False)
-        return ",".join(r"\text{" + seg.lower() + "}" for seg in segments)
+        return latex_path_label(_segments(self.path(key), modelnums=False))
 
     def latex(self, vk) -> str:
         """Latex name for vk, path in the subscript.

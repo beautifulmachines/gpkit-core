@@ -5,7 +5,12 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from .display.naming import DisplayScope, decorated, marks_vector
+from .display.naming import (
+    DisplayScope,
+    decorated,
+    latex_path_label,
+    marks_vector,
+)
 from .units import qty
 from .util.repr_conventions import ReprMixin, latexify, merge_subscript
 from .util.small_classes import Count
@@ -258,9 +263,7 @@ class VarKey(ReprMixin):
             if depth is not None:
                 namespace = namespace[-depth:] if depth > 0 else []
             if namespace:
-                parts.append(
-                    ",".join(r"\text{" + n.lower() + "}" for n, _ in namespace)
-                )
+                parts.append(latex_path_label(n for n, _ in namespace))
         if "idx" not in excluded and self.idx:
             parts.append(",".join(map(str, self.idx)))
         return merge_subscript(name, ",".join(parts)) if parts else name

@@ -6,6 +6,7 @@ import pytest
 
 from gpkit.constraints.set import ConstraintSet
 from gpkit.display import DisplayScope
+from gpkit.display.naming import latex_path_label
 from gpkit.nomials.constraints import SingleEquationConstraint
 from gpkit.nomials.core import Nomial
 from gpkit.util.repr_conventions import also_excluding
@@ -414,6 +415,14 @@ class TestVarKeyComposition:
         veckey = VarKey("c", lineage=SPAR, shape=(3,))
         el = VarKey("c", lineage=SPAR, shape=(3,), idx=(1,), veckey=veckey)
         assert el.latex().endswith(r"\text{spar},1}")
+
+    def test_latex_escapes_an_underscore_in_a_model_name(self):
+        "A class name may hold `_`, which latex would read as a subscript."
+        assert latex_path_label(["Aircraft", "_Wing"]) == (
+            r"\text{aircraft},\text{\_wing}"
+        )
+        S = VarKey("S", lineage=(("_Wing", 0),))
+        assert S.latex() == r"{S}_{\text{\_wing}}"
 
     def test_latex_and_text_agree_on_ordering(self):
         """Both formats read path, then name, then index."""
