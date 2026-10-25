@@ -130,7 +130,23 @@ class TestSmallScripts:
             r"\text{one},\text{two}",
         )
         assert extract_subscript("m") is None  # no subscript
-        assert extract_subscript(r"\vec{m}") is None  # brace but not _{...}
+        assert extract_subscript(r"\boldsymbol{m}") is None  # brace but not _{...}
+
+    def test_latexify_bold_sets_only_the_base_symbol(self):
+        "Bold marks a vector's symbol; subscripts, operators and accents stay regular."
+        assert latexify("e", bold=True) == r"\boldsymbol{e}"
+        assert latexify("rho_inf", bold=True) == r"\boldsymbol{\rho}_{\infty}"
+        assert latexify("m_wet", bold=True) == r"\boldsymbol{m}_{\text{wet}}"
+        # \boldsymbol does not bold \text, so an upright name is \textbf instead
+        assert latexify("Cd", bold=True) == r"\textbf{Cd}"
+        assert latexify("Delta_h_climb", bold=True) == (
+            r"\Delta{\boldsymbol{h}_{\text{climb}}}"
+        )
+        assert latexify("tan_alpha", bold=True) == r"\tan{\boldsymbol{\alpha}}"
+        assert latexify("Sigma_W", bold=True) == r"\Sigma{\boldsymbol{W}}"
+        # a name written in LaTeX is not parsed, so it is bolded whole
+        assert latexify(r"\bar{M}", bold=True) == r"\boldsymbol{\bar{M}}"
+        assert latexify(r"\bar{M}") == r"\bar{M}"
 
     def test_latexify_lambda_workarounds(self):
         """lamda and lambda_ both render as \\lambda (Python keyword workarounds)."""

@@ -396,10 +396,10 @@ class TestVarKeyComposition:
         scope = DisplayScope(anchor=WING, shown=[spar_t, skin_t])
         assert spar_t.latex(scope) == r"{t}_{\text{spar}}"
 
-    def test_latex_vector_parent_wears_the_arrow(self):
+    def test_latex_vector_parent_is_bold(self):
         c = VarKey("c", lineage=SPAR, shape=(3,))
         scope = DisplayScope(anchor=SPAR, shown=[c])
-        assert c.latex(scope) == r"\vec{c}"
+        assert c.latex(scope) == r"\boldsymbol{c}"
 
     def test_latex_element_index_ends_the_subscript(self):
         """Index follows the path in latex, as it follows the name in text."""
@@ -408,6 +408,12 @@ class TestVarKeyComposition:
         other = VarKey("c", lineage=WING + (("Skin", 0),))  # collide, so Spar shows
         scope = DisplayScope(anchor=WING, shown=[el, other])
         assert el.latex(scope) == r"{c}_{\text{spar},1}"
+
+    def test_unscoped_latex_also_ends_with_the_index(self):
+        "latex() without a scope composes path then index, as latex(scope) does."
+        veckey = VarKey("c", lineage=SPAR, shape=(3,))
+        el = VarKey("c", lineage=SPAR, shape=(3,), idx=(1,), veckey=veckey)
+        assert el.latex().endswith(r"\text{spar},1}")
 
     def test_latex_and_text_agree_on_ordering(self):
         """Both formats read path, then name, then index."""

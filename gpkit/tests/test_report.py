@@ -1050,9 +1050,9 @@ class TestVectorRendering:
         assert r"{c}_{1} &\geq {c}_{2}" in md
         assert "c[1]" not in md, "raw brackets leaked into latex"
 
-    def test_latex_whole_vector_wears_the_arrow(self):
+    def test_latex_whole_vector_is_bold(self):
         md = self._model().report(fmt="md")
-        assert r"$\vec{c}$" in md
+        assert r"$\boldsymbol{c}$" in md
 
 
 class TestVectorConstraintRows:
@@ -1089,7 +1089,9 @@ class TestVectorConstraintRows:
         q, x = VectorVariable(3, "q"), VectorVariable(3, "x")
         m = Model(q.sum(), [q >= x + x**2 / 2, x >= 1])
         (vector, _) = _constraints(m.report(fmt="dict"))
-        assert vector["latex"] == r"\vec{q} \geq \vec{x} + \frac{\vec{x}^{2}}{2}"
+        assert vector["latex"] == (
+            r"\boldsymbol{q} \geq \boldsymbol{x} + \frac{\boldsymbol{x}^{2}}{2}"
+        )
 
     def test_one_never_written_as_a_vector_is_its_elements(self):
         "An array assembled element by element has no vector form to show."
