@@ -18,6 +18,7 @@ from gpkit import (
     VectorVariable,
     units,
 )
+from gpkit.display.render import LATEX, TEXT, render
 from gpkit.exceptions import InvalidPosynomial
 from gpkit.nomials import NomialMap
 
@@ -112,15 +113,15 @@ class TestMonomial:
     def test_latex(self):
         "Test latex string creation"
         x = Variable("x")
-        m = Monomial({"x": 2, "y": -1}, 5).latex()
+        m = render(Monomial({"x": 2, "y": -1}, 5), LATEX)
         assert isinstance(m, str)
-        assert (5 * x).latex() == "5 x"
+        assert render(5 * x, LATEX) == "5 x"
 
     def test_latex_unit_constant_no_spurious_one(self):
         "Unit-only constants (e.g. 4*m^2 / L) must not leave '1' artifacts"
         length = Variable("L", "m", "length")
         expr = 4 * gpkit.units.m**2 / length
-        latex = expr.latex(excluded=("units",))
+        latex = render(expr, LATEX, ("units",))
         assert "1" not in latex  # no spurious coefficient
         assert r"\mathrm" in latex  # units shown on the constant factor
         assert "4" in latex
@@ -133,7 +134,7 @@ class TestMonomial:
         c = x >= 4 * gpkit.units("m")
         # report.py passes excluded=("units",) to suppress units on variables,
         # but bare constants like 4 [m] are dimensionally meaningless without units
-        latex = c.latex(excluded=("units",))
+        latex = render(c, LATEX, ("units",))
         assert r"\mathrm" in latex  # units rendered on the constant
         assert "4" in latex
 
@@ -190,9 +191,9 @@ class TestMonomial:
             weight >= (power / (1 * gpkit.units("W"))) ** 0.803 * coeff,
         ]
         for c in cases:
-            shown_str = "[" in c.str_without(excluded)
-            shown_latex = r"\mathrm" in c.latex(excluded)
-            assert shown_str == shown_latex, c.str_without(excluded)
+            shown_str = "[" in render(c, TEXT, excluded)
+            shown_latex = r"\mathrm" in render(c, LATEX, excluded)
+            assert shown_str == shown_latex, render(c, TEXT, excluded)
 
     def test_latex_mixed_expr_constant_units_shown(self):
         """In expressions mixing a unit-bearing constant with variables,
@@ -200,7 +201,7 @@ class TestMonomial:
         wing_area = Variable("S", "m^2", "wing area")
         wingspan = Variable("L", "m", "wingspan")
         c = wing_area >= 4 * gpkit.units("m") * wingspan
-        latex = c.latex(excluded=("units",))
+        latex = render(c, LATEX, ("units",))
         assert r"\mathrm" in latex  # constant's units appear
         assert "4" in latex
         assert "L" in latex  # variable name present
@@ -210,7 +211,7 @@ class TestMonomial:
         S = Variable("S", units="m^2")
         rho = Variable("rho", units="kg/m^3")
         x = rho * S
-        xstr = x.str_without()
+        xstr = render(x, TEXT)
         assert isinstance(xstr, str)
         assert "S" in xstr and "rho" in xstr
 
@@ -352,7 +353,7 @@ class TestSignomial:
         with SignomialsEnabled():
             if sys.platform[:3] != "win":
                 assert str(1 - x - y**2 - 1) == "1 - x - y² - 1"
-            assert (1 - x / y**2).latex() == "1 - \\frac{x}{y^{2}}"
+            assert render(1 - x / y**2, LATEX) == "1 - \\frac{x}{y^{2}}"
             _ = hash(1 - x / y**2)
         with pytest.raises(TypeError):
             _ = x - y
@@ -397,11 +398,11 @@ class TestPi:
         assert not hasattr(gpkit.pi, "key")
 
     def test_pi_str(self):
-        s = gpkit.pi.str_without()
+        s = render(gpkit.pi, TEXT)
         assert s in ("π", "PI")  # platform-dependent
 
     def test_pi_latex(self):
-        assert gpkit.pi.latex() == r"\pi"
+        assert render(gpkit.pi, LATEX) == r"\pi"
 
     def test_pi_value(self):
         assert float(gpkit.pi.c) == pytest.approx(np.pi)
@@ -414,7 +415,7 @@ class TestPi:
 
     def test_pi_expression_latex(self):
         r = Variable("r")
-        latex = (gpkit.pi * r**2).latex(excluded=["units"])
+        latex = render(gpkit.pi * r**2, LATEX, ["units"])
         assert r"\pi" in latex
 
     def test_pi_model_solves_correctly(self):

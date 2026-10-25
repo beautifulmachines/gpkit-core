@@ -38,15 +38,6 @@ def maybe_flatten(value):
     return value
 
 
-def try_str_without(item, excluded, *, latex=False):
-    "Try to call item.str_without(excluded); fall back to str(item)"
-    if latex and hasattr(item, "latex"):
-        return item.latex(excluded)
-    if hasattr(item, "str_without"):
-        return item.str_without(excluded)
-    return str(item)
-
-
 def mag(c):
     "Return magnitude of a Number or Quantity"
     return getattr(c, "magnitude", c)

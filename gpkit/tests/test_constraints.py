@@ -21,6 +21,7 @@ from gpkit.constraints.relax import (
 )
 from gpkit.constraints.set import constraint_keys
 from gpkit.constraints.tight import Tight
+from gpkit.display.render import LATEX, TEXT, render
 from gpkit.exceptions import Infeasible, InvalidGPConstraint, PrimalInfeasible
 from gpkit.nomials import MonomialEquality, PosynomialInequality, SignomialInequality
 from gpkit.nomials.substitution import parse_subs
@@ -160,7 +161,7 @@ class TestConstraint:
         assert c.as_hmapslt1({}) == [(x / y**2).hmap]
         assert c.left == x
         assert c.right == y**2
-        assert isinstance((1 >= x).latex(), str)
+        assert isinstance(render(1 >= x, LATEX), str)
 
     def test_oper_overload(self):
         "Test Constraint initialization by operator overloading"
@@ -315,7 +316,7 @@ class TestMonomialEquality:
         x = Variable("x")
         y = Variable("y")
         mec = x == y
-        assert isinstance(mec.str_without(), str)
+        assert isinstance(render(mec, TEXT), str)
 
     def test_united_dimensionless(self):
         "Check dimensionless unit-ed variables work"

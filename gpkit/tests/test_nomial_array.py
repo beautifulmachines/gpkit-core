@@ -8,6 +8,7 @@ import pytest
 import gpkit
 from gpkit import Monomial, NomialArray, Posynomial, Variable, VectorVariable
 from gpkit.constraints.set import ConstraintSet
+from gpkit.display.render import LATEX, TEXT, render
 from gpkit.units import DimensionalityError
 
 
@@ -19,8 +20,8 @@ class TestNomialArray:
     def test_shape(self):
         x = VectorVariable((2, 3), "x")
         assert x.shape == (2, 3)
-        assert isinstance(x.str_without(), str)
-        assert isinstance(x.latex(), str)
+        assert isinstance(render(x, TEXT), str)
+        assert isinstance(render(x, LATEX), str)
 
     def test_ndim(self):
         x = VectorVariable((3, 4), "x")
@@ -64,10 +65,9 @@ class TestNomialArray:
         # division with monomials
         p2 = NomialArray([x_0 / m, x_1 / m, x_2 / m]).T
         assert x / m == p2
-        assert isinstance(v.str_without(), str)
-        assert isinstance(v.latex(), str)
-        assert isinstance(p.str_without(), str)
-        assert isinstance(p.latex(), str)
+        for array in (v, p):
+            assert isinstance(render(array, TEXT), str)
+            assert isinstance(render(array, LATEX), str)
 
     def test_constraint_gen(self):
         x = VectorVariable(3, "x", label="dummy variable")

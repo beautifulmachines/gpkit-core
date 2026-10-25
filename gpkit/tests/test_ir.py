@@ -32,7 +32,7 @@ from gpkit.constraints.bounded import Bounded
 from gpkit.constraints.relax import ConstantsRelaxed
 from gpkit.constraints.set import build_model_tree
 from gpkit.constraints.tight import Tight
-from gpkit.display.render import LATEX, TEXT, render, varkey_names
+from gpkit.display.render import LATEX, TEXT, render_ast
 from gpkit.exceptions import IRVersionError
 from gpkit.ir import IR_VERSION, check_ir_version
 from gpkit.nomials.map import NomialMap
@@ -47,8 +47,8 @@ from gpkit.tests.test_margin_objective import SimpleMarginModel
 
 
 def _text(node, fmt=TEXT):
-    "node rendered with each variable named as it names itself."
-    return render(node, fmt, varkey_names(node, (), latex=fmt is LATEX))
+    "node rendered with each variable named by its ref, which here is its name."
+    return render_ast(node, fmt, str)
 
 
 from gpkit.toml import to_toml
@@ -170,12 +170,11 @@ class TestASTNodes:
     def test_varnode_from_variable(self):
         x = Variable("x")
         node = to_ast(x)
-        assert isinstance(node, VarNode)
-        assert node.varkey is x.key
+        assert node == VarNode(x.key.ref)
 
     def test_varnode_renders_its_name(self):
         x = Variable("x")
-        assert _text(VarNode(x.key)) == "x"
+        assert _text(VarNode(x.key.ref)) == "x"
 
     def test_constnode(self):
         node = ConstNode(3.14)
@@ -239,7 +238,7 @@ class TestASTNodes:
 
     def test_to_ast_idempotent(self):
         x = Variable("x")
-        node = VarNode(x.key)
+        node = VarNode(x.key.ref)
         assert to_ast(node) is node
 
     def test_to_ast_unit_monomial_becomes_units_node(self):
@@ -325,29 +324,23 @@ class TestVarKeyIR:
 
 
 class TestASTNodeIR:
-    """Tests for AST node to_ir() / ast_from_ir() round-trip."""
+    """Tests for AST node to_ir() / ast_from_ir() round-trip.
 
-    def _var_registry(self, *variables):
-        "Build var_registry from Variables."
-        return {v.key.ref: v.key for v in variables}
+    A tree holds refs, not objects, so reading one back gives an equal tree.
+    """
 
     def test_varnode(self):
         x = Variable("x")
-        node = VarNode(x.key)
+        node = VarNode(x.key.ref)
         ir = node.to_ir()
         assert ir == {"node": "var", "ref": "x"}
-        registry = self._var_registry(x)
-        node2 = ast_from_ir(ir, registry)
-        assert isinstance(node2, VarNode)
-        assert node2.varkey == x.key
+        assert ast_from_ir(ir) == node
 
     def test_constnode(self):
         node = ConstNode(3.14)
         ir = node.to_ir()
         assert ir == {"node": "const", "value": 3.14}
-        node2 = ast_from_ir(ir, {})
-        assert isinstance(node2, ConstNode)
-        assert node2.value == 3.14
+        assert ast_from_ir(ir) == node
 
     def test_pinode_is_constnode(self):
         node = PiNode()
@@ -364,14 +357,14 @@ class TestASTNodeIR:
         node = PiNode()
         ir = node.to_ir()
         assert ir == {"node": "pi"}
-        node2 = ast_from_ir(ir, None)
+        node2 = ast_from_ir(ir)
         assert isinstance(node2, PiNode)
 
     def test_unitsnode_ir_roundtrip(self):
         node = UnitsNode(units("W").hmap.units)
         ir = node.to_ir()
         assert ir == {"node": "units", "units": "1 watt"}
-        node2 = ast_from_ir(ir, None)
+        node2 = ast_from_ir(ir)
         assert isinstance(node2, UnitsNode)
         assert node2.units == node.units
 
@@ -387,10 +380,7 @@ class TestASTNodeIR:
         assert ir["node"] == "expr"
         assert ir["op"] == "add"
         assert len(ir["children"]) == 2
-        registry = self._var_registry(x, y)
-        ast2 = ast_from_ir(ir, registry)
-        assert isinstance(ast2, ExprNode)
-        assert ast2.op == "add"
+        assert ast_from_ir(ir) == result.ast
 
     def test_exprnode_pow_preserves_exponent(self):
         x = Variable("x")
@@ -399,30 +389,20 @@ class TestASTNodeIR:
         assert ir["op"] == "pow"
         # exponent is a raw number, not a const node
         assert ir["children"][1] == 3
-        registry = self._var_registry(x)
-        ast2 = ast_from_ir(ir, registry)
-        assert ast2.children[1] == 3
+        assert ast_from_ir(ir).children[1] == 3
 
     def test_nested_ast_roundtrip(self):
         x = Variable("x")
         y = Variable("y")
         result = (x + y) * x
-        ir = result.ast.to_ir()
-        registry = self._var_registry(x, y)
-        ast2 = ast_from_ir(ir, registry)
-        assert ast2.op == "mul"
-        assert ast2.children[0].op == "add"
+        assert ast_from_ir(result.ast.to_ir()) == result.ast
 
     def test_json_roundtrip(self):
         x = Variable("x")
         y = Variable("y")
         result = x * y + x**2
-        ir = result.ast.to_ir()
-        json_str = json.dumps(ir)
-        ir2 = json.loads(json_str)
-        registry = self._var_registry(x, y)
-        ast2 = ast_from_ir(ir2, registry)
-        assert _text(ast2) == _text(result.ast)
+        ir2 = json.loads(json.dumps(result.ast.to_ir()))
+        assert ast_from_ir(ir2) == result.ast
 
 
 class TestNomialMapIR:
@@ -929,7 +909,7 @@ class TestVectorConstraintIR:
         "rho*V promotes rho to an array to multiply; the written form is still rho."
         rho, V = Variable("rho"), VectorVariable(3, "V")
         product = rho * V
-        assert product.ast.children[0] == VarNode(rho.key)
+        assert product.ast.children[0] == VarNode(rho.key.ref)
 
     def test_the_solution_names_only_solver_relations(self, ir):
         "Like primal, its sensitivities are per element; the model IR groups them."

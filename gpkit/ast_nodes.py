@@ -4,15 +4,11 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from functools import reduce
-from typing import TYPE_CHECKING
 
 import numpy as np
 
 from .exceptions import IRSerializationError
 from .units import ureg
-
-if TYPE_CHECKING:
-    from .varkey import VarKey
 
 
 @dataclass(frozen=True)
@@ -26,14 +22,13 @@ class ASTNode:
 
 @dataclass(frozen=True)
 class VarNode(ASTNode):
-    """Reference to a variable.  Holds the VarKey for rich rendering."""
+    """A variable, by its VarKey.ref.
 
-    varkey: VarKey
+    A tree is syntax only, so a live tree and one read from a document are
+    the same; whoever renders it names each ref.
+    """
 
-    @property
-    def ref(self):
-        "Qualified path string for IR serialization."
-        return self.varkey.ref
+    ref: str
 
     def to_ir(self):
         return {"node": "var", "ref": self.ref}
@@ -126,10 +121,42 @@ def varnodes(node):
             yield from varnodes(child)
 
 
+def variables_of(obj):
+    """{ref: VarKey} for every variable in obj's math, and their vectors.
+
+    obj is a nomial, an array of them, or a VarKey.  A vector's ref is included
+    because a written form names a whole vector where the math holds its
+    elements.
+    """
+    if isinstance(obj, np.ndarray):
+        vks = [vk for el in obj.flat for vk in getattr(el, "vks", ())]
+    else:
+        vks = list(getattr(obj, "vks", ()))
+    if hasattr(obj, "key"):  # a variable, a vector variable, or a VarKey itself
+        vks.append(obj.key)
+    keys = {vk.ref: vk for vk in vks}
+    keys.update((vk.veckey.ref, vk.veckey) for vk in vks if vk.veckey is not None)
+    return keys
+
+
+def written_ast(obj, variables=None):
+    """obj's written form, or None if it has none it can be shown by.
+
+    A written form that names a variable obj's math lacks is not used: in
+    3*x/x*y, x cancelled, so nothing could name it and no document lists it.
+    """
+    tree = to_ast(obj)
+    if not isinstance(tree, ASTNode):
+        return tree  # None, or a raw number
+    variables = variables_of(obj) if variables is None else variables
+    if any(node.ref not in variables for node in varnodes(tree)):
+        return None
+    return tree
+
+
 def _term_order(term):
-    "Sort key for a term: its variables' refs and exponents, constants last."
-    exps, _ = term
-    powers = sorted((k.ref, x) for k, x in exps.items() if x)
+    "Sort key for an IR term: its variables' refs and exponents, constants last."
+    powers = sorted((ref, x) for ref, x in term.get("exps", {}).items() if x)
     return (not powers, powers)
 
 
@@ -140,16 +167,17 @@ def _product(factors):
 def ast_from_terms(terms):
     """The AST of a sum of monomials, for math with no written form.
 
-    terms are (exps, coeff) pairs, exps mapping each variable (anything with a
-    .ref) to its exponent: an hmap's items, or the IR's terms.  Variables with
-    negative exponents form the denominator, so 2*x/y reads as written.
+    terms are in the IR's form, [{"coeff": c, "exps": {ref: x}}], which an
+    hmap's to_ir() also gives.  Variables with negative exponents form the
+    denominator, so 2*x/y reads as written.
 
     Terms and factors are sorted by ref, constants last, since an hmap's order
     depends on how it was built.
     """
     monomials = []
-    for exps, coeff in sorted(terms, key=_term_order):
-        exps = sorted(exps.items(), key=lambda kx: kx[0].ref)
+    for term in sorted(terms, key=_term_order):
+        coeff = term["coeff"]
+        exps = sorted(term.get("exps", {}).items())
         num = [
             VarNode(k) if x == 1 else ExprNode("pow", (VarNode(k), x))
             for k, x in exps
@@ -195,37 +223,37 @@ def ast_to_ir(child):
         ) from exc
 
 
-def _list_from_ir(items, var_registry):
+def _list_from_ir(items):
     "Deserialize a list of AST children: dicts recurse, raw values pass through."
-    return [ast_from_ir(c, var_registry) if isinstance(c, dict) else c for c in items]
+    return [ast_from_ir(c) if isinstance(c, dict) else c for c in items]
 
 
-def _ast_from_ir_var(d, reg):
-    return VarNode(reg[d["ref"]])
+def _ast_from_ir_var(d):
+    return VarNode(d["ref"])
 
 
-def _ast_from_ir_const(d, _reg):
+def _ast_from_ir_const(d):
     return ConstNode(d["value"])
 
 
-def _ast_from_ir_pi(_d, _reg):
+def _ast_from_ir_pi(_d):
     return PiNode()
 
 
-def _ast_from_ir_expr(d, reg):
-    return ExprNode(d["op"], tuple(_list_from_ir(d["children"], reg)))
+def _ast_from_ir_expr(d):
+    return ExprNode(d["op"], tuple(_list_from_ir(d["children"])))
 
 
-def _ast_from_ir_units(d, _reg):
+def _ast_from_ir_units(d):
     return UnitsNode(ureg.Quantity(d["units"]))
 
 
-def _ast_from_ir_slice(d, _reg):
+def _ast_from_ir_slice(d):
     return slice(d.get("start"), d.get("stop"), d.get("step"))
 
 
-def _ast_from_ir_tuple(d, reg):
-    return tuple(_list_from_ir(d["items"], reg))
+def _ast_from_ir_tuple(d):
+    return tuple(_list_from_ir(d["items"]))
 
 
 _AST_NODE_BUILDERS = {
@@ -239,23 +267,14 @@ _AST_NODE_BUILDERS = {
 }
 
 
-def ast_from_ir(ir_dict, var_registry):
-    """Reconstruct an AST node from its IR dict.
-
-    Parameters
-    ----------
-    ir_dict : dict or number
-        The IR representation of an AST node.
-    var_registry : dict
-        Mapping from ref strings to VarKey objects.
-    """
+def ast_from_ir(ir_dict):
+    "Reconstruct an AST node from its IR dict, or pass a raw number through."
     if not isinstance(ir_dict, dict):
-        assert var_registry is None
-        return ir_dict  # raw number passthrough (e.g., exponent in pow)
+        return ir_dict  # e.g. an exponent in pow
     builder = _AST_NODE_BUILDERS.get(ir_dict["node"])
     if builder is None:
         raise ValueError(f"Unknown AST IR node type: {ir_dict['node']}")
-    return builder(ir_dict, var_registry)
+    return builder(ir_dict)
 
 
 def to_ast(obj):
@@ -294,7 +313,7 @@ def to_ast(obj):
         except (ValueError, TypeError):
             pass
     if hasattr(obj, "key"):
-        return VarNode(obj.key)
+        return VarNode(obj.key.ref)
     # a nomial or array that got this far was never written as one expression;
     # a list or tuple operand is an array too, as in y * [1, 2, 3]
     unwritten = hasattr(obj, "hmap") or isinstance(obj, (np.ndarray, list, tuple))

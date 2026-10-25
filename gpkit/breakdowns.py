@@ -6,13 +6,14 @@ from collections import defaultdict, namedtuple
 import numpy as np
 
 from gpkit.constraints.set import constraint_senss
+from gpkit.display.render import TEXT, render
 from gpkit.nomials import Monomial, Posynomial
 from gpkit.nomials.map import NomialMap
 from gpkit.units import DimensionalityError
 from gpkit.util.repr_conventions import lineagestr
 from gpkit.util.repr_conventions import unitstr as get_unitstr
 from gpkit.util.small_classes import FixedScalar, HashVector
-from gpkit.util.small_scripts import mag, try_str_without
+from gpkit.util.small_scripts import mag
 from gpkit.varkey import VarKey, lineage_display_context, necessarylineage
 from gpkit.varmap import get_lineage_map
 
@@ -51,8 +52,8 @@ def get_model_breakdown(csenss):
                 subbd["|sensitivity|"] = 0
             subbd["|sensitivity|"] += senss
         # treat vectors as namespace
-        constrstr = try_str_without(
-            constraint, {"units", ":MAGIC:" + lineagestr(constraint)}
+        constrstr = render(
+            constraint, TEXT, {"units", ":MAGIC:" + lineagestr(constraint)}
         )
         if " at 0x" in constrstr:  # don't print memory addresses
             constrstr = constrstr[: constrstr.find(" at 0x")] + ">"
@@ -274,7 +275,7 @@ def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
             print(
                 "  " * indent
                 + "which in: "
-                + constraint.str_without(["units", "lineage"])
+                + render(constraint, TEXT, ["units", "lineage"])
                 + " (sensitivity %+.2g)" % csenss[constraint]
             )
         interesting_vks = {key}
@@ -311,7 +312,10 @@ def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
                     print(
                         "  " * indent
                         + "{ through a factor of %s (%s) }"
-                        % (factor.str_without(["units"]), get_valstr(factor, solution))
+                        % (
+                            render(factor, TEXT, ["units"]),
+                            get_valstr(factor, solution),
+                        )
                     )
                 subsubtree = []
                 transform = Transform(factor, 1, keymon)
@@ -338,7 +342,6 @@ def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
     sortedmonvals = sorted(
         zip([-float("%.2g" % mv) for mv in monvals], range(len(mons)), monvals, mons)
     )
-    # print([m.str_without({"units", "lineage"}) for m in mons])
     if verbosity:
         if len(monsols) == 1:
             print("  " * indent + "breaks down into:")
@@ -437,7 +440,7 @@ def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
                 factor.ast = None
                 if verbosity:
                     keyvalstr = "%s (%s)" % (
-                        factor.str_without(["units"]),
+                        render(factor, TEXT, ["units"]),
                         get_valstr(factor, solution),
                     )
                     print("  " * indent + "{ through a factor of %s }" % keyvalstr)
@@ -481,7 +484,7 @@ def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
         else:
             if verbosity:
                 keyvalstr = "%s (%s)" % (
-                    mon.str_without(["units"]),
+                    render(mon, TEXT, ["units"]),
                     get_valstr(mon, solution),
                 )
                 print("  " * indent + keyvalstr)
@@ -907,12 +910,13 @@ def legend_entry(key, shortname, solution, prefix, basically_fixed_variables):
 
 def get_keystr(key, solution, prefix=""):  # noqa: ARG001
     "Returns formatted string of the key in solution."
-    if hasattr(key, "str_without"):
-        out = key.str_without({"units", ":MAGIC:" + prefix})
+    excluded = {"units", ":MAGIC:" + prefix}
+    if isinstance(key, VarKey):
+        out = key.str_without(excluded)
     elif isinstance(key, tuple):
         out = "[%i terms]" % len(key)
     else:
-        out = str(key)
+        out = render(key, TEXT, excluded)
     return out if len(out) <= 67 else out[:66] + "…"
 
 

@@ -1,8 +1,9 @@
-"""Rendering an expression tree as text, LaTeX or TOML.
+"""Rendering nomials, arrays and constraints as text, LaTeX or TOML.
 
-`render` walks the tree and decides where parentheses go, from operator
-precedence.  A format (`TEXT`, `LATEX`, `TOML`) supplies the spelling of each
-operator, number and leaf.  Variables are named by the caller's `names(ref)`.
+`render` takes a gpkit object; `render_ast` takes an expression tree, walks it,
+and decides where parentheses go, from operator precedence.  A format (`TEXT`,
+`LATEX`, `LATEX_ALIGNED`, `TOML`) supplies the spelling of each operator,
+number and leaf.  `render_ast` names variables by the caller's `names(ref)`.
 """
 
 import sys
@@ -10,17 +11,28 @@ from typing import ClassVar
 
 import numpy as np
 
-from ..ast_nodes import ASTNode, ConstNode, ExprNode, PiNode, UnitsNode, varnodes
+from ..ast_nodes import (
+    ASTNode,
+    ConstNode,
+    ExprNode,
+    PiNode,
+    UnitsNode,
+    ast_from_terms,
+    variables_of,
+    written_ast,
+)
 from ..units import ureg
 from ..util.repr_conventions import (
     MUL,
     PI_STR,
     UNICODE_EXPONENTS,
+    also_excluding,
     extract_subscript,
     merge_subscript,
     unitstr,
 )
 from ..util.small_classes import Numbers
+from ..varkey import VarKey
 
 # Operator precedence, loosest first.  A child is parenthesized when its
 # precedence is below what its position needs.  Unary minus is below a product:
@@ -191,11 +203,52 @@ class Toml(Text):
         return f"{base}[{spec}]"
 
 
-TEXT, LATEX, TOML = Text(), Latex(), Toml()
+class AlignedLatex(Latex):
+    "LaTeX whose relations carry the & an align environment lines them up at."
+
+    def relation(self, oper):
+        return "&" + super().relation(oper)
 
 
-def render(node, fmt, names, unit_literals=True):
-    """node as fmt spells it, naming each variable by names(ref).
+TEXT, LATEX, LATEX_ALIGNED, TOML = Text(), Latex(), AlignedLatex(), Toml()
+
+
+def render(obj, fmt, excluded=()):
+    """A nomial, nomial array or constraint as fmt spells it.
+
+    excluded is the format flags ("units", "lineage", ...) or a DisplayScope,
+    and each variable is named as its VarKey names itself under it.  Anything
+    else, such as a custom constraint class, is shown as its str().
+    """
+    if hasattr(obj, "oper"):  # a constraint as written
+        sides = also_excluding(excluded, "units")  # a relation shows no units
+        left, right = (render(side, fmt, sides) for side in (obj.left, obj.right))
+        return f"{left} {fmt.relation(obj.oper)} {right}"
+    if isinstance(obj, VarKey):  # a vector constraint's side is its vector's key
+        return (
+            obj.latex(excluded) if isinstance(fmt, Latex) else obj.str_without(excluded)
+        )
+    if isinstance(obj, np.ndarray):
+        return _array(obj, fmt, excluded)
+    if hasattr(obj, "hmap"):
+        return _nomial(obj, fmt, excluded)
+    if isinstance(obj, Numbers):
+        return fmt.number(obj)
+    return str(obj)
+
+
+class Rendered:
+    "str() and notebook LaTeX through render, for nomials, arrays and constraints."
+
+    def __str__(self):
+        return render(self, TEXT)
+
+    def _repr_latex_(self):
+        return "$$" + render(self, LATEX) + "$$"
+
+
+def render_ast(node, fmt, names, unit_literals=True):
+    """A tree as fmt spells it, naming each variable by names(ref).
 
     unit_literals=False leaves units off constants, for a caller that prints
     the whole expression's units after it.
@@ -203,12 +256,64 @@ def render(node, fmt, names, unit_literals=True):
     return _Render(fmt, names, unit_literals)(node)[0]
 
 
-def varkey_names(tree, excluded, latex=False):
-    "names(ref) for a live tree: each VarKey named as it names itself."
-    keys = {node.ref: node.varkey for node in varnodes(tree)}
+def names_of(variables, fmt, excluded):
+    "names(ref) for {ref: VarKey}: each VarKey named as it names itself."
+    if isinstance(fmt, Latex):
+        return lambda ref: variables[ref].latex(excluded)
+    return lambda ref: variables[ref].str_without(excluded)
+
+
+def _nomial(nomial, fmt, excluded):
+    "A nomial as written, or from its terms, then its units unless excluded."
+    latex = isinstance(fmt, Latex)
+    if hasattr(nomial, "key"):  # a variable, whose name LaTeX gives no units
+        name = nomial.key.latex(excluded) if latex else nomial.key.str_without(excluded)
+        return name if latex else name + _units_suffix(nomial, fmt, excluded)
+    units = _units_suffix(nomial, fmt, excluded)
+    variables = variables_of(nomial)
+    names = names_of(variables, fmt, excluded)
+    for tree in (
+        written_ast(nomial, variables),
+        ast_from_terms(nomial.hmap.to_ir()["terms"]),
+    ):
+        # the terms also stand in when the written form renders empty: it was
+        # only unit literals, and the suffix carries those units
+        text = "" if tree is None else render_ast(tree, fmt, names, not units)
+        if text:
+            return text + units
+    return units
+
+
+def _units_suffix(nomial, fmt, excluded):
+    "A nomial's units after it, as fmt sets them, unless excluded."
+    if "units" in excluded:
+        return ""
+    if isinstance(fmt, Latex):
+        units = nomial.unitstr(r"\mathrm{~\left[ %s \right]}", ":L~")
+        return units.replace("frac", "tfrac").replace(r"\cdot", r"\cdot ")
+    return nomial.unitstr(" [%s]")
+
+
+def _array(array, fmt, excluded):
+    "An array as written, as its vector's name, or element by element."
+    latex = isinstance(fmt, Latex)
+    if array.ast is not None:
+        variables = variables_of(array)
+        tree = written_ast(array, variables)
+        if tree is not None:
+            return render_ast(tree, fmt, names_of(variables, fmt, excluded))
+    if hasattr(array, "key"):  # a vector variable
+        if not latex:
+            return array.key.str_without(excluded)
+        units = array.latex_unitstr() if "units" not in excluded else ""
+        return array.key.latex(excluded) + units
     if latex:
-        return lambda ref: keys[ref].latex(excluded)
-    return lambda ref: keys[ref].str_without(excluded)
+        joined = ", ".join(render(el, fmt, excluded) for el in array.flat)
+        return rf"\left[{joined}\right]"
+    if not array.shape:
+        return render(array.flatten()[0], fmt, excluded)
+    rows = (np.ndarray.__getitem__(array, i) for i in range(array.shape[0]))
+    return "[" + ", ".join(render(row, fmt, excluded) for row in rows) + "]"
 
 
 class _Render:

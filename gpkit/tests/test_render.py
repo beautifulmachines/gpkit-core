@@ -6,11 +6,65 @@ expression.
 """
 
 from gpkit import Variable, VectorVariable, units
+from gpkit.ast_nodes import VarNode, ast_from_ir, to_ast
+from gpkit.display.render import LATEX, LATEX_ALIGNED, TEXT, render
 from gpkit.toml._printer import constraint_to_expr
 
 x = Variable("x")
 y = Variable("y")
 m = Variable("m", "m")
+
+
+class TestEntryPoint:
+    "render takes any nomial, array or constraint; str() is render with defaults."
+
+    def test_nomial(self):
+        assert render(x + 2 * y, TEXT) == "x + 2⋅y"
+
+    def test_units_suffix_unless_excluded(self):
+        assert render(2 * m, TEXT) == "2⋅m [m]"
+        assert render(2 * m, TEXT, {"units"}) == "2⋅m"
+
+    def test_constraint(self):
+        assert render(x >= 2 * y, LATEX) == r"x \geq 2 y"
+
+    def test_aligned_latex_constraint(self):
+        assert render(x >= y, LATEX_ALIGNED) == r"x &\geq y"
+
+    def test_vector(self):
+        assert render(VectorVariable(3, "v"), TEXT) == "v[:]"
+
+    def test_str_is_render(self):
+        c = x >= 2 * y
+        assert str(c) == render(c, TEXT)
+        assert str(2 * m) == render(2 * m, TEXT)
+
+    def test_anything_else_is_its_str(self):
+        "A custom constraint class knows nothing of rendering; it shows as its str."
+        assert render(object, TEXT) == str(object)
+
+
+class TestVarNode:
+    "A variable in a tree is its ref, so a live tree and a document's are the same."
+
+    def test_holds_the_ref(self):
+        assert to_ast(x) == VarNode(x.key.ref)
+
+    def test_from_ir_needs_no_registry(self):
+        assert ast_from_ir({"node": "var", "ref": "x"}) == VarNode("x")
+
+
+class TestCancelled:
+    "A written form naming a variable the math lacks is not used: x/x has no x."
+
+    expr = 3 * m / m * y
+
+    def test_renders_from_its_terms(self):
+        assert render(self.expr, TEXT, {"units"}) == "3⋅y"
+
+    def test_ir_side_has_no_ast(self):
+        "Every ref in the model IR's ASTs resolves in its variables."
+        assert "ast" not in (x >= self.expr).to_ir()["right"]
 
 
 def _terms(text):
@@ -23,11 +77,11 @@ class TestNumbers:
 
     def test_str_and_latex_show_the_same_coefficient(self):
         c = x >= 2.71828 * y
-        assert c.str_without({"units"}) == "x ≥ 2.718⋅y"
-        assert c.latex({"units"}) == r"x \geq 2.718 y"
+        assert render(c, TEXT) == "x ≥ 2.718⋅y"
+        assert render(c, LATEX) == r"x \geq 2.718 y"
 
     def test_large_coefficient_uses_latex_scientific_notation(self):
-        assert (1234567 * x).latex({"units"}) == r"1.235 \times 10^{6} x"
+        assert render(1234567 * x, LATEX) == r"1.235 \times 10^{6} x"
 
     def test_toml_coefficient_is_exact(self):
         assert constraint_to_expr((x >= 2.71828 * y).to_ir()) == "x >= 2.71828*y"
@@ -37,15 +91,15 @@ class TestParentheses:
     "A child is grouped exactly when its operator binds looser than its slot."
 
     def test_power_of_a_power_groups_the_base(self):
-        assert ((x**2) ** 0.5).str_without({"units"}) == "(x²)^0.5"
+        assert render((x**2) ** 0.5, TEXT) == "(x²)^0.5"
 
     def test_product_in_a_denominator_groups(self):
-        assert (x / (x * y)).str_without({"units"}) == "x/(x⋅y)"
+        assert render(x / (y * m), TEXT, {"units"}) == "x/(y⋅m)"
 
 
 class TestUnitLiterals:
     def test_latex_unit_literal_is_set_once(self):
-        assert (m / (2 * units.m)).latex({"units"}) == r"\frac{m}{2 \mathrm{m}}"
+        assert render(m / (2 * units.m), LATEX, {"units"}) == r"\frac{m}{2 \mathrm{m}}"
 
 
 class TestUnwritten:
@@ -54,10 +108,10 @@ class TestUnwritten:
     derived = (2.71828 * x**0.33333 + y).sub({y: 3})
 
     def test_str_matches_written_precision(self):
-        assert _terms(self.derived.str_without({"units"})) == {"2.718⋅x^0.3333", "3"}
+        assert _terms(render(self.derived, TEXT)) == {"2.718⋅x^0.3333", "3"}
 
     def test_latex_spaces_coefficient_from_variable(self):
-        assert _terms(self.derived.latex({"units"})) == {"2.718 x^{0.3333}", "3"}
+        assert _terms(render(self.derived, LATEX)) == {"2.718 x^{0.3333}", "3"}
 
     def test_toml_renders_it(self):
         c = x >= self.derived

@@ -1,5 +1,6 @@
 "Implements Loose"
 
+from ..display.render import TEXT, render
 from ..util.small_scripts import appendsolwarning
 from .set import ConstraintSet
 
@@ -21,7 +22,7 @@ class Loose(ConstraintSet):
             key = keys.get(constraint)
             c_senss = senss.get(key, 0)
             if c_senss >= self.senstol:
-                cstr = constraint.str_without({"units", "lineage"})
+                cstr = render(constraint, TEXT, {"units", "lineage"})
                 appendsolwarning(
                     f"{c_senss:+6.2g} : {cstr}",
                     result,
