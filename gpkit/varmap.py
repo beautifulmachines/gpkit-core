@@ -1,13 +1,12 @@
 "Implements the VarMap class"
 
-from collections import defaultdict
 from collections.abc import MutableMapping
 
 import numpy as np
 
+from .display.naming import DisplayScope
 from .units import Quantity, qty
 from .util.small_scripts import veclinkedfn
-from .varkey import lineage_display_context
 
 
 def _nested_lookup(nested_keys, val_dict):
@@ -249,7 +248,7 @@ class VarMap(MutableMapping):
 
     @property
     def varset(self):
-        "public access to varset. used by get_lineage_map"
+        "The VarSet this map's keys resolve through."
         return self._varset
 
     def __setitem__(self, key, value):
@@ -346,93 +345,12 @@ class Substitutions(VarMap):
         super().__setitem__(key, value)
 
 
-def _compute_collision_depths(name_collisions):
-    """Compute minimum lineage depth needed to disambiguate colliding varkeys.
-
-    Arguments
-    ---------
-    name_collisions : dict[str, set[VarKey]]
-        Mapping from short name to set of VarKeys that share that name.
-
-    Returns
-    -------
-    dict[VarKey, int]
-        Mapping from each VarKey to its required lineage depth.
-    """
-    result = {}
-    for varkeys in name_collisions.values():
-        # Map (partial_lineage, depth) → set of varkeys with that partial lineage
-        by_partial_lineage = defaultdict(set)
-        for vk in varkeys:
-            *_, shortest = vk.lineagestr().split(".")
-            by_partial_lineage[(shortest, 1)].add(vk)
-        # Keep extending lineage depth until all varkeys are unique
-        while any(len(vks) > 1 for vks in by_partial_lineage.values()):
-            for key, vks in list(by_partial_lineage.items()):
-                if len(vks) <= 1:
-                    continue
-                del by_partial_lineage[key]
-                partial, depth = key
-                depth += 1
-                for vk in vks:
-                    lineages = vk.lineagestr().split(".")
-                    if depth > len(lineages):
-                        extended = vk.lineagestr()  # full lineage; guaranteed unique
-                    else:
-                        extended = lineages[-depth] + "." + partial
-                    by_partial_lineage[(extended, depth)].add(vk)
-        for (_, depth), vks in by_partial_lineage.items():
-            (vk,) = vks
-            result[vk] = depth
-    return result
-
-
-def _collision_depths(varset):
-    """Minimum lineage depths for all VarKeys in a VarSet.
-
-    Returns {VarKey: int} where 0 means no lineage prefix needed and N means
-    the last N lineage segments are required to make the name unique.
-    Includes both element keys and their parent veckeys.
-    """
-    result = {}
-    name_collisions = defaultdict(set)
-    # vector_parent_keys() yields each vector once via its parent veckey, so
-    # siblings share one representative and one lineagestr — required to avoid
-    # duplicate entries that would cause an infinite loop in
-    # _compute_collision_depths.
-    for key in varset.vector_parent_keys():
-        if len(varset.by_name(key.name)) == 1:
-            result[key] = 0
-        else:
-            name_collisions[key.name].add(key)
-    result.update(_compute_collision_depths(name_collisions))
-    # Propagate veckey depths to element keys.
-    for key in varset:
-        if key not in result:
-            result[key] = result.get(key.veckey, 0)
-    return result
-
-
 def display_names(varkeys, excluded=()):
-    """Minimum-lineage display names for a collection of VarKeys.
+    """{VarKey: its shortest unambiguous name among varkeys}.
 
-    Returns {VarKey: str} mapping each key to its shortest unambiguous
-    display name, using the same formatting rules as VarKey.str_without.
-    Pass excluded strings (including ':MAGIC:' prefixes) to strip lineage.
+    excluded is the format flags ("units", "idx", ...) the names are spelled
+    with.
     """
-    varset = VarSet(varkeys)
-    with lineage_display_context(_collision_depths(varset)):
-        return {vk: vk.str_without(excluded) for vk in varkeys}
-
-
-def get_lineage_map(solution):
-    """Compute and cache lineage display mapping for solution variables.
-
-    Returns a dict mapping each VarKey to the number of lineage levels
-    needed to uniquely identify it among the solution's variables.
-    """
-    if "name_collision_varkeys" not in solution.meta:
-        varset = VarSet(solution.primal.varset)
-        varset.update(solution.constants)
-        solution.meta["name_collision_varkeys"] = _collision_depths(varset)
-    return solution.meta["name_collision_varkeys"]
+    varkeys = list(varkeys)
+    scope = DisplayScope(shown=varkeys, excluded=excluded)
+    return {vk: vk.str_without(scope) for vk in varkeys}

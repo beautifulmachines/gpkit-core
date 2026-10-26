@@ -1,58 +1,12 @@
 """Defines the VarKey class"""
 
-from contextlib import contextmanager
-from contextvars import ContextVar
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from .display.naming import (
-    DisplayScope,
-    decorated,
-    latex_path_label,
-    marks_vector,
-)
+from .display.naming import DisplayScope, decorated, marks_vector
 from .units import qty
 from .util.repr_conventions import ReprMixin, latexify, merge_subscript
 from .util.small_classes import Count
-
-_lineage_ctx: ContextVar[dict | None] = ContextVar("lineage_ctx", default=None)
-_EMPTY_LINEAGE_MAP: dict = {}  # never mutated; shared read-only fallback
-
-
-@contextmanager
-def lineage_display_context(mapping):
-    """Set VarKey→int lineage display depth for the enclosed block."""
-    token = _lineage_ctx.set(mapping)
-    try:
-        yield
-    finally:
-        _lineage_ctx.reset(token)
-
-
-def _current_lineage_map():
-    "Return the active lineage-depth mapping, or an empty one if unset."
-    return _lineage_ctx.get() or _EMPTY_LINEAGE_MAP
-
-
-def necessarylineage(vk):
-    """Display lineage depth for a VarKey in the current context."""
-    return _current_lineage_map().get(vk)
-
-
-def _strip_magic_prefix(namespace, excluded):
-    """Strip leading lineage segments matched by :MAGIC: exclusion strings."""
-    for ex in excluded:
-        if ex[:7] != ":MAGIC:":
-            continue
-        for seg in ex[7:].split("."):
-            if not namespace:
-                break
-            n, num = namespace[0]
-            if (f"{n}{num}" if num else n) == seg:
-                namespace = namespace[1:]
-            else:
-                break
-    return namespace
 
 
 @dataclass(frozen=True, eq=False)
@@ -128,7 +82,7 @@ class VarKey(ReprMixin):
         object.__setattr__(self, "_hashvalue", hash(ref))
 
         # Compute keys set
-        fullstr = self.str_without({"hiddenlineage", "modelnums", "vec"})
+        fullstr = self.str_without({"modelnums", "vec"})
         keys = {self.name, fullstr}
 
         # Auto-create veckey if idx is set but veckey is not
@@ -166,40 +120,10 @@ class VarKey(ReprMixin):
         for name in self.__dataclass_fields__:
             object.__setattr__(self, name, getattr(new_vk, name))
 
-    def str_without(self, excluded=()):  # noqa: PLR0912
-        "Returns string without certain fields (such as 'lineage')."
-        if isinstance(excluded, DisplayScope):
-            return decorated(excluded.name(self), self.idx, self.shape, excluded)
-        name = self.name
-        if "lineage" not in excluded and self.lineage:
-            namespace = self.lineagestr("modelnums" not in excluded).split(".")
-            for ex in excluded:
-                if ex[0:7] == ":MAGIC:":
-                    to_replace = ex[7:]
-                    if not to_replace:
-                        continue
-                    to_replace = to_replace.split(".")
-                    replaced = 0
-                    for modelname in to_replace:
-                        if not namespace or namespace[0] != modelname:
-                            break
-                        replaced += 1
-                        namespace = namespace[1:]
-                    if len(to_replace) > replaced:
-                        namespace.insert(0, "." * (len(to_replace) - replaced))
-            if "hiddenlineage" not in excluded:
-                lineage_map = _current_lineage_map()
-                lineage_depth = lineage_map.get(self)
-                if lineage_depth is None and self.veckey:
-                    lineage_depth = lineage_map.get(self.veckey)
-                if lineage_depth is not None:
-                    if lineage_depth > 0:
-                        namespace = namespace[-lineage_depth:]
-                    else:
-                        namespace = None
-            if namespace:
-                name = ".".join(namespace) + "." + name
-        return decorated(name, self.idx, self.shape, excluded)
+    def str_without(self, excluded=()):
+        "This key's name as a scope (or a bare flag set, naming full paths) gives it."
+        scope = DisplayScope.of(excluded)
+        return decorated(scope.name(self), self.idx, self.shape, scope)
 
     __repr__ = str_without
 
@@ -248,27 +172,6 @@ class VarKey(ReprMixin):
         return next(zip(*self.lineage))
 
     def latex(self, excluded=()):
-        "Returns latex representation."
-        if isinstance(excluded, DisplayScope):
-            return self._latex_scoped(excluded)
-        name = latexify(self.name, marks_vector(self.idx, self.shape, excluded))
-        parts = []  # path first, then index, as _latex_scoped composes them
-        if "lineage" not in excluded and self.lineage:
-            namespace = _strip_magic_prefix(list(self.lineage), excluded)
-            # Respect lineage_display_context depth (mirrors str_without)
-            lineage_map = _current_lineage_map()
-            depth = lineage_map.get(self)
-            if depth is None and self.veckey:
-                depth = lineage_map.get(self.veckey)
-            if depth is not None:
-                namespace = namespace[-depth:] if depth > 0 else []
-            if namespace:
-                parts.append(latex_path_label(n for n, _ in namespace))
-        if "idx" not in excluded and self.idx:
-            parts.append(",".join(map(str, self.idx)))
-        return merge_subscript(name, ",".join(parts)) if parts else name
-
-    def _latex_scoped(self, scope):
         """Latex name composed in the same order str_without uses.
 
         Both parts share the subscript, latex's prefix slot, in the order text
@@ -276,6 +179,7 @@ class VarKey(ReprMixin):
         {c}_{spar,1}.  A whole vector is set bold where text writes "[:]"; an
         element is a scalar, identified by its index instead.
         """
+        scope = DisplayScope.of(excluded)
         name = latexify(self.name, marks_vector(self.idx, self.shape, scope.excluded))
         parts = [p for p in (scope.latex_path(self),) if p]
         if self.idx and "idx" not in scope.excluded:

@@ -29,18 +29,6 @@ def lineagestr(lineage, modelnums=True):
     )
 
 
-def also_excluding(excluded, *flags):
-    """Add format flags to a render context.
-
-    Accepts either a bare collection of flags or a DisplayScope, and returns
-    the same kind, so a scope survives being narrowed mid-render.  Duck-typed
-    rather than imported: DisplayScope is built on this module.
-    """
-    if hasattr(excluded, "also_excluding"):
-        return excluded.also_excluding(*flags)
-    return frozenset(excluded).union(flags)
-
-
 def unitstr(units, into="%s", options=UNIT_FORMATTING, dimless=""):
     "Returns the string corresponding to an object's units."
     if hasattr(units, "units") and isinstance(units.units, Quantity):

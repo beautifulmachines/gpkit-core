@@ -19,6 +19,7 @@ from dataclasses import dataclass, field
 
 from .ast_nodes import ExprNode, VarNode, variables_of, written_ast
 from .constraints.set import constraint_senss
+from .display.naming import DisplayScope
 from .display.render import TEXT, names_of, render_ast
 from .units import DimensionalityError, qty
 from .util.repr_conventions import MUL
@@ -42,22 +43,24 @@ def _get_gt_lt(constraint):
     return None, None
 
 
-def _format_term_label(exp, coeff, strip_prefix=None):
+_FULL_PATH = DisplayScope(excluded={"units"})  # how a budget names its top variable
+
+
+def _scope(parent_vk):
+    "How a budget names its parent's terms: relative to the parent's model."
+    return DisplayScope(anchor=parent_vk.lineage, excluded={"units"})
+
+
+def _format_term_label(exp, coeff, scope):
     """Format a monomial term's exponent dict + coefficient as a string.
 
     Example: coeff=0.1, exp={m: 1, f: 1} → "0.1⋅m⋅f"
-
-    If ``strip_prefix`` is given (a lineagestr of the parent model), that
-    prefix is removed from variable names so only the relative path is shown.
     """
     parts = []
     if abs(coeff - 1.0) > 1e-10:
         parts.append(f"{coeff:.4g}")
     for vk, pow_ in exp.items():
-        if strip_prefix:
-            name = vk.str_without(["units", f":MAGIC:{strip_prefix}"])
-        else:
-            name = vk.str_without(["lineage"])
+        name = vk.str_without(scope)
         parts.append(name if pow_ == 1 else f"{name}^{pow_:.4g}")
     return MUL.join(parts) if parts else f"{coeff:.4g}"
 
@@ -86,7 +89,7 @@ def _vks_of_ast_term(node, variables):
     return frozenset()
 
 
-def _ast_label_map(lt, strip_prefix=None):
+def _ast_label_map(lt, scope):
     """Build label and is_var_node maps from lt.ast.
 
     Returns a pair ``(labels, is_var)`` where both are
@@ -94,18 +97,12 @@ def _ast_label_map(lt, strip_prefix=None):
     string for each addend term; ``is_var`` maps to ``True`` when the AST
     term is a bare VarNode (user wrote the variable directly, no scaling)
     and ``False`` otherwise.  Both dicts are empty when lt has no AST.
-
-    When *strip_prefix* is given (a lineagestr of the parent model), that
-    prefix is removed from variable names so only the relative path is shown.
     """
     variables = variables_of(lt)
     tree = written_ast(lt, variables) if lt.ast is not None else None
     if tree is None:
         return {}, {}
-    excluded = ["units"]
-    if strip_prefix:
-        excluded.append(f":MAGIC:{strip_prefix}")
-    names = names_of(variables, TEXT, excluded)
+    names = names_of(variables, TEXT, scope)
     labels = {}
     is_var = {}
     for term in _collect_sum_terms(tree):
@@ -272,7 +269,7 @@ class Budget:
         When the budget contains any growth allowance, two extra columns
         (Nominal and Growth) appear before the totals column.
         """
-        top_label = _vk_display(self.top_vk, lineage=True)
+        top_label = self.top_vk.str_without(_FULL_PATH)
         header = f"Budget  —  {top_label}"
         if self._show_growth_columns():
             return _render_growth_text(self, top_label, header)
@@ -280,7 +277,7 @@ class Budget:
 
     def markdown(self) -> str:
         """Return a GitHub-flavored markdown budget table."""
-        top_label = _vk_display(self.top_vk, lineage=True)
+        top_label = self.top_vk.str_without(_FULL_PATH)
         if self._show_growth_columns():
             lines = [
                 "| Component | Nominal | Growth | Total | Units | Fraction |",
@@ -323,23 +320,6 @@ class Budget:
 # ------------------------------------------------------------------
 # Rendering helpers (module-level to avoid circular dataclass refs)
 # ------------------------------------------------------------------
-
-
-def _vk_display(vk, lineage=False, strip_prefix=None):
-    """Return a display string for a VarKey.
-
-    With ``lineage=True`` returns the model-qualified path.  If
-    ``strip_prefix`` is given (a lineagestr of the parent model), that
-    prefix is removed so only the path *below* the parent is shown
-    (e.g. ``"Wing.m"`` instead of ``"Aircraft.Wing.m"`` when the parent
-    is ``"Aircraft"``).  With ``lineage=False`` returns just the variable
-    name without any lineage.
-    """
-    if lineage:
-        if strip_prefix:
-            return vk.str_without(["units", f":MAGIC:{strip_prefix}"])
-        return vk.str_without(["units"])
-    return vk.str_without(["units", "lineage"])
 
 
 def _render_plain_text(budget, top_label, header):
@@ -555,15 +535,13 @@ def _process_term(top_vk, term, ctx):
     ``2*m``) become non-recursing leaves; ``_is_redundant_compound_leaf``
     drops them when they're the only child of their parent.
     """
-    parent_prefix = top_vk.lineagestr() if top_vk.lineage else None
+    scope = _scope(top_vk)
     is_var = _term_is_var(term)
     if not is_var:
         label = (
             term.ast_label
             if term.ast_label is not None
-            else _format_term_label(
-                term.exp, term.phys_coeff, strip_prefix=parent_prefix
-            )
+            else _format_term_label(term.exp, term.phys_coeff, scope)
         )
         return BudgetNode(
             label=label,
@@ -575,9 +553,7 @@ def _process_term(top_vk, term, ctx):
         )
     (child_vk,) = term.exp.keys()
     label = (
-        term.ast_label
-        if term.ast_label is not None
-        else _vk_display(child_vk, lineage=True, strip_prefix=parent_prefix)
+        term.ast_label if term.ast_label is not None else child_vk.str_without(scope)
     )
     # Render in the variable's own declared units when they differ from
     # the parent's level units.
@@ -643,9 +619,7 @@ def _build_children(top_vk, lt, constraint, ctx):
     """
     total_val = float(ctx.solution[top_vk].to(ctx.level_units).magnitude)
     is_tight = abs(ctx.csenss.get(constraint, 0.0)) > 1e-5
-    ast_labels, ast_is_var = _ast_label_map(
-        lt, strip_prefix=top_vk.lineagestr() if top_vk.lineage else None
-    )
+    ast_labels, ast_is_var = _ast_label_map(lt, _scope(top_vk))
     nodes = []
     peeled_frac = 0.0
     for mon in lt.chop():

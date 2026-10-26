@@ -9,8 +9,6 @@ from gpkit.varmap import (
     Substitutions,
     VarMap,
     VarSet,
-    _collision_depths,
-    _compute_collision_depths,
     display_names,
 )
 
@@ -421,83 +419,41 @@ class TestDisplayNames:
         assert names[veckey] == "x[:]"
 
 
-class TestComputeCollisionDepths:
-    """Tests for _compute_collision_depths in varmap.py."""
+class TestShortestNames:
+    """display_names: each key's shortest name that is unique among those given."""
 
-    def test_simple_depth1_resolution(self):
-        """Two vars with distinct innermost model names resolve at depth 1."""
+    def test_colliding_names_widen_by_one_model(self):
         vk_a = VarKey("m", lineage=(("SubA", 0),))
         vk_b = VarKey("m", lineage=(("SubB", 0),))
-        result = _compute_collision_depths({"m": {vk_a, vk_b}})
-        assert result[vk_a] == 1
-        assert result[vk_b] == 1
+        assert display_names([vk_a, vk_b]) == {vk_a: "SubA.m", vk_b: "SubB.m"}
 
-    def test_asymmetric_lineage_no_indexerror(self):
-        """Regression: IndexError when shorter lineage is a suffix of a longer one.
+    def test_asymmetric_lineage(self):
+        """Regression: IndexError when one key's lineage is a suffix of another's.
 
-        The same model class in two different parent contexts each get num=0:
-          standalone Inner: lineagestr "Inner0" (1 component)
-          nested Outer.Inner: lineagestr "Outer0.Inner0" (2 components)
-        Both have "Inner0" at depth 1 → collision. At depth 2, the standalone
-        key only has 1 lineage component, so lineages[-2] raised IndexError.
-        With the fix, the shorter lineage falls back to its full lineagestr,
-        which differs from the longer one, resolving the collision.
+        The same model class in two parent contexts each gets num=0, so a
+        standalone Inner and Outer's Inner both end in "Inner"; widening the
+        standalone one past its single segment must stop at its full path.
         """
         vk_short = VarKey("x", lineage=(("Inner", 0),))
         vk_long = VarKey("x", lineage=(("Outer", 0), ("Inner", 0)))
-        # Must not raise IndexError
-        result = _compute_collision_depths({"x": {vk_short, vk_long}})
-        assert vk_short in result
-        assert vk_long in result
+        names = display_names([vk_short, vk_long])
+        assert names[vk_short] != names[vk_long]
 
-        # The resolved display strings must be distinct
-        def display_str(vk, depth):
-            parts = vk.lineagestr().split(".")
-            return vk.lineagestr() if depth > len(parts) else ".".join(parts[-depth:])
-
-        assert display_str(vk_short, result[vk_short]) != display_str(
-            vk_long, result[vk_long]
-        )
-
-
-class TestCollisionDepths:
-    """Tests for _collision_depths in varmap.py.
-
-    Regression coverage added while investigating gpkit-core#222: an earlier
-    manual repro looked up a depth map with a Variable object instead of its
-    .key VarKey and got a missing/None result, which looked like a bug in
-    _collision_depths itself. It wasn't — see test_variable_is_not_its_varkey
-    below. These tests instead pin the real, correct contract: every VarKey
-    passed in gets a depth entry, including keys with no name collision at
-    all (which must not be silently dropped by the backfill pass).
-    """
-
-    def test_every_key_gets_an_entry(self):
-        """No VarKey in the input varset is missing from the result, colliding or not."""
+    def test_every_key_is_named(self):
+        "A unique name stays bare; colliding ones each gain a distinct path."
         vk_unique = VarKey("F_tip", lineage=(("Wing", 0), ("Structure", 0)))
         vk_a = VarKey("eta", lineage=(("Motor", 0),))
         vk_b = VarKey("eta", lineage=(("Actuator", 0),))
-        varset = VarSet([vk_unique, vk_a, vk_b])
-
-        result = _collision_depths(varset)
-        # result is lineage needed to make name unique *in this set*
-        # different than "what should this variable be called here", which depends on DisplayScope
-
-        assert vk_unique in result
-        assert result[vk_unique] == 0, "globally-unique name needs no lineage at all"
-        assert vk_a in result
-        assert vk_b in result
-        assert result[vk_a] > 0, (
-            "colliding name must get a nonzero disambiguating depth"
-        )
-        assert result[vk_a] == result[vk_b]
+        names = display_names([vk_unique, vk_a, vk_b])
+        assert names[vk_unique] == "F_tip"
+        assert names[vk_a] != names[vk_b]
+        assert "eta" in names[vk_a] and "eta" in names[vk_b]
 
     def test_variable_is_not_its_varkey(self):
         """A Variable and its own .key VarKey do not hash/compare equal.
 
-        Looking up a VarKey-keyed dict (e.g. a _collision_depths result) with
-        the Variable wrapper instead of variable.key silently misses, rather
-        than raising — easy to get wrong when reading display-depth maps.
+        Looking up a VarKey-keyed dict with the Variable wrapper instead of
+        variable.key silently misses, rather than raising.
         """
         x = Variable("x")
         assert hash(x) != hash(x.key)

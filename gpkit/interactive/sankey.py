@@ -13,8 +13,7 @@ from .. import GPCOLORS, Model
 from ..constraints import ArrayConstraint
 from ..display.render import TEXT, render
 from ..repr_conventions import lineagestr, unitstr
-from ..varkey import lineage_display_context
-from ..varmap import get_lineage_map
+from ..varmap import display_names
 
 INSENSITIVE = 1e-2
 EPS = 1e-10
@@ -175,32 +174,30 @@ class Sankey:
         self.maxlinks = maxlinks
         self.showconstraints = showconstraints
 
-        lineage_map = get_lineage_map(self.solution)
-        with lineage_display_context(lineage_map):
-            if variable:
-                variable = variable.key
-                if not varlabel:
-                    varlabel = str(variable)
-                    if len(varlabel) > 20:
-                        varlabel = variable.str_without(["lineage"])
-                self.nodes[varlabel] = {"id": varlabel, "title": varlabel}
-                csetnode = self.add_node(varlabel, self.csetlabel)
-                if variable in self.solution["sensitivities"]["cost"]:
-                    costnode = self.add_node(varlabel, "[cost function]")
-                    self.links[costnode, varlabel] = self.solution["sensitivities"][
-                        "cost"
-                    ][variable]
-            else:
-                csetnode = self.csetlabel
-                self.nodes[self.csetlabel] = {
-                    "id": self.csetlabel,
-                    "title": self.csetlabel,
-                }
-            total_sens = self.link(self.cset, csetnode, variable)
-            if variable:
-                self.links[csetnode, varlabel] = total_sens
+        if variable:
+            variable = variable.key
+            if not varlabel:
+                varlabel = display_names(self.solution.variables)[variable]
+                if len(varlabel) > 20:
+                    varlabel = variable.str_without(["lineage"])
+            self.nodes[varlabel] = {"id": varlabel, "title": varlabel}
+            csetnode = self.add_node(varlabel, self.csetlabel)
+            if variable in self.solution["sensitivities"]["cost"]:
+                costnode = self.add_node(varlabel, "[cost function]")
+                self.links[costnode, varlabel] = self.solution["sensitivities"]["cost"][
+                    variable
+                ]
+        else:
+            csetnode = self.csetlabel
+            self.nodes[self.csetlabel] = {
+                "id": self.csetlabel,
+                "title": self.csetlabel,
+            }
+        total_sens = self.link(self.cset, csetnode, variable)
+        if variable:
+            self.links[csetnode, varlabel] = total_sens
 
-            links, nodes = self._links_and_nodes()
+        links, nodes = self._links_and_nodes()
 
         out = SankeyWidget(
             nodes=nodes,

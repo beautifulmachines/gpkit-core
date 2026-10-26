@@ -26,13 +26,13 @@ from ..util.repr_conventions import (
     MUL,
     PI_STR,
     UNICODE_EXPONENTS,
-    also_excluding,
     extract_subscript,
     merge_subscript,
     unitstr,
 )
 from ..util.small_classes import Numbers
 from ..varkey import VarKey
+from .naming import DisplayScope
 
 # Operator precedence, loosest first.  A child is parenthesized when its
 # precedence is below what its position needs.  Unary minus is below a product:
@@ -216,12 +216,13 @@ TEXT, LATEX, LATEX_ALIGNED, TOML = Text(), Latex(), AlignedLatex(), Toml()
 def render(obj, fmt, excluded=()):
     """A nomial, nomial array or constraint as fmt spells it.
 
-    excluded is the format flags ("units", "lineage", ...) or a DisplayScope,
-    and each variable is named as its VarKey names itself under it.  Anything
-    else, such as a custom constraint class, is shown as its str().
+    excluded is a DisplayScope, which names each variable, or a bare set of
+    format flags ("units", "lineage", ...), which names each by its full path.
+    Anything else, such as a custom constraint class, is shown as its str().
     """
+    excluded = DisplayScope.of(excluded)
     if hasattr(obj, "oper"):  # a constraint as written
-        sides = also_excluding(excluded, "units")  # a relation shows no units
+        sides = excluded.also_excluding("units")  # a relation shows no units
         left, right = (render(side, fmt, sides) for side in (obj.left, obj.right))
         return f"{left} {fmt.relation(obj.oper)} {right}"
     if isinstance(obj, VarKey):  # a vector constraint's side is its vector's key

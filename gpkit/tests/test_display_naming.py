@@ -8,7 +8,6 @@ from gpkit.constraints.set import ConstraintSet
 from gpkit.display import DisplayScope
 from gpkit.display.naming import latex_path_label
 from gpkit.display.render import render
-from gpkit.util.repr_conventions import also_excluding
 from gpkit.varkey import VarKey
 
 AIRCRAFT = (("Aircraft", 0),)
@@ -316,9 +315,14 @@ class TestFormatFlags:
         assert narrowed.anchor == scope.anchor
         assert narrowed.shown == scope.shown
 
-    def test_also_excluding_a_bare_set(self):
-        """Callers that never build a scope keep getting a plain flag set."""
-        assert also_excluding({"units"}, "root") == frozenset({"units", "root"})
+    def test_of_wraps_a_bare_flag_set(self):
+        "A caller passing flags gets a scope that names with full paths."
+        scope = DisplayScope.of({"units"})
+        assert scope == DisplayScope(excluded={"units"})
+
+    def test_of_passes_a_scope_through(self):
+        scope = DisplayScope(anchor=WING, excluded={"units"})
+        assert DisplayScope.of(scope) is scope
 
     def test_lineage_flag_suppresses_the_path(self):
         m = VarKey("m", lineage=TANK)
@@ -349,10 +353,10 @@ class TestFormatFlags:
         """`excluded` holds whole flags, so a bare string is never a valid value:
         iterating one yields characters, not flags.  A string default survives
         `"units" in excluded` only by substring accident, and is shredded the
-        moment it reaches also_excluding()."""
+        moment it becomes a scope."""
         default = inspect.signature(method).parameters["excluded"].default
         assert not isinstance(default, str)
-        assert set(default) <= set(also_excluding(default, "units"))
+        assert DisplayScope.of(default).excluded == set(default)
 
 
 class TestVarKeyComposition:

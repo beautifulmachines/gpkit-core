@@ -2,10 +2,12 @@
 
 import string
 from collections import defaultdict, namedtuple
+from dataclasses import replace
 
 import numpy as np
 
 from gpkit.constraints.set import constraint_senss
+from gpkit.display.naming import DisplayScope
 from gpkit.display.render import TEXT, render
 from gpkit.nomials import Monomial, Posynomial
 from gpkit.nomials.map import NomialMap
@@ -14,8 +16,7 @@ from gpkit.util.repr_conventions import lineagestr
 from gpkit.util.repr_conventions import unitstr as get_unitstr
 from gpkit.util.small_classes import FixedScalar, HashVector
 from gpkit.util.small_scripts import mag
-from gpkit.varkey import VarKey, lineage_display_context, necessarylineage
-from gpkit.varmap import get_lineage_map
+from gpkit.varkey import VarKey
 
 Tree = namedtuple("Tree", ["key", "value", "branches"])
 Transform = namedtuple("Transform", ["factor", "power", "origkey"])
@@ -34,7 +35,7 @@ def get_free_vks(posy, solution):
     return {vk for vk in posy.vks if vk not in solution.constants}
 
 
-def get_model_breakdown(csenss):
+def get_model_breakdown(csenss, scope):
     breakdowns = {"|sensitivity|": 0}
     for constraint, senss in csenss.items():
         senss = abs(senss)  # for those monomial
@@ -51,10 +52,9 @@ def get_model_breakdown(csenss):
             if "|sensitivity|" not in subbd:
                 subbd["|sensitivity|"] = 0
             subbd["|sensitivity|"] += senss
-        # treat vectors as namespace
-        constrstr = render(
-            constraint, TEXT, {"units", ":MAGIC:" + lineagestr(constraint)}
-        )
+        # named from the model it sits under, as its heading already says
+        anchor = getattr(constraint, "lineage", None) or ()
+        constrstr = render(constraint, TEXT, replace(scope, anchor=anchor))
         if " at 0x" in constrstr:  # don't print memory addresses
             constrstr = constrstr[: constrstr.find(" at 0x")] + ">"
         subbd[constrstr] = {"|sensitivity|": senss}
@@ -239,8 +239,11 @@ def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
     visited_bdkeys=None,
     gone_negative=False,
     all_visited_bdkeys=None,
+    *,
+    scope,
 ):
     "Returns the tree of breakdowns of key in bd, sorting by solution's values"
+    unitless = scope.also_excluding("units")  # how verbose output names things
     if key != cost and hasattr(key, "key"):
         key = key.key  # clear up Variables
     if key in bd:
@@ -257,7 +260,7 @@ def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
         all_visited_bdkeys = set()
     if verbosity:
         indent = verbosity - 1  # HACK: a bit of overloading, here
-        kvstr = "%s (%s)" % (key, get_valstr(key, solution))
+        kvstr = "%s (%s)" % (render(key, TEXT, scope), get_valstr(key, solution))
         if key in all_visited_bdkeys:
             print("  " * indent + kvstr + " [as broken down above]")
             verbosity = 0
@@ -313,7 +316,7 @@ def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
                         "  " * indent
                         + "{ through a factor of %s (%s) }"
                         % (
-                            render(factor, TEXT, ["units"]),
+                            render(factor, TEXT, unitless),
                             get_valstr(factor, solution),
                         )
                     )
@@ -440,7 +443,7 @@ def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
                 factor.ast = None
                 if verbosity:
                     keyvalstr = "%s (%s)" % (
-                        render(factor, TEXT, ["units"]),
+                        render(factor, TEXT, unitless),
                         get_valstr(factor, solution),
                     )
                     print("  " * indent + "{ through a factor of %s }" % keyvalstr)
@@ -479,12 +482,13 @@ def crawl(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
                 set(visited_bdkeys),
                 gone_negative,
                 all_visited_bdkeys,
+                scope=scope,
             )
             subtree.append(subsubtree)
         else:
             if verbosity:
                 keyvalstr = "%s (%s)" % (
-                    render(mon, TEXT, ["units"]),
+                    render(mon, TEXT, unitless),
                     get_valstr(mon, solution),
                 )
                 print("  " * indent + keyvalstr)
@@ -531,7 +535,7 @@ def get_spanstr(legend, length, label, leftwards, solution):  # noqa: ARG001
         return "┃" * (longside + 1) + shortname + "┃" * (shortside + 1)
 
 
-def discretize(tree, extent, solution, collapse, depth=0, justsplit=False):  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
+def discretize(tree, extent, solution, collapse, scope, depth=0, justsplit=False):  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
     # TODO: add vertical simplification?
     key, val, branches = tree
     if collapse:  # collapse Transforms with power 1
@@ -552,9 +556,9 @@ def discretize(tree, extent, solution, collapse, depth=0, justsplit=False):  # n
     values = [b.value for b in branches]
     bkey_indexs = {}
     for i, b in enumerate(branches):
-        k = get_keystr(b.key, solution)
+        k = get_keystr(b.key, solution, scope)
         if isinstance(b.key, Transform) and len(b.branches) == 1:
-            k = get_keystr(b.branches[0].key, solution)
+            k = get_keystr(b.branches[0].key, solution, scope)
         if k in bkey_indexs:
             values[bkey_indexs[k]] += values[i]
             values[i] = None
@@ -631,6 +635,7 @@ def discretize(tree, extent, solution, collapse, depth=0, justsplit=False):  # n
                 extent,
                 solution,
                 collapse,
+                scope,
                 depth=depth + 1,
                 justsplit=False,
             )
@@ -646,6 +651,7 @@ def discretize(tree, extent, solution, collapse, depth=0, justsplit=False):  # n
                 subextent,
                 solution,
                 collapse,
+                scope,
                 depth=depth + 1,
                 justsplit=justsplit,
             )
@@ -689,34 +695,37 @@ def plumb(tree, depth=0):
     return maxdepth
 
 
-def prune(tree, solution, maxlength, length=-1, prefix=""):
-    "Prune branches that are longer than a certain number of characters"
+def prune(tree, solution, maxlength, scope, length=-1):
+    """Prune branches that are longer than a certain number of characters.
+
+    Names are measured as graph prints them: the root by its own path, every
+    other node relative to the root (scope).
+    """
     key, extent, branches = tree
+    keyscope = replace(scope, anchor=()) if length == -1 else scope
     keylength = max(
         len(get_valstr(key, solution, into="(%s)")),
-        len(get_keystr(key, solution, prefix)),
+        len(get_keystr(key, solution, keyscope)),
     )
-    if length == -1 and isinstance(key, VarKey) and necessarylineage(key):
-        prefix = key.lineagestr()
     length += keylength + 3
     for branch in branches:
         keylength = max(
             len(get_valstr(branch.key, solution, into="(%s)")),
-            len(get_keystr(branch.key, solution, prefix)),
+            len(get_keystr(branch.key, solution, scope)),
         )
         branchlength = length + keylength + 3
         if branchlength > maxlength:
             return Tree(key, extent, [])
     return Tree(
-        key, extent, [prune(b, solution, maxlength, length, prefix) for b in branches]
+        key, extent, [prune(b, solution, maxlength, scope, length) for b in branches]
     )
 
 
-def simplify(tree, solution, extent, maxdepth, maxlength, collapse):  # noqa: PLR0913, PLR0917
+def simplify(tree, solution, extent, maxdepth, maxlength, collapse, scope):  # noqa: PLR0913, PLR0917
     "Discretize, prune, and layer a tree to prepare for printing"
-    subtree = discretize(tree, extent, solution, collapse)
+    subtree = discretize(tree, extent, solution, collapse, scope)
     if collapse and maxlength:
-        subtree = prune(subtree, solution, maxlength)
+        subtree = prune(subtree, solution, maxlength, scope)
     return layer([], subtree, maxdepth)
 
 
@@ -728,6 +737,7 @@ def graph(  # noqa: PLR0912, PLR0913, PLR0915
     basically_fixed_variables,
     *,
     cost,
+    scope,
     height=None,
     maxdepth=None,
     maxwidth=81,
@@ -736,8 +746,12 @@ def graph(  # noqa: PLR0912, PLR0913, PLR0915
     """Returns the breakdown as lines of text.
 
     The block is framed by blank lines and ends with a newline, so the first
-    and last lines are empty and joining with "\\n" gives back the text.
+    and last lines are empty and joining with "\\n" gives back the text.  The
+    root is named by scope; every other node relative to the root's model.
     """
+    root_scope = scope
+    if isinstance(tree.key, VarKey):
+        scope = replace(scope, anchor=tree.key.lineage)
     if tree.value == 0:
         # A breakdown apportions a total among its parts; a zero total has no
         # shares to lay out, and scaling by it would divide by zero. Happens
@@ -749,12 +763,12 @@ def graph(  # noqa: PLR0912, PLR0913, PLR0915
     if maxdepth is None:
         maxdepth = plumb(tree)
     if height is not None:
-        mt = simplify(tree, solution, height, maxdepth, maxwidth, collapse)
+        mt = simplify(tree, solution, height, maxdepth, maxwidth, collapse, scope)
     else:  # zoom in from a default height of 20 to a height of 4 per branch
         prev_height = None
         height = 20
         while prev_height != height:
-            mt = simplify(tree, solution, height, maxdepth, maxwidth, collapse)
+            mt = simplify(tree, solution, height, maxdepth, maxwidth, collapse, scope)
             prev_height = height
             height = min(height, max(*(4 * len(at_depth) for at_depth in mt)))
 
@@ -769,13 +783,10 @@ def graph(  # noqa: PLR0912, PLR0913, PLR0915
 
     # Format depth=0
     (A_key,) = [key for key, value in legend.items() if value == "A"]
-    prefix = ""
     if A_key is cost:
         A_str = "Cost"
     else:
-        A_str = get_keystr(A_key, solution)
-        if isinstance(A_key, VarKey) and necessarylineage(A_key):
-            prefix = A_key.lineagestr()
+        A_str = get_keystr(A_key, solution, root_scope)
     A_valstr = get_valstr(A_key, solution, into="(%s)")
     fmt = "{0:>%s}" % (max(len(A_str), len(A_valstr)) + 3)
     for j, entry in enumerate(chararray[0, :]):
@@ -811,7 +822,7 @@ def graph(  # noqa: PLR0912, PLR0913, PLR0915
                 if showlegend:
                     continue
 
-            keystr = get_keystr(key, solution, prefix)
+            keystr = get_keystr(key, solution, scope)
             if keystr in labeled:
                 valuestr = ""
             else:
@@ -871,9 +882,7 @@ def graph(  # noqa: PLR0912, PLR0913, PLR0915
         legend_lines = []
         for key, shortname in sorted(legend.items(), key=lambda kv: kv[1]):
             legend_lines.append(
-                legend_entry(
-                    key, shortname, solution, prefix, basically_fixed_variables
-                )
+                legend_entry(key, shortname, solution, scope, basically_fixed_variables)
             )
         maxlens = [max(len(el) for el in col) for col in zip(*legend_lines)]
         fmts = ["{0:<%s}" % L for L in maxlens]
@@ -887,7 +896,7 @@ def graph(  # noqa: PLR0912, PLR0913, PLR0915
     return lines
 
 
-def legend_entry(key, shortname, solution, prefix, basically_fixed_variables):
+def legend_entry(key, shortname, solution, scope, basically_fixed_variables):
     "Returns list of legend elements"
     operator = note = ""
     keystr = valuestr = " "
@@ -904,19 +913,19 @@ def legend_entry(key, shortname, solution, prefix, basically_fixed_variables):
     else:
         valuestr = get_valstr(key, solution, into="  " + operator + "%s")
         if not isinstance(key, FixedScalar):
-            keystr = get_keystr(key, solution, prefix)
+            keystr = get_keystr(key, solution, scope)
     return ["%-4s" % shortname, keystr, valuestr, note]
 
 
-def get_keystr(key, solution, prefix=""):  # noqa: ARG001
-    "Returns formatted string of the key in solution."
-    excluded = {"units", ":MAGIC:" + prefix}
+def get_keystr(key, solution, scope):  # noqa: ARG001
+    "Returns formatted string of the key in solution, named as scope says."
+    unitless = scope.also_excluding("units")
     if isinstance(key, VarKey):
-        out = key.str_without(excluded)
+        out = key.str_without(unitless)
     elif isinstance(key, tuple):
         out = "[%i terms]" % len(key)
     else:
-        out = render(key, TEXT, excluded)
+        out = render(key, TEXT, unitless)
     return out if len(out) <= 67 else out[:66] + "…"
 
 
@@ -962,28 +971,27 @@ class Breakdowns:
         self.sol = sol
         self.cost = model.cost
         self.csenss = constraint_senss(model, sol)
-        self.lineage_map = get_lineage_map(sol)
+        # every variable the solution holds, each named as briefly as is unique
+        self.scope = DisplayScope(shown=[*sol.primal, *sol.constants])
         self.mlookup = {}
-        with lineage_display_context(self.lineage_map):
-            bd = get_model_breakdown(self.csenss)
-            model_keys = [k for k in bd if k != "|sensitivity|"]
-            # Skip the generic "Model" wrapper when there's a single named
-            # submodel — but only if that key is a real model (has children),
-            # not a leaf constraint/variable string.
-            if len(model_keys) == 1 and any(
-                k != "|sensitivity|" for k in bd[model_keys[0]]
-            ):
-                top = model_keys[0]
-                self.mtree = crawl_modelbd(bd[top], self.mlookup, name=top)
-            else:
-                self.mtree = crawl_modelbd(bd, self.mlookup)
+        bd = get_model_breakdown(self.csenss, self.scope)
+        model_keys = [k for k in bd if k != "|sensitivity|"]
+        # Skip the generic "Model" wrapper when there's a single named
+        # submodel — but only if that key is a real model (has children),
+        # not a leaf constraint/variable string.
+        if len(model_keys) == 1 and any(
+            k != "|sensitivity|" for k in bd[model_keys[0]]
+        ):
+            top = model_keys[0]
+            self.mtree = crawl_modelbd(bd[top], self.mlookup, name=top)
+        else:
+            self.mtree = crawl_modelbd(bd, self.mlookup)
         self.basically_fixed_variables = set()
         self.bd = get_breakdowns(self.basically_fixed_variables, self.sol, self.csenss)
 
     def trace(self, key, *, permissivity=2):
         print()  # a little padding to start
-        with lineage_display_context(self.lineage_map):
-            self.get_tree(key, permissivity=permissivity, verbosity=1)
+        self.get_tree(key, permissivity=permissivity, verbosity=1)
 
     def get_tree(self, key, *, permissivity=2, verbosity=0):
         tree = None
@@ -1019,24 +1027,25 @@ class Breakdowns:
                 self.cost,
                 permissivity=permissivity,
                 verbosity=verbosity,
+                scope=self.scope,
             )
         return tree, kind
 
     def lines(self, key, *, height=None, permissivity=2, showlegend=False, maxwidth=85):
         "Returns the breakdown of key as lines of text"
-        with lineage_display_context(self.lineage_map):
-            tree, kind = self.get_tree(key, permissivity=permissivity)
-            lookup = self.bd if kind == "variable" else self.mlookup
-            return graph(
-                tree,
-                lookup,
-                self.sol,
-                self.basically_fixed_variables,
-                cost=self.cost,
-                height=height,
-                showlegend=showlegend,
-                maxwidth=maxwidth,
-            )
+        tree, kind = self.get_tree(key, permissivity=permissivity)
+        lookup = self.bd if kind == "variable" else self.mlookup
+        return graph(
+            tree,
+            lookup,
+            self.sol,
+            self.basically_fixed_variables,
+            cost=self.cost,
+            scope=self.scope,
+            height=height,
+            showlegend=showlegend,
+            maxwidth=maxwidth,
+        )
 
     def show(self, key, *, height=None, permissivity=2, showlegend=False, maxwidth=85):
         "Prints the breakdown of key"
