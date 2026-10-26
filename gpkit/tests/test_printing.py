@@ -128,8 +128,18 @@ class TestSolutionSections:
         assert [line.split(" : ")[1] for line in lines[3:]] == ["x ≥ c/10"]
 
 
+class Opaque:
+    "A constraint gpkit can solve but not write down: it has only as_gpconstr."
+
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+
+    def as_gpconstr(self, _x0):
+        return self.y >= self.x
+
+
 class TestDisplay:
-    "A row's name, units, label and heading come from a plain variable entry."
+    "What a table shows for each ref comes from the model IR, a plain document."
 
     def test_rows_read_the_model_irs_variable_entries(self, trip):
         entries = json.loads(json.dumps(trip.to_ir()["variables"]))
@@ -141,6 +151,21 @@ class TestDisplay:
             assert display.label(ref) == "speed"
             assert display.heading(ref) == "Trip.Leg"
         assert display.units(trip.w.key.ref) == "s²/m"
+
+    def test_constraints_and_cost_read_the_model_ir(self, trip):
+        "No live model: the document alone names the cost and shows each constraint."
+        ir = json.loads(json.dumps(trip.to_ir()))
+        display = Display(ir["variables"], ir)
+        assert display.cost_name == "Trip.x + Trip.w⋅Trip.Leg.v[:].sum()"
+        (ref,) = ir["model_tree"]["children"][0]["constraints"]
+        assert display.constraint(ref) == "v[:] ≥ d[:]/tau"
+        assert display.heading(ref) == "Trip.Leg"
+
+    def test_a_constraint_with_no_written_form_shows_its_type(self):
+        x, y = Variable("x"), Variable("y")
+        m = Model(y, [Opaque(x, y), x >= 1])
+        text = m.table(m.localsolve(verbosity=0), tables=["tightest constraints"])
+        assert "+1 : <Opaque>" in text.split("\n")
 
 
 class TestSweepSections:

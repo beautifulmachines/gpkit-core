@@ -67,6 +67,11 @@ class TestCancelled:
         assert "ast" not in (x >= self.expr).to_ir()["right"]
 
 
+def _bare(ref):
+    "x and y have no lineage or units, so each ref is the name TOML writes."
+    return ref
+
+
 def _terms(text):
     "The terms of a sum, whatever order they print in."
     return set(text.split(" + "))
@@ -84,7 +89,8 @@ class TestNumbers:
         assert render(1234567 * x, LATEX) == r"1.235 \times 10^{6} x"
 
     def test_toml_coefficient_is_exact(self):
-        assert constraint_to_expr((x >= 2.71828 * y).to_ir()) == "x >= 2.71828*y"
+        c = (x >= 2.71828 * y).to_ir()
+        assert constraint_to_expr(c, _bare) == "x >= 2.71828*y"
 
 
 class TestParentheses:
@@ -115,7 +121,7 @@ class TestUnwritten:
 
     def test_toml_renders_it(self):
         c = x >= self.derived
-        left, right = constraint_to_expr(c.to_ir()).split(" >= ")
+        left, right = constraint_to_expr(c.to_ir(), _bare).split(" >= ")
         assert left == "x"
         assert _terms(right) == {"2.71828*x**0.33333", "3"}
 

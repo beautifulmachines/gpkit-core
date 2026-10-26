@@ -44,6 +44,7 @@ from gpkit.nomials.math import (
     SingleSignomialEquality,
 )
 from gpkit.tests.test_margin_objective import SimpleMarginModel
+from gpkit.tests.test_printing import Opaque
 
 
 def _text(node, fmt=TEXT):
@@ -496,6 +497,14 @@ class TestNomialIR:
 
 class TestConstraintIR:
     """Tests for constraint to_ir()."""
+
+    def test_a_constraint_with_no_written_form_states_its_type(self):
+        "The model IR has an entry for every constraint, if only to name its type."
+        x, y = Variable("x"), Variable("y")
+        ir = Model(y, [Opaque(x, y), x >= 1]).to_ir()
+        (ref,) = [r for r, c in ir["constraints"].items() if c["type"] == "Opaque"]
+        assert "oper" not in ir["constraints"][ref]
+        assert ref in ir["model_tree"]["constraints"]
 
     def test_posy_inequality(self):
         """PosynomialInequality: x >= y + 1"""

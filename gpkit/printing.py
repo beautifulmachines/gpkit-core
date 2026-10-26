@@ -7,10 +7,9 @@ from typing import Any
 
 import numpy as np
 
-from .constraints.set import shown_as, solver_constraints, written_keyed_constraints
 from .display.naming import decorated
-from .display.render import TEXT, render
-from .ir import diff_solutions
+from .display.render import TEXT, render_ir
+from .ir import diff_solutions, shown_whole
 from .units import Quantity
 from .util.repr_conventions import lineagestr, unitstr
 
@@ -34,33 +33,20 @@ class Display:
     """How a table shows what a solution document names only by ref.
 
     The documents carry the numbers; this carries what a reader sees for each
-    ref -- name, units, label, model heading -- and each constraint's text.
-    Variables it reads from entries in the model IR's `variables` format, so a
-    table with a model and one without render them through the same code.
-    Constraint entries are their keys' IR, which places an element in its
-    vector constraint as a variable's entry places it in its vector.
+    ref -- name, units, label, model heading -- and each constraint's text, all
+    read from documents: variable entries in the model IR's `variables` format,
+    and the model IR itself when there is one.  A vector constraint's element
+    names its vector as a variable's element does, by `veckey_ref`.
     """
 
-    def __init__(self, entries, model=None):
+    def __init__(self, entries, model_ir=None):
         self.entries = entries
-        self.has_model = model is not None
+        self.has_model = model_ir is not None
+        self._constraints = {} if model_ir is None else model_ir["constraints"]
         # a solution holds the cost's value; only the model knows its expression
         self.cost_name = (
-            "cost" if model is None else render(model.cost, TEXT, {"units"})
+            "cost" if model_ir is None else render_ir(model_ir["cost"], TEXT, self.path)
         )
-        self._gathered, self._constraints = (
-            {},
-            {},
-        )  # _gathered: element ref -> its key IR
-        constraints = () if model is None else written_keyed_constraints(model)
-        for _, key, c in constraints:
-            rows = dict(shown_as(key, c))  # what the table's rows show
-            self._constraints.update((k.ref, row) for k, row in rows.items())
-            for idx, element in solver_constraints(c):  # what a solution keys by
-                element_key = key if idx is None else key.element(idx)
-                self._constraints[element_key.ref] = element
-                if idx is not None and key in rows:  # its vector prints as one row
-                    self._gathered[element_key.ref] = element_key.to_ir()
 
     def entry(self, ref) -> dict:
         """The IR entry that says which vector's row ref gathers into, if any.
@@ -68,11 +54,20 @@ class Display:
         A variable's entry, or a vector constraint element's when the vector
         prints as one row; empty otherwise, so the ref is a row of its own.
         """
-        return self.entries.get(ref) or self._gathered.get(ref, {})
+        if ref in self.entries:
+            return self.entries[ref]
+        constraint = self._constraints.get(ref, {})
+        vector = self._constraints.get(constraint.get("veckey_ref"))
+        return constraint if vector and shown_whole(vector) else {}
 
     def name(self, ref) -> str:
         entry = self.entries[ref]
         return decorated(entry["name"], entry.get("idx"), entry.get("shape"))
+
+    def path(self, ref) -> str:
+        "The name with its model's path before it, as an expression's variables show."
+        heading = self.heading(ref)
+        return f"{heading}.{self.name(ref)}" if heading else self.name(ref)
 
     def units(self, ref) -> str:
         return _units(self.entries[ref].get("units", ""))
@@ -82,19 +77,14 @@ class Display:
 
     def heading(self, ref) -> str:
         "The model a row is shown under; none for what no model owns."
-        if ref in self.entries:
-            return lineagestr(tuple(map(tuple, self.entries[ref].get("lineage", ()))))
-        constraint = self._constraints.get(ref)
-        return constraint.lineagestr() if hasattr(constraint, "lineagestr") else ""
+        entry = self.entries.get(ref) or self._constraints.get(ref, {})
+        return lineagestr(tuple(map(tuple, entry.get("lineage", ()))))
 
     def has_constraint(self, ref) -> bool:
         return ref in self._constraints
 
     def constraint(self, ref) -> str:
-        text = render(self._constraints[ref], TEXT, {"units", "lineage"})
-        if " at 0x" in text:  # a custom constraint's default repr
-            text = text[: text.find(" at 0x")] + ">"
-        return text
+        return render_ir(self._constraints[ref], TEXT, self.name)
 
 
 def _primal(doc) -> dict:
@@ -995,12 +985,11 @@ def _documents(obj, model=None, baseline=None, tol=0.0) -> Documents:
     "The documents and display for a Solution or Sweep, against a baseline if any."
     is_sweep = not _looks_like_solution(obj)
     sols = list(obj) if is_sweep else [obj]
-    # model.vks.to_ir() is the model IR's `variables`, without serializing every
-    # constraint to get it -- which a custom constraint may not support
-    entries = _variable_entries(sols) if model is None else model.vks.to_ir()
+    model_ir = None if model is None else model.to_ir()
+    entries = _variable_entries(sols) if model is None else model_ir["variables"]
     if baseline is not None:  # which may be a solution of another model
         entries = {**_variable_entries([baseline]), **entries}
-    display = Display(entries, model)
+    display = Display(entries, model_ir)
     return Documents(
         docs=[sol.to_ir() for sol in sols],
         display=display,

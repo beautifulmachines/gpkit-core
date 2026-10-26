@@ -10,7 +10,7 @@ from .util.repr_conventions import unitstr
 # Bump the major when a field is removed, re-keyed, or changes meaning; bump the
 # minor when one is added, or starts appearing where it did not before. Readers
 # check the major alone, so a minor bump never breaks one.
-IR_VERSION = "3.1"
+IR_VERSION = "3.2"
 
 
 def check_ir_version(doc):
@@ -48,6 +48,18 @@ def ir_units(obj) -> str:
     Display is unaffected: unitstr() formats from the live units, not from this.
     """
     return unitstr(obj, "%s", ":C")
+
+
+def shown_whole(constraint) -> bool:
+    """Whether a model IR constraint entry is shown as one relation.
+
+    Every entry is, except a vector constraint with a side never written as one
+    expression: only its elements' math is known, so each element is shown.
+    The document's counterpart of constraints.set.shown_as.
+    """
+    if constraint.get("type") != "ArrayConstraint":
+        return True
+    return all("ast" in constraint[side] for side in ("left", "right"))
 
 
 def _by_quantity(refs) -> dict:

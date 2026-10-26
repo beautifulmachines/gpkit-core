@@ -1,34 +1,26 @@
 "Generate TOML model specs from gpkit Models or IR dicts."
 
-import re
-
 import numpy as np
 
-from ..ast_nodes import ast_from_ir, ast_from_terms
-from ..display.render import TOML, render_ast
+from ..ast_nodes import ast_from_ir
+from ..display.render import TOML, render_ast, render_ir
 from ..display.render import exact_number as _format_number
-from ..ir import check_ir_version
+from ..ir import check_ir_version, shown_whole
 
 # ---------------------------------------------------------------------------
-# Ref string → Python variable name
+# Variable entry → Python variable name
 # ---------------------------------------------------------------------------
 
-# IR ref formats (from VarKey.ref):
-#   dimensionless scalar:  "x"
-#   scalar with units:     "h|ft"
-#   vector:                "d#3|ft"
-#   vector element:        "d[0]#3|ft"
-#   with lineage:          "Aircraft.Wing.S|ft²"
-#   lineage + vector:      "wing0.d[0]#3|ft"
-# We want just the bare name: "x", "h", "A_wall", "d", "d[0]"
-_REF_STRIP = re.compile(r"(#\d+)?(\|.*)?$")
+
+def _toml_name(entry):
+    "A variable entry's name as a TOML expression writes it: d, or d[0]."
+    idx = entry.get("idx")
+    return entry["name"] + (f"[{','.join(map(str, idx))}]" if idx else "")
 
 
-def _ref_to_name(ref):
-    """Extract the Python variable name from an IR ref string."""
-    bare = _REF_STRIP.sub("", ref)
-    # Strip lineage prefix: "Aircraft0.Wing0.S" → "S"
-    return bare.rsplit(".", 1)[-1]
+def _entry_names(variables):
+    "name_fn(ref) for the model IR's `variables`: each by its bare name."
+    return lambda ref: _toml_name(variables[ref])
 
 
 # ---------------------------------------------------------------------------
@@ -58,13 +50,13 @@ def _quote(text):
 # ---------------------------------------------------------------------------
 
 
-def ast_to_expr(node, name_fn=_ref_to_name):
+def ast_to_expr(node, name_fn):
     """An AST node, its IR dict, or a raw number, in TOML expression syntax.
 
-    name_fn : ref -> str, default _ref_to_name (bare name, no qualification).
-    Multi-model emission passes a resolver that qualifies a variable as
-    "Model.name" when another model owns it (see _make_name_resolver), so a
-    cross-model reference like self.engine.W does not print as a bare "W".
+    name_fn(ref) names each variable.  Multi-model emission passes a resolver
+    that qualifies a variable as "Model.name" when another model owns it (see
+    _make_name_resolver), so a cross-model reference like self.engine.W does
+    not print as a bare "W".
     """
     return render_ast(ast_from_ir(node), TOML, name_fn)
 
@@ -74,38 +66,30 @@ def ast_to_expr(node, name_fn=_ref_to_name):
 # ---------------------------------------------------------------------------
 
 
-def constraint_to_expr(constraint_ir, name_fn=_ref_to_name):
-    """Convert an IR constraint dict to a TOML constraint string."""
-    oper = TOML.relation(constraint_ir["oper"])
-    left = _nomial_ir_to_expr(constraint_ir["left"], name_fn)
-    right = _nomial_ir_to_expr(constraint_ir["right"], name_fn)
-    return f"{left} {oper} {right}"
+def constraint_to_expr(constraint_ir, name_fn):
+    "An IR constraint entry as a TOML constraint string."
+    if "oper" not in constraint_ir:
+        raise ValueError(
+            f"A {constraint_ir['type']} constraint has no written form, so TOML"
+            " cannot spell it."
+        )
+    return render_ir(constraint_ir, TOML, name_fn)
 
 
-def _written_exprs(refs, constraints, name_fn=_ref_to_name):
+def _written_exprs(refs, constraints, name_fn):
     """The constraints at refs as TOML strings, each as it was written.
 
-    A vector constraint is one line.  If a side was never written as one
-    expression (an array assembled element by element) only its elements' math
-    is known, so each element is a line of its own.
+    A vector constraint is one line, unless a side was never written as one
+    expression; then only its elements' math is known, and each is a line.
     """
     for ref in refs:
         c = constraints[ref]
-        written = all("ast" in c[side] for side in ("left", "right"))
-        if c["type"] != "ArrayConstraint" or written:
+        if shown_whole(c):
             yield constraint_to_expr(c, name_fn)
             continue
         for element in constraints.values():
             if element.get("veckey_ref") == ref:
                 yield constraint_to_expr(element, name_fn)
-
-
-def _nomial_ir_to_expr(nomial_ir, name_fn=_ref_to_name):
-    "A nomial IR dict as written, or from its terms if it never was."
-    ast = nomial_ir.get("ast")
-    if ast is not None:
-        return ast_to_expr(ast, name_fn)
-    return render_ast(ast_from_terms(nomial_ir["terms"]), TOML, name_fn)
 
 
 def _is_reciprocal(ast_dict):
@@ -129,7 +113,7 @@ def _is_reciprocal(ast_dict):
     return None
 
 
-def _format_objective(cost_ir, name_fn=_ref_to_name):
+def _format_objective(cost_ir, name_fn):
     """Determine objective direction and expression string.
 
     Detects the 1/expr pattern and returns ("max", expr_str) instead of
@@ -140,7 +124,7 @@ def _format_objective(cost_ir, name_fn=_ref_to_name):
         inner = _is_reciprocal(ast)
         if inner is not None:
             return "max", ast_to_expr(inner, name_fn)
-    return "min", _nomial_ir_to_expr(cost_ir, name_fn)
+    return "min", render_ir(cost_ir, TOML, name_fn)
 
 
 # ---------------------------------------------------------------------------
@@ -288,7 +272,7 @@ def _build_ref_to_model_id(tree, model_ids):
     return mapping
 
 
-def _make_name_resolver(ref_to_model_id, current_model_id):
+def _make_name_resolver(variables, ref_to_model_id, current_model_id):
     """Build a name_fn for ast_to_expr/constraint_to_expr: bare name for a
     variable owned by the model currently being emitted, "Model.name" for
     a reference to a variable owned by a different model (e.g. Aircraft's
@@ -296,7 +280,7 @@ def _make_name_resolver(ref_to_model_id, current_model_id):
     bare "W" indistinguishable from a same-named local variable."""
 
     def resolve(ref):
-        name = _ref_to_name(ref)
+        name = _toml_name(variables[ref])
         owner = ref_to_model_id.get(ref)
         if owner is not None and owner != current_model_id:
             return f"{owner}.{name}"
@@ -370,13 +354,14 @@ def _emit_single_model(ir, lines):
 
     lines.append("[model]")
     cost_ir = ir.get("cost", {})
-    direction, cost_str = _format_objective(cost_ir)
+    name_fn = _entry_names(variables)
+    direction, cost_str = _format_objective(cost_ir, name_fn)
     lines.append(f"objective = {_quote(f'{direction}: {cost_str}')}")
 
     refs = ir["model_tree"]["constraints"]
     if refs:
         lines.append("constraints = [")
-        for expr in _written_exprs(refs, ir["constraints"]):
+        for expr in _written_exprs(refs, ir["constraints"], name_fn):
             lines.append(f"  {_quote(expr)},")
         lines.append("]")
 
@@ -446,7 +431,7 @@ def _emit_model_section(  # noqa: PLR0913, PLR0917
 ):
     """Emit a single [models.X] section."""
     lines.append(f"[models.{model_id}]")
-    name_fn = _make_name_resolver(ref_to_model_id, model_id)
+    name_fn = _make_name_resolver(variables, ref_to_model_id, model_id)
 
     # Variables (flat format: vars as keys in model section). node["variables"]
     # is this node's own own_varkeys refs — already scoped to this exact
