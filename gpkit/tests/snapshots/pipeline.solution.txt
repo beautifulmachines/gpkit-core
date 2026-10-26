@@ -20,8 +20,8 @@
           ┃┣╸Pipe ┣╸W ≥ rho_m⋅3.142⋅D⋅t⋅L
           ┃┃      ┛
           ┃┛      ┣╸A = 0.7854⋅D²
-          ┃┓          ┣╸Q[2] ≤ V[2]⋅Pipeline.Pipe.A
-          ┃┃          ┣╸P[2] ≥ dp[2]⋅Q[2]/Pipeline.Pump.eta
+          ┃┓          ┣╸Q[2] ≤ V[2]⋅A
+          ┃┃          ┣╸P[2] ≥ dp[2]⋅Q[2]/eta
           ┃┣╸PipeFlow ┓
  Pipeline╺┫┃          ┣╸[13 terms]
           ┃┛          ┛

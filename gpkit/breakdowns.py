@@ -971,8 +971,11 @@ class Breakdowns:
         self.sol = sol
         self.cost = model.cost
         self.csenss = constraint_senss(model, sol)
-        # every variable the solution holds, each named as briefly as is unique
-        self.scope = DisplayScope(shown=[*sol.primal, *sol.constants])
+        # Every variable the solution holds, each named as briefly as is unique.
+        # Abbreviated even where a model owns it: a breakdown follows contributions
+        # rather than the model tree, so a short name does not read as local
+        # there, and full paths crowd the tree.
+        self.scope = DisplayScope(shown=[*sol.primal, *sol.constants], abbreviate=True)
         self.mlookup = {}
         bd = get_model_breakdown(self.csenss, self.scope)
         model_keys = [k for k in bd if k != "|sensitivity|"]
