@@ -9,14 +9,24 @@ from gpkit import Model, Variable, Vectorize, VectorVariable, units
 from gpkit.ast_nodes import ConstNode, ExprNode, UnitsNode, VarNode
 from gpkit.display.render import exact_number
 from gpkit.examples.uav import UAV
+from gpkit.tests.test_printing import Opaque
 from gpkit.toml import load_toml
-from gpkit.toml._printer import _ref_to_name, ast_to_expr, to_toml
+from gpkit.toml._printer import ast_to_expr, to_toml
 from gpkit.util.globals import NamedVariables
 from gpkit.util.small_scripts import mag
 from gpkit.varkey import VarKey
 
 # The documents literalincluded by docs/source/tomlmodels.rst
 TOML_EXAMPLES = Path(__file__).parents[2] / "docs" / "source" / "examples" / "toml"
+
+# What the IR's variable entries would name these refs
+_NAMES = {"x": "x", "y": "y", "h|ft": "h", "w|ft": "w"}
+
+
+def _expr(node):
+    "node in TOML syntax, each variable named as its entry names it."
+    return ast_to_expr(node, _NAMES.__getitem__)
+
 
 # ---------------------------------------------------------------------------
 # Numbers
@@ -47,44 +57,44 @@ class TestAstToExpr:
     """AST node rendering to plain expression strings."""
 
     def test_var_node(self):
-        assert ast_to_expr(VarNode(VarKey(name="x").ref)) == "x"
+        assert _expr(VarNode(VarKey(name="x").ref)) == "x"
 
     def test_var_node_with_units(self):
-        assert ast_to_expr(VarNode(VarKey(name="h", units="ft").ref)) == "h"
+        assert _expr(VarNode(VarKey(name="h", units="ft").ref)) == "h"
 
     def test_const_node(self):
-        assert ast_to_expr(ConstNode(2.0)) == "2"
-        assert ast_to_expr(ConstNode(3.14)) == "3.14"
+        assert _expr(ConstNode(2.0)) == "2"
+        assert _expr(ConstNode(3.14)) == "3.14"
 
     def test_raw_number(self):
-        assert ast_to_expr(42) == "42"
-        assert ast_to_expr(2.5) == "2.5"
+        assert _expr(42) == "42"
+        assert _expr(2.5) == "2.5"
 
     def test_add(self):
         a = ConstNode(1.0)
         b = ConstNode(2.0)
         node = ExprNode("add", (a, b))
-        assert ast_to_expr(node) == "1 + 2"
+        assert _expr(node) == "1 + 2"
 
     def test_mul(self):
         node = ExprNode("mul", (VarNode("x"), VarNode("y")))
-        assert ast_to_expr(node) == "x*y"
+        assert _expr(node) == "x*y"
 
     def test_mul_drops_1(self):
         node = ExprNode("mul", (ConstNode(1.0), VarNode("x")))
-        assert ast_to_expr(node) == "x"
+        assert _expr(node) == "x"
 
     def test_div(self):
         node = ExprNode("div", (VarNode("x"), VarNode("y")))
-        assert ast_to_expr(node) == "x/y"
+        assert _expr(node) == "x/y"
 
     def test_pow(self):
         node = ExprNode("pow", (VarNode("x"), 2))
-        assert ast_to_expr(node) == "x**2"
+        assert _expr(node) == "x**2"
 
     def test_neg(self):
         node = ExprNode("neg", (ConstNode(3.0),))
-        assert ast_to_expr(node) == "-3"
+        assert _expr(node) == "-3"
 
     def test_parenthesization(self):
         """Mul of add should parenthesize the add."""
@@ -93,7 +103,7 @@ class TestAstToExpr:
         c = ConstNode(3.0)
         add_node = ExprNode("add", (a, b))
         mul_node = ExprNode("mul", (add_node, c))
-        assert ast_to_expr(mul_node) == "(1 + 2)*3"
+        assert _expr(mul_node) == "(1 + 2)*3"
 
     def test_ir_dict(self):
         """IR dicts (from to_ir() JSON) should render correctly."""
@@ -105,7 +115,7 @@ class TestAstToExpr:
                 {"node": "var", "ref": "w|ft"},
             ],
         }
-        assert ast_to_expr(ir) == "h*w"
+        assert _expr(ir) == "h*w"
 
     def test_units_node(self):
         """UnitsNode (e.g. `1 * units("W")`) must round-trip as a real unit
@@ -113,13 +123,13 @@ class TestAstToExpr:
         round-tripped model's solved values whenever it's combined with an
         operand of different unit scale (see test_units_only_constant_in_constraint)."""
         node = UnitsNode(units("W").hmap.units)
-        assert ast_to_expr(node) == "units('W')"
+        assert _expr(node) == "units('W')"
 
     def test_div_by_units_node_preserves_literal(self):
         """x / (1*units.W) must keep the units() literal, not simplify it
         away — the division may carry a real unit-conversion factor."""
         node = ExprNode("div", (VarNode("x"), UnitsNode(units("W").hmap.units)))
-        assert ast_to_expr(node) == "x/units('W')"
+        assert _expr(node) == "x/units('W')"
 
 
 # ---------------------------------------------------------------------------
@@ -479,6 +489,27 @@ class TestVectorConstraints:
         m2 = load_toml(to_toml(m1))
         assert set(m2.to_ir()["constraints"]) == set(m1.to_ir()["constraints"])
 
+    def test_a_2d_vector_is_named_by_its_entry(self):
+        """Its ref spells the shape #2,3; the name comes from the variable's entry.
+
+        Checked in the text: the document's [vectors.(2, 3)] header does not
+        parse yet (#317).
+        """
+        a = VectorVariable((2, 3), "a", "m")
+        text = to_toml(Model(a.prod(), [a >= 1 * units("m")]))
+        assert "\"a >= units('m')\"," in text
+        assert "#" not in text
+
+
+class TestUnwritableConstraints:
+    "A constraint with no written form has no TOML spelling, and says so."
+
+    def test_raises_naming_its_type(self):
+        x, y = Variable("x"), Variable("y")
+        m = Model(y, [Opaque(x, y), x >= 1])
+        with pytest.raises(ValueError, match="Opaque"):
+            to_toml(m)
+
 
 # ---------------------------------------------------------------------------
 # Vector constant values
@@ -567,33 +598,3 @@ class TestStringEscaping:
         x = Variable("x", "m", label)
         m2 = load_toml(to_toml(Model(x, [x >= 1 * units("m")])))
         assert m2.vks.resolve("x").label == label
-
-
-# ---------------------------------------------------------------------------
-# _ref_to_name: lineage and suffix stripping
-# ---------------------------------------------------------------------------
-
-
-class TestRefToName:
-    """_ref_to_name extracts bare variable names from IR ref strings."""
-
-    def test_bare_name(self):
-        assert _ref_to_name("S") == "S"
-
-    def test_units_stripped(self):
-        assert _ref_to_name("S|ft²") == "S"
-
-    def test_lineage_stripped(self):
-        assert _ref_to_name("wing0.S|ft²") == "S"
-
-    def test_deep_lineage(self):
-        assert _ref_to_name("Aircraft.Wing.S|ft²") == "S"
-
-    def test_vector_element(self):
-        assert _ref_to_name("d[0]#3|ft") == "d[0]"
-
-    def test_lineage_vector_element(self):
-        assert _ref_to_name("wing0.d[0]#3|ft") == "d[0]"
-
-    def test_no_suffix(self):
-        assert _ref_to_name("x") == "x"

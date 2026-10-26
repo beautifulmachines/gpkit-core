@@ -320,7 +320,10 @@ class Model(CostedConstraintSet):
 
         constraints_ir = {}
         for _, key, c in written_keyed_constraints(self):
-            constraints_ir[key.ref] = {**c.to_ir(), **key.to_ir()}
+            # one gpkit cannot write down (a user's class with only as_gpconstr,
+            # say) still has an entry, naming its type
+            written = c.to_ir() if hasattr(c, "to_ir") else {"type": type(c).__name__}
+            constraints_ir[key.ref] = {**written, **key.to_ir()}
             for idx, element in solver_constraints(c):
                 if idx is None:
                     continue

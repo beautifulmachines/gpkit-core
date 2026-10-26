@@ -17,6 +17,7 @@ from ..ast_nodes import (
     ExprNode,
     PiNode,
     UnitsNode,
+    ast_from_ir,
     ast_from_terms,
     variables_of,
     written_ast,
@@ -246,6 +247,22 @@ class Rendered:
 
     def _repr_latex_(self):
         return "$$" + render(self, LATEX) + "$$"
+
+
+def render_ir(entry, fmt, names):
+    """A constraint or nomial entry from an IR document, as fmt spells it.
+
+    names(ref) names each variable.  A constraint with no written form has
+    only its type to show.
+    """
+    if "oper" in entry:
+        left, right = (render_ir(entry[side], fmt, names) for side in ("left", "right"))
+        return f"{left} {fmt.relation(entry['oper'])} {right}"
+    if "ast" in entry:
+        return render_ast(ast_from_ir(entry["ast"]), fmt, names)
+    if "terms" in entry:
+        return render_ast(ast_from_terms(entry["terms"]), fmt, names)
+    return f"<{entry['type']}>"
 
 
 def render_ast(node, fmt, names, unit_literals=True):
