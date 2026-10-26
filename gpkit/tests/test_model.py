@@ -356,9 +356,9 @@ class TestGP:
         the same class in two distinct parent contexts each gets number 0:
           - standalone Inner() → lineage (("Inner", 0),) → lineagestr "Inner0"
           - Outer's Inner()   → lineage (("Outer", 0), ("Inner", 0)) → "Outer0.Inner0"
-        Both produce "Inner0" at depth 1, causing a name collision. When
-        _compute_collision_depths tried depth 2, lineages[-2] on the 1-element
-        standalone list raised IndexError.
+        Both produce "Inner0" at depth 1, causing a name collision. Widening
+        to depth 2 read lineages[-2] of the 1-element standalone list, and
+        raised IndexError.
         """
 
         class _Inner(Model):

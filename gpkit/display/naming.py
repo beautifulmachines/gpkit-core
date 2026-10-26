@@ -153,6 +153,11 @@ class DisplayScope:
         object.__setattr__(self, "shown", frozenset(self.shown or ()))
         object.__setattr__(self, "excluded", frozenset(self.excluded or ()))
 
+    @classmethod
+    def of(cls, excluded) -> "DisplayScope":
+        "excluded as a scope: a scope as is, a bare flag set as one naming full paths."
+        return excluded if isinstance(excluded, cls) else cls(excluded=excluded)
+
     # -- format-flag protocol, so a scope goes wherever a flag set went ------
 
     def __contains__(self, flag) -> bool:

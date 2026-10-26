@@ -1,18 +1,16 @@
 "Implements ConstraintSet"
 
 from collections import defaultdict
-from contextlib import nullcontext
-from functools import cached_property
 
 import numpy as np
 
 from ..constraintkey import ConstraintKey
+from ..display.naming import DisplayScope
 from ..display.render import LATEX, TEXT, render
 from ..nomials import NomialArray, Variable
 from ..nomials.constraints import ArrayConstraint
-from ..util.repr_conventions import ReprMixin, also_excluding, lineagestr
-from ..varkey import lineage_display_context
-from ..varmap import EMPTY_VARSET, Substitutions, VarSet, _collision_depths
+from ..util.repr_conventions import ReprMixin, lineagestr
+from ..varmap import EMPTY_VARSET, Substitutions, VarSet
 
 
 def add_meq_bounds(bounded, meq_bounded):  # TODO: collapse with GP version?
@@ -392,23 +390,24 @@ class ConstraintSet(list, ReprMixin):
             f"{len(self.varkeys)} variable(s)>"
         )
 
-    @cached_property
-    def _name_collision_varkeys(self):
-        "Mapping of VarKey → lineage depth for display, computed once per instance."
-        return _collision_depths(self.varkeys)
+    def _root_scope(self, excluded):
+        """The scope a whole printout names variables in, marked as begun.
+
+        Bare flags get the shortest unambiguous name for each of this set's
+        variables; a caller's own scope is kept.
+        """
+        if not isinstance(excluded, DisplayScope):
+            excluded = DisplayScope(shown=self.varkeys, excluded=excluded)
+        return excluded.also_excluding("root")
 
     def lines_without(self, excluded):
         "Lines representation of a ConstraintSet."
         root, rootlines = "root" not in excluded, []
         if root:
-            excluded = also_excluding(excluded, "root")
-            ctx = lineage_display_context(self._name_collision_varkeys)
-        else:
-            ctx = nullcontext()
-        with ctx:
-            if root and hasattr(self, "_rootlines"):
+            excluded = self._root_scope(excluded)
+            if hasattr(self, "_rootlines"):
                 rootlines = self._rootlines(excluded)
-            lines = recursively_line(self, excluded)
+        lines = recursively_line(self, excluded)
         indent = " " if root or getattr(self, "lineage", None) else ""
         return rootlines + [(indent + line).rstrip() for line in lines]
 
@@ -421,7 +420,7 @@ class ConstraintSet(list, ReprMixin):
         lines = []
         root = "root" not in excluded
         if root:
-            excluded = also_excluding(excluded, "root")
+            excluded = self._root_scope(excluded)
             lines.append("\\begin{array}{ll} \\text{}")
             if hasattr(self, "_rootlatex"):
                 lines.append(self._rootlatex(excluded))
