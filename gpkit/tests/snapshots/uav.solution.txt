@@ -25,8 +25,8 @@
      ┃┃         ┛        ┣╸[2 terms]
  UAV╺┫┃         ┣╸SprintCondition╶⎨
      ┃┃         ┣╸R ≥ R_min
-     ┃┃         ┣╸Outbound.AircraftPerf.W ≥ UAV.Aircraft.W_zfw + Return.W_fuel
-     ┃┛         ┣╸Return.AircraftPerf.W ≥ UAV.Aircraft.W_zfw
+     ┃┃         ┣╸Outbound.AircraftPerf.W ≥ W_zfw + Return.W_fuel
+     ┃┛         ┣╸Return.AircraftPerf.W ≥ W_zfw
      ┃┓          ┓
      ┃┃          ┃
      ┃┃          ┣╸Wing╶⎨

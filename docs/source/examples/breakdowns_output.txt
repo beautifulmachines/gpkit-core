@@ -19,16 +19,16 @@ Variable breakdowns (note the two methods of access)
 
                            ┃┓           ┓
                            ┃┃           ┃
-                           ┃┣╸C_Di      ┣╸C_L²/UAV.Aircraft.Wing.A
+                           ┃┣╸C_Di      ┣╸WingAero.C_L²/A
                            ┃┃ (0.00565) ┃ (0.0169)
                            ┃┛           ┛
  Outbound.AircraftPerf.C_D╺┫┓
                   (0.0129) ┃┃
-                           ┃┣╸C_Dp
+                           ┃┣╸WingAero.C_Dp
                            ┃┃ (0.00555)
                            ┃┛
-                           ┃/┣╸UAV.Aircraft.Wing.S╶⎨
-                           ┃/┛ (29m²)
+                           ┃/┣╸S      ┣╸I_cap/t_cap
+                           ┃/┛ (29m²) ┛ (0.00447m⁴)
 
 
           ┃┓
@@ -41,16 +41,16 @@ Combining the two above by increasing maxwidth
 
                            ┃┓           ┓
                            ┃┃           ┃
-                           ┃┣╸C_Di      ┣╸C_L²/UAV.Aircraft.Wing.A
+                           ┃┣╸C_Di      ┣╸WingAero.C_L²/A
                            ┃┃ (0.00565) ┃ (0.0169)
                            ┃┛           ┛
  Outbound.AircraftPerf.C_D╺┫┓
                   (0.0129) ┃┃
-                           ┃┣╸C_Dp
+                           ┃┣╸WingAero.C_Dp
                            ┃┃ (0.00555)
                            ┃┛
-                           ┃/┣╸UAV.Aircraft.Wing.S╶⎨
-                           ┃/┛ (29m²)
+                           ┃/┣╸S      ┣╸I_cap/t_cap
+                           ┃/┛ (29m²) ┛ (0.00447m⁴)
 
 Model sensitivity breakdowns (note the two methods of access)
 ============================
@@ -66,8 +66,8 @@ Model sensitivity breakdowns (note the two methods of access)
      ┃┃         ┛        ┣╸[2 terms]
  UAV╺┫┃         ┣╸SprintCondition╶⎨
      ┃┃         ┣╸R ≥ R_min
-     ┃┃         ┣╸Outbound.AircraftPerf.W ≥ UAV.Aircraft.W_zfw + Return.W_fuel
-     ┃┛         ┣╸Return.AircraftPerf.W ≥ UAV.Aircraft.W_zfw
+     ┃┃         ┣╸Outbound.AircraftPerf.W ≥ W_zfw + Return.W_fuel
+     ┃┛         ┣╸Return.AircraftPerf.W ≥ W_zfw
      ┃┓          ┓
      ┃┃          ┃
      ┃┃          ┣╸Wing╶⎨
