@@ -21,8 +21,8 @@ from .ast_nodes import ExprNode, VarNode, variables_of, written_ast
 from .constraints.set import constraint_senss
 from .display.naming import DisplayScope
 from .display.render import TEXT, names_of, render_ast
+from .display.spelling import MUL
 from .units import DimensionalityError, qty
-from .util.repr_conventions import MUL
 from .varkey import VarKey
 
 # ---------------------------------------------------------------------------

@@ -18,10 +18,10 @@ from .constraints.set import (
 )
 from .display import DisplayScope
 from .display.render import LATEX, LATEX_ALIGNED, TEXT, render
+from .display.spelling import unitstr
 from .model import Model as _Model
 from .nomials.constraints import ArrayConstraint
 from .printing import _format_aligned_columns, _md_escape, _md_table
-from .util.repr_conventions import unitstr
 from .util.small_classes import Quantity
 from .varinfo import VarKind, classify_variables
 from .varmap import VarSet

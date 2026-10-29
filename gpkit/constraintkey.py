@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass, field
 
-from .util.repr_conventions import ReprMixin
+from .display.spelling import ReprMixin
 
 
 @dataclass(frozen=True, eq=False)

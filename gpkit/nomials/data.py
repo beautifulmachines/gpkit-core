@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from ..util.repr_conventions import ReprMixin
+from ..display.spelling import ReprMixin
 from ..varkey import VarKey
 from ..varmap import VarSet
 

@@ -7,8 +7,8 @@ import numpy as np
 
 from ..ast_nodes import ast_to_ir, written_ast
 from ..display.render import Rendered
+from ..display.spelling import ReprMixin
 from ..util.globals import NamedVariables
-from ..util.repr_conventions import ReprMixin
 
 
 class SingleEquationConstraint(Rendered, ReprMixin):
