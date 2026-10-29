@@ -9,11 +9,11 @@ import numpy as np
 from gpkit.constraints.set import constraint_senss
 from gpkit.display.naming import DisplayScope
 from gpkit.display.render import TEXT, render
+from gpkit.display.spelling import unitstr as get_unitstr
 from gpkit.nomials import Monomial, Posynomial
 from gpkit.nomials.map import NomialMap
 from gpkit.units import DimensionalityError
-from gpkit.util.repr_conventions import lineagestr
-from gpkit.util.repr_conventions import unitstr as get_unitstr
+from gpkit.util.lineage import lineagestr
 from gpkit.util.small_classes import FixedScalar, HashVector
 from gpkit.util.small_scripts import mag
 from gpkit.varkey import VarKey

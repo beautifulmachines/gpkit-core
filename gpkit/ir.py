@@ -1,8 +1,7 @@
 "The IR documents produced by Model.to_ir() and Solution.to_ir(), and diffs over them."
 
 from .exceptions import IRVersionError
-from .units import ureg
-from .util.repr_conventions import unitstr
+from .units import Quantity, ureg
 
 # One version for both documents, because a solution IR joins a model IR: two
 # numbers would admit pairings neither document could describe.
@@ -45,9 +44,15 @@ def ir_units(obj) -> str:
     - the display form substitutes a middle dot for products ("m⋅N"), and is
       platform-dependent besides
 
-    Display is unaffected: unitstr() formats from the live units, not from this.
+    Display spells units separately (display.spelling.unitstr), from the same
+    live units.
     """
-    return unitstr(obj, "%s", ":C")
+    if isinstance(getattr(obj, "units", None), Quantity):
+        obj = obj.units  # a nomial or VarKey, whose units are a Quantity
+    if not isinstance(obj, Quantity):
+        return ""
+    spelled = f"{obj.units:C}".replace(" ", "")
+    return "" if spelled == "dimensionless" else spelled
 
 
 def shown_whole(constraint) -> bool:

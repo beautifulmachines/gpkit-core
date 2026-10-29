@@ -14,7 +14,7 @@ import numpy as np
 
 from ..ast_nodes import expr, to_ast
 from ..display.render import Rendered
-from ..util.repr_conventions import ReprMixin
+from ..display.spelling import ReprMixin
 from ..util.small_classes import EMPTY_HV, HashVector, Numbers
 from .constraints import ArrayConstraint
 from .map import NomialMap

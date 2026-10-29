@@ -4,8 +4,9 @@ from dataclasses import dataclass, field, replace
 from typing import Any
 
 from .display.naming import DisplayScope, decorated, marks_vector
+from .display.spelling import ReprMixin, latexify, merge_subscript
 from .units import qty
-from .util.repr_conventions import ReprMixin, latexify, merge_subscript
+from .util.lineage import segments
 from .util.small_classes import Count
 
 
@@ -129,11 +130,7 @@ class VarKey(ReprMixin):
 
     def _compute_ref(self):
         "Canonical identity string: [lineage.]name[idx][#shape][|units]"
-        parts = []
-        if self.lineage:
-            parts.extend(f"{name}{num or ''}" for name, num in self.lineage)
-        parts.append(self.name)
-        ref = ".".join(parts)
+        ref = ".".join([*segments(self.lineage), self.name])
         if self.idx:
             ref += f"[{','.join(map(str, self.idx))}]"
         if self.shape:

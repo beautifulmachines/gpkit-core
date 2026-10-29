@@ -18,6 +18,7 @@ from gpkit import (
 from gpkit.constraintkey import ConstraintKey
 from gpkit.constraints.tight import Tight
 from gpkit.display.render import LATEX, render
+from gpkit.display.spelling import unitstr
 from gpkit.report import (
     CGroup,
     ReportSection,
@@ -31,7 +32,6 @@ from gpkit.report import (
     render_markdown,
     render_text,
 )
-from gpkit.util.repr_conventions import unitstr
 from gpkit.util.small_classes import Quantity
 from gpkit.varkey import VarKey
 

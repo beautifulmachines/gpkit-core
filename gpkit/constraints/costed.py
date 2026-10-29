@@ -5,8 +5,9 @@ from collections import namedtuple
 import numpy as np
 
 from ..display.render import LATEX, TEXT, render
+from ..display.spelling import unitstr
 from ..nomials import Variable
-from ..util.repr_conventions import lineagestr, unitstr
+from ..util.lineage import lineagestr
 from ..util.small_scripts import maybe_flatten
 from .set import ConstraintSet
 

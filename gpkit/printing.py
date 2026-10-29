@@ -9,9 +9,10 @@ import numpy as np
 
 from .display.naming import decorated
 from .display.render import TEXT, render_ir
+from .display.spelling import unitstr
 from .ir import diff_solutions, shown_whole
 from .units import Quantity
-from .util.repr_conventions import lineagestr, unitstr
+from .util.lineage import lineagestr
 
 Item = tuple[Any, Any]
 

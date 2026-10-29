@@ -7,9 +7,10 @@ import numpy as np
 from ..constraintkey import ConstraintKey
 from ..display.naming import DisplayScope
 from ..display.render import LATEX, TEXT, render
+from ..display.spelling import ReprMixin
 from ..nomials import NomialArray, Variable
 from ..nomials.constraints import ArrayConstraint
-from ..util.repr_conventions import ReprMixin, lineagestr
+from ..util.lineage import lineagestr
 from ..varmap import EMPTY_VARSET, Substitutions, VarSet
 
 

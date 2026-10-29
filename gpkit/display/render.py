@@ -23,7 +23,10 @@ from ..ast_nodes import (
     written_ast,
 )
 from ..units import ureg
-from ..util.repr_conventions import (
+from ..util.small_classes import Numbers
+from ..varkey import VarKey
+from .naming import DisplayScope
+from .spelling import (
     MUL,
     PI_STR,
     UNICODE_EXPONENTS,
@@ -31,9 +34,6 @@ from ..util.repr_conventions import (
     merge_subscript,
     unitstr,
 )
-from ..util.small_classes import Numbers
-from ..varkey import VarKey
-from .naming import DisplayScope
 
 # Operator precedence, loosest first.  A child is parenthesized when its
 # precedence is below what its position needs.  Unary minus is below a product:

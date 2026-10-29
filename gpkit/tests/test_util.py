@@ -7,13 +7,13 @@ import pytest
 
 import gpkit
 from gpkit import Variable, units
-from gpkit.util.build import build
-from gpkit.util.repr_conventions import (
+from gpkit.display.spelling import (
     MUL,
     extract_subscript,
     latexify,
     unitstr,
 )
+from gpkit.util.build import build
 from gpkit.util.small_classes import HashVector, SolverLog
 
 

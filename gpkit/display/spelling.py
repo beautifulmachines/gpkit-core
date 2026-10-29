@@ -1,8 +1,14 @@
-"Repository for representation standards"
+"""How gpkit spells things for a reader: glyphs, units, and LaTeX names.
+
+The platform's product, pi and exponent glyphs; units as text or LaTeX; a
+variable name as a LaTeX symbol; and ReprMixin, which gives gpkit objects their
+repr, str and notebook LaTeX.
+"""
 
 import sys
 
-from .small_classes import Quantity
+from ..util.lineage import lineagestr
+from ..util.small_classes import Quantity
 
 if sys.platform[:3] == "win":  # pragma: no cover
     MUL = "*"
@@ -14,19 +20,6 @@ else:  # pragma: no cover
     PI_STR = "π"
     UNICODE_EXPONENTS = True
     UNIT_FORMATTING = ":P~"
-
-
-def lineagestr(lineage, modelnums=True):
-    "Returns properly formatted lineage string"
-    if not isinstance(lineage, tuple):
-        lineage = getattr(lineage, "lineage", None)
-    return (
-        ".".join(
-            [f"{name}{num}" if (num and modelnums) else name for name, num in lineage]
-        )
-        if lineage
-        else ""
-    )
 
 
 def unitstr(units, into="%s", options=UNIT_FORMATTING, dimless=""):

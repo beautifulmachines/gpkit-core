@@ -12,7 +12,8 @@ from ipywidgets import Layout
 from .. import GPCOLORS, Model
 from ..constraints import ArrayConstraint
 from ..display.render import TEXT, render
-from ..repr_conventions import lineagestr, unitstr
+from ..display.spelling import unitstr
+from ..util.lineage import lineagestr
 from ..varmap import display_names
 
 INSENSITIVE = 1e-2

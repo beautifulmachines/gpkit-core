@@ -28,7 +28,7 @@ from ..exceptions import (
 from ..nomials.map import DIMLESS_QUANTITY
 from ..solutions import MarginSolution, Sensitivities, Solution, SolveStatus
 from ..solvers import default_solver
-from ..util.repr_conventions import lineagestr
+from ..util.lineage import lineagestr
 from ..util.small_classes import CootMatrix, FixedScalar, Numbers, SolverLog
 from ..util.small_scripts import appendsolwarning
 from ..varmap import VarMap

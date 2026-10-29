@@ -25,16 +25,9 @@ from collections import defaultdict
 from dataclasses import dataclass, replace
 from functools import lru_cache
 
-from ..util.repr_conventions import latexify, merge_subscript
-
-Lineage = tuple[tuple[str, int], ...]
-
-
-def _segments(lineage: Lineage, modelnums: bool = True) -> list[str]:
-    "Lineage tuple -> display segments, e.g. Aircraft, Wing2."
-    return [
-        f"{name}{num}" if (num and modelnums) else name for name, num in lineage or ()
-    ]
+from ..util.lineage import Lineage
+from ..util.lineage import segments as _segments
+from .spelling import latexify, merge_subscript
 
 
 def latex_path_label(names) -> str:
