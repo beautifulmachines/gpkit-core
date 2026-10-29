@@ -39,7 +39,7 @@ class VarEntry:
 
     key: "VarKey"  # noqa: F821
     name: str  # display name, relative to this section's scope
-    latex: str  # LaTeX rendering (from VarKey.latex())
+    latex: str  # LaTeX rendering (from DisplayScope.latex)
     value: Any  # float | ndarray | None — never a pint Quantity
     sensitivity: float | None  # shadow price from solution, or None
     units: str  # unit string
@@ -199,8 +199,8 @@ def _make_var_entry(info, scope, source="") -> VarEntry:
     "Render a VarInfo against scope, keeping the key it was built from."
     return VarEntry(
         key=info.key,
-        name=info.key.str_without(scope),
-        latex=info.key.latex(scope),
+        name=scope.text(info.key),
+        latex=scope.latex(info.key),
         value=_entry_datum(info.values),
         sensitivity=_entry_datum(info.sensitivities),
         units=unitstr(info.key) or "-",

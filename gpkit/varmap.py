@@ -4,7 +4,6 @@ from collections.abc import MutableMapping
 
 import numpy as np
 
-from .display.naming import DisplayScope
 from .units import Quantity, qty
 from .util.small_scripts import veclinkedfn
 
@@ -343,14 +342,3 @@ class Substitutions(VarMap):
         elif callable(value) and is_veckey(key):
             value = _elementwise_linked(key, value)
         super().__setitem__(key, value)
-
-
-def display_names(varkeys, excluded=()):
-    """{VarKey: its shortest unambiguous name among varkeys}.
-
-    excluded is the format flags ("units", "idx", ...) the names are spelled
-    with.
-    """
-    varkeys = list(varkeys)
-    scope = DisplayScope(shown=varkeys, excluded=excluded)
-    return {vk: vk.str_without(scope) for vk in varkeys}

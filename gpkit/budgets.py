@@ -60,7 +60,7 @@ def _format_term_label(exp, coeff, scope):
     if abs(coeff - 1.0) > 1e-10:
         parts.append(f"{coeff:.4g}")
     for vk, pow_ in exp.items():
-        name = vk.str_without(scope)
+        name = scope.text(vk)
         parts.append(name if pow_ == 1 else f"{name}^{pow_:.4g}")
     return MUL.join(parts) if parts else f"{coeff:.4g}"
 
@@ -269,7 +269,7 @@ class Budget:
         When the budget contains any growth allowance, two extra columns
         (Nominal and Growth) appear before the totals column.
         """
-        top_label = self.top_vk.str_without(_FULL_PATH)
+        top_label = _FULL_PATH.text(self.top_vk)
         header = f"Budget  —  {top_label}"
         if self._show_growth_columns():
             return _render_growth_text(self, top_label, header)
@@ -277,7 +277,7 @@ class Budget:
 
     def markdown(self) -> str:
         """Return a GitHub-flavored markdown budget table."""
-        top_label = self.top_vk.str_without(_FULL_PATH)
+        top_label = _FULL_PATH.text(self.top_vk)
         if self._show_growth_columns():
             lines = [
                 "| Component | Nominal | Growth | Total | Units | Fraction |",
@@ -552,9 +552,7 @@ def _process_term(top_vk, term, ctx):
             units=ctx.level_units,
         )
     (child_vk,) = term.exp.keys()
-    label = (
-        term.ast_label if term.ast_label is not None else child_vk.str_without(scope)
-    )
+    label = term.ast_label if term.ast_label is not None else scope.text(child_vk)
     # Render in the variable's own declared units when they differ from
     # the parent's level units.
     units = child_vk.unitrepr if child_vk.unitrepr != "-" else ctx.level_units

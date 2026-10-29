@@ -27,28 +27,13 @@ from functools import lru_cache
 
 from ..util.lineage import Lineage
 from ..util.lineage import segments as _segments
+from ..varkey import decorated, marks_vector
 from .spelling import latexify, merge_subscript
 
 
 def latex_path_label(names) -> str:
     "Model names as latex subscript content; a class name may hold `_`, escaped."
     return ",".join(r"\text{%s}" % n.lower().replace("_", r"\_") for n in names)
-
-
-def marks_vector(idx, shape, excluded) -> bool:
-    'Whether a name displays as a whole vector: "[:]" in text, bold in latex.'
-    return bool(shape) and not idx and "vec" not in excluded and "idx" not in excluded
-
-
-def decorated(name: str, idx=None, shape=(), excluded=()) -> str:
-    "name with the index suffix a vector element or vector parent displays."
-    if "idx" in excluded:
-        return name
-    if idx:
-        return name + f"[{','.join(map(str, idx))}]"
-    if marks_vector(idx, shape, excluded):
-        return name + "[:]"
-    return name
 
 
 def _kept(path: Lineage, depth: int) -> Lineage:
@@ -207,13 +192,31 @@ class DisplayScope:
             return ""
         return latex_path_label(_segments(self.path(key), modelnums=False))
 
-    def latex(self, vk) -> str:
-        """Latex name for vk, path in the subscript.
+    def text(self, vk) -> str:
+        "vk as a reader sees it in text: its name, then its index or [:]."
+        return decorated(self.name(vk), vk.idx, vk.shape, self)
 
-        The subscript is latex's prefix slot, so this composes in ``name``'s
-        order: path, name, then the index the caller appends.
+    def latex(self, vk) -> str:
+        """vk as a reader sees it in LaTeX, composed in the order text uses.
+
+        Path and index share the subscript, latex's prefix slot, in the order
+        text writes them -- so `Spar.c[1]` sets as {c}_{spar,1}.  A whole vector
+        is set bold where text writes "[:]"; an element is a scalar, identified
+        by its index instead.
         """
-        key = vk.veckey or vk
-        name = latexify(key.name)
-        sub = self.latex_path(key)
-        return merge_subscript(name, sub) if sub else name
+        name = latexify(vk.name, marks_vector(vk.idx, vk.shape, self.excluded))
+        parts = [p for p in (self.latex_path(vk),) if p]
+        if vk.idx and "idx" not in self.excluded:
+            parts.append(",".join(map(str, vk.idx)))
+        return merge_subscript(name, ",".join(parts)) if parts else name
+
+
+def display_names(varkeys, excluded=()) -> dict:
+    """{VarKey: its shortest unambiguous name among varkeys}.
+
+    excluded is the format flags ("units", "idx", ...) the names are spelled
+    with.
+    """
+    varkeys = list(varkeys)
+    scope = DisplayScope(shown=varkeys, excluded=excluded)
+    return {vk: scope.text(vk) for vk in varkeys}

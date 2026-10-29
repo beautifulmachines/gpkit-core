@@ -3,15 +3,29 @@
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from .display.naming import DisplayScope, decorated, marks_vector
-from .display.spelling import ReprMixin, latexify, merge_subscript
 from .units import qty
-from .util.lineage import segments
+from .util.lineage import lineagestr, segments
 from .util.small_classes import Count
 
 
+def marks_vector(idx, shape, excluded) -> bool:
+    'Whether a name stands for a whole vector: "[:]" in text, bold in latex.'
+    return bool(shape) and not idx and "vec" not in excluded and "idx" not in excluded
+
+
+def decorated(name: str, idx=None, shape=(), excluded=()) -> str:
+    "name with the index suffix a vector element or vector parent is written with."
+    if "idx" in excluded:
+        return name
+    if idx:
+        return name + f"[{','.join(map(str, idx))}]"
+    if marks_vector(idx, shape, excluded):
+        return name + "[:]"
+    return name
+
+
 @dataclass(frozen=True, eq=False)
-class VarKey(ReprMixin):
+class VarKey:
     """An object to correspond to each 'variable name'.
 
     Arguments
@@ -82,9 +96,9 @@ class VarKey(ReprMixin):
         object.__setattr__(self, "ref", ref)
         object.__setattr__(self, "_hashvalue", hash(ref))
 
-        # Compute keys set
-        fullstr = self.str_without({"modelnums", "vec"})
-        keys = {self.name, fullstr}
+        # The strings a lookup may name this key by (VarSet.resolve)
+        path = self._path(modelnums=False)
+        keys = {self.name, decorated(path, self.idx, self.shape, {"vec"})}
 
         # Auto-create veckey if idx is set but veckey is not
         if self.idx is not None:
@@ -93,7 +107,7 @@ class VarKey(ReprMixin):
                 object.__setattr__(self, "veckey", vk)
             else:
                 keys.add(self.veckey)
-                keys.add(self.str_without({"idx", "modelnums"}))
+                keys.add(path)
 
         object.__setattr__(self, "keys", frozenset(keys))
 
@@ -121,12 +135,19 @@ class VarKey(ReprMixin):
         for name in self.__dataclass_fields__:
             object.__setattr__(self, name, getattr(new_vk, name))
 
-    def str_without(self, excluded=()):
-        "This key's name as a scope (or a bare flag set, naming full paths) gives it."
-        scope = DisplayScope.of(excluded)
-        return decorated(scope.name(self), self.idx, self.shape, scope)
+    def _path(self, modelnums=True):
+        "The full dotted path to this key's name: Aircraft.Wing.S."
+        return ".".join([*segments(self.lineage, modelnums), self.name])
 
-    __repr__ = str_without
+    def __str__(self):
+        "The full path and index, Aircraft.Wing.c[1]; display.naming names it in context."
+        return decorated(self._path(), self.idx, self.shape)
+
+    __repr__ = __str__
+
+    def lineagestr(self, modelnums=True):
+        "The dotted path to the model this key belongs to."
+        return lineagestr(self.lineage, modelnums)
 
     def _compute_ref(self):
         "Canonical identity string: [lineage.]name[idx][#shape][|units]"
@@ -167,21 +188,6 @@ class VarKey(ReprMixin):
         if not self.lineage:
             return ()
         return next(zip(*self.lineage))
-
-    def latex(self, excluded=()):
-        """Latex name composed in the same order str_without uses.
-
-        Both parts share the subscript, latex's prefix slot, in the order text
-        writes them: path first, then index -- so `Spar.c[1]` sets as
-        {c}_{spar,1}.  A whole vector is set bold where text writes "[:]"; an
-        element is a scalar, identified by its index instead.
-        """
-        scope = DisplayScope.of(excluded)
-        name = latexify(self.name, marks_vector(self.idx, self.shape, scope.excluded))
-        parts = [p for p in (scope.latex_path(self),) if p]
-        if self.idx and "idx" not in scope.excluded:
-            parts.append(",".join(map(str, self.idx)))
-        return merge_subscript(name, ",".join(parts)) if parts else name
 
     def __eq__(self, other):
         if isinstance(other, str):

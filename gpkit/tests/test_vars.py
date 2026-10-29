@@ -17,8 +17,12 @@ from gpkit import (
     Vectorize,
     VectorVariable,
 )
+from gpkit.display.naming import DisplayScope
+from gpkit.display.spelling import latex_unitstr
 from gpkit.nomials import Variable as PlainVariable
 from gpkit.tools import te_exp_minus1
+
+_FULL = DisplayScope()  # names every variable by its full path
 
 
 class TestVarKey:
@@ -44,12 +48,12 @@ class TestVarKey:
         assert x.name == "x"
         with pytest.raises(TypeError):
             VarKey("x", name="y")
-        assert isinstance(x.latex(), str)
-        assert isinstance(x.latex_unitstr(), str)
+        assert isinstance(_FULL.latex(x), str)
+        assert isinstance(latex_unitstr(x), str)
         # an element is a scalar: its index, not bold
         y = VectorVariable(2, "y")
-        assert y.key.latex() == r"\boldsymbol{y}"
-        assert y[0].key.latex() == "{y}_{0}"
+        assert _FULL.latex(y.key) == r"\boldsymbol{y}"
+        assert _FULL.latex(y[0].key) == "{y}_{0}"
 
     def test_ast(self):
         if sys.platform[:3] == "win":  # pragma: no cover
@@ -492,39 +496,27 @@ class TestArrayArithmeticAsWritten:
 
 
 class TestVarKeyLatex:
-    """Tests for VarKey.latex() Greek/subscript auto-conversion."""
+    """A variable's LaTeX name: Greek and subscript auto-conversion."""
 
     def test_varkey_latex_greek(self):
-        """VarKey('rho').latex() returns string containing \\rho."""
-        vk = VarKey("rho")
-        result = vk.latex()
-        assert "\\rho" in result
-
-        vk2 = VarKey("alpha")
-        result2 = vk2.latex()
-        assert "\\alpha" in result2
+        """rho sets as \\rho."""
+        assert "\\rho" in _FULL.latex(VarKey("rho"))
+        assert "\\alpha" in _FULL.latex(VarKey("alpha"))
 
     def test_varkey_latex_underscore(self):
-        """VarKey('m_wet').latex() returns string containing m_{\\text{wet}}."""
-        vk = VarKey("m_wet")
-        result = vk.latex()
-        assert "m_{\\text{wet}}" in result
+        """m_wet sets as m_{\\text{wet}}."""
+        assert "m_{\\text{wet}}" in _FULL.latex(VarKey("m_wet"))
 
     def test_varkey_latex_recursive(self):
-        """VarKey('rho_inf').latex() returns string containing \\rho_{\\infty}."""
-        vk = VarKey("rho_inf")
-        result = vk.latex()
-        assert "\\rho_{\\infty}" in result
+        """rho_inf sets as \\rho_{\\infty}."""
+        assert "\\rho_{\\infty}" in _FULL.latex(VarKey("rho_inf"))
 
     def test_varkey_latex_already_escaped(self):
-        """VarKey('\\\\rho').latex() does NOT double-escape (no '\\\\\\\\rho')."""
-        vk = VarKey("\\rho")
-        result = vk.latex()
+        """A name written in LaTeX is not escaped again."""
+        result = _FULL.latex(VarKey("\\rho"))
         assert "\\\\rho" not in result
         assert "\\rho" in result
 
     def test_varkey_latex_plain(self):
-        """VarKey('x').latex() returns 'x' — no Greek, no underscore, unchanged."""
-        vk = VarKey("x")
-        result = vk.latex()
-        assert result == "x"
+        """x — no Greek, no underscore — sets unchanged."""
+        assert _FULL.latex(VarKey("x")) == "x"
