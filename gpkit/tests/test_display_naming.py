@@ -340,14 +340,7 @@ class TestFormatFlags:
         )
 
     @pytest.mark.parametrize(
-        "method",
-        [
-            render,
-            ConstraintSet.str_without,
-            ConstraintSet.latex,
-            VarKey.str_without,
-            VarKey.latex,
-        ],
+        "method", [render, ConstraintSet.str_without, ConstraintSet.latex]
     )
     def test_default_excluded_is_a_flag_collection(self, method):
         """`excluded` holds whole flags, so a bare string is never a valid value:
@@ -359,42 +352,38 @@ class TestFormatFlags:
         assert DisplayScope.of(default).excluded == set(default)
 
 
-class TestVarKeyComposition:
-    """VarKey.str_without/latex accept a scope and compose path + name + idx."""
+class TestFullSpelling:
+    """A scope spells a variable whole: path, name, then index or vector mark."""
 
-    def test_str_without_uses_the_scope(self):
+    def test_text_uses_the_scope(self):
         t = VarKey("t", lineage=SPAR)
-        scope = DisplayScope(anchor=WING, shown=[t])
-        assert t.str_without(scope) == "t"
-        assert t.str_without({"units"}) == "Aircraft.Wing.Spar.t"
+        assert DisplayScope(anchor=WING, shown=[t]).text(t) == "t"
+        assert DisplayScope().text(t) == "Aircraft.Wing.Spar.t"
 
     def test_vector_parent_gets_a_slice_suffix(self):
         c = VarKey("c", lineage=SPAR, shape=(3,))
-        scope = DisplayScope(anchor=WING, shown=[c])
-        assert c.str_without(scope) == "c[:]"
+        assert DisplayScope(anchor=WING, shown=[c]).text(c) == "c[:]"
 
     def test_vector_element_gets_its_index(self):
         veckey = VarKey("c", lineage=SPAR, shape=(3,))
         el = VarKey("c", lineage=SPAR, shape=(3,), idx=(1,), veckey=veckey)
-        scope = DisplayScope(anchor=WING, shown=[el])
-        assert el.str_without(scope) == "c[1]"
+        assert DisplayScope(anchor=WING, shown=[el]).text(el) == "c[1]"
 
     def test_idx_flag_suppresses_the_suffix(self):
         veckey = VarKey("c", lineage=SPAR, shape=(3,))
         el = VarKey("c", lineage=SPAR, shape=(3,), idx=(1,), veckey=veckey)
         scope = DisplayScope(anchor=WING, shown=[el], excluded={"idx"})
-        assert el.str_without(scope) == "c"
+        assert scope.text(el) == "c"
 
     def test_latex_puts_the_path_in_the_subscript(self):
         spar_t = VarKey("t", lineage=SPAR)
         skin_t = VarKey("t", lineage=WING + (("Skin", 0),))
         scope = DisplayScope(anchor=WING, shown=[spar_t, skin_t])
-        assert spar_t.latex(scope) == r"{t}_{\text{spar}}"
+        assert scope.latex(spar_t) == r"{t}_{\text{spar}}"
 
     def test_latex_vector_parent_is_bold(self):
         c = VarKey("c", lineage=SPAR, shape=(3,))
-        scope = DisplayScope(anchor=SPAR, shown=[c])
-        assert c.latex(scope) == r"\boldsymbol{c}"
+        assert DisplayScope(anchor=SPAR, shown=[c]).latex(c) == r"\boldsymbol{c}"
 
     def test_latex_element_index_ends_the_subscript(self):
         """Index follows the path in latex, as it follows the name in text."""
@@ -402,13 +391,13 @@ class TestVarKeyComposition:
         el = VarKey("c", lineage=SPAR, shape=(3,), idx=(1,), veckey=veckey)
         other = VarKey("c", lineage=WING + (("Skin", 0),))  # collide, so Spar shows
         scope = DisplayScope(anchor=WING, shown=[el, other])
-        assert el.latex(scope) == r"{c}_{\text{spar},1}"
+        assert scope.latex(el) == r"{c}_{\text{spar},1}"
 
     def test_unscoped_latex_also_ends_with_the_index(self):
-        "latex() without a scope composes path then index, as latex(scope) does."
+        "A scope naming full paths composes path then index too."
         veckey = VarKey("c", lineage=SPAR, shape=(3,))
         el = VarKey("c", lineage=SPAR, shape=(3,), idx=(1,), veckey=veckey)
-        assert el.latex().endswith(r"\text{spar},1}")
+        assert DisplayScope().latex(el).endswith(r"\text{spar},1}")
 
     def test_latex_escapes_an_underscore_in_a_model_name(self):
         "A class name may hold `_`, which latex would read as a subscript."
@@ -416,13 +405,20 @@ class TestVarKeyComposition:
             r"\text{aircraft},\text{\_wing}"
         )
         S = VarKey("S", lineage=(("_Wing", 0),))
-        assert S.latex() == r"{S}_{\text{\_wing}}"
+        assert DisplayScope().latex(S) == r"{S}_{\text{\_wing}}"
 
     def test_latex_and_text_agree_on_ordering(self):
         """Both formats read path, then name, then index."""
         veckey = VarKey("c", lineage=TANK, shape=(2,))
         el = VarKey("c", lineage=TANK, shape=(2,), idx=(0,), veckey=veckey)
         scope = DisplayScope(anchor=WING, shown=[el])
-        assert el.str_without(scope) == "Aircraft.Fuselage.Tank.c[0]"
+        assert scope.text(el) == "Aircraft.Fuselage.Tank.c[0]"
         expected = r"{c}_{\text{aircraft},\text{fuselage},\text{tank},0}"
-        assert el.latex(scope) == expected
+        assert scope.latex(el) == expected
+
+    def test_a_keys_own_str_is_its_full_path(self):
+        "A key's own str names it in full, as a scope naming full paths does."
+        veckey = VarKey("c", lineage=SPAR, shape=(3,))
+        el = VarKey("c", lineage=SPAR, shape=(3,), idx=(1,), veckey=veckey)
+        for vk in (veckey, el):
+            assert str(vk) == DisplayScope().text(vk)

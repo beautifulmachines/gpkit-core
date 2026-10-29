@@ -227,9 +227,7 @@ def render(obj, fmt, excluded=()):
         left, right = (render(side, fmt, sides) for side in (obj.left, obj.right))
         return f"{left} {fmt.relation(obj.oper)} {right}"
     if isinstance(obj, VarKey):  # a vector constraint's side is its vector's key
-        return (
-            obj.latex(excluded) if isinstance(fmt, Latex) else obj.str_without(excluded)
-        )
+        return _variable(obj, fmt, excluded)
     if isinstance(obj, np.ndarray):
         return _array(obj, fmt, excluded)
     if hasattr(obj, "hmap"):
@@ -274,19 +272,24 @@ def render_ast(node, fmt, names, unit_literals=True):
     return _Render(fmt, names, unit_literals)(node)[0]
 
 
+def _variable(vk, fmt, scope):
+    "A variable as fmt spells it, named as scope says."
+    return scope.latex(vk) if isinstance(fmt, Latex) else scope.text(vk)
+
+
 def names_of(variables, fmt, excluded):
-    "names(ref) for {ref: VarKey}: each VarKey named as it names itself."
-    if isinstance(fmt, Latex):
-        return lambda ref: variables[ref].latex(excluded)
-    return lambda ref: variables[ref].str_without(excluded)
+    "names(ref) for {ref: VarKey}: each named as excluded's scope says."
+    scope = DisplayScope.of(excluded)
+    return lambda ref: _variable(variables[ref], fmt, scope)
 
 
 def _nomial(nomial, fmt, excluded):
     "A nomial as written, or from its terms, then its units unless excluded."
-    latex = isinstance(fmt, Latex)
     if hasattr(nomial, "key"):  # a variable, whose name LaTeX gives no units
-        name = nomial.key.latex(excluded) if latex else nomial.key.str_without(excluded)
-        return name if latex else name + _units_suffix(nomial, fmt, excluded)
+        name = _variable(nomial.key, fmt, excluded)
+        if isinstance(fmt, Latex):
+            return name
+        return name + _units_suffix(nomial, fmt, excluded)
     units = _units_suffix(nomial, fmt, excluded)
     variables = variables_of(nomial)
     names = names_of(variables, fmt, excluded)
@@ -322,9 +325,9 @@ def _array(array, fmt, excluded):
             return render_ast(tree, fmt, names_of(variables, fmt, excluded))
     if hasattr(array, "key"):  # a vector variable
         if not latex:
-            return array.key.str_without(excluded)
+            return _variable(array.key, fmt, excluded)
         units = array.latex_unitstr() if "units" not in excluded else ""
-        return array.key.latex(excluded) + units
+        return _variable(array.key, fmt, excluded) + units
     if latex:
         joined = ", ".join(render(el, fmt, excluded) for el in array.flat)
         return rf"\left[{joined}\right]"

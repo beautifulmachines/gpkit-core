@@ -16,6 +16,7 @@ from ..constraints.set import (
     solver_constraints,
     walk_owned,
 )
+from ..display.spelling import unitstr
 from ..exceptions import (
     DualInfeasible,
     Infeasible,
@@ -757,7 +758,7 @@ class GeometricProgram:
                 if c_val:
                     const_senss[vk] /= c_val
 
-        units = plus_vk.unitstr() if plus_vk.units else ""
+        units = unitstr(plus_vk) if plus_vk.units else ""
         return MarginSolution(
             name=margin_obj.name,
             value=plus_val - minus_val,

@@ -14,6 +14,7 @@ from .ast_nodes import PiNode as _PiNode
 from .constraints.costed import Objective
 from .constraints.set import ConstraintSet
 from .constraints.sigeq import SignomialEquality
+from .display.naming import display_names
 from .margin_objective import MarginObjective
 from .model import Model
 from .nomials import (
@@ -33,6 +34,5 @@ from .util.build import build
 from .util.globals import NamedVariables, SignomialsEnabled, Vectorize, settings
 from .var import Var
 from .varkey import VarKey
-from .varmap import display_names
 
 pi = Monomial(_np.pi, ast=_PiNode())

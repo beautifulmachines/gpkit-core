@@ -4,13 +4,9 @@ import numpy as np
 import pytest
 
 from gpkit import Model, Variable, VectorVariable, units, ureg
+from gpkit.display.naming import display_names
 from gpkit.varkey import VarKey
-from gpkit.varmap import (
-    Substitutions,
-    VarMap,
-    VarSet,
-    display_names,
-)
+from gpkit.varmap import Substitutions, VarMap, VarSet
 
 
 @pytest.fixture(name="vm")

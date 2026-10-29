@@ -291,7 +291,7 @@ class Model(CostedConstraintSet):
                 cls = self.__class__.__name__
                 raise AmbiguousVariable(
                     f"'{name}' is ambiguous in {cls}: "
-                    f"{sorted(vk.str_without() for vk in matches)}"
+                    f"{sorted(str(vk) for vk in matches)}"
                 )
             return Variable(next(iter(matches)))
         # Dotted path: first segment is child attribute name

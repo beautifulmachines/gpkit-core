@@ -41,8 +41,12 @@ layers =
     # Variable containers (VarMap, VarSet) — depends on varkey
     gpkit.varmap
 
-    # Variable identity and display context (VarKey, lineage_display_context)
-    gpkit.varkey
+    # Naming, spelling and rendering for a reader; nothing below may import it,
+    # so identity never depends on how it is shown (#319)
+    gpkit.display
+
+    # Identity: of variables (VarKey) and of constraints (ConstraintKey)
+    gpkit.varkey | gpkit.constraintkey
 
     # Utilities (including globals, build)
     gpkit.util

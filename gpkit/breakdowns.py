@@ -921,7 +921,7 @@ def get_keystr(key, solution, scope):  # noqa: ARG001
     "Returns formatted string of the key in solution, named as scope says."
     unitless = scope.also_excluding("units")
     if isinstance(key, VarKey):
-        out = key.str_without(unitless)
+        out = unitless.text(key)
     elif isinstance(key, tuple):
         out = "[%i terms]" % len(key)
     else:
@@ -946,8 +946,8 @@ def get_valstr(key, solution, into="%s"):
     else:
         valuestr = "%-.3g" % mag(value)
     # get unitstr
-    if hasattr(key, "unitstr"):
-        unitstr = key.unitstr()
+    if hasattr(key, "units"):  # a variable or a nomial, not a tuple of terms
+        unitstr = get_unitstr(key)
     else:
         try:
             if hasattr(value, "units"):

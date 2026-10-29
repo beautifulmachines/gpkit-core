@@ -6,10 +6,12 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from . import printing
+from .display.naming import display_names
+from .display.spelling import unitstr
 from .ir import IR_VERSION, diff_solutions, ir_units
 from .units import Quantity
 from .varkey import VarKey
-from .varmap import VarMap, display_names
+from .varmap import VarMap
 
 
 class SolveStatus(StrEnum):
@@ -120,7 +122,7 @@ class MarginSolution:
         names = display_names([vk for vk, _ in items])
         for vk, s in items:
             if self.units and vk.units:
-                c_units = vk.unitstr()
+                c_units = unitstr(vk)
                 c_fmt = f"({c_units})" if "/" in c_units else c_units
                 su = f" {self.units}/{c_fmt}"
             else:

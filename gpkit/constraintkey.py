@@ -2,11 +2,9 @@
 
 from dataclasses import dataclass, field
 
-from .display.spelling import ReprMixin
-
 
 @dataclass(frozen=True, eq=False)
-class ConstraintKey(ReprMixin):
+class ConstraintKey:
     """Identifies one constraint by where it sits in a model.
 
     The constraint counterpart of VarKey, and the same shape: a path to the
@@ -74,6 +72,9 @@ class ConstraintKey(ReprMixin):
 
     def __str__(self):
         return self.ref
+
+    def __repr__(self):
+        return f"gpkit.ConstraintKey({self})"
 
     def to_ir(self):
         "Serialize this ConstraintKey to an IR dict."

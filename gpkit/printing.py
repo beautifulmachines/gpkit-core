@@ -7,12 +7,12 @@ from typing import Any
 
 import numpy as np
 
-from .display.naming import decorated
 from .display.render import TEXT, render_ir
 from .display.spelling import unitstr
 from .ir import diff_solutions, shown_whole
 from .units import Quantity
 from .util.lineage import lineagestr
+from .varkey import decorated
 
 Item = tuple[Any, Any]
 
