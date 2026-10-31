@@ -1,4 +1,4 @@
-"""Tests for gpkit/report.py: ReportSection IR, build_report_ir(), model.report()"""
+"""Tests for the model view, its report renderers, and model.report()"""
 
 import json
 from typing import ClassVar
@@ -18,19 +18,21 @@ from gpkit import (
 from gpkit.constraintkey import ConstraintKey
 from gpkit.constraints.tight import Tight
 from gpkit.display.render import LATEX, render
-from gpkit.display.spelling import unitstr
-from gpkit.report import (
-    CGroup,
-    ReportSection,
-    VarEntry,
-    _build_constraint_groups,
+from gpkit.display.report import (
     _fmt_value,
-    _md_escape,
     _md_var_table,
-    _serialize_value,
-    build_report_ir,
     render_markdown,
     render_text,
+)
+from gpkit.display.spelling import unitstr
+from gpkit.display.tables import _md_escape
+from gpkit.model_view import (
+    CGroup,
+    ModelView,
+    VarEntry,
+    _build_constraint_groups,
+    _serialize_value,
+    model_view,
 )
 from gpkit.util.small_classes import Quantity
 from gpkit.varkey import VarKey
@@ -108,13 +110,13 @@ class TestVariableRowsAreJoinable:
             return [self.x >= self.q.sum() + self.v.sum() + self.c]
 
     def test_entries_carry_their_varkey(self):
-        ir = build_report_ir(self.Mixed())
+        ir = model_view(self.Mixed())
         for entry in _all_vars(ir):
             assert isinstance(entry.key, VarKey)
 
     def test_a_vector_row_carries_the_veckey(self):
         "Only elements hold solved values, so the row has to say which vector."
-        ir = build_report_ir(self.Mixed())
+        ir = model_view(self.Mixed())
         q = next(e for e in _all_vars(ir) if e.key.name == "q")
         assert q.key.shape == (3,) and q.key.idx is None
 
@@ -128,13 +130,13 @@ class TestVariableRowsAreJoinable:
 
     def test_a_wholly_fixed_vector_is_reported_fixed(self):
         "No substitution sits on the veckey; the kind has to come from elements."
-        ir = build_report_ir(self.Mixed())
+        ir = model_view(self.Mixed())
         assert {e.key.name for e in ir.fixed_variables} == {"c", "q"}
         assert {e.key.name for e in ir.free_variables} == {"x", "v"}
 
 
 class TestReportDataclasses:
-    """Tests for VarEntry, CGroup, and ReportSection dataclasses."""
+    """Tests for VarEntry, CGroup, and ModelView dataclasses."""
 
     def test_var_entry_in_report(self):
         """VarEntry holds name, latex, value, sensitivity, units, label fields."""
@@ -164,7 +166,7 @@ class TestReportDataclasses:
         assert not isinstance(cg.constraints[0], str)
 
     def test_report_section_dataclass(self):
-        """ReportSection has all required fields."""
+        """ModelView has all required fields."""
         ve = VarEntry(
             key=VarKey(name="x"),
             name="x",
@@ -175,7 +177,7 @@ class TestReportDataclasses:
             label="",
         )
         cg = CGroup(label="", constraints=[], keys=[])
-        rs = ReportSection(
+        rs = ModelView(
             title="Wing",
             description="Wing structural model",
             assumptions=["thin airfoil"],
@@ -193,7 +195,7 @@ class TestReportDataclasses:
         assert not rs.children
 
     def test_report_section_to_dict(self):
-        """ReportSection.to_dict() returns a JSON-serializable dict."""
+        """ModelView.to_dict() returns a JSON-serializable dict."""
         ve = VarEntry(
             key=VarKey(name="x", units="m"),
             name="x",
@@ -207,7 +209,7 @@ class TestReportDataclasses:
         cg = CGroup(
             label="Aero", constraints=[x_test >= 1], keys=[ConstraintKey(index=0)]
         )
-        rs = ReportSection(
+        rs = ModelView(
             title="Fuselage",
             description="fuselage drag model",
             assumptions=[],
@@ -231,7 +233,7 @@ class TestReportDataclasses:
         cg = CGroup(
             label="Raw", constraints=[("x", ">=", "1")], keys=[ConstraintKey(index=0)]
         )
-        rs = ReportSection(
+        rs = ModelView(
             title="T",
             description="",
             assumptions=[],
@@ -258,7 +260,7 @@ class TestReportDataclasses:
                 return {"group": [x >= 1]}
 
         m = _AbbrParent()
-        ir = build_report_ir(m)
+        ir = model_view(m)
         child_ir = ir.children[0]
         d = child_ir.to_dict()
         cg = d["constraint_groups"][0]
@@ -297,7 +299,7 @@ class TestConstraintEntries:
     def test_latex_names_variables_like_str(self):
         "Both forms come from the section's scope, so they name variables alike."
         m = _IdParent()
-        child_ir = build_report_ir(m).children[0]
+        child_ir = model_view(m).children[0]
         raw = [
             render(c, LATEX)
             for cg in child_ir.constraint_groups
@@ -340,14 +342,14 @@ class TestConstraintEntries:
         assert len({e["key"] for e in entries}) == len(entries)
 
 
-# ── build_report_ir() ────────────────────────────────────────────────────────
+# ── model_view() ────────────────────────────────────────────────────────
 
 
 class TestBuildReportIR:
-    """Tests for build_report_ir() tree traversal."""
+    """Tests for model_view() tree traversal."""
 
-    def test_build_report_ir_simple(self):
-        """build_report_ir(simple_model) returns ReportSection with title=class name."""
+    def test_model_view_simple(self):
+        """model_view(simple_model) returns ModelView with title=class name."""
 
         class _RSSimple(Model):
             """A simple test model."""
@@ -357,14 +359,14 @@ class TestBuildReportIR:
                 return [x >= 1]
 
         m = _RSSimple()
-        ir = build_report_ir(m)
-        assert isinstance(ir, ReportSection)
+        ir = model_view(m)
+        assert isinstance(ir, ModelView)
         assert ir.title == "_RSSimple"
         assert len(_all_vars(ir)) >= 1
         assert not ir.children
 
-    def test_build_report_ir_nested(self):
-        """build_report_ir(nested_model) returns ReportSection with children."""
+    def test_model_view_nested(self):
+        """model_view(nested_model) returns ModelView with children."""
 
         class _RSChild(Model):
             def setup(self):
@@ -378,14 +380,14 @@ class TestBuildReportIR:
                 return [y >= 1, child]
 
         m = _RSParent()
-        ir = build_report_ir(m)
-        assert isinstance(ir, ReportSection)
+        ir = model_view(m)
+        assert isinstance(ir, ModelView)
         assert ir.title == "_RSParent"
         assert len(ir.children) == 1
         assert ir.children[0].title == "_RSChild"
 
-    def test_build_report_ir_dict_cgroups(self):
-        """build_report_ir produces named CGroups when setup() returns a dict."""
+    def test_model_view_dict_cgroups(self):
+        """model_view produces named CGroups when setup() returns a dict."""
 
         class _RSDict(Model):
             def setup(self):
@@ -394,12 +396,12 @@ class TestBuildReportIR:
                 return {"Drag": [x >= 1], "Lift": [y >= 1]}
 
         m = _RSDict()
-        ir = build_report_ir(m)
+        ir = model_view(m)
         group_labels = [cg.label for cg in ir.constraint_groups]
         assert "Drag" in group_labels
         assert "Lift" in group_labels
 
-    def test_build_report_ir_dict_cgroups_with_tight(self):
+    def test_model_view_dict_cgroups_with_tight(self):
         """dict cgroups with Tight-wrapped list produce leaf CGroup constraints."""
 
         class _RSDictTight(Model):
@@ -409,7 +411,7 @@ class TestBuildReportIR:
                 return {"Structural": [Tight([x >= 1, y >= x])]}
 
         m = _RSDictTight()
-        ir = build_report_ir(m)
+        ir = model_view(m)
         assert ir.constraint_groups[0].label == "Structural"
         # Tight should be unwrapped: two leaf constraints, not a Tight object
         for c in ir.constraint_groups[0].constraints:
@@ -434,7 +436,7 @@ class TestBuildReportIR:
         assert "mddt" in result
 
     def test_var_entry_uses_pretty_unit_format(self):
-        """build_report_ir uses platform-appropriate pretty format in VarEntry.units."""
+        """model_view uses platform-appropriate pretty format in VarEntry.units."""
 
         class _RSPrettyUnits(Model):
             def setup(self):
@@ -443,7 +445,7 @@ class TestBuildReportIR:
                 return [area >= area_min]
 
         m = _RSPrettyUnits()
-        ir = build_report_ir(m)
+        ir = model_view(m)
         ve = _all_vars(ir)[0]
         area_vk = next(vk for vk in m.own_varkeys if vk.name == "S_pu")
         assert ve.units == unitstr(area_vk)
@@ -529,12 +531,12 @@ class TestValueUnitsContract:
             _serialize_value(qty)
 
     def test_var_entry_value_is_plain_float_after_solve(self):
-        """build_report_ir stores plain floats in VarEntry.value, never Quantities."""
+        """model_view stores plain floats in VarEntry.value, never Quantities."""
         x = Variable("x_plain", "m")
         c = Variable("c_plain", 2.0, "m")
         m = Model(x, [x >= c])
         sol = m.solve(verbosity=0)
-        ir = build_report_ir(m, solution=sol)
+        ir = model_view(m, solution=sol)
         all_ves = _all_vars(ir) + [ve for ch in ir.children for ve in _all_vars(ch)]
         for ve in all_ves:
             assert not isinstance(ve.value, Quantity), (
@@ -660,7 +662,7 @@ class TestRenderText:
         assert "x_tsol" in result
 
     def test_render_text_direct(self):
-        """render_text(ir) returns hierarchical text from a ReportSection IR."""
+        """render_text(ir) returns hierarchical text from a ModelView IR."""
         ve = VarEntry(
             key=VarKey(name="x", units="m"),
             name="x",
@@ -671,7 +673,7 @@ class TestRenderText:
             label="span",
         )
         cg = CGroup(label="Load", constraints=[], keys=[])
-        ir = ReportSection(
+        ir = ModelView(
             title="Wing",
             description="Wing model",
             assumptions=["thin airfoil"],
@@ -688,7 +690,7 @@ class TestRenderText:
 
     def test_render_text_assumptions_present(self):
         """render_text includes assumptions section when present."""
-        ir = ReportSection(
+        ir = ModelView(
             title="Aircraft",
             description="",
             assumptions=["steady level flight", "rigid structure"],
@@ -782,7 +784,7 @@ class TestRenderMarkdown:
         assert "|" in result  # pipe table from variable table
 
     def test_render_markdown_direct(self):
-        """render_markdown(ir) returns markdown from a ReportSection IR."""
+        """render_markdown(ir) returns markdown from a ModelView IR."""
         ve = VarEntry(
             key=VarKey(name="x", units="m"),
             name="x",
@@ -793,7 +795,7 @@ class TestRenderMarkdown:
             label="span",
         )
         cg = CGroup(label="Aero", constraints=[], keys=[])
-        ir = ReportSection(
+        ir = ModelView(
             title="Fuselage",
             description="Fuselage drag model",
             assumptions=[],
@@ -809,7 +811,7 @@ class TestRenderMarkdown:
 
     def test_render_markdown_description(self):
         """render_markdown includes description text when present."""
-        ir = ReportSection(
+        ir = ModelView(
             title="Propulsion",
             description="Turbofan engine sizing",
             assumptions=[],
@@ -823,7 +825,7 @@ class TestRenderMarkdown:
 
     def test_render_markdown_assumptions(self):
         """render_markdown formats assumptions as bold assumption block."""
-        ir = ReportSection(
+        ir = ModelView(
             title="Structural",
             description="",
             assumptions=["beam theory", "isotropic material"],
@@ -1019,7 +1021,7 @@ class TestDisplayOrderStability:
                 self.cost = total
                 return [self.left, self.right, total >= self.left.W + self.right.W]
 
-        ir = build_report_ir(Rig())
+        ir = model_view(Rig())
         foreign = [v.name for v in ir.free_variables if "." in v.name]
         assert foreign == sorted(foreign, key=lambda n: n), (
             f"foreign vars not in a stable order: {foreign}"
@@ -1046,7 +1048,7 @@ class TestVectorRendering:
         assert "c[1] ≥ c[2]" in text
 
     def test_whole_vector_shows_a_slice_in_its_table_row(self):
-        entries = build_report_ir(self._model()).free_variables
+        entries = model_view(self._model()).free_variables
         assert [v.name for v in entries if v.name.startswith("c")] == ["c[:]"]
 
     def test_latex_element_index_ends_the_subscript(self):

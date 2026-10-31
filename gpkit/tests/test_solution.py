@@ -18,12 +18,12 @@ from gpkit import (
     Variable,
     VectorVariable,
     breakdowns,
-    printing,
 )
 from gpkit.constraints.bounded import Bounded
 from gpkit.constraints.loose import Loose
 from gpkit.constraints.set import audit_solution, constraint_keys, keyed_constraints
 from gpkit.constraints.tight import Tight
+from gpkit.display import tables
 from gpkit.solutions import SolveStatus, Sweep
 from gpkit.tests.conftest import run_threads
 from gpkit.util.small_classes import Quantity, Strings
@@ -310,7 +310,7 @@ def test_printing_table_backward_compat():
     c = Variable("c_st", 2.0, "m", "fixed variable")
     m = Model(x, [x >= c])
     sol = m.solve(verbosity=0)
-    result = printing.table(sol)
+    result = tables.table(sol)
     assert isinstance(result, str)
     assert len(result) > 0
 

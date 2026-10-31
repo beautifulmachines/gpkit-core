@@ -1,8 +1,8 @@
 """Tests for model description metadata, IR wiring, and renderer output.
 
 Split from test_report.py to keep that file within the line-count limit.
-Covers: Model.description(), class-attr assumptions/references, ReportSection
-fields (references, front_matter, toc, objective_*), build_report_ir wiring,
+Covers: Model.description(), class-attr assumptions/references, ModelView
+fields (references, front_matter, toc, objective_*), model_view wiring,
 and renderer output for all new fields.
 """
 
@@ -13,23 +13,18 @@ from typing import ClassVar
 import pytest
 
 from gpkit import Model, Variable
-from gpkit.report import (
-    ReportSection,
-    build_report_ir,
-    render_markdown,
-    render_report,
-    render_text,
-)
+from gpkit.display.report import render_markdown, render_report, render_text
+from gpkit.model_view import ModelView, model_view
 
-# ── ReportSection references / front_matter / toc fields ─────────────────────
+# ── ModelView references / front_matter / toc fields ─────────────────────
 
 
-class TestReportSectionReferences:
-    """Tests for references, front_matter, and toc fields on ReportSection."""
+class TestModelViewReferences:
+    """Tests for references, front_matter, and toc fields on ModelView."""
 
     def test_references_field_exists(self):
-        """ReportSection has a references field defaulting to []."""
-        ir = ReportSection(
+        """ModelView has a references field defaulting to []."""
+        ir = ModelView(
             title="Wing",
             description="",
             assumptions=[],
@@ -40,8 +35,8 @@ class TestReportSectionReferences:
         assert not ir.references
 
     def test_references_in_to_dict(self):
-        """ReportSection.to_dict() includes references."""
-        ir = ReportSection(
+        """ModelView.to_dict() includes references."""
+        ir = ModelView(
             title="Wing",
             description="",
             assumptions=[],
@@ -56,7 +51,7 @@ class TestReportSectionReferences:
 
     def test_preamble_field_exists(self):
         """A section carries its model's own preamble, defaulting to ''."""
-        ir = ReportSection(
+        ir = ModelView(
             title="Aircraft",
             description="",
             assumptions=[],
@@ -67,7 +62,7 @@ class TestReportSectionReferences:
         assert ir.preamble == ""
 
     def test_preamble_in_to_dict(self):
-        ir = ReportSection(
+        ir = ModelView(
             title="Aircraft",
             description="",
             assumptions=[],
@@ -84,18 +79,18 @@ class TestReportSectionReferences:
         They are renderer arguments; a section that carried them would make a
         model's data depend on how it is being printed.
         """
-        fields = {f.name for f in dataclasses.fields(ReportSection)}
+        fields = {f.name for f in dataclasses.fields(ModelView)}
         assert not fields & {"front_matter", "toc"}
 
 
-# ── build_report_ir description wiring ───────────────────────────────────────
+# ── model_view description wiring ───────────────────────────────────────
 
 
 class TestBuildReportIRDescription:
-    """build_report_ir() pulls description from model.description() classmethod."""
+    """model_view() pulls description from model.description() classmethod."""
 
     def test_build_ir_description_from_docstring(self):
-        """build_report_ir uses docstring as section description."""
+        """model_view uses docstring as section description."""
 
         class _IRAero(Model):
             """Aerodynamics submodel."""
@@ -104,11 +99,11 @@ class TestBuildReportIRDescription:
                 x = Variable("x_ir_aero")
                 return [x >= 1]
 
-        ir = build_report_ir(_IRAero())
+        ir = model_view(_IRAero())
         assert ir.description == "Aerodynamics submodel."
 
     def test_build_ir_assumptions_from_description(self):
-        """build_report_ir populates assumptions from model.description()."""
+        """model_view populates assumptions from model.description()."""
 
         class _IRAss(Model):
             def setup(self):
@@ -123,11 +118,11 @@ class TestBuildReportIRDescription:
                     "references": [],
                 }
 
-        ir = build_report_ir(_IRAss())
+        ir = model_view(_IRAss())
         assert "beam theory" in ir.assumptions
 
     def test_build_ir_references_from_description(self):
-        """build_report_ir populates references from model.description()."""
+        """model_view populates references from model.description()."""
 
         class _IRRef(Model):
             def setup(self):
@@ -142,11 +137,11 @@ class TestBuildReportIRDescription:
                     "references": ["Drela 2013"],
                 }
 
-        ir = build_report_ir(_IRRef())
+        ir = model_view(_IRRef())
         assert "Drela 2013" in ir.references
 
     def test_build_ir_class_attrs_wired(self):
-        """build_report_ir picks up class-attr assumptions/references."""
+        """model_view picks up class-attr assumptions/references."""
 
         class _IRClassAttr(Model):
             """Structural model."""
@@ -158,7 +153,7 @@ class TestBuildReportIRDescription:
                 x = Variable("x_ir_cls")
                 return [x >= 1]
 
-        ir = build_report_ir(_IRClassAttr())
+        ir = model_view(_IRClassAttr())
         assert ir.description == "Structural model."
         assert "no buckling" in ir.assumptions
         assert "Raymer 2018" in ir.references
@@ -167,7 +162,7 @@ class TestBuildReportIRDescription:
         """Anonymous model sections have empty description, assumptions, references."""
         x = Variable("x_ir_anon")
         m = Model(1 / x, [x >= 1])
-        ir = build_report_ir(m)
+        ir = model_view(m)
         assert ir.description == ""
         assert not ir.assumptions
         assert not ir.references
@@ -180,9 +175,9 @@ class TestBuildReportIRDescription:
                 x = Variable("x_ir_fm")
                 return [x >= 1]
 
-        params = inspect.signature(build_report_ir).parameters
+        params = inspect.signature(model_view).parameters
         assert not params.keys() & {"front_matter", "toc"}
-        build_report_ir(_IRFM())  # and it still builds
+        model_view(_IRFM())  # and it still builds
 
     def test_build_ir_carries_each_models_own_preamble(self):
         "Per section, unlike front_matter, which applies once at the root."
@@ -205,7 +200,7 @@ class TestBuildReportIRDescription:
                 self.child = _Child()
                 return [self.child, self.child.y >= 1]
 
-        ir = build_report_ir(_Parent())
+        ir = model_view(_Parent())
         assert ir.preamble == "Parent notes."
         assert [c.preamble for c in ir.children] == ["Child notes."]
 
@@ -217,7 +212,7 @@ class TestRenderReferences:
     """Tests that renderers include references output."""
 
     def _ir_with_refs(self):
-        return ReportSection(
+        return ModelView(
             title="Wing",
             description="A wing model.",
             assumptions=["steady state"],
@@ -242,7 +237,7 @@ class TestRenderReferences:
 
     def test_render_text_no_references_block_when_empty(self):
         """render_text omits references block when list is empty."""
-        ir = ReportSection(
+        ir = ModelView(
             title="Wing",
             description="",
             assumptions=[],
@@ -256,7 +251,7 @@ class TestRenderReferences:
 
     def test_render_markdown_no_references_when_empty(self):
         """render_markdown omits **References:** when list is empty."""
-        ir = ReportSection(
+        ir = ModelView(
             title="Wing",
             description="",
             assumptions=[],
@@ -277,7 +272,7 @@ class TestRenderFrontMatterToc:
 
     @staticmethod
     def _section(**kwargs):
-        return ReportSection(
+        return ModelView(
             title="Aircraft",
             description="",
             assumptions=[],
@@ -329,7 +324,7 @@ class TestRenderFrontMatterToc:
 
 
 class TestObjective:
-    """Tests for objective expression and value in ReportSection and renderers."""
+    """Tests for objective expression and value in ModelView and renderers."""
 
     def _solved_box(self):
         from gpkit.examples.simple_box import Box  # noqa: PLC0415
@@ -339,8 +334,8 @@ class TestObjective:
         return m, sol
 
     def test_objective_fields_on_report_section(self):
-        """ReportSection has all four objective_* fields defaulting to empty/None."""
-        ir = ReportSection(
+        """ModelView has all four objective_* fields defaulting to empty/None."""
+        ir = ModelView(
             title="Test",
             description="",
             assumptions=[],
@@ -354,8 +349,8 @@ class TestObjective:
         assert ir.objective_units == ""
 
     def test_objective_in_to_dict(self):
-        """ReportSection.to_dict() includes all four objective fields."""
-        ir = ReportSection(
+        """ModelView.to_dict() includes all four objective fields."""
+        ir = ModelView(
             title="Test",
             description="",
             assumptions=[],
@@ -374,7 +369,7 @@ class TestObjective:
         assert d["objective_units"] == "1/m³"
 
     def test_build_ir_populates_objective_unsolved(self):
-        """build_report_ir sets objective_str and latex even without a solution."""
+        """model_view sets objective_str and latex even without a solution."""
 
         class _ObjModel(Model):
             def setup(self):
@@ -384,26 +379,26 @@ class TestObjective:
                 return [x >= y, y >= x]
 
         m = _ObjModel()
-        ir = build_report_ir(m)
+        ir = model_view(m)
         assert ir.objective_str != ""
         assert ir.objective_latex != ""
         assert ir.objective_value is None  # no solution provided
         assert ir.objective_units != ""
 
     def test_build_ir_populates_objective_solved(self):
-        """build_report_ir populates objective_value from solution.
+        """model_view populates objective_value from solution.
 
         Box uses cost=1/(h*w*d), so the direction flips to "maximize" and
         objective_value is the maximized volume (1/sol.cost), not sol.cost.
         """
         m, sol = self._solved_box()
-        ir = build_report_ir(m, solution=sol)
+        ir = model_view(m, solution=sol)
         assert ir.objective_value is not None
         assert ir.objective_direction == "maximize"
         assert ir.objective_value == pytest.approx(1.0 / sol.cost)
 
     def test_build_ir_objective_empty_for_constant_cost(self):
-        """build_report_ir leaves objective fields empty when cost has no variables."""
+        """model_view leaves objective fields empty when cost has no variables."""
 
         class _ConstCost(Model):
             def setup(self):
@@ -411,7 +406,7 @@ class TestObjective:
                 return [x >= 1]
 
         m = _ConstCost()
-        ir = build_report_ir(m)
+        ir = model_view(m)
         assert ir.objective_str == ""
         assert ir.objective_latex == ""
 
@@ -434,7 +429,7 @@ class TestObjective:
                 return [self.child, y >= x, x >= 1]
 
         m = _Parent()
-        ir = build_report_ir(m)
+        ir = model_view(m)
         assert ir.objective_str != ""  # parent has a real cost
         assert ir.children[0].objective_str == ""  # child does not
 

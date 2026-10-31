@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from gpkit import Model, NomialArray, Variable, VectorVariable
-from gpkit.printing import Display
+from gpkit.display.tables import Display
 
 
 class Leg(Model):

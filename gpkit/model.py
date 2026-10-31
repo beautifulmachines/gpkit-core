@@ -4,7 +4,6 @@ from time import time
 
 import numpy as np
 
-from . import printing
 from .breakdowns import Breakdowns
 from .budgets import build_budget
 from .constraints.costed import CostedConstraintSet
@@ -14,6 +13,8 @@ from .constraints.set import (
     solver_constraints,
     written_keyed_constraints,
 )
+from .display import tables
+from .display.report import render_report
 from .exceptions import (
     AmbiguousVariable,
     Infeasible,
@@ -21,6 +22,7 @@ from .exceptions import (
     VariableNotFound,
 )
 from .ir import IR_VERSION
+from .model_view import model_view
 from .nomials import Monomial, Variable
 from .nomials.map import DIMLESS_QUANTITY
 from .nomials.substitution import is_linked
@@ -187,6 +189,11 @@ class Model(CostedConstraintSet):
     def submodels(self):
         """Direct child models in setup() definition order."""
         return list(self._children)
+
+    @property
+    def is_anonymous(self):
+        "Whether this is a bare Model(cost, constraints), not a named subclass."
+        return type(self) is Model
 
     def walk(self):
         """Yield this model and all its descendants, depth-first."""
@@ -405,10 +412,8 @@ class Model(CostedConstraintSet):
         toc : bool, optional
             If True, a table-of-contents marker is inserted (Markdown only).
         """
-        from .report import build_report_ir, render_report  # noqa: PLC0415
-
-        ir = build_report_ir(self, solution=solution)
-        return render_report(ir, fmt=fmt, front_matter=front_matter, toc=toc)
+        view = model_view(self, solution=solution)
+        return render_report(view, fmt=fmt, front_matter=front_matter, toc=toc)
 
     def table(self, solution, fmt="text", **kwargs):
         """A table of solution, with what only this model can say about it.
@@ -419,12 +424,12 @@ class Model(CostedConstraintSet):
         the breakdowns are text art, kept only until budgets replace them.
         """
         if fmt != "text" or "tables" in kwargs or isinstance(solution, Sweep):
-            return printing.table(solution, model=self, fmt=fmt, **kwargs)
+            return tables.table(solution, model=self, fmt=fmt, **kwargs)
         bds = Breakdowns(self, solution)
         lines = bds.lines("cost") + bds.lines("model sensitivities") + [""]
         if solution.derived is not None:
             lines.append(solution.derived.table())
-        table = printing.table(solution, model=self, **kwargs)
+        table = tables.table(solution, model=self, **kwargs)
         return "\n".join(lines) + table
 
     def diff(self, solution, baseline, **kwargs):
@@ -433,7 +438,7 @@ class Model(CostedConstraintSet):
         Takes a Solution or a Sweep; sol.diff(baseline) is the same table, with
         the cost named only "cost", since a solution holds no expression for it.
         """
-        return printing.diff(solution, baseline, model=self, **kwargs)
+        return tables.diff(solution, baseline, model=self, **kwargs)
 
     def budget(self, solution, var, display_units=None, depth=float("inf")):
         """The Budget breaking var down, read from this model's constraints.
