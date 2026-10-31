@@ -15,7 +15,7 @@ from gpkit.constraints.tight import Tight
 from gpkit.examples.pipeline import Pipeline
 from gpkit.examples.uav import UAV
 from gpkit.exceptions import AmbiguousVariable, VariableNotFound
-from gpkit.report import build_report_ir
+from gpkit.model_view import model_view
 
 
 class TestModelGraph:
@@ -403,9 +403,7 @@ class _WrappedTop(Model):
 
 def _shown(model):
     "The written constraints model's own report section shows."
-    return [
-        c for cg in build_report_ir(model).constraint_groups for c in cg.constraints
-    ]
+    return [c for cg in model_view(model).constraint_groups for c in cg.constraints]
 
 
 class TestConstraintWalk:
@@ -445,7 +443,7 @@ class TestConstraintWalk:
         tree = build_model_tree(m)
 
         def check(node, model):
-            groups = build_report_ir(model).constraint_groups
+            groups = model_view(model).constraint_groups
             assert [k.ref for cg in groups for k in cg.keys] == node["constraints"]
             for child_node, child in zip(node["children"], model.submodels):
                 check(child_node, child)

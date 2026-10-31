@@ -132,7 +132,7 @@ class TestMonomial:
         even when variables suppress theirs"""
         x = Variable("x", "m")
         c = x >= 4 * gpkit.units("m")
-        # report.py passes excluded=("units",) to suppress units on variables,
+        # a report passes excluded=("units",) to suppress units on variables,
         # but bare constants like 4 [m] are dimensionally meaningless without units
         latex = render(c, LATEX, ("units",))
         assert r"\mathrm" in latex  # units rendered on the constant

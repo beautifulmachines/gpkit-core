@@ -212,7 +212,7 @@ class TestRenderedDiff:
     """The text table renders the same comparison, rather than its own.
 
     None of this was covered before: no test exercised Solution.diff,
-    Sweep.diff or printing.diff.
+    Sweep.diff or tables.diff.
     """
 
     def test_a_moved_value_is_reported_as_a_percentage(self):

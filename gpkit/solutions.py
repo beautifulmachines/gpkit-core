@@ -5,7 +5,7 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
-from . import printing
+from .display import tables
 from .display.naming import display_names
 from .display.spelling import unitstr
 from .ir import IR_VERSION, diff_solutions, ir_units
@@ -210,7 +210,7 @@ class Solution:
 
     def diff(self, baseline, **kwargs):
         "printable difference table between this and other"
-        return printing.diff(self, baseline, **kwargs)
+        return tables.diff(self, baseline, **kwargs)
 
     def save(self, filename, **pickleargs):
         """Pickle the solution and save it to a file. Load again with e.g:
@@ -282,7 +282,7 @@ class Solution:
         lines = []
         if fmt == "text" and "tables" not in kwargs and self.derived is not None:
             lines.append(self.derived.table())
-        return "\n".join(lines) + printing.table(self, fmt=fmt, **kwargs)
+        return "\n".join(lines) + tables.table(self, fmt=fmt, **kwargs)
 
 
 class Sweep(list[Solution]):
@@ -314,7 +314,7 @@ class Sweep(list[Solution]):
 
     def diff(self, baseline, **kwargs):
         "printable difference table between this and other"
-        return printing.diff(self, baseline, **kwargs)
+        return tables.diff(self, baseline, **kwargs)
 
     def save(self, filename, **pickleargs):
         "Pickle the Sweep and save it to filename"
@@ -323,4 +323,4 @@ class Sweep(list[Solution]):
 
     def table(self, **kwargs):
         "A text table of what these solutions hold; model.table(sols) adds more."
-        return printing.table(self, **kwargs)
+        return tables.table(self, **kwargs)

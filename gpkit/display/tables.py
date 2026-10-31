@@ -1,4 +1,4 @@
-"printing functionality for gpkit objects"
+"""Solution tables: table() and diff(), as text or markdown, from IR documents."""
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass, replace
@@ -7,12 +7,12 @@ from typing import Any
 
 import numpy as np
 
-from .display.render import TEXT, render_ir
-from .display.spelling import unitstr
-from .ir import diff_solutions, shown_whole
-from .units import Quantity
-from .util.lineage import lineagestr
-from .varkey import decorated
+from ..ir import diff_solutions, shown_whole
+from ..units import Quantity
+from ..util.lineage import lineagestr
+from ..varkey import decorated
+from .render import TEXT, render_ir
+from .spelling import unitstr
 
 Item = tuple[Any, Any]
 

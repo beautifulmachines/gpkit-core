@@ -23,6 +23,9 @@ layers =
     # Model eventually goes here? user-friendly interface to model and solvers
     gpkit.model
 
+    # The view of the model tree that reports and dict consumers read
+    gpkit.model_view
+
     # mathematical optimization models
     gpkit.programs
 
