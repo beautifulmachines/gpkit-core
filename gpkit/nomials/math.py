@@ -587,8 +587,8 @@ class MonomialEquality(PosynomialInequality):
     def sens_from_dual(self, las, nus, _):  # noqa: ARG002
         """Returns the variable/constraint/term sensitivities from lambda/nu
 
-        The net of the two directions, over the l_over_r form's one monomial;
-        its sign is the binding direction. Only the net is unique (#324).
+        An equality has one multiplier, signed by which direction binds. The solver
+        sees two opposed inequalities, so it is the difference of their duals.
         """
         la_lr, la_rl = las  # l_over_r, r_over_l -- see _gen_unsubbed
         la = la_lr - la_rl

@@ -40,13 +40,13 @@ check-clean:
 	fi
 
 # Releasing
-release: check-clean  # Cut a release: make release VERSION=v0.4.0
-	@if [ -z "$(VERSION)" ]; then \
-		echo "Usage: make release VERSION=vX.Y.Z"; \
+release: check-clean  # Cut a release: make release V=x.y.z
+	@if [ -z "$(V)" ]; then \
+		echo "Usage: make release V=x.y.z"; \
 		exit 1; \
 	fi
-	@echo "$(VERSION)" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$' || { \
-		echo "VERSION must look like vX.Y.Z (got '$(VERSION)')"; \
+	@echo "$(V)" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$$' || { \
+		echo "V must look like x.y.z (got '$(V)')"; \
 		exit 1; \
 	}
 	@git fetch origin main --quiet
@@ -54,7 +54,7 @@ release: check-clean  # Cut a release: make release VERSION=v0.4.0
 		echo "HEAD is not up to date with origin/main. Pull or push first."; \
 		exit 1; \
 	fi
-	gh release create $(VERSION) --generate-notes
+	gh release create v$(V) --generate-notes
 
 
 # Help
@@ -64,8 +64,9 @@ help:
 	@echo "  format            Format code with ruff"
 	@echo "  examples          Regenerate catalog example output files"
 	@echo "  test              Run all tests"
+	@echo "  check-downstream  Run sibling model repos' tests against this copy"
 	@echo "  coverage          Run tests with coverage reporting"
 	@echo "  clean             Clean build artifacts"
 	@echo "  check-clean       Check no uncommitted changes"
-	@echo "  release           Cut a release (make release VERSION=vX.Y.Z)"
+	@echo "  release           Cut a release (make release V=x.y.z)"
 	@echo "  help              Show this help message"

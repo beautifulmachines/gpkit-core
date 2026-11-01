@@ -110,18 +110,35 @@ To cut a release:
 1. Make sure `main` is green.
 2. Run:
    ```bash
-   make release VERSION=vX.Y.Z
+   make release V=X.Y.Z
    ```
    This checks that your working directory is clean and up to date with
-   `origin/main`, then creates a GitHub Release with the given tag (equivalent to
+   `origin/main`, then creates a GitHub Release tagged `vX.Y.Z` (equivalent to
    `gh release create vX.Y.Z --generate-notes`, or via the GitHub UI: Releases →
    Draft a new release → tag `vX.Y.Z` → Generate release notes → Publish).
 3. That's it — publishing the release triggers `.github/workflows/publish.yml`,
    which builds the package (version read straight from the new tag) and uploads it
    to PyPI.
 
-Use plain `vMAJOR.MINOR.PATCH` tags. Bump PATCH for fixes, MINOR for backwards-compatible
-additions, MAJOR for breaking changes.
+Use plain `vMAJOR.MINOR.PATCH` tags. While gpkit-core is pre-1.0, bump MINOR for breaking
+changes and additions, and PATCH for fixes. Breaking changes don't get a deprecation period.
+
+### Releases that change output
+
+gassolar's CI installs gpkit-core from PyPI and fails on snapshot drift, so a change to
+reported output reaches it through a release, not a merge. The order is:
+
+1. Merge to gpkit-core.
+2. Cut the release.
+3. Regenerate snapshots in gassolar and commit them:
+   ```bash
+   uv run pytest tests/test_catalog.py::test_catalog_snapshots
+   ```
+
+`make check-downstream` shows whether a change affects output in sibling repos, and leaves the
+regenerated snapshots there to commit. gassolar's CI is red between steps 2 and 3, so have that
+commit ready before releasing. The nightly Downstream workflow goes red at step 1, which is
+expected. gpkit-core's own snapshots passing doesn't show that other repos' output is unchanged.
 
 ## Documentation
 
