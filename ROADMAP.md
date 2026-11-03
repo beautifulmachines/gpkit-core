@@ -22,7 +22,7 @@ symptom. We would rather decide what each thing is, once, and let the code follo
 ## What that looks like
 
 **Results can be trusted.** GPkit should never be quietly wrong: if it can't give the right answer,
-it should say so. This comes first, because engineers refine a design by re-solving many times, and
+it should say so. Engineers refine a design by re-solving many times, and
 that only works if they believe each result.
 
 **The documentation is worth reading.** It is badly out of date and far from where it should be. A

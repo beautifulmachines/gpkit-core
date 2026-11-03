@@ -478,7 +478,8 @@ class Model(CostedConstraintSet):
         for var, vals in sweepvals.items():
             keys = self.varkeys.keys(var)
             for key in keys:
-                if not key.shape:
+                # a scalar, or one element of a vector: each point is one number
+                if not key.shape or key.idx is not None:
                     continue
                 # next line raises a ValueError if size mismatch
                 np.broadcast(vals, np.empty(key.shape))

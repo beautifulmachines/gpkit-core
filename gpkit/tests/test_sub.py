@@ -229,6 +229,9 @@ class TestModelSubs:
         a = [sol.cost for sol in m.sweep({y[1]: [3, 5]}, verbosity=0)]
         b = [6, 10]
         npt.assert_allclose(a, b)
+        # sweeping one element takes any number of points, not just len(y)
+        a = [sol.cost for sol in m.sweep({y[1]: [3, 5, 7]}, verbosity=0)]
+        npt.assert_allclose(a, [6, 10, 14])
         # create a numpy float array, then insert a sweep element
         m.substitutions.update({y: [2, 3]})
         a = [sol.cost for sol in m.sweep({y[1]: [3, 5]}, verbosity=0)]
