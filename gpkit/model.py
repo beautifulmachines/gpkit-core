@@ -472,41 +472,30 @@ class Model(CostedConstraintSet):
         "Sweeps {var: values} in-sync across one dim. Returns a Sweep"
         return self._sweep(self.localsolve, sweepvals, skipfailures, **solveargs)
 
-    def _validate_sweep(self, sweepvals):
-        "Validate and return {VarKey: iterable} mapping"
-        # this logic might eventually live in VarMap
-        for var, vals in sweepvals.items():
-            keys = self.varkeys.keys(var)
-            for key in keys:
-                if not key.shape:
-                    continue
-                # next line raises a ValueError if size mismatch
-                np.broadcast(vals, np.empty(key.shape))
-        return sweepvals
-
     def _sweep(self, solvefn, sweepvals, skipfailures, **solveargs):
         "Runs sweep using solvefn (either self.solve or self.localsolve)"
         sols = []
-        self._validate_sweep(sweepvals)
         lengths = {len(vals) for vals in sweepvals.values()}
         if len(lengths) != 1:
             raise ValueError(f"sweepvals has mismatched lengths {lengths}")
         oldsubs = self.substitutions
         tic = time()
-        for i in range(lengths.pop()):
-            sweepsubs = {var: vals[i] for var, vals in sweepvals.items()}
-            self.substitutions = Substitutions(oldsubs)
-            self.substitutions.register_keys(self.varkeys)
-            self.substitutions.update(sweepsubs)
-            try:
-                sols.append(solvefn(**solveargs))
-            except Infeasible as err:
-                if not skipfailures:
-                    raise RuntimeWarning(
-                        f"Solve {i} was infeasible. To continue sweeping after"
-                        "failures, pass skipfailures=True to Model.sweep."
-                    ) from err
-        self.substitutions = oldsubs
+        try:
+            for i in range(lengths.pop()):
+                sweepsubs = {var: vals[i] for var, vals in sweepvals.items()}
+                self.substitutions = Substitutions(oldsubs)
+                self.substitutions.register_keys(self.varkeys)
+                self.substitutions.update(sweepsubs)
+                try:
+                    sols.append(solvefn(**solveargs))
+                except Infeasible as err:
+                    if not skipfailures:
+                        raise RuntimeWarning(
+                            f"Solve {i} was infeasible. To continue sweeping after "
+                            "failures, pass skipfailures=True to Model.sweep."
+                        ) from err
+        finally:
+            self.substitutions = oldsubs
         if not sols:
             raise RuntimeWarning("All solves were infeasible.")
 
