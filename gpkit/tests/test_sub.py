@@ -195,8 +195,10 @@ class TestModelSubs:
         sol.table()
         assert len(sol) == 1
 
+        subs = m.substitutions
         with pytest.raises(RuntimeWarning):
             sol = m.sweep(sweep, verbosity=0, skipfailures=False)
+        assert m.substitutions is subs  # a failed sweep leaves the model as it was
 
         sweep[x_min][0] = 5  # so no sweeps solve
         with pytest.raises(RuntimeWarning):
@@ -224,6 +226,11 @@ class TestModelSubs:
         sweep = {y: [[2, 3, 9], [5, 7, 11]]}
         with pytest.raises(ValueError):
             m.sweep(sweep, verbosity=0)
+        with pytest.raises(ValueError):  # points that differ in shape
+            m.sweep({y: [[2, 3], [5, 7, 11]]}, verbosity=0)
+        # a scalar point fills every element, as substituting a scalar does
+        a = [sol.cost for sol in m.sweep({y: [1, 2, 3]}, verbosity=0)]
+        npt.assert_allclose(a, [1, 4, 9])
         m = Model(x, [x >= y.prod()])
         m.substitutions.update({y[0]: 2})
         a = [sol.cost for sol in m.sweep({y[1]: [3, 5]}, verbosity=0)]
