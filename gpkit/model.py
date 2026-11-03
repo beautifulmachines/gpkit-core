@@ -491,7 +491,7 @@ class Model(CostedConstraintSet):
                 except Infeasible as err:
                     if not skipfailures:
                         raise RuntimeWarning(
-                            f"Solve {i} was infeasible. To continue sweeping after"
+                            f"Solve {i} was infeasible. To continue sweeping after "
                             "failures, pass skipfailures=True to Model.sweep."
                         ) from err
         finally:
