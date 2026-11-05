@@ -500,11 +500,9 @@ class TestSignomialInequality:
 
     def test_signomial_v_ss_propagates_to_original_constraint(self):
         """Sensitivity computed on an SGP-approximated constraint propagates
-        back to the original SignomialInequality via .generated_by. This is
-        the extraction capability gpkit/interactive/{sankey,references}.py
-        read today; validate it directly since that module is slated for
-        retirement (see workspace CLAUDE.md) and tradespace will need the
-        same capability independent of it."""
+        back to the original SignomialInequality via .generated_by.
+        gpkit/interactive/{sankey,references}.py rely on this today; test it
+        directly so it stays covered independently of those modules."""
         x = Variable("x")
         y = Variable("y")
         with SignomialsEnabled():

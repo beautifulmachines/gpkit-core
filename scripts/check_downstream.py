@@ -9,7 +9,7 @@ Sibling repos are discovered by looking for a catalog.toml, so no repo names
 are hardcoded.
 
     python scripts/check_downstream.py           # every sibling found
-    python scripts/check_downstream.py lunar     # just the named ones
+    python scripts/check_downstream.py gassolar  # just the named ones
 """
 
 import subprocess
