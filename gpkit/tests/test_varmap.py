@@ -67,6 +67,13 @@ class TestSubstitutions:
         assert vm[t.key] == pytest.approx(72.0)
         assert vm.quantity(t.key).to("day").magnitude == pytest.approx(3.0)
 
+    def test_a_list_on_one_element_is_refused_before_solving(self):
+        "It used to solve with the list's last value, silently (#386)"
+        y, x = VectorVariable(2, "y"), Variable("x")
+        m = Model(x, [x >= y.prod()])
+        with pytest.raises(ValueError, match="shape"):
+            m.substitutions.update({y[0]: 2, y[1]: [3, 5]})
+
     def test_a_models_substitutions_are_substitutions(self):
         x = Variable("x", "m")
         m = Model(x, [x >= 1 * units("m")])
@@ -230,6 +237,19 @@ class TestVarMap:
         vm.register_keys(VarSet([e.key for e in v]))
         with pytest.raises(ValueError, match="shape"):
             vm[v] = np.array([1, 2])
+
+    def test_setting_a_scalar_rejects_an_array(self, vm, x):
+        with pytest.raises(ValueError, match=r"x, a scalar.*shape \(2,\)"):
+            vm[x] = [1, 2]
+
+    def test_setting_a_vector_element_rejects_an_array(self, vm):
+        "An element is a scalar; a list on it used to solve with its last value (#386)"
+        v = VectorVariable(2, "v")
+        vm[v[0]] = 2
+        vm[v[0]] = ureg.Quantity(3, "dimensionless")
+        with pytest.raises(ValueError, match="shape"):
+            vm[v[1]] = [3, 5]
+        assert v[1].key not in vm
 
     def test_vector_partial(self, vm):
         v = VectorVariable(3, "v")

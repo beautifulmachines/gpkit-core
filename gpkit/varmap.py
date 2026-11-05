@@ -276,6 +276,10 @@ class VarMap(MutableMapping):
                 f"cannot set {key} of shape {key.shape} from a value of shape "
                 f"{np.shape(value)}"
             )
+        if np.shape(value):
+            raise ValueError(
+                f"cannot set {key}, a scalar, from a value of shape {np.shape(value)}"
+            )
         self._varset.add(key)
         self._data[key] = value
 
