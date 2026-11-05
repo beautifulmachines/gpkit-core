@@ -74,6 +74,17 @@ class TestSolution:
         for i in range(n):
             assert solx[i] == pytest.approx(2.5, abs=1e-4)
 
+    def test_partly_substituted_vector(self):
+        "Fixed elements of a vector read back alongside its free ones (#364)"
+        x = VectorVariable(3, "x", "m")
+        L = Variable("L", 10, "m")
+        m = Model(L / x[0] + L / x[1] + L / x[2], [x <= L])
+        m.substitutions[x[1]] = 4
+        solx = m.solve(verbosity=0)[x]
+        assert not np.isnan(solx.magnitude).any()
+        assert solx[1].to("m").magnitude == 4
+        assert solx[0].to("m").magnitude == pytest.approx(10, rel=1e-6)
+
     def test_subinto(self):
         h_max = Variable("h_max", 10, "m", "Length")
         a_min = Variable("A_min", 10, "m^2", "Area")

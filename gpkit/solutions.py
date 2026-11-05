@@ -5,13 +5,15 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
+import numpy as np
+
 from .display import tables
 from .display.naming import display_names
 from .display.spelling import unitstr
 from .ir import IR_VERSION, diff_solutions, ir_units
 from .units import Quantity
 from .varkey import VarKey
-from .varmap import VarMap
+from .varmap import VarMap, is_veckey
 
 
 class SolveStatus(StrEnum):
@@ -52,7 +54,6 @@ class Sensitivities:
     constraints_by_key: dict  # {ConstraintKey: sensitivity}; the model has the math
     terms_by_key: dict  # {ConstraintKey: (nu, ...)} -- per monomial, as written
     cost_terms: tuple  # (nu, ...) over the cost's terms; sums to 1
-    # cost: dict
     models: dict
     variables: VarMap
     variablerisk: VarMap  # only used for breakdowns
@@ -105,19 +106,15 @@ class MarginSolution:
             return "\n".join(lines)
         if cost_sens is not None:
             label = "by |GP sensitivity|"
-            items = sorted(
-                self.sensitivities.items(),
-                key=lambda kv: (
-                    -float(f"{abs(cost_sens.get(kv[0], 0)):.4g}"),
-                    kv[0].ref,
-                ),
-            )
+            rank = {vk: -abs(cost_sens.get(vk, 0)) for vk in self.sensitivities}
         else:
             label = "most negative first"
-            items = sorted(
-                self.sensitivities.items(),
-                key=lambda kv: (float(f"{kv[1]:.4g}"), kv[0].ref),
-            )
+            rank = self.sensitivities
+        # rounded so that ties print as ties, then broken by ref
+        items = sorted(
+            self.sensitivities.items(),
+            key=lambda kv: (float(f"{rank[kv[0]]:.4g}"), kv[0].ref),
+        )
         lines.append(f"  ∂({self.name})/∂c [{label}]:")
         names = display_names([vk for vk, _ in items])
         for vk, s in items:
@@ -165,7 +162,6 @@ class Solution:
     primal: VarMap
     constants: VarMap
     sens: Sensitivities
-    # program : GP
     meta: dict
     derived: "MarginSolution | None" = None
 
@@ -178,7 +174,10 @@ class Solution:
 
     def __getitem__(self, key: VarKey) -> "Quantity":
         if key in self.primal:
-            return self.primal.quantity(key)
+            vk = self.primal.varset.resolve(key)
+            if is_veckey(vk) and vk in self.constants:  # some elements fixed
+                return self._merged_vector(vk)
+            return self.primal.quantity(vk)
         if key in self.constants:
             return self.constants.quantity(key)
         if hasattr(key, "sub"):
@@ -190,6 +189,12 @@ class Solution:
                 return c
             return Quantity(c, key.units or "dimensionless")
         raise KeyError(f"no variable '{key}' found in the solution")
+
+    def _merged_vector(self, key):
+        "One vector's values, each element from whichever map holds it"
+        free, fixed = self.primal.quantity(key), self.constants.quantity(key)
+        merged = np.where(np.isnan(free.magnitude), fixed.magnitude, free.magnitude)
+        return Quantity(merged, free.units)
 
     def almost_equal(self, other, tol=1e-6):
         """Checks for almost-equality between two solutions.
@@ -215,7 +220,7 @@ class Solution:
     def save(self, filename, **pickleargs):
         """Pickle the solution and save it to a file. Load again with e.g:
         >>> import pickle
-        >>> with open("solution.pkl") as fil:
+        >>> with open("solution.pkl", "rb") as fil:
                 sol = pickle.load(fil)
         """
         with open(filename, "wb") as fil:
@@ -268,10 +273,10 @@ class Solution:
 
     def _warnings_ir(self) -> dict:
         "Warnings with each subject named by ref instead of held as an object."
-        out = {}
-        for category, warns in self.meta["warnings"].items():
-            out[category] = [{"message": w["message"], **_subject_ir(w)} for w in warns]
-        return out
+        return {
+            category: [{"message": w["message"], **_subject_ir(w)} for w in warns]
+            for category, warns in self.meta["warnings"].items()
+        }
 
     def table(self, fmt="text", **kwargs) -> str:
         """A table of what this solution holds, as text or markdown ("md").
@@ -296,21 +301,10 @@ class Sweep(list[Solution]):
         super().__init__(solutions)
         self.swept = tuple(swept)
 
-    # ----------------------------------------------------------------
-    # Convenience utilities (runtime helpers, minimal API)
-    # ----------------------------------------------------------------
-    def latest(self) -> Solution:
-        """Return the most recent Solution."""
-        return self[-1]
-
     def __repr__(self) -> str:
         if not self:
             return "Sweep([])"
         return f"Sweep(n={len(self)})"
-
-    def plot(self, var):
-        "Eventual plotting capability"
-        raise NotImplementedError
 
     def diff(self, baseline, **kwargs):
         "printable difference table between this and other"
