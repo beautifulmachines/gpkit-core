@@ -186,9 +186,7 @@ Fixed Variables
 
 When a Model is created, any fixed Variables are used to form a dictionary: ``{var: var.value for var in self.varlocs if var.value is not None}``. This dictionary is then substituted into the Model's cost and constraints before the ``substitutions`` argument is (and hence values are supplanted by any later substitutions).
 
-``solution.subinto(p)`` will substitute the solution(s) for variables into the posynomial ``p``, returning a NomialArray. For a non-swept solution, this is equivalent to ``p.sub(solution["variables"])``.
-
-You can also substitute by just calling the solution, i.e. ``solution(p)``. This returns a numpy array of just the coefficients (``c``) of the posynomial after substitution, and will raise a` ``ValueError``` if some of the variables in ``p`` were not found in ``solution``.
+``solution[p]`` substitutes the solution's values into the expression ``p`` and returns the result as a quantity in ``p``'s units. For a single variable this is just its value, whether it was free or fixed.
 
 Freeing Fixed Variables
 -----------------------

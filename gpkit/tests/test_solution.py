@@ -85,7 +85,7 @@ class TestSolution:
         assert solx[1].to("m").magnitude == 4
         assert solx[0].to("m").magnitude == pytest.approx(10, rel=1e-6)
 
-    def test_subinto(self):
+    def test_getitem_in_a_sweep(self):
         h_max = Variable("h_max", 10, "m", "Length")
         a_min = Variable("A_min", 10, "m^2", "Area")
         p_max = Variable("P", "m", "Perimeter")
@@ -94,7 +94,7 @@ class TestSolution:
         m = Model(12 / (w * h**3), [h <= h_max, h * w >= a_min, p_max >= 2 * h + 2 * w])
         p_vals = np.linspace(13, 24, 20)
         sweepsol = m.sweep({p_max: p_vals}, verbosity=0)
-        p_sol = [sol.subinto(p_max) for sol in sweepsol]
+        p_sol = [sol[p_max] for sol in sweepsol]
         assert len(p_sol) == 20
         for pv, ps in zip(p_vals, p_sol):
             assert 0 * gpkit.ureg.m == pytest.approx(pv * gpkit.ureg.m - ps)
