@@ -276,13 +276,9 @@ class VarMap(MutableMapping):
                 f"cannot set {key} of shape {key.shape} from a value of shape "
                 f"{np.shape(value)}"
             )
-        try:
-            shape = np.shape(value)
-        except ValueError:  # numpy's complaint about a ragged sequence
-            shape = "ragged"
-        if shape:
+        if np.shape(value):
             raise ValueError(
-                f"cannot set {key}, a scalar, from a value of shape {shape}"
+                f"cannot set {key}, a scalar, from a value of shape {np.shape(value)}"
             )
         if isinstance(value, np.ndarray):  # 0-d: store the number it holds
             value = value.item()
