@@ -302,7 +302,7 @@ class GeometricProgram:
                 if hasattr(sub, "units"):
                     sub = sub.to(key.units or "dimensionless").magnitude
                 self.substitutions[key] = sub
-            if not isinstance(sub, (Numbers, np.ndarray)):
+            if not isinstance(sub, Numbers):
                 raise TypeError(
                     f"substitution {{{key}: {sub}}} has invalid value type {type(sub)}."
                 )

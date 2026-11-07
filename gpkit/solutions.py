@@ -5,13 +5,15 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from enum import StrEnum
 
+import numpy as np
+
 from .display import tables
 from .display.naming import display_names
 from .display.spelling import unitstr
 from .ir import IR_VERSION, diff_solutions, ir_units
 from .units import Quantity
 from .varkey import VarKey
-from .varmap import VarMap
+from .varmap import VarMap, is_veckey
 
 
 class SolveStatus(StrEnum):
@@ -52,7 +54,6 @@ class Sensitivities:
     constraints_by_key: dict  # {ConstraintKey: sensitivity}; the model has the math
     terms_by_key: dict  # {ConstraintKey: (nu, ...)} -- per monomial, as written
     cost_terms: tuple  # (nu, ...) over the cost's terms; sums to 1
-    # cost: dict
     models: dict
     variables: VarMap
     variablerisk: VarMap  # only used for breakdowns
@@ -105,19 +106,15 @@ class MarginSolution:
             return "\n".join(lines)
         if cost_sens is not None:
             label = "by |GP sensitivity|"
-            items = sorted(
-                self.sensitivities.items(),
-                key=lambda kv: (
-                    -float(f"{abs(cost_sens.get(kv[0], 0)):.4g}"),
-                    kv[0].ref,
-                ),
-            )
+            rank = {vk: -abs(cost_sens.get(vk, 0)) for vk in self.sensitivities}
         else:
             label = "most negative first"
-            items = sorted(
-                self.sensitivities.items(),
-                key=lambda kv: (float(f"{kv[1]:.4g}"), kv[0].ref),
-            )
+            rank = self.sensitivities
+        # rounded so that ties print as ties, then broken by ref
+        items = sorted(
+            self.sensitivities.items(),
+            key=lambda kv: (float(f"{rank[kv[0]]:.4g}"), kv[0].ref),
+        )
         lines.append(f"  ∂({self.name})/∂c [{label}]:")
         names = display_names([vk for vk, _ in items])
         for vk, s in items:
@@ -165,7 +162,6 @@ class Solution:
     primal: VarMap
     constants: VarMap
     sens: Sensitivities
-    # program : GP
     meta: dict
     derived: "MarginSolution | None" = None
 
@@ -177,36 +173,39 @@ class Solution:
         return vmap
 
     def __getitem__(self, key: VarKey) -> "Quantity":
-        if key in self.primal:
-            return self.primal.quantity(key)
-        if key in self.constants:
-            return self.constants.quantity(key)
-        if hasattr(key, "sub"):
-            subbed = key.sub(self.variables, require_positive=False)
-            # Use .cs rather than .c: a zero-valued sub produces a Signomial
-            # (0 ≤ 0 triggers any_nonpositive_cs), which lacks .c but has .cs.
-            (c,) = subbed.cs
-            if isinstance(c, Quantity):
-                return c
-            return Quantity(c, key.units or "dimensionless")
-        raise KeyError(f"no variable '{key}' found in the solution")
+        "A variable's value, or an expression's with the solution substituted in"
+        if hasattr(key, "sub") and not hasattr(key, "key"):
+            return self._substituted(key)
+        try:
+            vk, value = self.primal.item(key)
+        except KeyError:
+            if key in self.constants:
+                return self.constants.quantity(key)
+            raise KeyError(f"no variable '{key}' found in the solution") from None
+        # a vector's fixed elements read as nan from primal; fill them in
+        if is_veckey(vk) and np.isnan(value).any() and vk in self.constants:
+            value = np.where(np.isnan(value), self.constants[vk], value)
+        return Quantity(value, vk.units or "dimensionless")
+
+    def _substituted(self, expr):
+        "A scalar expression's value, with the solution substituted in"
+        if hasattr(expr, "shape"):
+            raise TypeError(
+                f"sol[...] takes a scalar expression, not {expr}; for a vector, "
+                "compute with its values instead, e.g. 2*sol[v]"
+            )
+        subbed = expr.sub(self.variables, require_positive=False)
+        if subbed.vks:
+            raise KeyError(f"the solution has no value for {subbed.vks} in {expr}")
+        # .cs, not .c: substituting a zero leaves a Signomial, which has no .c
+        (c,) = subbed.cs
+        return c if isinstance(c, Quantity) else Quantity(c, "dimensionless")
 
     def almost_equal(self, other, tol=1e-6):
         """Checks for almost-equality between two solutions.
         tol is treated as relative for primal; absolute for sensitivities
         """
         return not diff_solutions(other.to_ir(), self.to_ir(), tol)["changed"]
-
-    def subinto(self, posy):
-        "solution substituted into posy."
-        for target_vmap in (self.primal, self.constants):
-            if posy in target_vmap:
-                return target_vmap.quantity(posy)
-
-        if not hasattr(posy, "sub"):
-            raise ValueError(f"no variable '{posy}' found in the solution")
-
-        return posy.sub(self.variables, require_positive=False)
 
     def diff(self, baseline, **kwargs):
         "printable difference table between this and other"
@@ -215,7 +214,7 @@ class Solution:
     def save(self, filename, **pickleargs):
         """Pickle the solution and save it to a file. Load again with e.g:
         >>> import pickle
-        >>> with open("solution.pkl") as fil:
+        >>> with open("solution.pkl", "rb") as fil:
                 sol = pickle.load(fil)
         """
         with open(filename, "wb") as fil:
@@ -268,10 +267,10 @@ class Solution:
 
     def _warnings_ir(self) -> dict:
         "Warnings with each subject named by ref instead of held as an object."
-        out = {}
-        for category, warns in self.meta["warnings"].items():
-            out[category] = [{"message": w["message"], **_subject_ir(w)} for w in warns]
-        return out
+        return {
+            category: [{"message": w["message"], **_subject_ir(w)} for w in warns]
+            for category, warns in self.meta["warnings"].items()
+        }
 
     def table(self, fmt="text", **kwargs) -> str:
         """A table of what this solution holds, as text or markdown ("md").
@@ -296,21 +295,10 @@ class Sweep(list[Solution]):
         super().__init__(solutions)
         self.swept = tuple(swept)
 
-    # ----------------------------------------------------------------
-    # Convenience utilities (runtime helpers, minimal API)
-    # ----------------------------------------------------------------
-    def latest(self) -> Solution:
-        """Return the most recent Solution."""
-        return self[-1]
-
     def __repr__(self) -> str:
         if not self:
             return "Sweep([])"
         return f"Sweep(n={len(self)})"
-
-    def plot(self, var):
-        "Eventual plotting capability"
-        raise NotImplementedError
 
     def diff(self, baseline, **kwargs):
         "printable difference table between this and other"

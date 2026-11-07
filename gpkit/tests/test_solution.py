@@ -74,7 +74,30 @@ class TestSolution:
         for i in range(n):
             assert solx[i] == pytest.approx(2.5, abs=1e-4)
 
-    def test_subinto(self):
+    def test_partly_substituted_vector(self):
+        "Fixed elements of a vector read back alongside its free ones (#364)"
+        x = VectorVariable(3, "x", "m")
+        L = Variable("L", 10, "m")
+        m = Model(L / x[0] + L / x[1] + L / x[2], [x <= L])
+        m.substitutions[x[1]] = 4
+        solx = m.solve(verbosity=0)[x]
+        assert not np.isnan(solx.magnitude).any()
+        assert solx[1].to("m").magnitude == 4
+        assert solx[0].to("m").magnitude == pytest.approx(10, rel=1e-6)
+
+    def test_getitem_expression(self):
+        "An expression gets the solution substituted in, or says why it can't"
+        x, z = VectorVariable(2, "x", "m"), Variable("z", "m")
+        m = Model(x.prod(), [x >= 1 * gpkit.units("m")])
+        m.substitutions[x[1]] = 4
+        sol = m.solve(verbosity=0)
+        assert sol[2 * x[0] + x[1]].to("m").magnitude == pytest.approx(6)
+        with pytest.raises(KeyError, match="no value"):
+            _ = sol[3 * z]  # used to read 3 m, z's coefficient
+        with pytest.raises(TypeError, match="scalar expression"):
+            _ = sol[2 * x]
+
+    def test_getitem_in_a_sweep(self):
         h_max = Variable("h_max", 10, "m", "Length")
         a_min = Variable("A_min", 10, "m^2", "Area")
         p_max = Variable("P", "m", "Perimeter")
@@ -83,7 +106,7 @@ class TestSolution:
         m = Model(12 / (w * h**3), [h <= h_max, h * w >= a_min, p_max >= 2 * h + 2 * w])
         p_vals = np.linspace(13, 24, 20)
         sweepsol = m.sweep({p_max: p_vals}, verbosity=0)
-        p_sol = [sol.subinto(p_max) for sol in sweepsol]
+        p_sol = [sol[p_max] for sol in sweepsol]
         assert len(p_sol) == 20
         for pv, ps in zip(p_vals, p_sol):
             assert 0 * gpkit.ureg.m == pytest.approx(pv * gpkit.ureg.m - ps)

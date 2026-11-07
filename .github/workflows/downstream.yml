@@ -5,8 +5,8 @@
 # dominates), and a downstream main that is red for unrelated reasons should
 # not block work in gpkit-core.
 #
-# lunar is deliberately absent — it is a private repo, so this public workflow
-# cannot clone it. Run `make check-downstream` locally to include it.
+# Only the public model repos are checked out here. Run `make check-downstream`
+# locally to also include any other sibling repo that has a catalog.toml.
 
 name: Downstream
 

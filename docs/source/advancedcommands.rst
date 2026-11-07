@@ -95,16 +95,7 @@ For variables computed during a solution (linked substitutions), see :ref:`sgp`.
 Sweeps
 ======
 
-Sweeps are useful for analyzing tradeoff surfaces. A sweep “value” is an Iterable of numbers, e.g. ``[1, 2, 3]``. The simplest way to sweep a model is to call ``model.sweep({sweepvar: sweepvalues})``, which will return a solution array but not change the model's substitutions dictionary. If multiple ``sweepvars`` are given, the method will run them all as independent one-dimensional sweeps and return a list of one solution per sweep. The method ``model.autosweep({sweepvar: (start, end)}, tol=0.01)`` behaves very similarly, except that only the bounds of the sweep need be specified and the region in betwen will be swept to a maximum possible error of tol in the log of the cost. For details see `1D Autosweeps`_ below.
-
-
-Sweep Substitutions
--------------------
-Alternatively, or to sweep a higher-dimensional grid, Variables can swept with a substitution value takes the form ``('sweep', Iterable)``, such as ``('sweep', np.linspace(1e6, 1e7, 100))``. During variable declaration, giving an Iterable value for a Variable is assumed to be giving it a sweep value: for example, ``x = Variable("x", [1, 2, 3])`` will sweep ``x`` over three values.
-
-Vector variables may also be substituted for: ``{y: ("sweep" ,[[1, 2], [1, 2], [1, 2]])}`` will sweep :math:`y\ \forall~y_i\in\left\{1,2\right\}`. These sweeps cannot be specified during Variable creation.
-
-A Model with sweep substitutions will solve for all possible combinations: e.g., if there’s a variable ``x`` with value ``('sweep', [1, 3])`` and a variable ``y`` with value ``('sweep', [14, 17])`` then the gp will be solved four times, for :math:`(x,y)\in\left\{(1, 14),\ (1, 17),\ (3, 14),\ (3, 17)\right\}`. The returned solutions will be a one-dimensional array (or 2-D for vector variables), accessed in the usual way.
+Sweeps are useful for analyzing tradeoff surfaces. ``model.sweep({x: [1, 2, 3]})`` solves the model once per value and returns a ``Sweep``, a list of solutions, without changing the model's substitutions. Given several variables, as in ``model.sweep({x: xs, y: ys})``, it steps through them together, so the value lists must have the same length; to sweep a grid, pass every combination, e.g. built with ``itertools.product``. The method ``model.autosweep({sweepvar: (start, end)}, tol=0.01)`` sweeps one variable given only its bounds, solving enough points in between to keep the error in the log of the cost under ``tol``. For details see `1D Autosweeps`_ below.
 
 1D Autosweeps
 -------------
@@ -186,9 +177,7 @@ Fixed Variables
 
 When a Model is created, any fixed Variables are used to form a dictionary: ``{var: var.value for var in self.varlocs if var.value is not None}``. This dictionary is then substituted into the Model's cost and constraints before the ``substitutions`` argument is (and hence values are supplanted by any later substitutions).
 
-``solution.subinto(p)`` will substitute the solution(s) for variables into the posynomial ``p``, returning a NomialArray. For a non-swept solution, this is equivalent to ``p.sub(solution["variables"])``.
-
-You can also substitute by just calling the solution, i.e. ``solution(p)``. This returns a numpy array of just the coefficients (``c``) of the posynomial after substitution, and will raise a` ``ValueError``` if some of the variables in ``p`` were not found in ``solution``.
+``solution[p]`` substitutes the solution's values into the scalar expression ``p`` and returns the result as a quantity in ``p``'s units; if ``p`` has a variable the solution doesn't hold, it raises ``KeyError``. For a single variable, scalar or vector, this is just its value, whether it was free or fixed. For a vector expression, compute with the values instead, e.g. ``2*solution[v]``.
 
 Freeing Fixed Variables
 -----------------------

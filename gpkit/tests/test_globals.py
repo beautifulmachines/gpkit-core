@@ -83,7 +83,7 @@ def test_signomials_enabled_thread_isolation():
 
 
 def test_concurrent_build_and_solve():
-    "The tradespace scenario: concurrent per-thread builds + solves, no lock."
+    "Concurrent per-thread builds and solves, as a threaded server runs them, with no lock."
     results = {}
     barrier = threading.Barrier(4)
 

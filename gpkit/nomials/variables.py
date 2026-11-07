@@ -61,7 +61,10 @@ class Variable(Monomial):
                 ) and "value" not in descr:
                     descr["value"] = arg
                 elif isinstance(arg, Iterable) and not isinstance(arg, Strings):
-                    raise NotImplementedError
+                    raise ValueError(
+                        f"a Variable's value is one number, not {arg!r}; "
+                        "to sweep it, use Model.sweep"
+                    )
                 elif isinstance(arg, Strings) and "units" not in descr:
                     descr["units"] = arg
                 elif isinstance(arg, Strings) and "label" not in descr:
