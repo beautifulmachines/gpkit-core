@@ -74,6 +74,25 @@ class TestSubstitutions:
         with pytest.raises(ValueError, match="shape"):
             m.substitutions.update({y[0]: 2, y[1]: [3, 5]})
 
+    def test_a_0d_array_is_a_scalar(self):
+        "numpy's convention: ndim 0 is a scalar, so it is stored as its number"
+        x, y = Variable("x"), Variable("y")
+        m = Model(y, [y >= x])
+        m.substitutions[x] = np.array(3.0)
+        assert m.substitutions[x] == 3.0
+        assert not isinstance(m.substitutions[x], np.ndarray)
+        assert m.solve(verbosity=0).cost == pytest.approx(3)
+
+    def test_a_linked_function_must_return_a_scalar(self):
+        "Its output is stored like any other fixed value, so the same rule holds"
+        a, b, y = Variable("a", 2), Variable("b"), Variable("y")
+        m = Model(y, [y >= b, y >= a])
+        m.substitutions[b] = lambda c: np.array(3 * c[a.key])
+        assert m.solve(verbosity=0).cost == pytest.approx(6)
+        m.substitutions[b] = lambda c: np.array([3 * c[a.key]])
+        with pytest.raises(ValueError, match="b, a scalar.*shape"):
+            m.solve(verbosity=0)
+
     def test_a_models_substitutions_are_substitutions(self):
         x = Variable("x", "m")
         m = Model(x, [x >= 1 * units("m")])

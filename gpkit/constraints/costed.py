@@ -8,7 +8,6 @@ from ..display.render import LATEX, TEXT, render
 from ..display.spelling import unitstr
 from ..nomials import Variable
 from ..util.lineage import lineagestr
-from ..util.small_scripts import maybe_flatten
 from .set import ConstraintSet
 
 Objective = namedtuple("Objective", ["sense", "expr", "variable", "units", "value"])
@@ -51,9 +50,11 @@ class CostedConstraintSet(ConstraintSet):
     lineage = None
 
     def __init__(self, cost, constraints, substitutions=None):
-        self.cost = maybe_flatten(cost)
-        if isinstance(self.cost, np.ndarray):  # if it's still a vector
-            raise TypeError(f"Cost must be scalar, not the vector {self.cost}.")
+        if isinstance(cost, np.ndarray):
+            if cost.ndim:
+                raise TypeError(f"Cost must be scalar, not the vector {cost}.")
+            cost = cost.item()  # 0-d: the nomial it holds
+        self.cost = cost
         subs = {k: k.value for k in self.cost.vks if k.value is not None}
         if substitutions:
             subs.update(substitutions)

@@ -8,13 +8,12 @@ from ..nomials.substitution import parse_linked, parse_subs
 from ..solutions import SolveStatus
 from ..util.globals import SignomialsEnabled
 from ..util.small_classes import FixedScalar
-from ..util.small_scripts import maybe_flatten
 from ..varmap import VarMap
 
 
 def evaluate_linked(constants, linked):
     "Evaluates the values and derivatives of linked variables."
-    kdc = VarMap({k: adnumber(maybe_flatten(v), k) for k, v in constants.items()})
+    kdc = VarMap({k: adnumber(v, k) for k, v in constants.items()})
     linked_derivs = {}
     array_calculated = {}  # cache for batch-evaluated vector linked functions
     for v, f in linked.items():
@@ -42,12 +41,13 @@ def evaluate_linked(constants, linked):
                 f" (compatible with '{v.units}'),"
                 f" e.g. `return value * gpkit.units('{v.units}')`."
             )
-        out = maybe_flatten(out)
-        if not hasattr(out, "x"):
-            constants[v] = out
-            continue  # a new fixed variable, not a calculated one
-        constants[v] = out.x
-        linked_derivs[v] = {adn.tag: grad for adn, grad in out.d().items() if adn.tag}
+        constants[v] = out  # refused unless a scalar; a 0-d array gives its item
+        out = constants[v]
+        if hasattr(out, "x"):  # calculated from other constants: keep derivatives
+            constants[v] = out.x
+            linked_derivs[v] = {
+                adn.tag: grad for adn, grad in out.d().items() if adn.tag
+            }
     return linked_derivs
 
 

@@ -31,13 +31,6 @@ def appendsolwarning(
     )
 
 
-def maybe_flatten(value):
-    "Extract values from 0-d numpy arrays, if necessary"
-    if hasattr(value, "size") and value.size == 1:
-        return value.item()
-    return value
-
-
 def mag(c):
     "Return magnitude of a Number or Quantity"
     return getattr(c, "magnitude", c)

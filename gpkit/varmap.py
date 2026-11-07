@@ -284,6 +284,8 @@ class VarMap(MutableMapping):
             raise ValueError(
                 f"cannot set {key}, a scalar, from a value of shape {shape}"
             )
+        if isinstance(value, np.ndarray):  # 0-d: store the number it holds
+            value = value.item()
         self._varset.add(key)
         self._data[key] = value
 
