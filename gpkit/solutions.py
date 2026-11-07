@@ -173,28 +173,33 @@ class Solution:
         return vmap
 
     def __getitem__(self, key: VarKey) -> "Quantity":
-        if key in self.primal:
-            vk = self.primal.varset.resolve(key)
-            if is_veckey(vk) and vk in self.constants:  # some elements fixed
-                return self._merged_vector(vk)
-            return self.primal.quantity(vk)
-        if key in self.constants:
-            return self.constants.quantity(key)
-        if hasattr(key, "sub"):
-            subbed = key.sub(self.variables, require_positive=False)
-            # Use .cs rather than .c: a zero-valued sub produces a Signomial
-            # (0 ≤ 0 triggers any_nonpositive_cs), which lacks .c but has .cs.
-            (c,) = subbed.cs
-            if isinstance(c, Quantity):
-                return c
-            return Quantity(c, key.units or "dimensionless")
-        raise KeyError(f"no variable '{key}' found in the solution")
+        "A variable's value, or an expression's with the solution substituted in"
+        if hasattr(key, "sub") and not hasattr(key, "key"):
+            return self._substituted(key)
+        try:
+            vk, value = self.primal.item(key)
+        except KeyError:
+            if key in self.constants:
+                return self.constants.quantity(key)
+            raise KeyError(f"no variable '{key}' found in the solution") from None
+        # a vector's fixed elements read as nan from primal; fill them in
+        if is_veckey(vk) and np.isnan(value).any() and vk in self.constants:
+            value = np.where(np.isnan(value), self.constants[vk], value)
+        return Quantity(value, vk.units or "dimensionless")
 
-    def _merged_vector(self, key):
-        "One vector's values, each element from whichever map holds it"
-        free, fixed = self.primal.quantity(key), self.constants.quantity(key)
-        merged = np.where(np.isnan(free.magnitude), fixed.magnitude, free.magnitude)
-        return Quantity(merged, free.units)
+    def _substituted(self, expr):
+        "A scalar expression's value, with the solution substituted in"
+        if hasattr(expr, "shape"):
+            raise TypeError(
+                f"sol[...] takes a scalar expression, not {expr}; for a vector, "
+                "compute with its values instead, e.g. 2*sol[v]"
+            )
+        subbed = expr.sub(self.variables, require_positive=False)
+        if subbed.vks:
+            raise KeyError(f"the solution has no value for {subbed.vks} in {expr}")
+        # .cs, not .c: substituting a zero leaves a Signomial, which has no .c
+        (c,) = subbed.cs
+        return c if isinstance(c, Quantity) else Quantity(c, "dimensionless")
 
     def almost_equal(self, other, tol=1e-6):
         """Checks for almost-equality between two solutions.

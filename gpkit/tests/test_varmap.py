@@ -241,6 +241,12 @@ class TestVarMap:
     def test_setting_a_scalar_rejects_an_array(self, vm, x):
         with pytest.raises(ValueError, match=r"x, a scalar.*shape \(2,\)"):
             vm[x] = [1, 2]
+        with pytest.raises(ValueError, match="x, a scalar.*ragged"):
+            vm[x] = ("sweep", [1, 2])
+
+    def test_a_variable_with_a_list_value_says_so(self):
+        with pytest.raises(ValueError, match="one number"):
+            Variable("x", [1, 2, 3])
 
     def test_setting_a_vector_element_rejects_an_array(self, vm):
         "An element is a scalar; a list on it used to solve with its last value (#386)"

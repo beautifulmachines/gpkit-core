@@ -85,6 +85,18 @@ class TestSolution:
         assert solx[1].to("m").magnitude == 4
         assert solx[0].to("m").magnitude == pytest.approx(10, rel=1e-6)
 
+    def test_getitem_expression(self):
+        "An expression gets the solution substituted in, or says why it can't"
+        x, z = VectorVariable(2, "x", "m"), Variable("z", "m")
+        m = Model(x.prod(), [x >= 1 * gpkit.units("m")])
+        m.substitutions[x[1]] = 4
+        sol = m.solve(verbosity=0)
+        assert sol[2 * x[0] + x[1]].to("m").magnitude == pytest.approx(6)
+        with pytest.raises(KeyError, match="no value"):
+            _ = sol[3 * z]  # used to read 3 m, z's coefficient
+        with pytest.raises(TypeError, match="scalar expression"):
+            _ = sol[2 * x]
+
     def test_getitem_in_a_sweep(self):
         h_max = Variable("h_max", 10, "m", "Length")
         a_min = Variable("A_min", 10, "m^2", "Area")
