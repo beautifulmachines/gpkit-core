@@ -159,7 +159,7 @@ class Model(CostedConstraintSet):
             self.cgroups = None
             _scan_for_children(constraints or [])
 
-        self._check_lineage_collisions()
+        self._check_tree()
         cost = cost or Monomial(1)
         constraints = constraints or []
         if setup_vars:
@@ -201,35 +201,43 @@ class Model(CostedConstraintSet):
         for child in self._children:
             yield from child.walk()
 
-    def _check_lineage_collisions(self):
-        """Raise if two Models in this tree share a lineage.
+    def _check_tree(self):
+        """Raise if a Model includes one it didn't create, or two share a lineage.
 
-        Two separately built instances of the same class get identical
-        lineages (numbering resets per root build, not per process);
-        composing both into one tree would silently merge their variables
-        and substitutions. Skips if nested -- the outermost call's walk
-        already covers this subtree.
-
-        A bare Model() has no lineage and several can nest, so they are skipped
-        here and told apart where constraint keys are formed instead.
+        A part's lineage is its creator's plus one entry. A bare Model() has no
+        lineage, so its parts are checked against its nearest named ancestor.
+        Runs only for the outermost model, whose walk covers the whole tree.
         """
         if NamedVariables.lineage:
             return
         seen = {}
-        for model in self.walk():
+
+        def visit(model, owner):
             lineage = getattr(model, "lineage", None)
-            if not lineage:
-                continue
-            prior = seen.get(lineage)
-            if prior is not None and prior is not model:
-                raise ValueError(
-                    f"{type(prior).__name__} and {type(model).__name__} "
-                    f"are distinct instances with the same lineage {lineage!r}. "
-                    "Build differing instances as siblings inside one parent's "
-                    "setup() instead, e.g. self.left = Wing(...); "
-                    "self.right = Wing(...)."
-                )
-            seen[lineage] = model
+            if lineage:
+                if lineage[:-1] != getattr(owner, "lineage", ()):
+                    includer = (
+                        "The top level" if owner is None else type(owner).__name__
+                    )
+                    raise ValueError(
+                        f"{includer} includes {type(model).__name__}, which it "
+                        "didn't create. Include a model only where it's "
+                        "created, and elsewhere use its variables."
+                    )
+                prior = seen.get(lineage)
+                if prior is not None and prior is not model:
+                    raise ValueError(
+                        f"{type(prior).__name__} and {type(model).__name__} "
+                        f"are distinct instances with the same lineage {lineage!r}. "
+                        "Build differing instances as siblings inside one parent's "
+                        "setup() instead, e.g. self.left = Wing(...); "
+                        "self.right = Wing(...)."
+                    )
+                seen[lineage] = model
+            for child in model._children:
+                visit(child, model if lineage else owner)
+
+        visit(self, None)
 
     @classmethod
     def description(cls):

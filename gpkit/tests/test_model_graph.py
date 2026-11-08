@@ -2,7 +2,7 @@
 
 import pytest
 
-from gpkit import Model, SignomialEquality, SignomialsEnabled, Variable
+from gpkit import Model, SignomialEquality, SignomialsEnabled, Var, Variable
 from gpkit.constraints.bounded import Bounded
 from gpkit.constraints.loose import Loose
 from gpkit.constraints.set import (
@@ -262,6 +262,68 @@ class TestSubmodels:
         assert W_rollup is not None
         sol = s.solve(verbosity=0)
         assert sol.cost == pytest.approx(3.0, rel=1e-3)
+
+
+class _Part(Model):
+    m = Var("-", "mass")
+
+    def setup(self):
+        return [self.m >= 1]
+
+
+class _User(Model):
+    "Uses a part's variables without including the part."
+
+    def setup(self, part):
+        m = Variable("m")
+        return [m >= part.m]
+
+
+class _Includer(Model):
+    "Includes a part it was handed."
+
+    def setup(self, part):
+        return [part]
+
+
+class TestPartsAreIncludedByTheirCreator:
+    """A model includes only the models it creates; others use their variables."""
+
+    def test_returning_a_siblings_part_raises(self):
+        class _Leg(Model):
+            def setup(self):
+                self.part = _Part()
+                return [self.part, _Includer(self.part)]
+
+        with pytest.raises(ValueError, match="_Includer includes _Part"):
+            _Leg()
+
+    def test_returning_a_part_built_outside_raises(self):
+        with pytest.raises(ValueError, match="_Includer includes _Part"):
+            _Includer(_Part())
+
+    def test_using_a_part_built_outside_is_fine(self):
+        part = _Part()
+        m = Model(part.m, [part, _User(part)])
+        assert m.submodels == [part, m.submodels[1]]
+
+    def test_bare_model_is_transparent(self):
+        class _Holder(Model):
+            def setup(self):
+                self.part = _Part()
+                return [Model(None, [self.part])]
+
+        holder = _Holder()
+        assert holder.part in list(holder.walk())
+
+    def test_uav_tree_matches_lineage(self):
+        def check(node, parent):
+            if parent:
+                assert node["instance_id"].rsplit(".", 1)[0] == parent
+            for child in node["children"]:
+                check(child, node["instance_id"])
+
+        check(UAV().to_ir()["model_tree"], None)
 
 
 class TestGetVar:

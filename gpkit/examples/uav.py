@@ -215,11 +215,7 @@ class PropulsionPerf(Model):
 
 
 class AircraftPerf(Model):
-    """Full aircraft performance: lift balance, total drag, thrust.
-
-    Includes the flight state so that V, rho, mu appear in this model's
-    own_varkeys — useful for condition table comparisons.
-    """
+    """Full aircraft performance: lift balance, total drag, thrust."""
 
     T = Var("N", "thrust force")
     W = Var("N", "aircraft weight")
@@ -236,7 +232,6 @@ class AircraftPerf(Model):
         e = aircraft.wing.e
         rho, V = state.rho, state.V
         return [
-            state,
             self.wing_aero,
             self.prop_perf,
             self.W <= 0.5 * rho * C_L * S * V**2,
@@ -265,7 +260,8 @@ class MissionLeg(Model):
         z = self.z_bre
         z_sum = sum(z**k / math.factorial(k) for k in range(1, _BREGUET_ORDER + 1))
         return [
-            self.perf,  # AircraftPerf already includes self.state
+            self.state,
+            self.perf,
             z >= g * R * T / (aircraft.engine.h_fuel * eta_0 * W),
             self.W_fuel / W >= z_sum,
         ]
@@ -324,7 +320,8 @@ class SprintCondition(Model):
         self.state = FlightState()
         self.perf = aircraft.perf(self.state)
         return [
-            self.perf,  # AircraftPerf already includes self.state
+            self.state,
+            self.perf,
             aircraft.engine.P_max
             >= self.perf.T * self.state.V / self.perf.prop_perf.eta_0,
             self.state.V >= self.V_reqt,
