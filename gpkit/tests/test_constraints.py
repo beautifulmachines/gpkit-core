@@ -372,7 +372,7 @@ class TestMonomialEquality:
             m.solve(verbosity=0)
 
     def test_duplicate_nested_model_detection(self):
-        "Shared Model returned by both parent and child should error"
+        "A shared Model returned by models that didn't create it should error"
 
         class Component(Model):
             "Shared component model (like Aircraft in JHO)"
@@ -402,8 +402,8 @@ class TestMonomialEquality:
                 self.cost = comp.get_var("w")
                 return [comp, Segment(comp), Segment(comp)]
 
-        with pytest.raises(ValueError, match="[Dd]uplicate"):
-            System().solve(verbosity=0)
+        with pytest.raises(ValueError, match="System includes Component"):
+            System()
 
 
 class TestSignomialInequality:

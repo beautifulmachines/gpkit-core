@@ -88,6 +88,10 @@
   fixed h_fuel  [UAV.Aircraft.Engine]
   cons  z_bre ≥ g⋅R⋅T/(h_fuel⋅eta_0⋅W)
   cons  W_fuel/W ≥ z_bre^1 + z_bre²/2 + z_bre³/6 + z_bre⁴/24
+[UAV.Mission.Outbound.FlightState]
+  free  V
+  fixed mu
+  fixed rho
 [UAV.Mission.Outbound.AircraftPerf]
   free  C_D
   free  C_Di
@@ -105,10 +109,6 @@
   cons  T ≥ 0.5⋅rho⋅C_D⋅S⋅V²
   cons  C_Di ≥ C_L²/(π⋅e⋅A)
   cons  C_D ≥ CDA0/S + C_Dp + C_Di
-[UAV.Mission.Outbound.FlightState]
-  free  V
-  fixed mu
-  fixed rho
 [UAV.Mission.Outbound.AircraftPerf.WingAero]
   free  C_Dp
   free  C_L
@@ -145,6 +145,10 @@
   fixed h_fuel  [UAV.Aircraft.Engine]
   cons  z_bre ≥ g⋅R⋅T/(h_fuel⋅eta_0⋅W)
   cons  W_fuel/W ≥ z_bre^1 + z_bre²/2 + z_bre³/6 + z_bre⁴/24
+[UAV.Mission.Return.FlightState]
+  free  V
+  fixed mu
+  fixed rho
 [UAV.Mission.Return.AircraftPerf]
   free  C_D
   free  C_Di
@@ -162,10 +166,6 @@
   cons  T ≥ 0.5⋅rho⋅C_D⋅S⋅V²
   cons  C_Di ≥ C_L²/(π⋅e⋅A)
   cons  C_D ≥ CDA0/S + C_Dp + C_Di
-[UAV.Mission.Return.FlightState]
-  free  V
-  fixed mu
-  fixed rho
 [UAV.Mission.Return.AircraftPerf.WingAero]
   free  C_Dp
   free  C_L
@@ -199,6 +199,10 @@
   fixed V_reqt
   cons  P_max ≥ T⋅V/eta_0
   cons  V ≥ V_reqt
+[UAV.Mission.SprintCondition.FlightState]
+  free  V
+  fixed mu
+  fixed rho
 [UAV.Mission.SprintCondition.AircraftPerf]
   free  C_D
   free  C_Di
@@ -216,10 +220,6 @@
   cons  T ≥ 0.5⋅rho⋅C_D⋅S⋅V²
   cons  C_Di ≥ C_L²/(π⋅e⋅A)
   cons  C_D ≥ CDA0/S + C_Dp + C_Di
-[UAV.Mission.SprintCondition.FlightState]
-  free  V
-  fixed mu
-  fixed rho
 [UAV.Mission.SprintCondition.AircraftPerf.WingAero]
   free  C_Dp
   free  C_L
