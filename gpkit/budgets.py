@@ -200,7 +200,7 @@ class BudgetNode:
     value : float
         Numerical value in *units* (the node's own per-row units).
     fraction : float
-        Fraction of the top-level budget total (0–1).
+        Fraction of its parent row's value (0–1).
     slack : float
         Relative slack of *this node's own* budget constraint (0.0 = tight).
         Only non-zero when the node has children derived from a sub-budget
@@ -581,26 +581,27 @@ def _build_children(top_vk, lt, constraint, ctx):
     return nodes, peeled_frac, slack_frac
 
 
-def _cbe_value(value, children, peeled_frac):
-    "Sum children's cbe when present; otherwise scale value by non-growth fraction."
+def _nominal_share(children, child_shares, peeled_frac):
+    """The share of a row's value that is nominal (cbe): its children's shares
+    weighted by their fractions, or for a leaf, what its own growth leaves.
+
+    Shares roll up rather than values, because a child's value may be in its
+    own units while its fraction is always of its parent."""
     if children:
-        return sum(c.cbe_value for c in children)
-    return value * (1.0 - peeled_frac)
+        return sum(c.fraction * s for c, s in zip(children, child_shares))
+    return 1.0 - peeled_frac
 
 
-def _compute_cbe_ga(node):
-    """Post-order cbe/ga split.
-
-    For every node, ``ga = value − cbe``.  Non-leaves take ``cbe`` from the
-    sum of children's cbe; leaves derive it from their own ``peeled_frac``.
-    ``has_growth`` propagates up from peeled allowances at this level or in
-    any descendant.
-    """
-    for child in node.children:
-        _compute_cbe_ga(child)
-    node.cbe_value = _cbe_value(node.value, node.children, node.peeled_frac)
+def _split_growth(node):
+    """Set a row's cbe/ga split and ``has_growth``, post-order, and return its
+    nominal share. ``has_growth`` propagates up from peeled allowances at this
+    level or in any descendant."""
+    child_shares = [_split_growth(child) for child in node.children]
+    share = _nominal_share(node.children, child_shares, node.peeled_frac)
+    node.cbe_value = node.value * share
     node.ga_value = node.value - node.cbe_value
     node.has_growth = node.peeled_frac > 0 or any(c.has_growth for c in node.children)
+    return share
 
 
 def _resolve_vk(var):
@@ -701,9 +702,8 @@ def build_budget(model, solution, var, display_units=None, depth=float("inf")):
         visited=frozenset({top_vk}),
     )
     children, peeled_frac, _ = _build_children(top_vk, lt, constraint, ctx)
-    for child in children:
-        _compute_cbe_ga(child)
-    cbe_total = _cbe_value(total_val, children, peeled_frac)
+    shares = [_split_growth(child) for child in children]
+    cbe_total = total_val * _nominal_share(children, shares, peeled_frac)
     has_growth = peeled_frac > 0 or any(c.has_growth for c in children)
     _trim_to_depth(children, depth - 1)
     return Budget(

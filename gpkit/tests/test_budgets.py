@@ -816,6 +816,47 @@ class TestBudgetUnitMismatchCoeff:
         # label should not start with a numeric coefficient like "0.001⋅m_struct"
         assert not struct_node.label[0].isdigit()
 
+    def test_no_growth_when_none_declared(self):
+        """A row in grams under a total in kg must not read as growth (#396)."""
+        model = MixedUnitMass()
+        sol, _ = solve(model)
+        b = build_budget(model, sol, model.m)
+        assert b.cbe_total == pytest.approx(b.total, rel=1e-6)
+        assert b.ga_total == pytest.approx(0.0, abs=1e-6 * b.total)
+        assert "Growth" not in b.text()
+
+    def test_growth_in_other_units_rolls_up(self):
+        """Growth on a row in grams reaches a total in kg at its physical size."""
+
+        class Part(Model):
+            "A part massed in grams, with a 20% growth allowance."
+
+            def setup(self):
+                self.m = Variable("m", "g", "part mass", growth=0.20)
+                return self.m.grown_from(Variable("e", 5000, "g", "estimate"))
+
+        class Assembly(Model):
+            "A kg total over a kg payload and a gram part."
+
+            def setup(self):
+                self.part = Part()
+                self.m = Variable("m", "kg", "total mass")
+                self.cost = self.m
+                payload = Variable("m_pay", 10, "kg", "payload")
+                return [self.part, self.m >= payload + self.part.m]
+
+        model = Assembly()
+        sol, _ = solve(model)
+        b = build_budget(model, sol, model.m)
+        # part: 5 kg nominal + 1 kg growth; total 16 kg
+        assert b.total == pytest.approx(16.0, rel=1e-4)
+        assert b.cbe_total == pytest.approx(15.0, rel=1e-4)
+        assert b.ga_total == pytest.approx(1.0, rel=1e-4)
+        part = next(n for n in b.children if n.vk == model.part.m.key)
+        assert part.units == "g"
+        assert part.cbe_value == pytest.approx(5000.0, rel=1e-4)
+        assert part.ga_value == pytest.approx(1000.0, rel=1e-4)
+
 
 # ---------------------------------------------------------------------------
 # Tests: mixed units (issue #161)
