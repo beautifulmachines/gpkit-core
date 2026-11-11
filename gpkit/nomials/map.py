@@ -132,14 +132,14 @@ class NomialMap(HashVector):
         cp.units = self.units
         # csmap is modified during substitution, but keeps the same exps
         cp.expmap, cp.csmap = {}, self.copy()
-        varlocs = defaultdict(set)
+        varlocs = defaultdict(list)
         for exp, c in self.items():
             new_exp = exp.copy()
             cp.expmap[exp] = new_exp  # cp modifies exps, so it needs new ones
             cp[new_exp] = c
             for vk in new_exp:
                 if vk in fixed:
-                    varlocs[vk].add((exp, new_exp))
+                    varlocs[vk].append((exp, new_exp))
 
         squished = set()
         for vk in varlocs:

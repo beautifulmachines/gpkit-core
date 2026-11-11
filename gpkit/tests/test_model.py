@@ -1,5 +1,7 @@
 """Tests for GP and SP classes"""
 
+import os
+import subprocess
 import sys
 from io import StringIO
 
@@ -1173,6 +1175,32 @@ def test_verbose_solve_percentages_read_as_percentages(capsys):
     printed = capsys.readouterr().out
     assert "Result packing took" in printed
     assert "%%" not in printed
+
+
+_PRINT_SOLVER_INPUT = """
+from gpkit.examples.pipeline import Pipeline
+from gpkit.examples.uav import UAV
+
+for modelcls in (Pipeline, UAV):
+    gp = modelcls.default().gp()
+    print([vk.ref for vk in gp.vars], list(gp.data.c))
+    print(sorted(zip(gp.data.A.row, gp.data.A.col, gp.data.A.data)))
+"""
+
+
+def test_solver_input_independent_of_hash_seed():
+    "One model gives one solver input, however the process hashes strings"
+    outputs = {
+        subprocess.run(
+            [sys.executable, "-c", _PRINT_SOLVER_INPUT],
+            env={**os.environ, "PYTHONHASHSEED": seed},
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout
+        for seed in ("0", "1")
+    }
+    assert len(outputs) == 1
 
 
 # ── Task 1: _cgroups from dict setup() ──────────────────────────────────────
