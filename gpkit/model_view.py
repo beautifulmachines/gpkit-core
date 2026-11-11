@@ -269,6 +269,12 @@ def _build_constraint_groups(model) -> list[CGroup]:
     return groups
 
 
+def _objective_scope(model) -> DisplayScope:
+    """Names for the cost's variables: as much of each path as tells them apart,
+    so two same-named variables in different submodels read differently."""
+    return DisplayScope(anchor=model.lineage, shown=model.cost.vks, excluded={"units"})
+
+
 def _build_objective(model, solution) -> dict:
     """Return objective keyword args for ModelView for the model's cost.
 
@@ -286,10 +292,10 @@ def _build_objective(model, solution) -> dict:
             "objective_direction": "minimize",
         }
     obj = model.objective_info(solution=solution)
-    excluded = {"units", "lineage"}
+    scope = _objective_scope(model)
     return {
-        "objective_str": render(obj.expr, TEXT, excluded),
-        "objective_latex": render(obj.expr, LATEX, excluded),
+        "objective_str": render(obj.expr, TEXT, scope),
+        "objective_latex": render(obj.expr, LATEX, scope),
         "objective_label": (obj.variable.label or "") if obj.variable else "",
         "objective_value": obj.value,
         "objective_units": obj.units,
@@ -312,8 +318,7 @@ def _model_stats(model) -> dict:
     n_constraints = sum(1 for _ in model.flat())
     if model.cost.vks:
         obj = model.objective_info()
-        excluded = {"units", "lineage"}
-        obj_latex = render(obj.expr, LATEX, excluded)
+        obj_latex = render(obj.expr, LATEX, _objective_scope(model))
         obj_label = (obj.variable.label or "") if obj.variable else ""
         obj_direction = obj.sense
     else:

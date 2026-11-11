@@ -385,6 +385,26 @@ class TestObjective:
         assert ir.objective_value is None  # no solution provided
         assert ir.objective_units != ""
 
+    def test_objective_tells_same_named_variables_apart(self):
+        """A cost over same-named variables of two submodels names each by
+        its path, the way the rest of the report does."""
+
+        class _Leg(Model):
+            def setup(self):
+                self.fuel = Variable("fuel", "kg")
+                return [self.fuel >= Variable("need", 1, "kg")]
+
+        class _Trip(Model):
+            def setup(self):
+                self.out, self.back = _Leg(), _Leg()
+                self.cost = self.out.fuel + self.back.fuel
+                return [self.out, self.back]
+
+        ir = model_view(_Trip())
+        names = ir.objective_str.split(" + ")
+        assert len(set(names)) == 2, ir.objective_str
+        assert all(name.endswith("fuel") for name in names)
+
     def test_build_ir_populates_objective_solved(self):
         """model_view populates objective_value from solution.
 
