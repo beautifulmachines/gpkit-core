@@ -304,7 +304,7 @@ class Budget:
     def to_dict(self) -> dict:
         """Return a JSON-serializable nested dict suitable for browser/Compass."""
         return {
-            "variable": str(self.top_vk),
+            "ref": self.top_vk.ref,
             "total": self.total,
             "cbe_total": self.cbe_total,
             "ga_total": self.ga_total,
@@ -438,7 +438,7 @@ def _collect_md_rows(nodes, lines, depth, show_growth=False):
 
 
 def _node_to_dict(node):
-    return {
+    d = {
         "label": node.label,
         "value": node.value,
         "cbe_value": node.cbe_value,
@@ -449,6 +449,10 @@ def _node_to_dict(node):
         "slack": node.slack,
         "children": [_node_to_dict(c) for c in node.children],
     }
+    # compound terms and [slack] are not variables, so they have no ref
+    if node.vk is not None:
+        d["ref"] = node.vk.ref
+    return d
 
 
 # ---------------------------------------------------------------------------

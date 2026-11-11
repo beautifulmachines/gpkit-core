@@ -1038,6 +1038,33 @@ class TestBudgetNodeUnits:
         assert "units" in child_dict
         assert child_dict["units"] == "kg"
 
+    @pytest.mark.parametrize("model_cls", [Aircraft, SlackModel])
+    def test_to_dict_refs_join_ir(self, model_cls):
+        """Rows backed by a variable carry its ref, which keys the model IR;
+        rows that are not a variable, like [slack], carry none."""
+        model = model_cls()
+        sol, _ = solve(model)
+        top = model.m if model_cls is Aircraft else model.m_total
+        b = build_budget(model, sol, top)
+        d = b.to_dict()
+        assert d["ref"] == top.key.ref
+        ir_vars = model.to_ir()["variables"]
+        unreffed = []
+
+        def walk(rows):
+            for row, node in rows:
+                if node.vk is None:
+                    assert "ref" not in row
+                    unreffed.append(row["label"])
+                else:
+                    assert row["ref"] == node.vk.ref
+                    assert row["ref"] in ir_vars
+                walk(zip(row["children"], node.children))
+
+        walk(zip(d["children"], b.children))
+        if model_cls is SlackModel:
+            assert "[slack]" in unreffed
+
     def test_slack_node_units(self):
         """Slack node units match the budget level units."""
         model = SlackModel()
