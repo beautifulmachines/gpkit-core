@@ -317,8 +317,11 @@ class TestBudgetRendering:
         b = build_budget(model, sol, model.m)
         d = b.to_dict()
         assert d["units"] == "kg"
-        assert isinstance(d["children"], list)
-        assert d["total"] == pytest.approx(b.total)
+        assert d["value"] == pytest.approx(b.total)
+        assert d["fraction"] == 1.0
+        # the top row is shaped like every other row, and named as text() names it
+        assert d.keys() == d["children"][0].keys()
+        assert f"Budget  —  {d['label']}" in b.text()
 
     def test_to_dict_zero_term_json_safe(self):
         """A zero-substituted budget term must not produce NaN in to_dict().
@@ -620,9 +623,7 @@ class TestBudgetRenderingWithGrowth:
         model = GrowthSpar()
         sol, _ = solve(model)
         d = build_budget(model, sol, model.m).to_dict()
-        assert "cbe_total" in d
-        assert "ga_total" in d
-        assert d["cbe_total"] + d["ga_total"] == pytest.approx(d["total"], rel=1e-4)
+        assert d["cbe_value"] + d["ga_value"] == pytest.approx(d["value"], rel=1e-4)
 
 
 class TestBudgetGrowthCellBlanking:
