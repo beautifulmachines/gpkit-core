@@ -393,8 +393,7 @@ class GeometricProgram:
             print(f" for {len(self.vars)} free variables")
             print(f"  in {len(self.data.k)} posynomial inequalities.")
 
-        solverargs = DEFAULT_SOLVER_KWARGS.get(solvername, {})
-        solverargs.update(kwargs)
+        solverargs = {**DEFAULT_SOLVER_KWARGS.get(solvername, {}), **kwargs}
         if self.choicevaridxs and solvername == "mosek_conif":
             solverargs["choicevaridxs"] = self.choicevaridxs
             self.integersolve = True

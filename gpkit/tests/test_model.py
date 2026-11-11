@@ -1,5 +1,6 @@
 """Tests for GP and SP classes"""
 
+import copy
 import os
 import subprocess
 import sys
@@ -37,6 +38,7 @@ from gpkit.exceptions import (
     UnknownInfeasible,
     UnnecessarySGP,
 )
+from gpkit.programs.gp import DEFAULT_SOLVER_KWARGS
 from gpkit.util.small_classes import CootMatrix
 
 NDIGS = {"cvxopt": 5, "mosek_cli": 5, "mosek_conif": 3}
@@ -1201,6 +1203,14 @@ def test_solver_input_independent_of_hash_seed():
         for seed in ("0", "1")
     }
     assert len(outputs) == 1
+
+
+def test_solver_kwargs_do_not_outlive_their_solve():
+    "Options passed to one solve never become defaults for the next"
+    x = Variable("x")
+    before = copy.deepcopy(DEFAULT_SOLVER_KWARGS)
+    Model(x, [x >= 1]).solve(solver="cvxopt", verbosity=0, use_leqs=False)
+    assert DEFAULT_SOLVER_KWARGS == before
 
 
 # ── Task 1: _cgroups from dict setup() ──────────────────────────────────────
