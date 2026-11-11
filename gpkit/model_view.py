@@ -269,14 +269,12 @@ def _build_constraint_groups(model) -> list[CGroup]:
     return groups
 
 
-def _objective_scope(model) -> DisplayScope:
-    """Names for the cost's variables: as much of each path as tells them apart,
-    so two same-named variables in different submodels read differently."""
-    return DisplayScope(anchor=model.lineage, shown=model.cost.vks, excluded={"units"})
-
-
-def _build_objective(model, solution) -> dict:
+def _build_objective(model, solution, scope) -> dict:
     """Return objective keyword args for ModelView for the model's cost.
+
+    The cost names its variables through the section's scope, as constraints
+    do, so a variable reads the same in the objective as everywhere else in
+    the section.
 
     All fields are empty/None when the cost has no variables (i.e. it is a
     trivial constant placeholder rather than a real optimization objective).
@@ -292,7 +290,7 @@ def _build_objective(model, solution) -> dict:
             "objective_direction": "minimize",
         }
     obj = model.objective_info(solution=solution)
-    scope = _objective_scope(model)
+    scope = scope.also_excluding("units")
     return {
         "objective_str": render(obj.expr, TEXT, scope),
         "objective_latex": render(obj.expr, LATEX, scope),
@@ -300,37 +298,6 @@ def _build_objective(model, solution) -> dict:
         "objective_value": obj.value,
         "objective_units": obj.units,
         "objective_direction": obj.sense,
-    }
-
-
-# ── Standard text blocks ──────────────────────────────────────────────────────
-
-
-def _model_stats(model) -> dict:
-    """Compute model-wide counts for use in report text blocks.
-
-    Returns a dict with keys: n_free, n_constraints, objective_str,
-    objective_latex.  All values are derived from the model without requiring
-    a solved solution.
-    """
-    n_free = len(model.vks) - len(model.substitutions)
-    # flat() returns a generator (flatiter), so use sum() rather than len().
-    n_constraints = sum(1 for _ in model.flat())
-    if model.cost.vks:
-        obj = model.objective_info()
-        obj_latex = render(obj.expr, LATEX, _objective_scope(model))
-        obj_label = (obj.variable.label or "") if obj.variable else ""
-        obj_direction = obj.sense
-    else:
-        obj_latex = None
-        obj_label = ""
-        obj_direction = "minimize"
-    return {
-        "n_free": n_free,
-        "n_constraints": n_constraints,
-        "objective_latex": obj_latex,
-        "objective_label": obj_label or "",
-        "objective_direction": obj_direction,
     }
 
 
@@ -355,10 +322,11 @@ def model_view(
     own_name = "" if is_anon else type(model).__name__
     lineage_path = model.lineagestr() if own_name else _parent_path
     cgroups = _build_constraint_groups(model)
+    # The section shows its constraints and its objective, so variables from
+    # either that this model doesn't own are listed here too.
     extra_vks = (
-        constraint_varkeys(c for cg in cgroups for c in cg.constraints)
-        - model.own_varkeys
-    )
+        constraint_varkeys(c for cg in cgroups for c in cg.constraints) | model.cost.vks
+    ) - model.own_varkeys
     # One set feeds both what the section shows and how much lineage each name
     # needs, so the two cannot disagree.
     # abbreviate: the variable tables below list every foreign key with its
@@ -389,7 +357,7 @@ def model_view(
         constraint_groups=cgroups,
         scope=scope,
         preamble=preamble,
-        **_build_objective(model, solution),
+        **_build_objective(model, solution, scope),
         children=[
             model_view(child, solution=solution, _parent_path=lineage_path)
             for child in model.submodels

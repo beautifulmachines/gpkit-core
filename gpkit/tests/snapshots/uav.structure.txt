@@ -1,4 +1,6 @@
 [UAV]
+  free  Outbound.W_fuel
+  free  Return.W_fuel
 [UAV.Aircraft]
   free  W_mto
   free  W_tilde

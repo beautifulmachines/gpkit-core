@@ -389,21 +389,47 @@ class TestObjective:
         """A cost over same-named variables of two submodels names each by
         its path, the way the rest of the report does."""
 
-        class _Leg(Model):
+        class Leg(Model):
             def setup(self):
                 self.fuel = Variable("fuel", "kg")
                 return [self.fuel >= Variable("need", 1, "kg")]
 
-        class _Trip(Model):
+        class Trip(Model):
             def setup(self):
-                self.out, self.back = _Leg(), _Leg()
+                self.out, self.back = Leg(), Leg()
                 self.cost = self.out.fuel + self.back.fuel
                 return [self.out, self.back]
 
-        ir = model_view(_Trip())
-        names = ir.objective_str.split(" + ")
-        assert len(set(names)) == 2, ir.objective_str
-        assert all(name.endswith("fuel") for name in names)
+        ir = model_view(Trip())
+        assert ir.objective_str == "Leg.fuel + Leg1.fuel"
+        assert ir.objective_latex == (
+            r"{\text{fuel}}_{\text{leg}} + {\text{fuel}}_{\text{leg1}}"
+        )
+        # the section lists them, so its tables say where they live
+        assert [e.name for e in ir.free_variables] == ["Leg.fuel", "Leg1.fuel"]
+
+    def test_objective_names_variables_as_its_section_does(self):
+        """A cost on a submodel's W, in a model with its own W, names it as the
+        section's tables and constraints do, never as the model's own."""
+
+        class Wing(Model):
+            def setup(self):
+                self.W = Variable("W", "N")
+                return [self.W >= Variable("W0", 10, "N")]
+
+        class AC(Model):
+            def setup(self):
+                self.wing = Wing()
+                W = Variable("W", "N")
+                self.cost = self.wing.W
+                return [self.wing, W >= self.wing.W + Variable("W_pay", 5, "N")]
+
+        ir = model_view(AC())
+        assert ir.objective_str == "Wing.W"
+        assert ir.objective_latex == r"{W}_{\text{wing}}"
+        assert ir.to_dict()["constraint_groups"][0]["constraints"][0]["str"] == (
+            "W ≥ Wing.W + W_pay"
+        )
 
     def test_build_ir_populates_objective_solved(self):
         """model_view populates objective_value from solution.
