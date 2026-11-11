@@ -385,6 +385,52 @@ class TestObjective:
         assert ir.objective_value is None  # no solution provided
         assert ir.objective_units != ""
 
+    def test_objective_tells_same_named_variables_apart(self):
+        """A cost over same-named variables of two submodels names each by
+        its path, the way the rest of the report does."""
+
+        class Leg(Model):
+            def setup(self):
+                self.fuel = Variable("fuel", "kg")
+                return [self.fuel >= Variable("need", 1, "kg")]
+
+        class Trip(Model):
+            def setup(self):
+                self.out, self.back = Leg(), Leg()
+                self.cost = self.out.fuel + self.back.fuel
+                return [self.out, self.back]
+
+        ir = model_view(Trip())
+        assert ir.objective_str == "Leg.fuel + Leg1.fuel"
+        assert ir.objective_latex == (
+            r"{\text{fuel}}_{\text{leg}} + {\text{fuel}}_{\text{leg1}}"
+        )
+        # the section lists them, so its tables say where they live
+        assert [e.name for e in ir.free_variables] == ["Leg.fuel", "Leg1.fuel"]
+
+    def test_objective_names_variables_as_its_section_does(self):
+        """A cost on a submodel's W, in a model with its own W, names it as the
+        section's tables and constraints do, never as the model's own."""
+
+        class Wing(Model):
+            def setup(self):
+                self.W = Variable("W", "N")
+                return [self.W >= Variable("W0", 10, "N")]
+
+        class AC(Model):
+            def setup(self):
+                self.wing = Wing()
+                W = Variable("W", "N")
+                self.cost = self.wing.W
+                return [self.wing, W >= self.wing.W + Variable("W_pay", 5, "N")]
+
+        ir = model_view(AC())
+        assert ir.objective_str == "Wing.W"
+        assert ir.objective_latex == r"{W}_{\text{wing}}"
+        assert ir.to_dict()["constraint_groups"][0]["constraints"][0]["str"] == (
+            "W ≥ Wing.W + W_pay"
+        )
+
     def test_build_ir_populates_objective_solved(self):
         """model_view populates objective_value from solution.
 

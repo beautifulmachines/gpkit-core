@@ -190,7 +190,9 @@ class DisplayScope:
         key = vk.veckey or vk
         if "lineage" in self.excluded:
             return ""
-        return latex_path_label(_segments(self.path(key), modelnums=False))
+        return latex_path_label(
+            _segments(self.path(key), "modelnums" not in self.excluded)
+        )
 
     def text(self, vk) -> str:
         "vk as a reader sees it in text: its name, then its index or [:]."
