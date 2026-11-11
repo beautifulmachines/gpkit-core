@@ -200,7 +200,7 @@ class BudgetNode:
     value : float
         Numerical value in *units* (the node's own per-row units).
     fraction : float
-        Fraction of the top-level budget total (0–1).
+        Fraction of its parent row's value (0–1).
     slack : float
         Relative slack of *this node's own* budget constraint (0.0 = tight).
         Only non-zero when the node has children derived from a sub-budget
@@ -263,55 +263,66 @@ class Budget:
         "True when any growth allowance is present in this budget."
         return abs(self.ga_total) > 1e-6 * max(abs(self.total), 1.0)
 
+    def _top_node(self) -> BudgetNode:
+        "The top variable as a row, so every level renders the same way."
+        return BudgetNode(
+            label=_FULL_PATH.text(self.top_vk),
+            vk=self.top_vk,
+            value=self.total,
+            fraction=1.0,
+            slack=0.0,
+            units=self.units,
+            children=self.children,
+            cbe_value=self.cbe_total,
+            ga_value=self.ga_total,
+            has_growth=self.has_growth,
+        )
+
     def text(self) -> str:
         """Return an aligned-column plain-text budget table.
 
         When the budget contains any growth allowance, two extra columns
         (Nominal and Growth) appear before the totals column.
         """
-        top_label = _FULL_PATH.text(self.top_vk)
-        header = f"Budget  —  {top_label}"
-        if self._show_growth_columns():
-            return _render_growth_text(self, top_label, header)
-        return _render_plain_text(self, top_label, header)
+        top, show_growth = self._top_node(), self._show_growth_columns()
+        rows = []
+        if show_growth:  # titled columns; a title also sets its column's width
+            rows.append((0, "", [*_value_titles(show_growth), "", ""]))
+        for depth, node in _walk(top):
+            label = node.label + _slack_note(node, "  (slack {:.1f}%)")
+            rows.append((depth, label, _cells(node, show_growth)))
+        lbl_w = max(2 * depth + len(label) for depth, label, _ in rows)
+        widths = [max(map(len, col)) for col in zip(*(cells for _, _, cells in rows))]
+        header = f"Budget  —  {top.label}"
+        lines = [header, "-" * len(header)]
+        for depth, label, cells in rows:
+            pad = " " * (lbl_w - 2 * depth - len(label))
+            values = "".join(f"  {cell:>{w}}" for cell, w in zip(cells, widths))
+            lines.append(f"  {'  ' * depth}{label}{pad}{values}")
+        return "\n".join(lines)
 
     def markdown(self) -> str:
         """Return a GitHub-flavored markdown budget table."""
-        top_label = _FULL_PATH.text(self.top_vk)
-        if self._show_growth_columns():
-            lines = [
-                "| Component | Nominal | Growth | Total | Units | Fraction |",
-                "| --- | ---: | ---: | ---: | :--- | ---: |",
-                (
-                    f"| **{top_label}** | **{self.cbe_total:.4g}** "
-                    f"| **{self.ga_total:.4g}** | **{self.total:.4g}** "
-                    f"| **[{self.units}]** | **100.0%** |"
-                ),
-            ]
-            _collect_md_rows(self.children, lines, depth=0, show_growth=True)
-            return "\n".join(lines)
+        top, show_growth = self._top_node(), self._show_growth_columns()
+        titles = _value_titles(show_growth)
         lines = [
-            "| Component | Value | Units | Fraction |",
-            "| --- | ---: | :--- | ---: |",
-            (
-                f"| **{top_label}** | **{self.total:.4g}** "
-                f"| **[{self.units}]** | **100.0%** |"
-            ),
+            _md_row(["Component", *titles, "Units", "Fraction"]),
+            _md_row(["---", *["---:"] * len(titles), ":---", "---:"]),
         ]
-        _collect_md_rows(self.children, lines, depth=0)
+        for depth, node in _walk(top):
+            cells = _cells(node, show_growth)
+            if depth == 0:
+                lines.append(_md_row(f"**{c}**" for c in [node.label, *cells]))
+            else:
+                indent = "&nbsp;" * (4 * (depth - 1))
+                label = indent + node.label + _slack_note(node, " *(slack {:.1f}%)*")
+                lines.append(_md_row([label, *cells]))
         return "\n".join(lines)
 
     def to_dict(self) -> dict:
-        """Return a JSON-serializable nested dict suitable for browser/Compass."""
-        return {
-            "variable": str(self.top_vk),
-            "total": self.total,
-            "cbe_total": self.cbe_total,
-            "ga_total": self.ga_total,
-            "has_growth": self.has_growth,
-            "units": self.units,
-            "children": [_node_to_dict(n) for n in self.children],
-        }
+        """Return a JSON-serializable nested dict. Every row, the top
+        included, has the same keys."""
+        return _node_to_dict(self._top_node())
 
     def __repr__(self) -> str:
         return self.text()
@@ -322,123 +333,38 @@ class Budget:
 # ------------------------------------------------------------------
 
 
-def _render_plain_text(budget, top_label, header):
-    rows = [(0, top_label, f"{budget.total:.4g}", f"[{budget.units}]", "100.0%")]
-    _collect_text_rows(budget.children, rows, depth=1)
-    lbl_w = max(r[0] * 2 + len(r[1]) for r in rows)
-    val_w = max(len(r[2]) for r in rows)
-    unt_w = max(len(r[3]) for r in rows)
-    pct_w = max(len(r[4]) for r in rows)
-    lines = [header, "-" * len(header)]
-    for depth, label, val_str, units_str, pct_str in rows:
-        lines.append(
-            f"  {'  ' * depth}{label}"
-            f"{' ' * (lbl_w - depth * 2 - len(label))}  "
-            f"{val_str:>{val_w}}  {units_str:>{unt_w}}  {pct_str:>{pct_w}}"
-        )
-    return "\n".join(lines)
+def _walk(node, depth=0):
+    "(depth, node) for a node and every row under it, depth-first."
+    yield depth, node
+    for child in node.children:
+        yield from _walk(child, depth + 1)
 
 
-def _render_growth_text(budget, top_label, header):
-    rows = [
-        (
-            0,
-            top_label,
-            f"{budget.cbe_total:.4g}",
-            f"{budget.ga_total:.4g}",
-            f"{budget.total:.4g}",
-            f"[{budget.units}]",
-            "100.0%",
-        )
-    ]
-    _collect_text_rows(budget.children, rows, depth=1, show_growth=True)
-    w = {
-        "lbl": max(r[0] * 2 + len(r[1]) for r in rows),
-        "cbe": max(*(len(r[2]) for r in rows), len("Nominal")),
-        "ga": max(*(len(r[3]) for r in rows), len("Growth")),
-        "tot": max(*(len(r[4]) for r in rows), len("Total")),
-        "unt": max(len(r[5]) for r in rows),
-        "pct": max(len(r[6]) for r in rows),
-    }
-    lines = [
-        header,
-        "-" * len(header),
-        (
-            f"  {' ' * w['lbl']}  {'Nominal':>{w['cbe']}}  {'Growth':>{w['ga']}}  "
-            f"{'Total':>{w['tot']}}  {'':>{w['unt']}}  {'':>{w['pct']}}"
-        ),
-    ]
-    for row in rows:
-        lines.append(_format_growth_row(row, w))
-    return "\n".join(lines)
+def _value_titles(show_growth):
+    "Titles of the number columns."
+    return ["Nominal", "Growth", "Total"] if show_growth else ["Value"]
 
 
-def _format_growth_row(row, w):
-    depth, label, cbe_s, ga_s, tot_s, unt_s, pct_s = row
-    return (
-        f"  {'  ' * depth}{label}"
-        f"{' ' * (w['lbl'] - depth * 2 - len(label))}  "
-        f"{cbe_s:>{w['cbe']}}  {ga_s:>{w['ga']}}  {tot_s:>{w['tot']}}  "
-        f"{unt_s:>{w['unt']}}  {pct_s:>{w['pct']}}"
-    )
+def _cells(node, show_growth):
+    "One row's columns after its label: the numbers, then units and fraction."
+    numbers = [f"{node.value:.4g}"]
+    if show_growth:
+        growth = f"{node.ga_value:.4g}" if node.has_growth else ""
+        numbers = [f"{node.cbe_value:.4g}", growth, *numbers]
+    return [*numbers, f"[{node.units}]", f"{node.fraction * 100:.1f}%"]
 
 
-def _collect_text_rows(nodes, rows, depth, show_growth=False):
-    for node in nodes:
-        label = node.label
-        if node.slack > 1e-4:
-            label += f"  (slack {node.slack * 100:.1f}%)"
-        if show_growth:
-            ga_str = f"{node.ga_value:.4g}" if node.has_growth else ""
-            rows.append(
-                (
-                    depth,
-                    label,
-                    f"{node.cbe_value:.4g}",
-                    ga_str,
-                    f"{node.value:.4g}",
-                    f"[{node.units}]",
-                    f"{node.fraction * 100:.1f}%",
-                )
-            )
-        else:
-            rows.append(
-                (
-                    depth,
-                    label,
-                    f"{node.value:.4g}",
-                    f"[{node.units}]",
-                    f"{node.fraction * 100:.1f}%",
-                )
-            )
-        if node.children:
-            _collect_text_rows(node.children, rows, depth + 1, show_growth=show_growth)
+def _slack_note(node, template):
+    "The template filled with the row's slack percentage, if it has slack."
+    return template.format(node.slack * 100) if node.slack > 1e-4 else ""
 
 
-def _collect_md_rows(nodes, lines, depth, show_growth=False):
-    indent = "&nbsp;" * (4 * depth)
-    for node in nodes:
-        label = f"{indent}{node.label}"
-        if node.slack > 1e-4:
-            label += f" *(slack {node.slack * 100:.1f}%)*"
-        if show_growth:
-            ga_str = f"{node.ga_value:.4g}" if node.has_growth else ""
-            lines.append(
-                f"| {label} | {node.cbe_value:.4g} | {ga_str} "
-                f"| {node.value:.4g} | [{node.units}] "
-                f"| {node.fraction * 100:.1f}% |"
-            )
-        else:
-            lines.append(
-                f"| {label} | {node.value:.4g} | [{node.units}] "
-                f"| {node.fraction * 100:.1f}% |"
-            )
-        if node.children:
-            _collect_md_rows(node.children, lines, depth + 1, show_growth=show_growth)
+def _md_row(cells):
+    return "| " + " | ".join(cells) + " |"
 
 
 def _node_to_dict(node):
-    return {
+    d = {
         "label": node.label,
         "value": node.value,
         "cbe_value": node.cbe_value,
@@ -449,6 +375,10 @@ def _node_to_dict(node):
         "slack": node.slack,
         "children": [_node_to_dict(c) for c in node.children],
     }
+    # compound terms and [slack] are not variables, so they have no ref
+    if node.vk is not None:
+        d["ref"] = node.vk.ref
+    return d
 
 
 # ---------------------------------------------------------------------------
@@ -651,26 +581,27 @@ def _build_children(top_vk, lt, constraint, ctx):
     return nodes, peeled_frac, slack_frac
 
 
-def _cbe_value(value, children, peeled_frac):
-    "Sum children's cbe when present; otherwise scale value by non-growth fraction."
+def _nominal_share(children, child_shares, peeled_frac):
+    """The share of a row's value that is nominal (cbe): its children's shares
+    weighted by their fractions, or for a leaf, what its own growth leaves.
+
+    Shares roll up rather than values, because a child's value may be in its
+    own units while its fraction is always of its parent."""
     if children:
-        return sum(c.cbe_value for c in children)
-    return value * (1.0 - peeled_frac)
+        return sum(c.fraction * s for c, s in zip(children, child_shares))
+    return 1.0 - peeled_frac
 
 
-def _compute_cbe_ga(node):
-    """Post-order cbe/ga split.
-
-    For every node, ``ga = value − cbe``.  Non-leaves take ``cbe`` from the
-    sum of children's cbe; leaves derive it from their own ``peeled_frac``.
-    ``has_growth`` propagates up from peeled allowances at this level or in
-    any descendant.
-    """
-    for child in node.children:
-        _compute_cbe_ga(child)
-    node.cbe_value = _cbe_value(node.value, node.children, node.peeled_frac)
+def _split_growth(node):
+    """Set a row's cbe/ga split and ``has_growth``, post-order, and return its
+    nominal share. ``has_growth`` propagates up from peeled allowances at this
+    level or in any descendant."""
+    child_shares = [_split_growth(child) for child in node.children]
+    share = _nominal_share(node.children, child_shares, node.peeled_frac)
+    node.cbe_value = node.value * share
     node.ga_value = node.value - node.cbe_value
     node.has_growth = node.peeled_frac > 0 or any(c.has_growth for c in node.children)
+    return share
 
 
 def _resolve_vk(var):
@@ -771,9 +702,8 @@ def build_budget(model, solution, var, display_units=None, depth=float("inf")):
         visited=frozenset({top_vk}),
     )
     children, peeled_frac, _ = _build_children(top_vk, lt, constraint, ctx)
-    for child in children:
-        _compute_cbe_ga(child)
-    cbe_total = _cbe_value(total_val, children, peeled_frac)
+    shares = [_split_growth(child) for child in children]
+    cbe_total = total_val * _nominal_share(children, shares, peeled_frac)
     has_growth = peeled_frac > 0 or any(c.has_growth for c in children)
     _trim_to_depth(children, depth - 1)
     return Budget(
