@@ -21,10 +21,9 @@ g = Variable("g", "m/s^2", "gravitational constant", value=9.8)
 
 
 class Wing(Model):
-    """Wing structure: spar geometry, sizing constraints, and wing weight.
-
-    Sized against W_design, the weight it is rated to carry: the spar bending
-    and shear constraints scale with it. Aircraft sets that rating.
+    """
+    The wing's structure: a spar sized to carry the aircraft's design weight in
+    bending and shear, and the wing weight that results.
     """
 
     S = Var("m^2", "wing area")
@@ -40,6 +39,7 @@ class Wing(Model):
     W_cap = Var("N", "spar cap weight")
     W_web = Var("N", "shear web weight")
     W = Var("N", "wing weight")
+    # Aircraft sets W_design; the spar bending and shear constraints scale with it
     W_design = Var("N", "rated carried weight, excluding the wing")
     # Wing structural constants
     N_lift = Var("-", "wing loading multiplier", value=6.0)
@@ -114,7 +114,7 @@ class Wing(Model):
 
 
 class Engine(Model):
-    """Engine: shaft power, weight fit, and propulsion constants."""
+    """The engine, whose weight grows with the shaft power it must deliver."""
 
     P_max = Var("kW", "maximum shaft power")
     W = Var("N", "engine weight")
@@ -136,7 +136,10 @@ class Engine(Model):
 
 
 class Aircraft(Model):
-    """System-level vehicle: weight buildup and fuselage drag."""
+    """
+    The whole vehicle: its weight built up from its parts, payload and fuel, and the
+    fuselage's drag.
+    """
 
     W_zfw = Var("N", "zero fuel weight")
     W_tilde = Var("N", "non-wing weight (fixed + payload + engine)")
@@ -162,7 +165,7 @@ class Aircraft(Model):
 
 
 class FlightState(Model):
-    """Flight conditions: velocity, air density, viscosity."""
+    """Flight conditions: speed, air density and viscosity."""
 
     V = Var("m/s", "flight speed")
     rho = Var("kg/m^3", "air density", value=0.91)
@@ -170,7 +173,7 @@ class FlightState(Model):
 
 
 class WingAero(Model):
-    """Wing aerodynamics: profile drag and Reynolds number at a flight state."""
+    """Wing drag at one flight condition, from its Reynolds number."""
 
     C_L = Var("-", "wing lift coefficient")
     C_Dp = Var("-", "profile drag coefficient")
@@ -195,9 +198,9 @@ class WingAero(Model):
 
 
 class PropulsionPerf(Model):
-    """Propulsive efficiency chain at a flight state.
-
-    Receives T (thrust) from AircraftPerf for the actuator disk equation.
+    """
+    How efficiently the propeller turns engine power into thrust at one flight
+    condition.
     """
 
     eta_i = Var("-", "ideal propulsive efficiency")
@@ -205,6 +208,7 @@ class PropulsionPerf(Model):
     eta_0 = Var("-", "overall propulsive efficiency")
 
     def setup(self, engine, state, T):
+        # T is the thrust AircraftPerf requires; the actuator disk equation uses it
         eta_i, eta_prop, eta_0 = self.eta_i, self.eta_prop, self.eta_0
         V, rho = state.V, state.rho
         return [
@@ -215,7 +219,10 @@ class PropulsionPerf(Model):
 
 
 class AircraftPerf(Model):
-    """Full aircraft performance: lift balance, total drag, thrust."""
+    """
+    The whole aircraft at one flight condition: lift equal to weight, total drag,
+    and the thrust to overcome it.
+    """
 
     T = Var("N", "thrust force")
     W = Var("N", "aircraft weight")
@@ -242,10 +249,9 @@ class AircraftPerf(Model):
 
 
 class MissionLeg(Model):
-    """One cruise leg: Breguet range equation at a single flight state.
-
-    W is the *final* (end-of-leg) weight, following the standard Breguet
-    formulation where W_fuel/W = e^z - 1 ≈ z + z²/2 + …
+    """
+    One cruise leg: the fuel burned over its distance, from the Breguet range
+    equation.
     """
 
     W_fuel = Var("N", "fuel weight for this leg")
@@ -255,6 +261,8 @@ class MissionLeg(Model):
         # R is Mission.R — the same VarKey shared by outbound and return legs
         self.state = FlightState()
         self.perf = aircraft.perf(self.state)
+        # W is the end-of-leg weight, as in the standard Breguet form
+        # W_fuel/W = e^z - 1 ≈ z + z²/2 + …
         T, W = self.perf.T, self.perf.W
         eta_0 = self.perf.prop_perf.eta_0
         z = self.z_bre
@@ -268,22 +276,17 @@ class MissionLeg(Model):
 
 
 class Outbound(MissionLeg):
-    """Outbound cruise leg."""
+    """The outbound cruise leg."""
 
 
 class Return(MissionLeg):
-    """Return cruise leg."""
+    """The return cruise leg."""
 
 
 class Mission(Model):
-    """Out-and-back mission: two cruise legs, sprint condition, weight chain.
-
-    outbound_leg.perf.W is the turnaround weight — the final weight of the
-    outbound leg and initial weight of the return leg.  The sprint condition
-    is sized at the turnaround weight.
-
-    For a multi-segment cruise, replace the two named legs with:
-        with Vectorize(N): self.segments = MissionSegment(aircraft, self.R)
+    """
+    An out-and-back mission: two cruise legs, with a sprint at the turnaround
+    weight.
     """
 
     R = Var("m", "mission leg range")
@@ -291,6 +294,8 @@ class Mission(Model):
     W_fuel = Var("N", "total fuel weight")
 
     def setup(self, aircraft):
+        # For a multi-segment cruise, vectorize MissionLeg over N segments in place
+        # of the two named legs.
         self.outbound_leg = Outbound(aircraft, self.R)
         self.return_leg = Return(aircraft, self.R)
         self.sprint = SprintCondition(aircraft)
@@ -312,7 +317,7 @@ class Mission(Model):
 
 
 class SprintCondition(Model):
-    """Sprint condition: engine sizing at the required sprint speed."""
+    """A sprint at the required speed, which sizes the engine."""
 
     V_reqt = Var("m/s", "sprint speed requirement", value=150)
 
@@ -329,7 +334,10 @@ class SprintCondition(Model):
 
 
 class HeavyLandingCase(Model):
-    """Sizing case: stall speed constraint at MTOW and sea-level density."""
+    """
+    Landing at maximum takeoff weight at sea level, which limits stall speed and so
+    sizes the wing.
+    """
 
     V_stall = Var("m/s", "stall speed")
     V_stallmax = Var("m/s", "stall speed limit", value=38)
@@ -350,10 +358,7 @@ class HeavyLandingCase(Model):
 
 
 class UAV(Model):
-    """Fixed-wing UAV minimizing fuel for a symmetric out-and-back mission.
-
-    Submodels are accessed via attributes (aircraft.wing, mission.outbound_leg).
-    """
+    """A fixed-wing UAV sized to burn the least fuel on an out-and-back mission."""
 
     references: ClassVar = [
         (
