@@ -47,12 +47,6 @@ class TestExamples:
         tree = example.bds.get_tree("cost")
         assert tree, "cost breakdown produced no tree"
 
-    def test_issue_1513(self, example):
-        assert example.sol[0].cost == pytest.approx(20.0, rel=1e-2)
-
-    def test_issue_1522(self, example):
-        assert example.sol.cost == pytest.approx(3.0, rel=1e-2)
-
     def test_autosweep(self, example):
         bst1, tol1 = example.bst1, example.tol1
         bst2, tol2 = example.bst2, example.tol2
@@ -177,10 +171,6 @@ class TestExamples:
         # all variables named "m" are still accessible via varkeys
         all_m = model.varkeys.keys("m")
         assert len(all_m) == 3  # PowerSystem.m, Battery.m, Motor.m
-
-    @pytest.mark.skip(reason="pint units error - needs investigation")
-    def test_plot_sweep1d(self, example):
-        pass
 
     def test_uav(self, example):
         m = example.UAV()

@@ -942,6 +942,18 @@ class Widget(Model):
 class TestModelNoSolve:
     "model tests that don't require a solver"
 
+    def test_subclass_without_setup_refuses_arguments(self):
+        "A subclass with no setup() has nothing to pass arguments to, so it says so"
+        x = Variable("x", "m")
+        c = Variable("c", 1.0, "m")
+
+        class NoSetup(Model):
+            pass
+
+        with pytest.raises(TypeError, match="has no setup"):
+            NoSetup(x, [x >= c])
+        assert NoSetup().n_constraints == 0
+
     def test_modelname_added(self):
         t = Thing(2)
         for vk in t.vks:

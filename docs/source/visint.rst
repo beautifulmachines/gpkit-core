@@ -201,19 +201,3 @@ With some different arguments, the model looks like this:
 The only piece of unexplained syntax in this is ``minsenss``. Perhaps
 unsurprisingly, this just limits the links shown to only those whose sensitivity
 exceeds that minimum; it's quite useful for exploring a large model.
-
-
-Plotting a 1D Sweep
-==================
-
-Methods exist to facilitate creating, solving, and plotting the results of a single-variable sweep (see :ref:`Sweeps` for details). Example usage is as follows:
-
-.. literalinclude:: examples/plot_sweep1d.py
-
-Which results in:
-
-.. figure:: examples/plot_sweep1d.png
-    :align: center
-
-.. figure:: examples/plot_autosweep1d.png
-    :align: center

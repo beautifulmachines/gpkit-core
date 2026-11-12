@@ -3,11 +3,6 @@
 # expected_cost / expected_cost_tol drive parametrized tests in test_catalog.py
 
 [[models]]
-id = "box"
-module = "gpkit.examples.simple_box"
-class = "Box"
-
-[[models]]
 id = "water_tank"
 module = "gpkit.examples.water_tank"
 class = "WaterTank"

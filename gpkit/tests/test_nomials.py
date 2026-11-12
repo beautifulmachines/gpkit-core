@@ -358,6 +358,15 @@ class TestSignomial:
         with pytest.raises(TypeError):
             _ = x - y
 
+    def test_negation_raises_without_signomials(self):
+        "Negating fails at the minus sign rather than returning NotImplemented"
+        x = Variable("x")
+        v = VectorVariable(3, "v")
+        with pytest.raises(TypeError, match="other side of the constraint"):
+            _ = -x
+        with pytest.raises(TypeError, match="other side of the constraint"):
+            _ = -v
+
     def test_chop(self):
         "Test Signomial deconstruction"
         x = Variable("x")

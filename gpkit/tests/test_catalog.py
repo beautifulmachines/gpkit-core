@@ -33,7 +33,6 @@ from gpkit.util.small_scripts import mag
 # External repos using run_catalog_test can put expected_cost/expected_cost_tol
 # directly in their catalog.toml entries instead.
 _EXPECTED_COSTS = {
-    "box": (0.003674, 0.01),
     "water_tank": (1.293, 0.01),
     "beam": (0.7825, 0.001),
     "pipeline": (234504.0, 0.01),

@@ -224,8 +224,8 @@ class SolutionOracle:
             if self._is_cost(posy):  # with small tol should look like a line
                 ax.fill_between(
                     self.sampled_at,
-                    self.cost_lb(),
-                    self.cost_ub(),
+                    mag(self.cost_lb()),
+                    mag(self.cost_ub()),
                     facecolor=GPBLU,
                     edgecolor=GPBLU,
                     linewidth=0.75,

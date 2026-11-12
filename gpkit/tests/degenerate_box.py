@@ -1,4 +1,10 @@
-"Maximizes box volume given area and aspect ratio constraints."
+"""A box-volume GP whose optimum is nearly degenerate, kept as a test fixture.
+
+From Section 2.4 of Boyd et al.'s GP tutorial. With these numbers the floor
+aspect ratio constraint d/w >= gamma is almost tight (d/w = 2.0018 against 2)
+at a dual of about 3e-4, which exercises how near-zero sensitivities are
+handled. The numbers match the paper, so they are not tuned away.
+"""
 
 from gpkit import Model, Var
 
@@ -30,8 +36,3 @@ class Box(Model):
             d / w >= self.gamma,
             d / w <= self.delta,
         ]
-
-
-if __name__ == "__main__":
-    m = Box()
-    print(m.table(m.solve(verbosity=0)))

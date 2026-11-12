@@ -117,22 +117,11 @@ class Model(CostedConstraintSet):
             # including its own (name, num), and those of models above it
             with NamedVariables(self.__class__.__name__) as (self.lineage, setup_vars):
                 self._instantiate_var_descriptors()
-                if hasattr(self, "setup"):
-                    args = (
-                        tuple(arg for arg in [cost, constraints] if arg is not None)
-                        + args
-                    )
-                    cs = self.setup(*args, **kwargs)
-                    if (
-                        isinstance(cs, tuple)
-                        and len(cs) == 2
-                        and isinstance(cs[1], dict)
-                    ):
-                        constraints, substitutions = cs
-                    else:
-                        constraints = cs or []
-                else:
-                    constraints = []
+                constraints, setup_subs = self._run_setup(
+                    cost, constraints, args, kwargs
+                )
+                if setup_subs is not None:
+                    substitutions = setup_subs
             cost = self.cost
             # Named constraint groups from dict setup(); None for list setup().
             # Use `is None` checks — empty dict is a valid groups map.
@@ -175,6 +164,21 @@ class Model(CostedConstraintSet):
         for var, fn in self.computed.items():
             key = getattr(var, "key", var)
             result.primal[key] = fn(result)
+
+    def _run_setup(self, cost, constraints, args, kwargs):
+        "Pass the constructor's arguments to setup(); return its constraints and subs."
+        args = tuple(a for a in [cost, constraints] if a is not None) + args
+        if not hasattr(self, "setup"):
+            if args or kwargs:
+                raise TypeError(
+                    f"{self.__class__.__name__} has no setup() to take"
+                    " arguments; build Model(cost, constraints) instead"
+                )
+            return [], None
+        cs = self.setup(*args, **kwargs)
+        if isinstance(cs, tuple) and len(cs) == 2 and isinstance(cs[1], dict):
+            return cs
+        return cs or [], None
 
     def _instantiate_var_descriptors(self):
         """Create Var descriptor fields on self before setup() runs."""
