@@ -259,10 +259,13 @@ class Signomial(Nomial):
         return NotImplemented
 
     def __neg__(self):
-        if SignomialsEnabled:
-            out = -1 * self
-            return Signomial(out.hmap, ast=expr("neg", (to_ast(self),)))
-        return NotImplemented
+        if not SignomialsEnabled:
+            raise TypeError(
+                "can't negate a posynomial; move the term to the other side of the"
+                " constraint (write a >= b, not a - b >= 0)"
+            )
+        out = -1 * self
+        return Signomial(out.hmap, ast=expr("neg", (to_ast(self),)))
 
     def __sub__(self, other):
         return self + -other if SignomialsEnabled else NotImplemented
