@@ -175,7 +175,7 @@ so that updating any one of them will update all of them.
 Fixed Variables
 ---------------
 
-When a Model is created, any fixed Variables are used to form a dictionary: ``{var: var.value for var in self.varlocs if var.value is not None}``. This dictionary is then substituted into the Model's cost and constraints before the ``substitutions`` argument is (and hence values are supplanted by any later substitutions).
+A variable declared with a value, such as ``L = Var("m", "length", value=2)`` in a Model class, is fixed: building the Model puts that value in ``model.substitutions``. The ``substitutions`` argument is applied afterwards, so it overrides the declared value.
 
 ``solution[p]`` substitutes the solution's values into the scalar expression ``p`` and returns the result as a quantity in ``p``'s units; if ``p`` has a variable the solution doesn't hold, it raises ``KeyError``. For a single variable, scalar or vector, this is just its value, whether it was free or fixed. For a vector expression, compute with the values instead, e.g. ``2*solution[v]``.
 

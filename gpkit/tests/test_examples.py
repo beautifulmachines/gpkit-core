@@ -178,10 +178,6 @@ class TestExamples:
         all_m = model.varkeys.keys("m")
         assert len(all_m) == 3  # PowerSystem.m, Battery.m, Motor.m
 
-    @pytest.mark.skip(reason="pint units error - needs investigation")
-    def test_plot_sweep1d(self, example):
-        pass
-
     def test_uav(self, example):
         m = example.UAV()
         sol = m.solve(verbosity=0)
