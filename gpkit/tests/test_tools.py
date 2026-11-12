@@ -93,3 +93,18 @@ class TestTools:
         assert y == VectorVariable(3, "y")
         with pytest.raises(NotImplementedError):
             _ = te_tangent(x, 16)
+
+
+def test_autosweep_plot_labels_axes_with_units():
+    "Plotting an autosweep labels each axis with its variable and units"
+    mpl = pytest.importorskip("matplotlib")
+    mpl.use("Agg")
+    import matplotlib.pyplot as plt  # noqa: PLC0415
+
+    x = Variable("x", "m", "swept variable")
+    y = Variable("y", "m^2", "cost")
+    m = Model(y, [y >= x**2, y >= x * Variable("a", 1, "m")])
+    fig, ax = m.autosweep({x: (1, 3)}, tol=0.01, verbosity=0).plot(y)
+    assert ax.get_xlabel() == "swept variable [m]"
+    assert ax.get_ylabel() == "cost [m²]"
+    plt.close(fig)

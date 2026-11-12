@@ -1,7 +1,8 @@
-"Implements plot_sweep1d function"
+"Axes setup and labels for plotting 1D sweeps"
 
 import matplotlib.pyplot as plt
 
+from ..display.spelling import unitstr
 from ..exceptions import InvalidGPConstraint
 
 
@@ -27,7 +28,7 @@ def format_and_label_axes(var, posys, axes, ylabel=True):
             if hasattr(posy, "key"):
                 ylabel = (
                     posy.key.label or posy.key.name
-                ) + f" [{posy.key.unitstr(dimless='-')}]"
+                ) + f" [{unitstr(posy.key, dimless='-')}]"
             else:
                 ylabel = str(posy)
             ax.set_ylabel(ylabel)
@@ -44,7 +45,7 @@ def format_and_label_axes(var, posys, axes, ylabel=True):
             i.set_linewidth(0.6)
             i.set_color("0.6")
             i.set_linestyle("dotted")
-    xlabel = (var.key.label or var.key.name) + f" [{var.key.unitstr(dimless='-')}]"
+    xlabel = (var.key.label or var.key.name) + f" [{unitstr(var.key, dimless='-')}]"
     axes[-1].set_xlabel(xlabel)
     plt.locator_params(nbins=4)
     plt.subplots_adjust(wspace=0.15)
