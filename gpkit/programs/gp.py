@@ -348,7 +348,7 @@ class GeometricProgram:
 
     def gen(self):
         "compile this program and set meq_idxs"
-        variables = set()
+        variables = {}  # a dict as an ordered set, so column order is reproducible
         self.meq_idxs = MonoEqualityIndexes()
         self.exps = []
         m_idx = 0
@@ -359,7 +359,7 @@ class GeometricProgram:
                     self.meq_idxs.first_half.add(m_idx)
             self.exps.extend(hmap)
             for exp in hmap:
-                variables.update(exp)
+                variables.update(dict.fromkeys(exp))
                 m_idx += 1
         self.varcols = {vk: i for i, vk in enumerate(variables)}
         self.vars = tuple(variables)
@@ -393,8 +393,7 @@ class GeometricProgram:
             print(f" for {len(self.vars)} free variables")
             print(f"  in {len(self.data.k)} posynomial inequalities.")
 
-        solverargs = DEFAULT_SOLVER_KWARGS.get(solvername, {})
-        solverargs.update(kwargs)
+        solverargs = {**DEFAULT_SOLVER_KWARGS.get(solvername, {}), **kwargs}
         if self.choicevaridxs and solvername == "mosek_conif":
             solverargs["choicevaridxs"] = self.choicevaridxs
             self.integersolve = True
