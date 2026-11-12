@@ -13,17 +13,6 @@ Of course, the optimal value is 1. Output:
 .. literalinclude:: examples/x_greaterthan_1_output.txt
     :language: breakdowns
 
-Maximizing the Volume of a Box
-==============================
-This example comes from Section 2.4 of the `GP tutorial <http://stanford.edu/~boyd/papers/pdf/gp_tutorial.pdf>`_, by S. Boyd et. al.
-
-.. literalinclude:: examples/simple_box.py
-
-The output is
-
-.. literalinclude:: examples/simple_box_output.txt
-    :language: breakdowns
-
 Water Tank
 ==========
 Say we had a fixed mass of water we wanted to contain within a tank, but also wanted to minimize the cost of the material we had to purchase (i.e. the surface area of the tank):
@@ -62,11 +51,3 @@ By plotting the deflection, we can see that the agreement between the analytical
 .. figure:: examples/beam.svg
    :width: 500 px
    :align: center
-
-.. Comments:
-
-..
-    .. literalinclude:: code/simple_box.py
-        :language: python
-        :emphasize-lines: 2-4, 6
-        :lines: 1-7

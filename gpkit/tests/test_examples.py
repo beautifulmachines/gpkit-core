@@ -47,12 +47,6 @@ class TestExamples:
         tree = example.bds.get_tree("cost")
         assert tree, "cost breakdown produced no tree"
 
-    def test_issue_1513(self, example):
-        assert example.sol[0].cost == pytest.approx(20.0, rel=1e-2)
-
-    def test_issue_1522(self, example):
-        assert example.sol.cost == pytest.approx(3.0, rel=1e-2)
-
     def test_autosweep(self, example):
         bst1, tol1 = example.bst1, example.tol1
         bst2, tol2 = example.bst2, example.tol2

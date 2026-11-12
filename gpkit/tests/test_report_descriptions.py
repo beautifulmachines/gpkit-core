@@ -327,7 +327,7 @@ class TestObjective:
     """Tests for objective expression and value in ModelView and renderers."""
 
     def _solved_box(self):
-        from gpkit.examples.simple_box import Box  # noqa: PLC0415
+        from gpkit.tests.degenerate_box import Box  # noqa: PLC0415
 
         m = Box()
         sol = m.solve(verbosity=0)
