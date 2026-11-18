@@ -591,6 +591,15 @@ class SignomialInequality(ScalarSingleEquationConstraint):
             self.unsubbed = [plt - pgt]
         self.bounded = self.as_gpconstr({}).bounded
 
+    def to_ir(self):
+        "Serialize this constraint; a guessed side's terms each carry their share"
+        ir = super().to_ir()
+        if self.guess is not None:
+            shares = {exp: w for t, w in self.guess.weights.items() for exp in t.hmap}
+            for exp, term in zip(self.right.hmap, ir["right"]["terms"]):
+                term["guess"] = shares[exp]
+        return ir
+
     def as_hmapslt1(self, substitutions):
         "Returns the posys <= 1 representation of this constraint."
         (siglt0,) = self.unsubbed
