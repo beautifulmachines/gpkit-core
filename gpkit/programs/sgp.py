@@ -124,7 +124,9 @@ class SequentialGeometricProgram:
     a dummy variable `z` to be greater than the desired Signomial objective `s`
     (z >= s) and then minimizing that dummy variable.""")
         gpconstraints, self.sgpconstraints = split_constraints(model, substitutions)
-        if use_pccp is None:  # a fully guessed first GP is conservative: no slack
+        # Fully guessed, the first GP is the modeler's own conservative design:
+        # if it is infeasible, say so rather than slacken it away
+        if use_pccp is None:
             use_pccp = not all(
                 getattr(cs, "guess", None) is not None for cs in self.sgpconstraints
             )

@@ -5,7 +5,7 @@ from itertools import pairwise
 import numpy as np
 import pytest
 
-from gpkit import Model, SignomialsEnabled, Variable, guess
+from gpkit import Model, SignomialEquality, SignomialsEnabled, Variable, guess
 from gpkit.constraints.set import keyed_constraints
 from gpkit.exceptions import Infeasible, InvalidGPConstraint
 from gpkit.nomials import SignomialInequality
@@ -45,10 +45,17 @@ class TestLowerBound:
             guess({x: 1, 2 * x * y: 3}).lower_bound(),
         )
 
-    def test_shares_at_raises_unless_terms_collapse(self):
+    def test_shares_at_is_none_unless_terms_collapse(self):
         x, y = Variable("x"), Variable("y")
+        assert (x + 2 * y).shares_at({x: 1}) is None
         with pytest.raises(ValueError, match="monomial"):
-            (x + 2 * y).shares_at({x: 1})
+            (x + 2 * y).mono_lower_bound({x: 1})
+
+    def test_tiny_share_stays_finite(self):
+        "(c/w)**w overflows for a tiny w unless computed in log space"
+        x, y = Variable("x"), Variable("y")
+        bound = guess({x: 1, 1e300 * y: 1e-310}).lower_bound()
+        assert np.isfinite(bound.c)
 
     def test_mono_lower_bound_is_bound_at_shares(self):
         x, y = Variable("x"), Variable("y")
@@ -90,12 +97,22 @@ class TestGuess:
         "x + y >= 2y + z is really x >= y + z"
         x, y, z = Variable("x"), Variable("y"), Variable("z")
         with pytest.raises(ValueError, match="both sides"):
-            guess({x: 1, y: 1}) >= 2 * y + z  # noqa: B015
+            _ = guess({x: 1, y: 1}) >= 2 * y + z
 
     def test_keys_combining_into_one_term_raise(self):
         x = Variable("x")
         with pytest.raises(ValueError, match="term"):
             guess({x: 1, 2 * x: 1})
+
+    def test_non_monomial_key_raises(self):
+        x, y, z = Variable("x"), Variable("y"), Variable("z")
+        with pytest.raises(ValueError, match="must be a monomial"):
+            guess({x + y: 1, z: 1})
+
+    def test_equality_takes_no_guess(self):
+        x, y, z = Variable("x"), Variable("y"), Variable("z")
+        with pytest.raises(TypeError, match="inequality"):
+            SignomialEquality(z, guess({x: 1, y: 1}))
 
 
 def pressure_vessel(*, guessed=True):

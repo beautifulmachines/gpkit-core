@@ -255,17 +255,21 @@ class Posynomial(Signomial):
 
     def mono_lower_bound(self, x0):
         "Monomial lower bound on this posynomial, exact at x0"
-        return self.shares_at(x0).lower_bound()
-
-    def shares_at(self, x0):
-        """Shares of this posynomial's terms at x0. x0 may leave variables free,
-        as long as the substituted terms share one exponent."""
-        terms = self.chop()  # coefficients in this posynomial's units
-        subbed = [t.hmap.sub(x0, t.vks) for t in terms]
-        if len({exp for hmap in subbed for exp in hmap}) > 1:
+        shares = self.shares_at(x0)
+        if shares is None:
             raise ValueError(
                 f"{self} at {x0} is not a monomial, so its shares are not numbers"
             )
+        return shares.lower_bound()
+
+    def shares_at(self, x0):
+        """Shares of this posynomial's terms at x0, or None if x0 doesn't set
+        them. x0 may leave variables free, as long as the substituted terms
+        share one exponent."""
+        terms = self.chop()  # coefficients in this posynomial's units
+        subbed = [t.hmap.sub(x0, t.vks) for t in terms]
+        if len({exp for hmap in subbed for exp in hmap}) > 1:
+            return None
         return Shares({t: sum(h.values()) for t, h in zip(terms, subbed)})
 
 
@@ -696,10 +700,8 @@ class SignomialInequality(ScalarSingleEquationConstraint):
         if x0:
             (siglt0,) = self.unsubbed
             _, negy = siglt0.posy_negy()
-            try:
-                return negy.shares_at(x0)
-            except ValueError:
-                pass
+            if (shares := negy.shares_at(x0)) is not None:
+                return shares
         return self.guess
 
     def as_gpconstr(self, x0):
@@ -717,6 +719,8 @@ class SingleSignomialEquality(SignomialInequality):
     "A constraint of the general form posynomial == posynomial"
 
     def __init__(self, left, right):
+        if isinstance(right, Shares):
+            raise TypeError("a guess is the greater-than side of an inequality")
         SignomialInequality.__init__(self, left, "<=", right)
         self.oper = "="
         self.meq_bounded = self.as_gpconstr({}).meq_bounded
@@ -752,6 +756,12 @@ class Shares:
         if any(w < 0 for w in weights.values()) or not total:
             raise ValueError("each weight must be >= 0, and at least one > 0")
         self.weights = {Monomial(t): w / total for t, w in weights.items()}
+        for term in self.weights:
+            if len(term.hmap) != 1:
+                raise ValueError(
+                    f"each guessed term must be a monomial; {term} has"
+                    f" {len(term.hmap)} terms"
+                )
         self.posynomial = sum(self.weights)
         if len(self.posynomial.hmap) < len(self.weights):
             raise ValueError(
@@ -760,14 +770,16 @@ class Shares:
 
     def lower_bound(self):
         "Monomial lower bound on the posynomial, exact at these shares"
-        exp, c = HashVector(), 1.0
+        exp, logc = HashVector(), 0.0
         for term, w in self.weights.items():
             if w:
                 (t_exp,) = term.hmap
                 for vk, e in t_exp.items():
                     exp[vk] = exp.get(vk, 0) + w * e
-                c *= (self.posynomial.hmap[t_exp] / w) ** w  # in common units
-        hmap = NomialMap({exp: c})
+                # (c/w)**w, in log space so that a tiny share can't overflow;
+                # c is in the posynomial's common units
+                logc += w * (np.log(self.posynomial.hmap[t_exp]) - np.log(w))
+        hmap = NomialMap({exp: float(np.exp(logc))})
         hmap.units = self.posynomial.units
         return Monomial(hmap)
 

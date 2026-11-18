@@ -22,7 +22,6 @@ from .nomials import (
     Monomial,
     NomialArray,
     Posynomial,
-    Shares,
     Signomial,
     Variable,
     VectorVariable,
