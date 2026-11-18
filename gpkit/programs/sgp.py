@@ -1,7 +1,6 @@
 """Implement the SequentialGeometricProgram class"""
 
 import warnings as pywarnings
-from collections import defaultdict
 from time import time
 
 import numpy as np
@@ -20,6 +19,63 @@ from ..varmap import VarMap
 from .gp import GeometricProgram
 
 EPS = 1e-6  # 1 +/- this is used in a few relative differences
+
+
+def split_constraints(model, substitutions):
+    "model's constraints: (GP-compatible after substitution, signomial)"
+    gpconstraints, sgpconstraints = [], []
+    for cs in model.flat():
+        try:
+            if not hasattr(cs, "as_hmapslt1"):
+                raise InvalidGPConstraint(cs)
+            if not isinstance(cs, PosynomialInequality):
+                cs.as_hmapslt1(substitutions)  # gp-compatible?
+            gpconstraints.append(cs)
+        except InvalidGPConstraint as exc:
+            if not hasattr(cs, "as_gpconstr"):
+                raise InvalidSGPConstraint(cs) from exc
+            sgpconstraints.append(cs)
+    return gpconstraints, sgpconstraints
+
+
+def approximation_point(vks, substitutions, x0=None):
+    """The values known when approximating: substitutions, then x0. A signomial
+    constraint's shares are measured here only where these values collapse its
+    greater-than side to a monomial; elsewhere its guess stands."""
+    point = VarMap(substitutions)
+    point.register_keys(vks)  # for string access and so forth
+    point.update(x0 or {})
+    return point
+
+
+def approximate(sgpconstraints, point):
+    "Each signomial constraint's GP stand-in at point, each linked to the other"
+    approximated = []
+    for cs in sgpconstraints:
+        gpc = cs.as_gpconstr(point)
+        gpc.generated_by, cs.generated = cs, gpc
+        approximated.append(gpc)
+    return approximated
+
+
+def local_gp(cost, model, substitutions, *, x0=None, **kwargs):
+    """The GP that stands in for model's signomial constraints: each one's
+    greater-than side condensed at its shares (measured at x0 where x0
+    determines them, else guessed)."""
+    gpconstraints, sgpconstraints = split_constraints(model, substitutions)
+    point = approximation_point(model.vks, substitutions, x0)
+    unshared = [
+        cs
+        for cs in sgpconstraints
+        if not hasattr(cs, "gt_shares") or cs.gt_shares(point) is None
+    ]
+    if unshared:
+        raise InvalidGPConstraint(
+            "no guess, and x0 does not set the shares, of: "
+            + "; ".join(str(cs) for cs in unshared)
+        )
+    approximated = approximate(sgpconstraints, point)
+    return GeometricProgram(cost, approximated + gpconstraints, substitutions, **kwargs)
 
 
 class SequentialGeometricProgram:
@@ -57,7 +113,7 @@ class SequentialGeometricProgram:
         slack = Variable("C")
 
     def __init__(
-        self, cost, model, substitutions, *, use_pccp=True, pccp_penalty=2e2, **kwargs
+        self, cost, model, substitutions, *, use_pccp=None, pccp_penalty=2e2, **kwargs
     ):
         self.cost = cost
         self.pccp_penalty = pccp_penalty
@@ -67,49 +123,25 @@ class SequentialGeometricProgram:
     The equivalent of a Signomial objective can be constructed by constraining
     a dummy variable `z` to be greater than the desired Signomial objective `s`
     (z >= s) and then minimizing that dummy variable.""")
-        self.gpconstraints, self.sgpconstraints = [], []
+        gpconstraints, self.sgpconstraints = split_constraints(model, substitutions)
+        if use_pccp is None:  # a fully guessed first GP is conservative: no slack
+            use_pccp = not all(
+                getattr(cs, "guess", None) is not None for cs in self.sgpconstraints
+            )
         if not use_pccp:
             self.slack = 1
+            self.gpconstraints = gpconstraints
         else:
-            self.gpconstraints.append(self.slack >= 1)
-        cost *= self.slack**pccp_penalty
-        self.approxconstraints = []
-        self.sgpvks = set()
-        x0 = VarMap(substitutions)
-        x0.register_keys(model.vks)  # for string access and so forth
-        for cs in model.flat():
-            try:
-                if not hasattr(cs, "as_hmapslt1"):
-                    raise InvalidGPConstraint(cs)
-                if not isinstance(cs, PosynomialInequality):
-                    cs.as_hmapslt1(substitutions)  # gp-compatible?
-                self.gpconstraints.append(cs)
-            except InvalidGPConstraint as exc:
-                if not hasattr(cs, "as_gpconstr"):
-                    raise InvalidSGPConstraint(cs) from exc
-                self.sgpconstraints.append(cs)
-                for hmaplt1 in cs.as_gpconstr(x0).as_hmapslt1({}):
-                    constraint = Posynomial(hmaplt1) <= self.slack
-                    constraint.generated_by = cs
-                    cs.generated = constraint
-                    self.approxconstraints.append(constraint)
-                    self.sgpvks.update(constraint.vks)
+            self.gpconstraints = [self.slack >= 1, *gpconstraints]
         if not self.sgpconstraints:
             raise UnnecessarySGP("""Model valid as a Geometric Program.
 
 SequentialGeometricPrograms should only be created with Models containing
 Signomial Constraints, since Models without Signomials have global
 solutions and can be solved with 'Model.solve()'.""")
-        self._gp = GeometricProgram(
-            cost, self.approxconstraints + self.gpconstraints, substitutions, **kwargs
-        )
-        self._gp.x0 = x0
-        self.a_idxs = defaultdict(list)
-        last_cost_mon = self._gp.data.k[0]
-        first_gp_mon = sum(self._gp.data.k[: 1 + len(self.approxconstraints)])
-        for row_idx, m_idx in enumerate(self._gp.data.A.row):
-            if last_cost_mon <= m_idx <= first_gp_mon:
-                self.a_idxs[self._gp.data.p_idxs[m_idx]].append(row_idx)
+        self._gpcost = cost * self.slack**pccp_penalty
+        self.vks, self.substitutions, self.gpkwargs = model.vks, substitutions, kwargs
+        self._gp = self.gp()  # the first GP
 
     def localsolve(  # noqa: PLR0912, PLR0913, PLR0915
         self,
@@ -141,9 +173,6 @@ solutions and can be solved with 'Model.solve()'.""")
             consecutive solve's objective values.
         iteration_limit : int
             Maximum GP iterations allowed.
-        mutategp: boolean
-            Prescribes whether to mutate the previously generated GP
-            or to create a new GP with every solve.
         **solveargs :
             Passed to solver function.
 
@@ -156,10 +185,9 @@ solutions and can be solved with 'Model.solve()'.""")
         starttime = time()
         if verbosity > 0:
             print("Starting a sequence of GP solves")
-            print(f" for {len(self.sgpvks)} free variables")
-            print(f"  in {len(self.sgpconstraints)} locally-GP constraints")
-            print(f"  and for {len(self._gp.vars)} free variables")
-            print(f"  in {len(self._gp.data.k)} posynomial inequalities.")
+            print(f" for {len(self.sgpconstraints)} signomial constraints,")
+            print(f"  {len(self._gp.vars)} free variables")
+            print(f"  and {len(self._gp.data.k)} posynomial inequalities.")
         prevcost, cost, rel_improvement = None, None, None
         while rel_improvement is None or rel_improvement > reltol:
             prevcost = cost
@@ -169,7 +197,7 @@ solutions and can be solved with 'Model.solve()'.""")
                     "Check `m.program.results`; if they're converging, try "
                     "`.localsolve(..., iteration_limit=NEWLIMIT)`."
                 )
-            gp = self.gp(x0, cleanx0=len(self.gps) >= 1)  # clean the first x0
+            gp = self.gp(x0)
             self.gps.append(gp)  # NOTE: SIDE EFFECTS
             if verbosity > 1:
                 print(f"\nGP Solve {len(self.gps)}")
@@ -259,58 +287,25 @@ solutions and can be solved with 'Model.solve()'.""")
             ]
         return self._results
 
-    def _update_a_matrix(self, m_idx, hmap, a_idxs):
-        """Update A matrix entries for a given monomial.
+    def gp(self, x0=None):
+        "The GP approximating this SGP about x0, built fresh"
+        point = approximation_point(self.vks, self.substitutions, x0)
+        approximated = approximate(self.sgpconstraints, point)
+        if hasattr(self.slack, "key"):  # PCCP: each may slacken by C
+            approximated = [
+                self._slackened(Posynomial(hmaplt1), gpc.generated_by)
+                for gpc in approximated
+                for hmaplt1 in gpc.as_hmapslt1({})
+            ]
+        return GeometricProgram(
+            self._gpcost,
+            approximated + self.gpconstraints,
+            self.substitutions,
+            **self.gpkwargs,
+        )
 
-        Arguments
-        ---------
-        m_idx : int
-            Starting index for this monomial
-        hmap : dict
-            Monomial mapping
-        a_idxs : list
-            List of A matrix indices that can be modified
-        """
-        for i, (exp, c) in enumerate(hmap.items()):
-            self._gp.exps[m_idx + i] = exp
-            self._gp.data.c[m_idx + i] = c
-            for var, x in exp.items():
-                try:  # modify a particular A entry
-                    row_idx = a_idxs.pop()
-                    self._gp.data.A.row[row_idx] = m_idx + i
-                    self._gp.data.A.col[row_idx] = self._gp.varcols[var]
-                    self._gp.data.A.data[row_idx] = x
-                except IndexError:  # numbers of exps increased
-                    a_idxs.append(len(self._gp.data.A.row))
-                    self._gp.data.A.row.append(m_idx + i)
-                    self._gp.data.A.col.append(self._gp.varcols[var])
-                    self._gp.data.A.data.append(x)
-            for row_idx in a_idxs:  # number of exps decreased
-                self._gp.data.A.row[row_idx] = 0  # zero out this entry
-                self._gp.data.A.col[row_idx] = 0
-                self._gp.data.A.data[row_idx] = 0
-
-    def gp(self, x0=None, *, cleanx0=False):
-        "Update self._gp for x0 and return it."
-        if not x0:
-            return self._gp  # return last generated
-        if not cleanx0:
-            cleanedx0 = VarMap()
-            cleanedx0.register_keys(self._gp.vars)
-            cleanedx0.update(x0)
-            x0 = cleanedx0
-        self._gp.x0.update({vk: x0[vk] for vk in self.sgpvks if vk in x0})
-        p_idx = 0
-        for sgpc in self.sgpconstraints:
-            for hmaplt1 in sgpc.as_gpconstr(self._gp.x0).as_hmapslt1({}):
-                approxc = self.approxconstraints[p_idx]
-                approxc.left = self.slack
-                approxc.right.hmap = hmaplt1
-                approxc.unsubbed = [Posynomial(hmaplt1) / self.slack]
-                p_idx += 1  # p_idx=0 is the cost; sp constraints are after it
-                (hmap,) = approxc.as_hmapslt1(self._gp.substitutions)
-                self._gp.hmaps[p_idx] = hmap
-                m_idx = self._gp.data.m_idxs[p_idx].start
-                a_idxs = list(self.a_idxs[p_idx])  # A's entries we can modify
-                self._update_a_matrix(m_idx, hmap, a_idxs)
-        return self._gp
+    def _slackened(self, posy, sgpconstraint):
+        "posy <= C, standing in for sgpconstraint"
+        constraint = posy <= self.slack
+        constraint.generated_by = sgpconstraint
+        return constraint

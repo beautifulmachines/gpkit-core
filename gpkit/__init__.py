@@ -22,9 +22,11 @@ from .nomials import (
     Monomial,
     NomialArray,
     Posynomial,
+    Shares,
     Signomial,
     Variable,
     VectorVariable,
+    guess,
 )
 from .programs.gp import GeometricProgram
 from .programs.sgp import SequentialGeometricProgram

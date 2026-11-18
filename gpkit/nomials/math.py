@@ -118,46 +118,6 @@ class Signomial(Nomial):
                 ny[exp] = -c  # -c to keep it a posynomial
         return Posynomial(py) if py else 0, Posynomial(ny) if ny else 0
 
-    def mono_approximation(self, x0):
-        """Monomial approximation about a point x0
-
-        Arguments
-        ---------
-        x0 (dict):
-            point to monomialize about
-
-        Returns
-        -------
-        Monomial (unless self(x0) < 0, in which case a Signomial is returned)
-        """
-        x0 = self.vks.clean(x0)
-        psub = self.hmap.sub(x0, self.vks, parsedsubs=True)
-        if EMPTY_HV not in psub or len(psub) > 1:
-            raise ValueError(
-                f"Variables {psub} remained after substituting x0={x0} into {self}"
-            )
-        (c0,) = psub.values()
-        c, exp = c0, HashVector()
-        for vk in self.vks:
-            val = float(x0[vk])
-            (diff,) = self.hmap.diff(vk).sub(x0, self.vks, parsedsubs=True).values()
-            e = val * diff / c0
-            if e:
-                exp[vk] = e
-            try:
-                c /= val**e
-            except OverflowError as exc:
-                raise OverflowError(
-                    f"While approximating the variable {vk} with a local value of"
-                    f" {val}, {c}/({val}**{e}) overflowed. Try reducing the variable's"
-                    " value by changing its unit prefix, or specify x0 values"
-                    " for any free variables it's multiplied or divided by in"
-                    f" the posynomial {self} whose expected value is far from 1."
-                ) from exc
-        hmap = NomialMap({exp: c})
-        hmap.units = self.units
-        return Monomial(hmap)
-
     def sub(self, substitutions, require_positive=True):
         """Returns a nomial with substitued values.
 
@@ -294,18 +254,19 @@ class Posynomial(Signomial):
     # Posynomial.__ge__ falls back on Signomial.__ge__
 
     def mono_lower_bound(self, x0):
-        """Monomial lower bound at a point x0
+        "Monomial lower bound on this posynomial, exact at x0"
+        return self.shares_at(x0).lower_bound()
 
-        Arguments
-        ---------
-        x0 (dict):
-            point to make lower bound exact
-
-        Returns
-        -------
-        Monomial
-        """
-        return self.mono_approximation(x0)
+    def shares_at(self, x0):
+        """Shares of this posynomial's terms at x0. x0 may leave variables free,
+        as long as the substituted terms share one exponent."""
+        terms = self.chop()  # coefficients in this posynomial's units
+        subbed = [t.hmap.sub(x0, t.vks) for t in terms]
+        if len({exp for hmap in subbed for exp in hmap}) > 1:
+            raise ValueError(
+                f"{self} at {x0} is not a monomial, so its shares are not numbers"
+            )
+        return Shares({t: sum(h.values()) for t, h in zip(terms, subbed)})
 
 
 class Monomial(Posynomial):
@@ -363,9 +324,6 @@ class Monomial(Posynomial):
         return NotImplemented
 
     # Monomial.__le__ falls back on Posynomial.__le__
-
-    def mono_approximation(self, x0):  # noqa: ARG002
-        return self
 
 
 class ScalarSingleEquationConstraint(SingleEquationConstraint):
@@ -603,11 +561,16 @@ class MonomialEquality(PosynomialInequality):
 class SignomialInequality(ScalarSingleEquationConstraint):
     """A constraint of the general form posynomial >= posynomial
 
-    Stored at .unsubbed[0] as a single Signomial (0 >= self)"""
+    Stored at .unsubbed[0] as a single Signomial (0 >= self). A greater-than
+    side written as a guess keeps its Shares at .guess."""
+
+    guess = None
 
     def __init__(self, left, oper, right):
+        if isinstance(right, Shares):
+            self.guess, right = right, right.posynomial
         ScalarSingleEquationConstraint.__init__(self, left, oper, right)
-        if not SignomialsEnabled:
+        if self.guess is None and not SignomialsEnabled:
             raise TypeError(
                 "Cannot initialize SignomialInequality"
                 " outside of a SignomialsEnabled environment."
@@ -618,7 +581,14 @@ class SignomialInequality(ScalarSingleEquationConstraint):
             pgt, plt = self.left, self.right
         else:
             raise ValueError(f"operator {self.oper} is not supported.")
-        self.unsubbed = [plt - pgt]
+        if self.guess is not None and (shared := set(plt.hmap) & set(pgt.hmap)):
+            terms = ", ".join(str(Monomial(NomialMap({e: 1}))) for e in shared)
+            raise ValueError(
+                f"{terms} appears on both sides of {self}; cancel it and"
+                " guess the shares of what remains"
+            )
+        with SignomialsEnabled():
+            self.unsubbed = [plt - pgt]
         self.bounded = self.as_gpconstr({}).bounded
 
     def as_hmapslt1(self, substitutions):
@@ -711,16 +681,27 @@ class SignomialInequality(ScalarSingleEquationConstraint):
         # rather than the terms as written (#324).
         return self.v_ss, la, None
 
+    def gt_shares(self, x0=None):
+        """Shares of the greater-than side: measured at x0 where x0 determines
+        them, else the guess; None if neither"""
+        if x0:
+            (siglt0,) = self.unsubbed
+            _, negy = siglt0.posy_negy()
+            try:
+                return negy.shares_at(x0)
+            except ValueError:
+                pass
+        return self.guess
+
     def as_gpconstr(self, x0):
         "Returns GP-compatible approximation at x0"
         (siglt0,) = self.unsubbed
         posy, negy = siglt0.posy_negy()
-        # default guess of 1.0 for unspecified negy variables
-        x0 = {vk: x0.get(vk, 1) for vk in negy.vks}
-        pconstr = PosynomialInequality(posy, "<=", negy.mono_lower_bound(x0))
-        pconstr.generated_by = self
-        self.generated = pconstr
-        return pconstr
+        shares = self.gt_shares(x0)
+        if shares is None:
+            # default guess of 1.0 for unspecified negy variables
+            shares = negy.shares_at({vk: x0.get(vk, 1) for vk in negy.vks})
+        return PosynomialInequality(posy, "<=", shares.lower_bound())
 
 
 class SingleSignomialEquality(SignomialInequality):
@@ -735,13 +716,67 @@ class SingleSignomialEquality(SignomialInequality):
         "SignomialEquality is never considered GP-compatible"
         raise InvalidGPConstraint(self)
 
+    def gt_shares(self, x0=None):
+        "Equalities take no guess, so a local GP can't stand in for them yet"
+
     def as_gpconstr(self, x0):
         "Returns GP-compatible approximation at x0"
         (siglt0,) = self.unsubbed
         posy, negy = siglt0.posy_negy()
         # default guess of 1.0 for unspecified negy variables
         x0 = {vk: x0.get(vk, 1) for vk in siglt0.vks}
-        mec = posy.mono_lower_bound(x0) == negy.mono_lower_bound(x0)
-        mec.generated_by = self
-        self.generated = mec
-        return mec
+        return posy.mono_lower_bound(x0) == negy.mono_lower_bound(x0)
+
+
+class Shares:
+    """A posynomial's terms, each with a share of its value.
+
+    Shares are nonnegative and sum to 1. By weighted AM-GM the posynomial is
+    at least prod((m_i/w_i)**w_i) over terms with w_i > 0, with equality
+    where the terms' values split as the shares do. A term with no share
+    drops out of the bound.
+    """
+
+    def __init__(self, weights):
+        "weights: {term: relative weight}, normalized here to sum to 1"
+        total = sum(weights.values())
+        if any(w < 0 for w in weights.values()) or not total:
+            raise ValueError("each weight must be >= 0, and at least one > 0")
+        self.weights = {Monomial(t): w / total for t, w in weights.items()}
+        self.posynomial = sum(self.weights)
+        if len(self.posynomial.hmap) < len(self.weights):
+            raise ValueError(
+                f"guessed terms combine into fewer terms: {self.posynomial}"
+            )
+
+    def lower_bound(self):
+        "Monomial lower bound on the posynomial, exact at these shares"
+        exp, c = HashVector(), 1.0
+        for term, w in self.weights.items():
+            if w:
+                (t_exp,) = term.hmap
+                for vk, e in t_exp.items():
+                    exp[vk] = exp.get(vk, 0) + w * e
+                c *= (self.posynomial.hmap[t_exp] / w) ** w  # in common units
+        hmap = NomialMap({exp: c})
+        hmap.units = self.posynomial.units
+        return Monomial(hmap)
+
+    def __ge__(self, other):
+        if isinstance(other, Numbers | Signomial):
+            return SignomialInequality(other, "<=", self)
+        return NotImplemented
+
+    def __le__(self, other):
+        raise TypeError(
+            "a guess is the greater-than side: write guess(...) >= p or p <= guess(...)"
+        )
+
+    __eq__ = __le__
+    __hash__ = None
+
+
+def guess(weights):
+    """The greater-than side of a signomial inequality, with a first guess at
+    how its value splits among its terms: guess({m: 1, cap: 0}) >= cyl."""
+    return Shares(weights)

@@ -565,13 +565,18 @@ class TestPosynomial:
         x = Variable("x")
         y = Variable("y")
         p = y**2 + 1
-        assert y.mono_lower_bound({y: 1}) == y
-        assert p.mono_lower_bound({y: 1}) == 2 * y
-        assert p.mono_lower_bound({y: 0}) == 1
-        assert (x * y**2 + 1).mono_lower_bound({y: 1, x: 1}) == 2 * y * x**0.5
+
+        def same(mon, expected):
+            "Same monomial, to within rounding"
+            return (mon / expected).value == pytest.approx(1)
+
+        assert same(y.mono_lower_bound({y: 1}), y)
+        assert same(p.mono_lower_bound({y: 1}), 2 * y)
+        assert same(p.mono_lower_bound({y: 0}), 1)
+        assert same((x * y**2 + 1).mono_lower_bound({y: 1, x: 1}), 2 * y * x**0.5)
         # test with units
         d = Variable("d", units="ft")
         h = Variable("h", units="ft")
         p = d * h**2 + h * d**2
         m = p.mono_lower_bound({d: 1, h: 1})
-        assert m == 2 * (d * h) ** 1.5
+        assert same(m, 2 * (d * h) ** 1.5)
