@@ -762,7 +762,7 @@ class Shares:
                     f"each guessed term must be a monomial; {term} has"
                     f" {len(term.hmap)} terms"
                 )
-        self.posynomial = sum(self.weights)
+        self.posynomial = sum(weights)  # as written, so it displays as written
         if len(self.posynomial.hmap) < len(self.weights):
             raise ValueError(
                 f"guessed terms combine into fewer terms: {self.posynomial}"

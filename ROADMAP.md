@@ -28,8 +28,6 @@ that only works if they believe each result.
 **The documentation is worth reading.** It is badly out of date and far from where it should be. A
 clear, accurate, fun rewrite is central to this work, not cleanup after it: if a concept can't be
 explained in a paragraph, it isn't finished, so writing the docs shows us what is still unsettled.
-The first step is a published reference for the intermediate representation, the JSON form of a
-model and its solution.
 
 ## How we decide
 
