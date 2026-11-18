@@ -9,9 +9,11 @@ from .math import (
     MonomialEquality,
     Posynomial,
     PosynomialInequality,
+    Shares,
     Signomial,
     SignomialInequality,
     SingleSignomialEquality,
+    guess,
 )
 from .variables import ArrayVariable, Variable
 

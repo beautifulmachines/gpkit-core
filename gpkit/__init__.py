@@ -25,6 +25,7 @@ from .nomials import (
     Signomial,
     Variable,
     VectorVariable,
+    guess,
 )
 from .programs.gp import GeometricProgram
 from .programs.sgp import SequentialGeometricProgram

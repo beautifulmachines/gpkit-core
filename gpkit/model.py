@@ -28,7 +28,7 @@ from .nomials.map import DIMLESS_QUANTITY
 from .nomials.substitution import is_linked
 from .programs.gp import GeometricProgram
 from .programs.prog_factories import progify, solvify
-from .programs.sgp import SequentialGeometricProgram
+from .programs.sgp import SequentialGeometricProgram, local_gp
 from .solutions import Sweep
 from .tools.autosweep import autosweep_1d
 from .util.globals import NamedVariables, Vectorize
@@ -474,6 +474,7 @@ class Model(CostedConstraintSet):
     solve = solvify(progify(GeometricProgram, "solve"))
 
     sp = progify(SequentialGeometricProgram)
+    local_gp = progify(local_gp)
     localsolve = solvify(progify(SequentialGeometricProgram, "localsolve"))
 
     def sweep(self, sweepvals, skipfailures=False, **solveargs):

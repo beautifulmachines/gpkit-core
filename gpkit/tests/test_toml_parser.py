@@ -311,6 +311,58 @@ constraints = ["x[0] >= 1", "x[1] >= 2", "x[2] >= 3"]
 # ---------------------------------------------------------------------------
 
 
+def _with_constraint(constraint):
+    "A document whose first constraint is `constraint`, over x, y and z"
+    return (
+        '[vars]\nx = "-"\ny = "-"\nz = "-"\n[model]\nobjective = "min: 1/(x*y)"\n'
+        f'constraints = ["{constraint}", "x <= 2", "y <= 2"]\n'
+    )
+
+
+class TestGuess:
+    """guess() writes a signomial constraint's greater-than side."""
+
+    @pytest.mark.parametrize(
+        "constraint",
+        ["guess({x: 1, 2*y: 3}) >= z + 1", "z + 1 <= guess({x: 1, 2*y: 3})"],
+    )
+    def test_either_side(self, constraint):
+        (c, *_) = load_toml(_with_constraint(constraint)).flat()
+        x, y = Variable("x"), Variable("y")
+        assert {str(t): w for t, w in c.guess.weights.items()} == {
+            str(x): 0.25,
+            str(2 * y): 0.75,
+        }
+
+    def test_solves(self):
+        m = load_toml(_with_constraint("guess({x: 1, y: 1}) >= 1.5"))
+        assert m.localsolve(verbosity=0).cost == pytest.approx(0.25)
+
+    @pytest.mark.parametrize(
+        ("constraint", "match"),
+        [
+            ("x + y >= z + 1", "signomial constraint.*guess"),
+            ("2*guess({x: 1, y: 1}) >= z", "whole side"),
+            ("guess({x: 1, y: -1}) >= z", "numeric shares"),
+            ("guess({x: 1, y: z}) >= 1", "numeric shares"),
+            ("guess(x) >= z", "numeric shares"),
+            ("x >= {y: 1}", "only be guess"),
+            ("guess({x: 0, y: 0}) >= z", "weight"),
+            ("guess({x: 1, y: 0}) >= z + y", "both sides"),
+        ],
+    )
+    def test_rejects(self, constraint, match):
+        with pytest.raises(TomlParseError, match=match):
+            load_toml(_with_constraint(constraint))
+
+    def test_not_in_objective(self):
+        with pytest.raises(TomlParseError, match="whole side"):
+            load_toml(
+                '[vars]\nx = "-"\ny = "-"\n[model]\n'
+                'objective = "min: guess({x: 1, y: 1})"\nconstraints = ["x >= 1"]\n'
+            )
+
+
 class TestErrors:
     """Error handling for malformed TOML input."""
 

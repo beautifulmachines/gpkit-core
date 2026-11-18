@@ -17,6 +17,7 @@ from gpkit import (
     VarKey,
     Vectorize,
     VectorVariable,
+    guess,
 )
 from gpkit.ast_nodes import (
     ConstNode,
@@ -557,6 +558,27 @@ class TestConstraintIR:
         ir = c.to_ir()
         assert ir["type"] == "SignomialInequality"
         assert ir["oper"] in ("<=", ">=")
+        assert all("guess" not in term for term in ir["right"]["terms"])
+
+    @pytest.mark.parametrize("written_left", [True, False])
+    def test_guessed_terms_carry_their_shares(self, written_left):
+        "Normalized, zeros written out, whichever side the guess was written on"
+        x, y, z = Variable("x"), Variable("y", "m"), Variable("z", "m")
+        shares = guess({z: 3, 2 * x * y: 0})
+        c = shares >= y + x * z if written_left else y + x * z <= shares
+        guesses = {
+            tuple(term["exps"]): term["guess"] for term in c.to_ir()["right"]["terms"]
+        }
+        assert guesses == {(z.key.ref,): 1.0, (x.key.ref, y.key.ref): 0.0}
+
+    def test_guess_reaches_the_model_ir(self):
+        x, y = Variable("x"), Variable("y")
+        m = Model(1 / (x * y), [guess({x: 1, y: 3}) >= 1, x <= 2, y <= 2])
+        ir = json.loads(json.dumps(m.to_ir()))
+        (constraint,) = [
+            c for c in ir["constraints"].values() if c["type"] == "SignomialInequality"
+        ]
+        assert sorted(t["guess"] for t in constraint["right"]["terms"]) == [0.25, 0.75]
 
     def test_single_signomial_equality(self):
         """SingleSignomialEquality.

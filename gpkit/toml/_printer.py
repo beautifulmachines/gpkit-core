@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from ..ast_nodes import ast_from_ir
+from ..ast_nodes import ast_from_ir, ast_from_terms
 from ..display.render import TOML, render_ast, render_ir
 from ..display.render import exact_number as _format_number
 from ..ir import check_ir_version, shown_whole
@@ -73,6 +73,15 @@ def constraint_to_expr(constraint_ir, name_fn):
             f"A {constraint_ir['type']} constraint has no written form, so TOML"
             " cannot spell it."
         )
+    terms = constraint_ir["right"].get("terms", [])
+    if any("guess" in term for term in terms):
+        shares = ", ".join(
+            f"{render_ast(ast_from_terms([term]), TOML, name_fn)}:"
+            f" {_format_number(term['guess'])}"
+            for term in terms
+        )
+        lt = render_ir(constraint_ir["left"], TOML, name_fn)
+        return f"guess({{{shares}}}) >= {lt}"
     return render_ir(constraint_ir, TOML, name_fn)
 
 

@@ -84,14 +84,31 @@ The model section
     ]
 
 Expressions use ``+``, ``*``, ``/`` and ``**``, with the comparisons ``>=``, ``<=`` and ``==``.
-Three function calls are allowed and no others: ``sum()`` and ``prod()`` over a vector, and
-``units('W')`` for a unit literal where a bare conversion factor is needed.
+Four function calls are allowed and no others: ``sum()`` and ``prod()`` over a vector,
+``units('W')`` for a unit literal where a bare conversion factor is needed, and ``guess()`` for a
+signomial constraint (below).
 
 ``-`` works between *numbers* only — a named dimension or a literal, as in ``(N-1)*dx`` below.
 Subtracting one variable from another is not a GP-compatible constraint and gpkit's variables
-have no subtraction operator, so it is rejected rather than quietly turned into a signomial. To
-write a constraint of that form, build the model in Python under ``SignomialsEnabled`` (see
-:doc:`signomialprogramming`).
+have no subtraction operator, so it is rejected rather than quietly turned into a signomial.
+
+Signomial constraints
+=====================
+
+A constraint with a posynomial on *both* sides, ``p_lt <= p_gt``, is signomial, and gpkit solves
+it as a sequence of GPs (see :doc:`signomialprogramming`). Each GP replaces ``p_gt`` with a
+monomial lower bound, fixed by how ``p_gt``'s value splits among its terms. TOML asks for a first
+guess at that split, written as the greater-than side:
+
+.. literalinclude:: examples/toml/pressure_vessel.toml
+   :language: toml
+
+``guess({term: share, ...})`` names each term of ``p_gt`` with a non-negative share. The shares
+are relative, normalized to sum to 1, and a zero share leaves its term out of the first GP. Every
+guess makes that first GP conservative: its optimum, when it has one, satisfies the original
+constraint. ``m.local_gp().solve()`` solves just that GP; ``m.localsolve()`` starts from it and
+refines the shares at each solution, without slack. A constraint with posynomials on both sides
+and no ``guess()`` is rejected.
 
 Submodels
 =========

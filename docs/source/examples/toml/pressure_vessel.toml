@@ -1,0 +1,27 @@
+name = "Pressure Vessel"
+description = "Lightest composite tank holding a given volume at a given pressure."
+
+[vars]
+r     = ["m", "radius"]
+L     = ["m", "overall length, end caps included"]
+t     = ["m", "cylinder wall thickness"]
+m     = ["kg", "mass"]
+P     = ["20000000 Pa", "pressure"]
+V     = ["0.01 m^3", "internal volume"]
+sf    = [2, "safety factor"]
+sigma = ["1200000000 Pa", "composite strength"]
+rho_c = ["1600 kg/m^3", "composite density"]
+rho_l = ["4430 kg/m^3", "liner density"]
+t_l   = ["0.0005 m", "liner thickness"]
+
+[model]
+objective = "min: m"
+constraints = [
+  "3.1416*r**2*L >= V + 2.0944*r**3",
+  "t >= P*r*sf/sigma",
+  # mass + hemispherical caps >= cylinder + liner: the caps carry half the
+  # cylinder's hoop stress, so they are half as thick. A zero share for the
+  # cap term starts by counting them at full thickness.
+  "guess({m: 1, 6.2832*rho_c*r**2*t: 0}) >= 6.2832*rho_c*r*t*L + 6.2832*rho_l*r*L*t_l",
+  "L >= 2*r",
+]
