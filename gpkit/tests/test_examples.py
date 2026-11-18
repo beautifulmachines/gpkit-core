@@ -284,6 +284,14 @@ class TestExamples:
     def test_simple_sp(self, example):
         assert example.sol.cost == pytest.approx(0.9, rel=1e-2)
 
+    def test_pressure_vessel(self, example):
+        kg = [res.cost.to("kg").magnitude for res in example.vessel.program.results]
+        assert example.conservative.cost.to("kg").magnitude == pytest.approx(
+            1.79193, rel=1e-4
+        )
+        assert kg[0] == pytest.approx(1.79193, rel=1e-4)
+        assert kg[-1] == pytest.approx(1.29719, rel=1e-4)
+
     def test_x_greaterthan_1(self, example):
         assert example.sol.cost == pytest.approx(1.0, rel=1e-2)
 
