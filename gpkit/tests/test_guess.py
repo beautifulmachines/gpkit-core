@@ -5,7 +5,7 @@ from itertools import pairwise
 import numpy as np
 import pytest
 
-from gpkit import Model, SignomialEquality, SignomialsEnabled, Variable, guess
+from gpkit import Model, SignomialEquality, SignomialsEnabled, Variable, guess, pi
 from gpkit.constraints.set import keyed_constraints
 from gpkit.exceptions import Infeasible, InvalidGPConstraint
 from gpkit.nomials import SignomialInequality
@@ -81,6 +81,10 @@ class TestGuess:
         x, y, z = Variable("x"), Variable("y"), Variable("z")
         gpc = (guess({x: 2, y: 2}) >= z).as_gpconstr({})
         assert_same_monomial(gpc.right, (x / 0.5) ** 0.5 * (y / 0.5) ** 0.5)
+
+    def test_terms_display_as_written(self):
+        x, y = Variable("x"), Variable("y")
+        assert str(guess({x: 1, pi * y: 0}).posynomial) == "x + π⋅y"
 
     def test_arithmetic_raises(self):
         x, y = Variable("x"), Variable("y")
