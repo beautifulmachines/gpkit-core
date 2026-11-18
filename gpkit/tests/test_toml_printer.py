@@ -5,10 +5,11 @@ from pathlib import Path
 
 import pytest
 
-from gpkit import Model, Variable, Vectorize, VectorVariable, units
+from gpkit import Model, Variable, Vectorize, VectorVariable, guess, units
 from gpkit.ast_nodes import ConstNode, ExprNode, UnitsNode, VarNode
 from gpkit.display.render import exact_number
 from gpkit.examples.uav import UAV
+from gpkit.exceptions import InvalidGPConstraint
 from gpkit.tests.test_printing import Opaque
 from gpkit.toml import load_toml
 from gpkit.toml._printer import ast_to_expr, to_toml
@@ -230,16 +231,34 @@ class TestToToml:
 class TestRoundTrip:
     """Round-trip: TOML file → Model → TOML string → Model → solve."""
 
+    @staticmethod
+    def _solve(model):
+        "solve a GP; localsolve a signomial program"
+        try:
+            return model.solve(verbosity=0)
+        except InvalidGPConstraint:
+            return model.localsolve(verbosity=0)
+
     def _round_trip(self, toml_path):
         """Load a TOML, solve, generate TOML, load again, solve, compare."""
         m1 = load_toml(toml_path)
-        sol1 = m1.solve(verbosity=0)
+        sol1 = self._solve(m1)
 
         toml_str = to_toml(m1)
         m2 = load_toml(toml_str)
-        sol2 = m2.solve(verbosity=0)
+        sol2 = self._solve(m2)
 
         return sol1, sol2
+
+    def test_guess_round_trips(self):
+        "Each share comes back with its term, normalized; printing is then a fixed point"
+        m1 = load_toml(TOML_EXAMPLES / "pressure_vessel.toml")
+        toml_str = to_toml(m1)
+        assert "guess({m: 1, 6.2832*rho_c*r**2*t: 0}) >= " in toml_str
+        assert to_toml(load_toml(toml_str)) == toml_str
+        x, y, z = Variable("x"), Variable("y"), Variable("z")
+        m = Model(1 / (x * y), [guess({x: 1, 2 * y: 3}) >= z + 1, x <= 2, y <= 2])
+        assert "guess({x: 0.25, 2*y: 0.75}) >= " in to_toml(m)
 
     @pytest.mark.parametrize("path", sorted(TOML_EXAMPLES.glob("*.toml")), ids=str)
     def test_every_documented_example_round_trips(self, path):

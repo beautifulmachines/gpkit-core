@@ -3,6 +3,7 @@
 import ast
 import operator
 
+from ..nomials import guess as _guess
 from ..units import units as _units
 
 # ---------------------------------------------------------------------------
@@ -34,8 +35,9 @@ _ALLOWED_NODES = frozenset(
         ast.GtE,
         ast.LtE,
         ast.Eq,
-        # function calls (restricted to sum/prod in validation)
+        # function calls (restricted to sum/prod/units/guess in validation)
         ast.Call,
+        ast.Dict,  # only as guess()'s argument, checked in validation
     }
 )
 
@@ -57,29 +59,44 @@ class TomlExpressionError(Exception):
 # ---------------------------------------------------------------------------
 
 
-_ALLOWED_FUNCTIONS = frozenset({"sum", "prod", "units"})
+_ALLOWED_FUNCTIONS = frozenset({"sum", "prod", "units", "guess"})
+_GUESS_FORM = "guess({term: share, ...}) >= posynomial"
 
 
-def _validate_ast(tree):
-    """Walk the AST and reject any node not in the whitelist."""
+def _validate_ast(tree, guess_sides=()):
+    """Walk the AST and reject any node not in the whitelist.
+
+    guess_sides: the nodes a guess() may be, namely a constraint's two sides.
+    """
+    guess_dicts = set()
     for node in ast.walk(tree):
         if type(node) not in _ALLOWED_NODES:
             _reject(node)
         if isinstance(node, ast.Call):
             _validate_call(node)
+            if node.func.id == "guess":
+                if node not in guess_sides:
+                    raise TomlExpressionError(
+                        f"guess() must be a whole side of a constraint: {_GUESS_FORM}"
+                    )
+                guess_dicts.add(node.args[0])
+        if isinstance(node, ast.Dict) and node not in guess_dicts:
+            raise TomlExpressionError(
+                f"A dict may only be guess()'s argument: {_GUESS_FORM}"
+            )
 
 
 def _validate_call(node):
-    """Restrict function calls to sum(), prod(), and units() only."""
+    """Restrict function calls to sum(), prod(), units() and guess()."""
     if not isinstance(node.func, ast.Name):
         raise TomlExpressionError(
-            "Only sum(), prod(), and units() function calls are allowed"
+            "Only sum(), prod(), units() and guess() function calls are allowed"
         )
     name = node.func.id
     if name not in _ALLOWED_FUNCTIONS:
         raise TomlExpressionError(
             f"Function call '{name}' is not allowed. "
-            f"Only sum(), prod(), and units() are supported."
+            f"Only sum(), prod(), units() and guess() are supported."
         )
     if len(node.args) != 1 or node.keywords:
         raise TomlExpressionError(f"{name}() takes exactly one positional argument")
@@ -88,6 +105,17 @@ def _validate_call(node):
     ):
         raise TomlExpressionError(
             'units() takes a single string literal argument, e.g. units("W")'
+        )
+    if name == "guess" and not (
+        isinstance(node.args[0], ast.Dict)
+        and None not in node.args[0].keys  # no {**unpacking}
+        and all(
+            isinstance(v, ast.Constant) and isinstance(v.value, (int, float))
+            for v in node.args[0].values
+        )
+    ):
+        raise TomlExpressionError(
+            f"guess() takes a dict of terms to numeric shares: {_GUESS_FORM}"
         )
 
 
@@ -166,6 +194,18 @@ def _eval_call(node, ns):
     if func_name == "units":
         # arg is guaranteed a string ast.Constant by _validate_call
         return _units(node.args[0].value)
+    if func_name == "guess":
+        # arg is guaranteed a dict of numeric constants by _validate_call
+        weights = node.args[0]
+        try:
+            return _guess(
+                {
+                    _eval_node(k, ns): v.value
+                    for k, v in zip(weights.keys, weights.values)
+                }
+            )
+        except ValueError as exc:
+            raise TomlExpressionError(f"guess(): {exc}") from exc
     arg = _eval_node(node.args[0], ns)
     method = getattr(arg, func_name, None)
     if method is None:
@@ -273,9 +313,10 @@ def parse_constraint(text, namespace):
         tree = ast.parse(text, mode="eval")
     except SyntaxError as exc:
         raise TomlExpressionError(f"Syntax error in constraint: {text!r}") from exc
-    _validate_ast(tree)
-
     body = tree.body
+    sides = (body.left, *body.comparators) if isinstance(body, ast.Compare) else ()
+    _validate_ast(tree, guess_sides=sides)
+
     if not isinstance(body, ast.Compare):
         raise TomlExpressionError(
             f"Expected a constraint (>=, <=, ==), got expression: {text}"
@@ -286,13 +327,22 @@ def parse_constraint(text, namespace):
     left = _eval_node(body.left, namespace)
     right = _eval_node(body.comparators[0], namespace)
     op = body.ops[0]
-
-    if isinstance(op, ast.GtE):
-        return left >= right
-    if isinstance(op, ast.LtE):
-        return left <= right
-    if isinstance(op, ast.Eq):
-        return left == right
+    try:
+        if isinstance(op, ast.GtE):
+            return left >= right
+        if isinstance(op, ast.LtE):
+            return left <= right
+        if isinstance(op, ast.Eq):
+            return left == right
+    except TypeError as exc:
+        if "SignomialsEnabled" not in str(exc):
+            raise
+        raise TomlExpressionError(
+            f"{text} is a signomial constraint; write its greater-than side with"
+            f" a first guess at each term's share: {_GUESS_FORM}"
+        ) from None
+    except ValueError as exc:  # e.g. a guessed term on both sides
+        raise TomlExpressionError(str(exc)) from exc
 
     raise TomlExpressionError(  # pragma: no cover
         f"Unsupported comparison operator in: {text}"
