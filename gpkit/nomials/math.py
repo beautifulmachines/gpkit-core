@@ -465,9 +465,9 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
             del hmap.expmap, hmap.csmap  # needed only for the mmap call above
             hmap = self._simplify_posy_ineq(hmap, self.pmap, substitutions)
             if hmap is not None:
-                if any(c <= 0 for c in hmap.values()):
+                if not all(0 < c < np.inf for c in hmap.values()):
                     raise InvalidGPConstraint(
-                        f"'{self}' became Signomial after substituting {substitutions}"
+                        f"'{self}' needs positive, finite coefficients"
                     )
                 hmap.parent = self
                 out.append(hmap)

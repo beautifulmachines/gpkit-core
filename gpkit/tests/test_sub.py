@@ -16,6 +16,7 @@ from gpkit import (
     Variable,
     VectorVariable,
 )
+from gpkit.exceptions import InvalidGPConstraint, InvalidPosynomial
 from gpkit.units import DimensionalityError
 from gpkit.util.small_scripts import mag
 
@@ -453,3 +454,9 @@ class TestNomialMapSubs:
         p = 2 * w + z * w + 2
 
         assert p.sub({z: -2}) == 2
+        with pytest.raises(ZeroDivisionError):
+            Model(w, [w >= 1 / z], {z: 0}).gp()
+        with pytest.raises(InvalidGPConstraint, match="finite"):
+            Model(w, [w >= 1e200 * z], {z: 1e200}).gp()
+        with pytest.raises(InvalidPosynomial, match="finite"):
+            Model(1e200 * z * w, [w >= 1], {z: 1e200}).gp()
