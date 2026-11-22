@@ -177,7 +177,7 @@ class NomialMap(HashVector):
         origexps = list(orig.keys())
         selfexps = list(self.keys())
         for orig_exp, self_exp in self.expmap.items():
-            if self_exp not in self:  # can occur in tautological constraints
+            if not self.get(self_exp):  # can occur in tautological constraints
                 continue  # after substitution
             fraction = self.csmap.get(orig_exp, orig[orig_exp]) / self[self_exp]
             orig_idx = origexps.index(orig_exp)

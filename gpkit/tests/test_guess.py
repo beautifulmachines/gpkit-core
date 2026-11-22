@@ -129,13 +129,13 @@ def pressure_vessel(*, guessed=True):
     L = Variable("L", "m", "overall length, caps included")
     t = Variable("t", "m", "cylinder wall thickness")
     m = Variable("m", "kg", "mass")
-    P = Variable("P", 200e5, "Pa", "pressure")
-    V = Variable("V", 0.01, "m^3", "internal volume")
-    sf = Variable("sf", 2, "-", "safety factor")
-    sigma = Variable("sigma", 1.2e9, "Pa", "composite strength")
-    rho_c = Variable("rho_c", 1600, "kg/m^3", "composite density")
-    rho_l = Variable("rho_l", 4430, "kg/m^3", "liner density")
-    t_l = Variable("t_l", 0.5e-3, "m", "liner thickness")
+    P = Variable("P", 30e6, "Pa", "pressure")
+    V = Variable("V", 0.05, "m^3", "internal volume")
+    sf = Variable("sf", 2.25, "-", "safety factor")
+    sigma = Variable("sigma", 1.5e9, "Pa", "composite strength")
+    rho_c = Variable("rho_c", 1550, "kg/m^3", "composite density")
+    rho_l = Variable("rho_l", 2700, "kg/m^3", "liner density")
+    t_l = Variable("t_l", 1e-3, "m", "liner thickness")
 
     cap = 2 * np.pi * rho_c * r**2 * t
     cyl = 2 * np.pi * rho_c * r * t * L
@@ -153,8 +153,8 @@ def pressure_vessel(*, guessed=True):
     return Model(m, constraints), mass, {"r": r, "L": L, "t": t, "m": m}
 
 
-CONSERVATIVE_KG = 1.79193  # caps counted at full thickness
-CONVERGED_KG = 1.29719  # a sphere: L = 2r
+CONSERVATIVE_KG = 9.88180  # caps counted at full thickness
+CONVERGED_KG = 7.00338  # a sphere: L = 2r
 
 
 class TestPressureVessel:
