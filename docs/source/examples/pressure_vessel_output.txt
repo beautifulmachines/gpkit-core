@@ -1,22 +1,22 @@
-Conservative design: 1.792 kg
+Conservative design: 9.882 kg
 
-         ┃┓
-    Cost╺┫┃
- (1.3kg) ┃┣╸m
-         ┃┛ (1.3kg)
+       ┃┓
+  Cost╺┫┃
+ (7kg) ┃┣╸m
+       ┃┛ (7kg)
 
 
 
        ┃┓
        ┃┃
        ┃┃
-       ┃┣╸6.283⋅rho_c⋅r⋅t⋅L + 6.283⋅rho_l⋅r⋅L⋅t_l ≤ m + 6.283⋅rho_c⋅r²⋅t
+       ┃┣╸2⋅π⋅rho_c⋅r⋅t⋅L + 2⋅π⋅rho_l⋅r⋅L⋅t_l ≤ m + 2⋅π⋅rho_c⋅r²⋅t
        ┃┃
        ┃┃
        ┃┛
  Model╺┫┓
        ┃┃
-       ┃┣╸3.142⋅r²⋅L ≥ V + 2.094⋅r³
+       ┃┣╸π⋅r²⋅L ≥ V + 0.6667⋅π⋅r³
        ┃┃
        ┃┛
        ┃┓
@@ -27,29 +27,29 @@ Conservative design: 1.792 kg
 
 Optimal Cost
 ------------
-m : 1.297 [kg]
+m : 7.003 [kg]
 
 Solution
 --------
-    L : 0.2673   [m]               overall length, end caps included
-    m : 1.297    [kg]              mass
-    r : 0.1337   [m]               radius
-    t : 0.004455 [m]               cylinder wall thickness
+    L : 0.4571  [m]               overall length, end caps included
+    m : 7.003   [kg]              mass
+    r : 0.2285  [m]               radius
+    t : 0.01028 [m]               cylinder wall thickness
 ...constants
-    V : 0.01     [m³]    (+0.8722) internal volume
-    P : 2e+07    [Pa]    (+0.6167) pressure
-rho_c : 1600     [kg/m³] (+0.6167) composite density
-   sf : 2                (+0.6167) safety factor
-sigma : 1.2e+09  [Pa]    (-0.6167) composite strength
-rho_l : 4430     [kg/m³] (+0.3833) liner density
-  t_l : 0.0005   [m]     (+0.3833) liner thickness
+    V : 0.05    [m³]    (+0.9157) internal volume
+    P : 3e+07   [Pa]    (+0.747)  pressure
+   sf : 2.25            (+0.747)  safety factor
+sigma : 1.5e+09 [Pa]    (-0.747)  composite strength
+rho_c : 1550    [kg/m³] (+0.747)  composite density
+rho_l : 2700    [kg/m³] (+0.253)  liner density
+  t_l : 0.001   [m]     (+0.253)  liner thickness
 
 Most Sensitive Constraints
 --------------------------
-+1.617  : 6.283⋅rho_c⋅r⋅t⋅L + 6.283⋅rho_l⋅r⋅L⋅t_l ≤ m + 6.283⋅rho_c⋅r²⋅t
-+1.308  : 3.142⋅r²⋅L ≥ V + 2.094⋅r³
-+0.6167 : t ≥ P⋅r⋅sf/sigma
-+0.3083 : L ≥ 2⋅r
++1.747  : 2⋅π⋅rho_c⋅r⋅t⋅L + 2⋅π⋅rho_l⋅r⋅L⋅t_l ≤ m + 2⋅π⋅rho_c⋅r²⋅t
++1.373  : π⋅r²⋅L ≥ V + 0.6667⋅π⋅r³
++0.747  : t ≥ P⋅r⋅sf/sigma
++0.3735 : L ≥ 2⋅r
 
 mass of each GP solve, each a feasible design
-1.792 kg, 1.533 kg, 1.416 kg, 1.318 kg, 1.297 kg, 1.297 kg
+9.882 kg, 8.696 kg, 8.099 kg, 7.494 kg, 7.019 kg, 7.003 kg, 7.003 kg

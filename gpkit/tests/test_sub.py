@@ -436,6 +436,14 @@ class TestModelSubs:
         m.localsolve(verbosity=0)
         assert m.substitutions["y"], "__call__"
 
+    def test_true_limit_with_vanishing_terms(self):
+        "A true limit on a constant drops out, even if substitution leaves 0 <= 1"
+        x, z = Variable("x"), Variable("z")
+        sol = Model(x, [x >= 1, z <= 5], {z: 0}).solve(verbosity=0)
+        assert sol.cost == pytest.approx(1)
+        sol = Model(x, [x >= 1, z >= 2], {z: np.inf}).solve(verbosity=0)
+        assert sol.cost == pytest.approx(1)
+
 
 class TestNomialMapSubs:
     "Tests substitutions of nomialmaps"
