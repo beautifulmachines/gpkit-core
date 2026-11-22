@@ -188,8 +188,10 @@ class NomialMap(HashVector):
 def subinplace(cp, exp, o_exp, vk, cval, squished):  # noqa: PLR0913, PLR0917
     "Modifies cp by substituing cval/expval for vk in exp"
     x = exp[vk]
-    powval = float(cval) ** x if cval != 0 or x >= 0 else np.sign(cval) * np.inf
+    powval = float(cval) ** float(x)  # not numpy's power, where 0**-1 is inf
     cp.csmap[o_exp] *= powval
+    if np.isnan(cp.csmap[o_exp]):  # e.g. 0*inf, which isn't ours to decide
+        raise ValueError(f"substituting {vk} = {cval} is undefined (nan)")
     if exp in cp:
         c = cp.pop(exp)
         exp.hashvalue ^= hash((vk, x))  # remove (key, value) from hashvalue

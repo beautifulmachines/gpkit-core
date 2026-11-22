@@ -465,9 +465,9 @@ class PosynomialInequality(ScalarSingleEquationConstraint):
             del hmap.expmap, hmap.csmap  # needed only for the mmap call above
             hmap = self._simplify_posy_ineq(hmap, self.pmap, substitutions)
             if hmap is not None:
-                if any(c <= 0 for c in hmap.values()):
+                if not all(0 < c < np.inf for c in hmap.values()):
                     raise InvalidGPConstraint(
-                        f"'{self}' became Signomial after substituting {substitutions}"
+                        f"'{self}' needs positive, finite coefficients"
                     )
                 hmap.parent = self
                 out.append(hmap)
@@ -647,49 +647,29 @@ class SignomialInequality(ScalarSingleEquationConstraint):
             exp: Signomial(hmap, require_positive=False)
             for exp, hmap in posy_hmaps.items()
         }
-        self._sigvars = {
-            exp: (list(self._negysig.vks) + list(sig.vks))
-            for exp, sig in self._coeffsigs.items()
-        }
         return p_ineq.as_hmapslt1(substitutions)
 
     def sens_from_dual(self, las, nus, varvals):
-        """We want to do the following chain:
-           dlog(Obj)/dlog(monomial[i])    = nu[i]
-           * dlog(monomial)/d(monomial)   = 1/(monomial value)
-           * d(monomial)/d(var)           = see below
-           * d(var)/dlog(var)             = var
-           = dlog(Obj)/dlog(var)
-        each final monomial is really
-           (coeff signomial)/(negy signomial)
-        and by the chain rule d(monomial)/d(var) =
-           d(coeff)/d(var)*1/negy + d(1/negy)/d(var)*coeff
-           = d(coeff)/d(var)*1/negy - d(negy)/d(var)*coeff*1/negy**2
+        """Each solved monomial i is coeff_i/negy, with dual nu[i], so
+           dlog(Obj)/dlog(var) = sum_i nu[i] * (dlog(coeff_i) - dlog(negy))
+        where dlog(sum of terms)/dlog(var) is the sum of each term's share
+        times var's exponent in it.
         """
-
-        def subval(posy):
-            "Substitute solution into a posynomial and return the result"
-            hmap = posy.sub(varvals, require_positive=False).hmap
-            ((key, value),) = hmap.items()
-            assert not key  # constant
-            return value
-
         (la,) = las
         (nu,) = nus
         self.v_ss = {}
-        invnegy_val = 1 / subval(self._negysig)
-        for i, nu_i in enumerate(nu):
-            mon = self._mons[i]
-            inv_mon_val = 1 / subval(mon)
-            coeff = self._coeffsigs[mon.exp]
-            for var in self._sigvars[mon.exp]:
-                d_mon_d_var = subval(coeff.diff(var)) * invnegy_val - (
-                    subval(self._negysig.diff(var)) * subval(coeff) * invnegy_val**2
-                )
-                var_val = varvals[var]
-                sens = nu_i * inv_mon_val * d_mon_d_var * var_val
-                assert isinstance(sens, float)
-                self.v_ss[var] = sens + self.v_ss.get(var, 0)
+        weighted = [(self._negysig, -sum(nu))]
+        weighted += [(self._coeffsigs[m.exp], n) for m, n in zip(self._mons, nu)]
+        for sig, weight in weighted:
+            values = [
+                c * np.prod([np.float64(varvals[vk]) ** x for vk, x in exp.items()])
+                for exp, c in sig.hmap.items()
+            ]
+            total = sum(values)
+            for exp, value in zip(sig.hmap, values):
+                for vk, x in exp.items():
+                    dlog = weight * x * value / total
+                    self.v_ss[vk] = dlog + self.v_ss.get(vk, 0)
         # No per-term duals: nu here indexes the substituted posy/negy monomials
         # rather than the terms as written (#324).
         return self.v_ss, la, None

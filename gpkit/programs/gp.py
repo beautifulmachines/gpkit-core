@@ -307,8 +307,8 @@ class GeometricProgram:
                     f"substitution {{{key}: {sub}}} has invalid value type {type(sub)}."
                 )
         cost_hmap = cost.hmap.sub(self.substitutions, cost.vks)
-        if any(c <= 0 for c in cost_hmap.values()):
-            raise InvalidPosynomial("a GP's cost must be Posynomial")
+        if not all(0 < c < np.inf for c in cost_hmap.values()):
+            raise InvalidPosynomial("a GP's cost needs positive, finite coefficients")
         # Substitution can merge cost monomials, so the solved nu is indexed over
         # fewer terms than the cost was written with; this maps one back onto the
         # other, as a constraint's pmap does for its own hmap.
