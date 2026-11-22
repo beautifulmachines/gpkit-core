@@ -460,3 +460,36 @@ class TestNomialMapSubs:
             Model(w, [w >= 1e200 * z], {z: 1e200}).gp()
         with pytest.raises(InvalidPosynomial, match="finite"):
             Model(1e200 * z * w, [w >= 1], {z: 1e200}).gp()
+
+    @pytest.mark.parametrize(
+        ("a_val", "b_val"),
+        [(np.nan, 1), (lambda _: np.nan, 1), (np.inf, 0), (0, np.inf)],
+    )
+    def test_undefined_term_is_refused(self, a_val, b_val):
+        x, y, a, b = Variable("x"), Variable("y"), Variable("a"), Variable("b")
+        with SignomialsEnabled():
+            lesser, greater = x + y >= a * b, x + y * a * b >= 2
+        for c in (lesser, greater, a * b <= 1):
+            m = Model(x, [c, x >= 1, y >= 1, y <= 2], {a: a_val, b: b_val})
+            with pytest.raises(ValueError, match="undefined"):
+                m.gp()
+            if c is lesser:
+                with pytest.raises(ValueError, match="undefined"):
+                    m.sp()
+
+    def test_log_sensitivity_at_zero(self):
+        "d(cost)/dz is infinite here, but p*z**p, the log derivative of z**p, is 0"
+        x, y, a, z = Variable("x"), Variable("y"), Variable("a"), Variable("z")
+        with SignomialsEnabled():
+            c = x + y * a >= 1 + z**0.5
+        sol = Model(x, [c, x >= 0.1], {a: 0, z: 0}).solve(verbosity=0)
+        assert sol.cost == pytest.approx(1)
+        assert sol.sens.variables[z] == 0
+
+    def test_sensitivity_to_constant_on_both_sides(self):
+        x, p, q = Variable("x"), Variable("p"), Variable("q")
+        with SignomialsEnabled():
+            c = x * q + x * p >= 1 + 3 * q
+        sol = Model(x, [c, x >= 0.01], {p: 1, q: 2}).solve(verbosity=0)
+        # cost = (1 + 3q)/(q + p), so dlog(cost)/dlog(q) = 6/7 - 2/3
+        assert sol.sens.variables[q] == pytest.approx(4 / 21, abs=1e-5)

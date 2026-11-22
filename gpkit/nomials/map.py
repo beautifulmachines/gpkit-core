@@ -190,6 +190,8 @@ def subinplace(cp, exp, o_exp, vk, cval, squished):  # noqa: PLR0913, PLR0917
     x = exp[vk]
     powval = float(cval) ** float(x)  # not numpy's power, where 0**-1 is inf
     cp.csmap[o_exp] *= powval
+    if np.isnan(cp.csmap[o_exp]):  # e.g. 0*inf, which isn't ours to decide
+        raise ValueError(f"substituting {vk} = {cval} is undefined (nan)")
     if exp in cp:
         c = cp.pop(exp)
         exp.hashvalue ^= hash((vk, x))  # remove (key, value) from hashvalue
