@@ -485,6 +485,14 @@ class TestNomialMapSubs:
                 with pytest.raises(ValueError, match="undefined"):
                     m.sp()
 
+    def test_merged_terms_undefined_is_refused(self):
+        "Terms that merge to inf - inf are undefined, not a cancellation"
+        x, a, b = Variable("x"), Variable("a"), Variable("b")
+        with SignomialsEnabled():
+            p = a * x - b * x + 1
+        with pytest.raises(ValueError, match="undefined"):
+            p.sub({a: np.inf, b: np.inf})
+
     def test_log_sensitivity_at_zero(self):
         "d(cost)/dz is infinite here, but p*z**p, the log derivative of z**p, is 0"
         x, y, a, z = Variable("x"), Variable("y"), Variable("a"), Variable("z")

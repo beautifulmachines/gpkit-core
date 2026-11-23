@@ -126,29 +126,22 @@ class NomialMap(HashVector):
                 self.expmap, self.csmap = {exp: exp for exp in self}, {}
             return self
 
-        # Fold each term's fixed factors into its coefficient, e.g. with a fixed,
-        # c * a**p * x**q becomes (c * a**p) * x**q
         cp = NomialMap()
         cp.units = self.units
         cp.expmap, cp.csmap = {}, {}
         cvals = {}
         for exp, c in self.items():
-            new_exp = HashVector()
-            for vk, x in exp.items():
-                if vk not in fixed:
-                    new_exp[vk] = x
-                    continue
-                if vk not in cvals:
-                    cvals[vk] = numeric_value(vk, fixed[vk])
-                c *= cvals[vk] ** float(x)  # not numpy's, where 0**-1 is inf
-                if np.isnan(c):  # e.g. 0*inf, which isn't ours to decide
-                    raise ValueError(
-                        f"substituting {vk} = {cvals[vk]} is undefined (nan)"
-                    )
+            new_exp, c = fold_fixed(exp, c, fixed, cvals)
             cp.expmap[exp], cp.csmap[exp] = new_exp, c
             cp[new_exp] = cp.get(new_exp, 0) + c  # merge terms with equal exps
-        for exp in [exp for exp, c in cp.items() if c == 0]:
-            del cp[exp]  # terms that vanished or cancelled
+        for exp, c in list(cp.items()):
+            if np.isnan(c):  # merged terms of inf - inf
+                raise ValueError(
+                    f"substituting {dict(fixed)} is undefined (nan): merged terms"
+                    " cancel as inf - inf"
+                )
+            if c == 0:
+                del cp[exp]  # terms that vanished or cancelled
         if not cp:
             cp[EMPTY_HV] = 0.0
         return cp
@@ -178,6 +171,23 @@ class NomialMap(HashVector):
             orig_idx = origexps.index(orig_exp)
             pmap[selfexps.index(self_exp)][orig_idx] = fraction
         return pmap
+
+
+def fold_fixed(exp, c, fixed, cvals):
+    """Fold a term's fixed factors into its coefficient, e.g. with a fixed,
+    c * a**p * x**q becomes (c * a**p) * x**q. Returns the term's exps and
+    coefficient; cvals caches each fixed value as a number."""
+    new_exp = HashVector()
+    for vk, x in exp.items():
+        if vk not in fixed:
+            new_exp[vk] = x
+            continue
+        if vk not in cvals:
+            cvals[vk] = numeric_value(vk, fixed[vk])
+        c *= cvals[vk] ** float(x)  # not numpy's, where 0**-1 is inf
+        if np.isnan(c):  # e.g. 0*inf, which isn't ours to decide
+            raise ValueError(f"substituting {vk} = {cvals[vk]} is undefined (nan)")
+    return new_exp, c
 
 
 def numeric_value(vk, cval: Numbers | FixedScalar) -> float:
