@@ -455,7 +455,7 @@ class TestNomialMapSubs:
         with pytest.raises(ValueError):
             z.hmap.sub({z.key: w.key}, varkeys=z.vks)
 
-    def test_subinplace_zero(self):
+    def test_sub_zero(self):
         z = Variable("z")
         w = Variable("w")
 
@@ -501,3 +501,48 @@ class TestNomialMapSubs:
         sol = Model(x, [c, x >= 0.01], {p: 1, q: 2}).solve(verbosity=0)
         # cost = (1 + 3q)/(q + p), so dlog(cost)/dlog(q) = 6/7 - 2/3
         assert sol.sens.variables[q] == pytest.approx(4 / 21, abs=1e-5)
+
+
+class TestMergeDuringSubstitution:
+    "Terms that merge before their last fixed variable is substituted"
+
+    @pytest.fixture
+    def xabc(self):
+        return tuple(Variable(n) for n in "xabc")
+
+    def test_constraint_sensitivities(self, xabc):
+        x, a, b, c = xabc
+        sol = Model(x, [x >= a * b * c + b * c], {a: 2, b: 3, c: 5}).solve(verbosity=0)
+        # x = b*c*(a + 1)
+        assert sol.sens.variables[a] == pytest.approx(2 / 3, abs=1e-5)
+        assert sol.sens.variables[b] == pytest.approx(1, abs=1e-5)
+        assert sol.sens.variables[c] == pytest.approx(1, abs=1e-5)
+        assert sol.sens.variables[x] == pytest.approx(0, abs=1e-5)
+
+    def test_cost_sensitivities(self, xabc):
+        x, a, b, c = xabc
+        m = Model(a * b * c * x + b * c * x, [x >= 1], {a: 2, b: 3, c: 5})
+        sol = m.solve(verbosity=0)
+        assert sol.sens.variables[a] == pytest.approx(2 / 3, abs=1e-5)
+        assert sol.sens.variables[b] == pytest.approx(1, abs=1e-5)
+        assert sol.sens.variables[c] == pytest.approx(1, abs=1e-5)
+
+    def test_signomial_sensitivities(self, xabc):
+        x, a, b, c = xabc
+        y = Variable("y")
+        with SignomialsEnabled():
+            sig = a * b * c * x + b * c * x >= y + 1
+        sol = Model(x, [sig, y >= 1], {a: 2, b: 3, c: 5}).solve(verbosity=0)
+        # x = (y + 1)/(b*c*(a + 1))
+        assert sol.sens.variables[a] == pytest.approx(-2 / 3, abs=1e-5)
+
+    def test_expmap(self, xabc):
+        "Every term maps to its exponents without the fixed variables"
+        x, a, b, c = xabc
+        p = a * b * c * x + b * c * x + c * x**2 + x
+        fixed = {a.key: 2, b.key: 3, c.key: 5}
+        hmap = p.hmap.sub(fixed, p.vks)
+        for o_exp, exp in hmap.expmap.items():
+            assert exp == {vk: e for vk, e in o_exp.items() if vk not in fixed}
+            assert exp in hmap
+        assert sum(hmap.csmap.values()) == pytest.approx(sum(hmap.values()))
