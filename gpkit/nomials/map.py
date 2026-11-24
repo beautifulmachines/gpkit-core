@@ -1,13 +1,11 @@
 "Implements the NomialMap class"
 
-from collections import defaultdict
-
 import numpy as np
 
 from .. import units
 from ..ir import ir_units
 from ..units import DimensionalityError, qty
-from ..util.small_classes import EMPTY_HV, HashVector, Strings
+from ..util.small_classes import EMPTY_HV, FixedScalar, HashVector, Numbers, Strings
 from .substitution import parse_subs
 
 DIMLESS_QUANTITY = qty("dimensionless")
@@ -102,7 +100,7 @@ class NomialMap(HashVector):
                 out[exp] = c
         return out
 
-    def sub(self, substitutions, varkeys, parsedsubs=False):  # noqa: PLR0912
+    def sub(self, substitutions, varkeys, parsedsubs=False):
         """Applies substitutions to a NomialMap
 
         Parameters
@@ -130,30 +128,20 @@ class NomialMap(HashVector):
 
         cp = NomialMap()
         cp.units = self.units
-        # csmap is modified during substitution, but keeps the same exps
-        cp.expmap, cp.csmap = {}, self.copy()
-        varlocs = defaultdict(list)
+        cp.expmap, cp.csmap = {}, {}
+        cvals = {}
         for exp, c in self.items():
-            new_exp = exp.copy()
-            cp.expmap[exp] = new_exp  # cp modifies exps, so it needs new ones
-            cp[new_exp] = c
-            for vk in new_exp:
-                if vk in fixed:
-                    varlocs[vk].append((exp, new_exp))
-
-        squished = set()
-        for vk in varlocs:
-            exps, cval = varlocs[vk], fixed[vk]
-            if hasattr(cval, "hmap"):
-                if any(cval.hmap.keys()):
-                    raise ValueError("Monomial substitutions are not supported.")
-                (cval,) = cval.hmap.to(vk.units or DIMLESS_QUANTITY).values()
-            elif hasattr(cval, "to"):
-                cval = cval.to(vk.units or DIMLESS_QUANTITY).magnitude
-            elif not isinstance(cval, (int, float, np.number)):
-                raise ValueError("Monomial substitutions are not supported.")
-            for o_exp, exp in exps:
-                subinplace(cp, exp, o_exp, vk, cval, squished)
+            new_exp, c = fold_fixed(exp, c, fixed, cvals)
+            cp.expmap[exp], cp.csmap[exp] = new_exp, c
+            cp[new_exp] = cp.get(new_exp, 0) + c  # merge terms with equal exps
+        for exp, c in list(cp.items()):
+            if np.isnan(c):  # merged terms of inf - inf
+                raise ValueError(
+                    f"substituting {dict(fixed)} is undefined (nan): merged terms"
+                    " cancel as inf - inf"
+                )
+            if c == 0:
+                del cp[exp]  # terms that vanished or cancelled
         if not cp:
             cp[EMPTY_HV] = 0.0
         return cp
@@ -185,27 +173,31 @@ class NomialMap(HashVector):
         return pmap
 
 
-def subinplace(cp, exp, o_exp, vk, cval, squished):  # noqa: PLR0913, PLR0917
-    "Modifies cp by substituing cval/expval for vk in exp"
-    x = exp[vk]
-    powval = float(cval) ** float(x)  # not numpy's power, where 0**-1 is inf
-    cp.csmap[o_exp] *= powval
-    if np.isnan(cp.csmap[o_exp]):  # e.g. 0*inf, which isn't ours to decide
-        raise ValueError(f"substituting {vk} = {cval} is undefined (nan)")
-    if exp in cp:
-        c = cp.pop(exp)
-        exp.hashvalue ^= hash((vk, x))  # remove (key, value) from hashvalue
-        del exp[vk]
-        value = powval * c
-        if exp in cp:
-            squished.add(exp.copy())
-            currentvalue = cp[exp]
-            if value != -currentvalue:
-                cp[exp] += value
-            else:
-                del cp[exp]  # remove zeros created during substitution
-        elif value:
-            cp[exp] = value
-    elif exp in squished:
-        exp.hashvalue ^= hash((vk, x))  # remove (key, value) from hashvalue
-        del exp[vk]
+def fold_fixed(exp, c, fixed, cvals):
+    """Fold a term's fixed factors into its coefficient, e.g. with a fixed,
+    c * a**p * x**q becomes (c * a**p) * x**q. Returns the term's exps and
+    coefficient; cvals caches each fixed value as a number."""
+    new_exp = HashVector()
+    for vk, x in exp.items():
+        if vk not in fixed:
+            new_exp[vk] = x
+            continue
+        if vk not in cvals:
+            cvals[vk] = numeric_value(vk, fixed[vk])
+        c *= cvals[vk] ** float(x)  # not numpy's, where 0**-1 is inf
+        if np.isnan(c):  # e.g. 0*inf, which isn't ours to decide
+            raise ValueError(f"substituting {vk} = {cvals[vk]} is undefined (nan)")
+    return new_exp, c
+
+
+def numeric_value(vk, cval: Numbers | FixedScalar) -> float:
+    "The number cval stands for, in vk's units"
+    if hasattr(cval, "hmap"):
+        if any(cval.hmap.keys()):
+            raise ValueError("Monomial substitutions are not supported.")
+        (cval,) = cval.hmap.to(vk.units or DIMLESS_QUANTITY).values()
+    elif hasattr(cval, "to"):
+        cval = cval.to(vk.units or DIMLESS_QUANTITY).magnitude
+    elif not isinstance(cval, (int, float, np.number)):
+        raise ValueError("Monomial substitutions are not supported.")
+    return float(cval)
