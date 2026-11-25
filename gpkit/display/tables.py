@@ -152,6 +152,22 @@ class DiffRow:
         return not np.shape(self.rel) and np.isnan(self.rel)
 
 
+SENS_NEARZERO_TOL = 1e-7
+
+
+def fmt_sens(x, digits: int) -> str:
+    """A sensitivity, signed: 0 if exactly zero, ~0 if within solver noise of it.
+
+    A primal value can be tiny at any scale; a sensitivity is a dimensionless
+    dual, so a fixed tolerance separates a vanishing one from solver noise.
+    """
+    if x == 0:
+        return "0"
+    if abs(x) < SENS_NEARZERO_TOL:
+        return "~0"
+    return f"{x:+.{digits}g}".replace("+nan", "nan")
+
+
 class SectionSpec:
     align = None
     align_vecs = True  # aligns vectors if all same length
@@ -259,17 +275,9 @@ class SectionSpec:
         "Format a single number, a vector's element or a scalar, at p-1 digits."
         return f"{x:{self.pm}.{p - 1}g}".replace("+nan", "nan")
 
-    nearzero_tol = 1e-7
-
     def _fmt_one_sens(self, x, p) -> str:
-        """A sensitivity, signed, or ~0 where it vanishes.
-
-        A primal value can be tiny at any scale; a sensitivity is a dimensionless
-        dual, so a fixed tolerance separates "does not matter" from solver noise.
-        """
-        if abs(x) < self.nearzero_tol:
-            return "~0"
-        return f"{x:+.{p - 1}g}".replace("+nan", "nan")
+        "A sensitivity at p-1 digits, as fmt_sens writes one."
+        return fmt_sens(x, p - 1)
 
     def _fmt_val(self, val, suff="", one=None) -> str:
         "val, a vector's elements each formatted by one, if given"

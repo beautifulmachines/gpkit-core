@@ -87,7 +87,7 @@ class TestSolutionSections:
         ]
 
     @pytest.mark.parametrize(
-        "fixed, row, sens", [(0, "[ 2  2  0 ]", "~0"), (1, "[ 3  2  1 ]", "+0.3333")]
+        "fixed, row, sens", [(0, "[ 2  2  0 ]", "0"), (1, "[ 3  2  1 ]", "+0.3333")]
     )
     def test_a_partly_fixed_vector_is_one_free_row(self, fixed, row, sens):
         "Its fixed elements complete that row, and are fixed rows of their own."
