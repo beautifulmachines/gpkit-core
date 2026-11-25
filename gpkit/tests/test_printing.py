@@ -86,6 +86,24 @@ class TestSolutionSections:
             "v[:] : [ 1    nan  2   ] [m]"
         ]
 
+    @pytest.mark.parametrize(
+        "fixed, row, sens", [(0, "[ 2  2  0 ]", "~0"), (1, "[ 3  2  1 ]", "+0.3333")]
+    )
+    def test_a_partly_fixed_vector_is_one_free_row(self, fixed, row, sens):
+        "Its fixed elements complete that row, and are fixed rows of their own."
+        v = VectorVariable(3, "v", "N")
+        m = Model(v[0], [v[0] >= v[1] + v[2], v[1] >= 2 * v.units], {v[2]: fixed})
+        text = m.solve(verbosity=0).table(tables=["freevariables", "constants"])
+        assert text.split("\n") == [
+            "Free Variables",
+            "--------------",
+            f"v[:] : {row} [N]",
+            "",
+            "Fixed Variables",
+            "---------------",
+            f"v[2] : {fixed} [N] ({sens})",
+        ]
+
     def test_a_vector_constraint_is_one_row(self, trip):
         "Its sensitivities are per element, gathered as a vector variable's values are."
         sol = trip.solve(verbosity=0)

@@ -845,8 +845,11 @@ class Documents:
     tol: float = 0.0  # a comparison within it is no change, as almost_equal says
 
     def items(self, source) -> list[Item]:
-        "(ref, value) for each row of source, which reads one document."
-        return self._rows([source(doc) for doc in self.docs])
+        "(ref, value) rows from source, a function from a solution's IR to {ref: value}."
+        if self.is_sweep:
+            return _stack([source(doc) for doc in self.docs])
+        (doc,) = self.docs
+        return list(self._grouped(source(doc), *self._layout(source, doc)).items())
 
     def cost(self):
         return self._across([doc["cost"]["value"] for doc in self.docs])
@@ -873,29 +876,39 @@ class Documents:
             for name, cnt in counts.items()
         ]
 
-    def _rows(self, per_doc: list[dict]) -> list[Item]:
-        if not self.is_sweep:
-            (values,) = per_doc
-            return list(self._grouped(values).items())
-        return _stack(per_doc)
+    def _layout(self, source, doc) -> tuple[dict, set]:
+        """_grouped's fill and split for source's rows of doc.
 
-    def _grouped(self, values: dict) -> dict:
+        A vector with free and fixed elements is one free row holding all its
+        values; where fixed values are shown, each fixed element is its own row.
+        """
+        if source is _primal:
+            return _constants(doc), set()
+        return {}, {self.display.entry(r).get("veckey_ref") for r in _primal(doc)}
+
+    def _grouped(self, values: dict, fill=None, split=()) -> dict:
         """values as one document's rows, a vector's elements gathered into one.
 
         The IR carries elements only, so showing a vector as one row is this
-        step; an element with no value is nan.  A sweep's columns are already
-        its solutions, so there each element keeps a row of its own.
+        step; an element with no value is nan.  fill completes the vector rows
+        values makes, and a vector in split keeps its elements as rows.  A
+        sweep's columns are already its solutions, so there every element does.
         """
         if self.is_sweep:
             return dict(values)
         out = {}
         for ref, value in values.items():
             entry = self.display.entry(ref)
-            if "veckey_ref" not in entry:
+            vec = entry.get("veckey_ref")
+            if vec is None or vec in split:
                 out[ref] = value
                 continue
-            row = out.setdefault(entry["veckey_ref"], np.full(entry["shape"], np.nan))
+            row = out.setdefault(vec, np.full(entry["shape"], np.nan))
             row[tuple(entry["idx"])] = value
+        for ref, value in (fill or {}).items():
+            entry = self.display.entry(ref)
+            if (vec := entry.get("veckey_ref")) in out:
+                out[vec][tuple(entry["idx"])] = value
         return out
 
     def _across(self, values: list):
@@ -922,6 +935,7 @@ class Documents:
 
         diff_solutions matches a redeclared unit's two refs; renaming the
         baseline's to the scenario's before grouping pairs their rows too.
+        Changes and baseline values take the rows the scenario's values do.
         """
         diffs = [diff_solutions(self.baseline, doc) for doc in self.docs]
         parts = [_diff_part(diff, section) for diff in diffs]
@@ -934,8 +948,15 @@ class Documents:
             if vec := self.display.entries[new].get("veckey_ref"):
                 spelled[vec] = self.display.entries[old]["veckey_ref"]
 
-        def rows(values):
-            return self._grouped({renamed.get(r, r): v for r, v in values.items()})
+        _, split = self._layout(source, self.docs[0])  # a sweep's split is moot
+
+        def rows(values, fill=None):
+            def scenario_refs(vals):
+                return {renamed.get(r, r): v for r, v in vals.items()}
+
+            return self._grouped(
+                scenario_refs(values), scenario_refs(fill or {}), split
+            )
 
         def row(ref, rel, new, old):
             units = self.display.units  # the baseline's own, not the scenario's
@@ -945,7 +966,7 @@ class Documents:
             rows({r: self._moved(v) for r, v in p.get("matched", {}).items()})
             for p in parts
         ]
-        old_rows = rows(source(self.baseline))
+        old_rows = rows(source(self.baseline), self._layout(source, self.baseline)[0])
         nan = float("nan")
         out = [
             row(
@@ -977,9 +998,19 @@ def _stack(per_doc: list[dict]) -> list[Item]:
 
 
 def _diff_part(diff: dict, section: str) -> dict:
-    "The part of a diff_solutions output that compares one section."
+    """The part of a diff_solutions output that compares one section.
+
+    The primal's takes the constants' too: a free vector's row holds its fixed
+    elements, so its changes do as well.
+    """
     part = diff.get(section, {})
-    return part.get("variables", {}) if section == "sensitivities" else part
+    if section == "sensitivities":
+        return part.get("variables", {})
+    if section == "primal":
+        fixed = diff.get("constants", {})
+        keys = ("matched", "units_redeclared")
+        return {k: {**fixed.get(k, {}), **part.get(k, {})} for k in keys}
+    return part
 
 
 def _documents(obj, model=None, baseline=None, tol=0.0) -> Documents:

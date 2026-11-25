@@ -4,7 +4,7 @@ import json
 
 import pytest
 
-from gpkit import Model, Variable
+from gpkit import Model, Variable, VectorVariable
 from gpkit.exceptions import IRVersionError
 from gpkit.ir import IR_VERSION, diff_solutions
 
@@ -230,6 +230,32 @@ class TestRenderedDiff:
         x = Variable("x_same")
         sol = Model(x, [x >= 1]).solve(verbosity=0)
         assert "+0%" in sol.diff(sol)
+
+    @pytest.mark.parametrize("fixed", [0, 1])
+    def test_a_partly_fixed_vector_against_itself_is_unchanged(self, fixed):
+        v = VectorVariable(3, "v", "N")
+        m = Model(v[0], [v[0] >= v[1] + v[2], v[1] >= 2 * v.units], {v[2]: fixed})
+        sol = m.solve(verbosity=0)
+        tables = ("freevariables", "constants", "sensitivities")
+        assert m.solve(verbosity=0).diff(sol, tables=tables) == ""
+
+    def test_a_moved_fixed_element_shows_in_its_free_row_and_its_own(self):
+        v = VectorVariable(3, "v", "N")
+        m = Model(v[0], [v[0] >= v[1] + v[2], v[1] >= 2 * v.units], {v[2]: 1})
+        baseline = m.solve(verbosity=0)
+        m.substitutions[v[2]] = 2
+        text = m.solve(verbosity=0).diff(
+            baseline, tables=("freevariables", "constants")
+        )
+        assert text.split("\n") == [
+            "Free Variable Changes",
+            "---------------------",
+            "v[:] : [ +33.3%  +0%     +100%  ]",
+            "",
+            "Constant Changes",
+            "----------------",
+            "v[2] : +100%  (2N vs 1N)",
+        ]
 
     def test_a_variable_absent_from_the_baseline_renders(self):
         "This raised TypeError in the renderer's filter before the rewrite."
