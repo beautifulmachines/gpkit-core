@@ -852,12 +852,16 @@ class Documents:
     baseline: dict | None = None
     tol: float = 0.0  # a comparison within it is no change, as almost_equal says
 
-    def items(self, source) -> list[Item]:
-        "(ref, value) rows from source, a function from a solution's IR to {ref: value}."
+    def items(self, source, against=None) -> list[Item]:
+        """(ref, value) rows from source, a function from a solution's IR to {ref: value}.
+
+        against is the IR of a solution these rows are compared with.
+        """
         if self.is_sweep:
             return _stack([source(doc) for doc in self.docs])
         (doc,) = self.docs
-        return list(self._grouped(source(doc), *self._layout(source, doc)).items())
+        layout = self._layout(source, doc, against)
+        return list(self._grouped(source(doc), *layout).items())
 
     def cost(self):
         return self._across([doc["cost"]["value"] for doc in self.docs])
@@ -884,15 +888,18 @@ class Documents:
             for name, cnt in counts.items()
         ]
 
-    def _layout(self, source, doc) -> tuple[dict, set]:
+    def _layout(self, source, doc, against=None) -> tuple[dict, set]:
         """_grouped's fill and split for source's rows of doc.
 
         A vector with free and fixed elements is one free row holding all its
         values; where fixed values are shown, each fixed element is its own row.
+        Compared against another solution, a vector free in either is split, so
+        both sides' rows pair up.
         """
         if source is _primal:
             return _constants(doc), set()
-        return {}, {self.display.entry(r).get("veckey_ref") for r in _primal(doc)}
+        free = [r for d in (doc, against) if d for r in _primal(d)]
+        return {}, {self.display.entry(r).get("veckey_ref") for r in free}
 
     def _grouped(self, values: dict, fill=None, split=()) -> dict:
         """values as one document's rows, a vector's elements gathered into one.
@@ -956,7 +963,8 @@ class Documents:
             if vec := self.display.entries[new].get("veckey_ref"):
                 spelled[vec] = self.display.entries[old]["veckey_ref"]
 
-        _, split = self._layout(source, self.docs[0])  # a sweep's split is moot
+        # a sweep's split is moot: its rows are elements
+        _, split = self._layout(source, self.docs[0], self.baseline)
 
         def rows(values, fill=None):
             def scenario_refs(vals):
@@ -983,7 +991,7 @@ class Documents:
                 value,
                 old_rows.pop(ref, None),
             )
-            for ref, value in self.items(source)
+            for ref, value in self.items(source, self.baseline)
         ]  # then what was dropped, not merely unchanged
         return out + [row(ref, nan, None, old) for ref, old in old_rows.items()]
 

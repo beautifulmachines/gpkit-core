@@ -239,6 +239,26 @@ class TestRenderedDiff:
         tables = ("freevariables", "constants", "sensitivities")
         assert m.solve(verbosity=0).diff(sol, tables=tables) == ""
 
+    def test_elements_fixed_on_one_side_only_pair_up_either_way(self):
+        "Baseline fixes v[2]; scenario fixes all three, so v[0] and v[1] are new."
+        v, c = VectorVariable(3, "v", "N"), Variable("c", 0.5, "N")
+        x = Variable("x", "N")  # leaves the all-fixed solve something to solve
+        m = Model(x + v.sum(), [v >= c, x >= c], {v[2]: 1})
+        partly = m.solve(verbosity=0)
+        m.substitutions.update({v[0]: 1, v[1]: 1})
+        wholly = m.solve(verbosity=0)
+        for scenario, baseline, word in [
+            (wholly, partly, "(new)"),
+            (partly, wholly, "(only in baseline)"),
+        ]:
+            text = scenario.diff(baseline, tables=("constants",))
+            assert text.split("\n") == [
+                "Constant Changes",
+                "----------------",
+                f"v[0] : {word}",
+                f"v[1] : {word}",
+            ]
+
     def test_a_moved_fixed_element_shows_in_its_free_row_and_its_own(self):
         v = VectorVariable(3, "v", "N")
         m = Model(v[0], [v[0] >= v[1] + v[2], v[1] >= 2 * v.units], {v[2]: 1})
