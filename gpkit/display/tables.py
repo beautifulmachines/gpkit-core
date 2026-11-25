@@ -152,15 +152,11 @@ class DiffRow:
         return not np.shape(self.rel) and np.isnan(self.rel)
 
 
-SENS_NEARZERO_TOL = 1e-7
+SENS_NEARZERO_TOL = 1e-7  # sensitivities are dimensionless, so one tolerance fits
 
 
 def fmt_sens(x, digits: int) -> str:
-    """A sensitivity, signed: 0 if exactly zero, ~0 if within solver noise of it.
-
-    A primal value can be tiny at any scale; a sensitivity is a dimensionless
-    dual, so a fixed tolerance separates a vanishing one from solver noise.
-    """
+    "A sensitivity, signed: 0 if exactly zero, ~0 if within solver noise of it."
     if x == 0:
         return "0"
     if abs(x) < SENS_NEARZERO_TOL:
@@ -853,10 +849,7 @@ class Documents:
     tol: float = 0.0  # a comparison within it is no change, as almost_equal says
 
     def items(self, source, against=None) -> list[Item]:
-        """(ref, value) rows from source, a function from a solution's IR to {ref: value}.
-
-        against is the IR of a solution these rows are compared with.
-        """
+        "(ref, value) rows from source(doc); against is a solution's IR compared with."
         if self.is_sweep:
             return _stack([source(doc) for doc in self.docs])
         (doc,) = self.docs
@@ -889,13 +882,9 @@ class Documents:
         ]
 
     def _layout(self, source, doc, against=None) -> tuple[dict, set]:
-        """_grouped's fill and split for source's rows of doc.
-
-        A vector with free and fixed elements is one free row holding all its
-        values; where fixed values are shown, each fixed element is its own row.
-        Compared against another solution, a vector free in either is split, so
-        both sides' rows pair up.
-        """
+        """_grouped's fill and split: a vector with free and fixed elements is one
+        free row of all its values, and elsewhere a row per element (if free in
+        doc or against, so a diff's two sides pair up)."""
         if source is _primal:
             return _constants(doc), set()
         free = [r for d in (doc, against) if d for r in _primal(d)]
@@ -963,7 +952,6 @@ class Documents:
             if vec := self.display.entries[new].get("veckey_ref"):
                 spelled[vec] = self.display.entries[old]["veckey_ref"]
 
-        # a sweep's split is moot: its rows are elements
         _, split = self._layout(source, self.docs[0], self.baseline)
 
         def rows(values, fill=None):
@@ -1014,11 +1002,7 @@ def _stack(per_doc: list[dict]) -> list[Item]:
 
 
 def _diff_part(diff: dict, section: str) -> dict:
-    """The part of a diff_solutions output that compares one section.
-
-    The primal's takes the constants' too: a free vector's row holds its fixed
-    elements, so its changes do as well.
-    """
+    "The part of a diff_solutions output comparing one section; primal's has constants'."
     part = diff.get(section, {})
     if section == "sensitivities":
         return part.get("variables", {})
