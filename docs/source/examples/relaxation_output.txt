@@ -205,8 +205,8 @@ x_min : 2
 
 Relax.OriginalValues
 ...constants
-x_max : 1  (~0)
-x_min : 2  (~0)
+x_max : 1  (0)
+x_min : 2  (0)
 
 Most Sensitive Constraints
 --------------------------

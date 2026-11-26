@@ -152,6 +152,18 @@ class DiffRow:
         return not np.shape(self.rel) and np.isnan(self.rel)
 
 
+SENS_NEARZERO_TOL = 1e-7  # sensitivities are dimensionless, so one tolerance fits
+
+
+def fmt_sens(x, digits: int) -> str:
+    "A sensitivity, signed: 0 if exactly zero, ~0 if within solver noise of it."
+    if x == 0:
+        return "0"
+    if abs(x) < SENS_NEARZERO_TOL:
+        return "~0"
+    return f"{x:+.{digits}g}".replace("+nan", "nan")
+
+
 class SectionSpec:
     align = None
     align_vecs = True  # aligns vectors if all same length
@@ -259,17 +271,9 @@ class SectionSpec:
         "Format a single number, a vector's element or a scalar, at p-1 digits."
         return f"{x:{self.pm}.{p - 1}g}".replace("+nan", "nan")
 
-    nearzero_tol = 1e-7
-
     def _fmt_one_sens(self, x, p) -> str:
-        """A sensitivity, signed, or ~0 where it vanishes.
-
-        A primal value can be tiny at any scale; a sensitivity is a dimensionless
-        dual, so a fixed tolerance separates "does not matter" from solver noise.
-        """
-        if abs(x) < self.nearzero_tol:
-            return "~0"
-        return f"{x:+.{p - 1}g}".replace("+nan", "nan")
+        "A sensitivity at p-1 digits, as fmt_sens writes one."
+        return fmt_sens(x, p - 1)
 
     def _fmt_val(self, val, suff="", one=None) -> str:
         "val, a vector's elements each formatted by one, if given"
@@ -844,9 +848,13 @@ class Documents:
     baseline: dict | None = None
     tol: float = 0.0  # a comparison within it is no change, as almost_equal says
 
-    def items(self, source) -> list[Item]:
-        "(ref, value) for each row of source, which reads one document."
-        return self._rows([source(doc) for doc in self.docs])
+    def items(self, source, against=None) -> list[Item]:
+        "(ref, value) rows from source(doc); against is a solution's IR compared with."
+        if self.is_sweep:
+            return _stack([source(doc) for doc in self.docs])
+        (doc,) = self.docs
+        layout = self._layout(source, doc, against)
+        return list(self._grouped(source(doc), *layout).items())
 
     def cost(self):
         return self._across([doc["cost"]["value"] for doc in self.docs])
@@ -873,29 +881,38 @@ class Documents:
             for name, cnt in counts.items()
         ]
 
-    def _rows(self, per_doc: list[dict]) -> list[Item]:
-        if not self.is_sweep:
-            (values,) = per_doc
-            return list(self._grouped(values).items())
-        return _stack(per_doc)
+    def _layout(self, source, doc, against=None) -> tuple[dict, set]:
+        """_grouped's fill and split: a vector with free and fixed elements is one
+        free row of all its values, and elsewhere a row per element (if free in
+        doc or against, so a diff's two sides pair up)."""
+        if source is _primal:
+            return _constants(doc), set()
+        free = [r for d in (doc, against) if d for r in _primal(d)]
+        return {}, {self.display.entry(r).get("veckey_ref") for r in free}
 
-    def _grouped(self, values: dict) -> dict:
+    def _grouped(self, values: dict, fill=None, split=()) -> dict:
         """values as one document's rows, a vector's elements gathered into one.
 
         The IR carries elements only, so showing a vector as one row is this
-        step; an element with no value is nan.  A sweep's columns are already
-        its solutions, so there each element keeps a row of its own.
+        step; an element with no value is nan.  fill completes the vector rows
+        values makes, and a vector in split keeps its elements as rows.  A
+        sweep's columns are already its solutions, so there every element does.
         """
         if self.is_sweep:
             return dict(values)
         out = {}
         for ref, value in values.items():
             entry = self.display.entry(ref)
-            if "veckey_ref" not in entry:
+            vec = entry.get("veckey_ref")
+            if vec is None or vec in split:
                 out[ref] = value
                 continue
-            row = out.setdefault(entry["veckey_ref"], np.full(entry["shape"], np.nan))
+            row = out.setdefault(vec, np.full(entry["shape"], np.nan))
             row[tuple(entry["idx"])] = value
+        for ref, value in (fill or {}).items():
+            entry = self.display.entry(ref)
+            if (vec := entry.get("veckey_ref")) in out:
+                out[vec][tuple(entry["idx"])] = value
         return out
 
     def _across(self, values: list):
@@ -922,6 +939,7 @@ class Documents:
 
         diff_solutions matches a redeclared unit's two refs; renaming the
         baseline's to the scenario's before grouping pairs their rows too.
+        Changes and baseline values take the rows the scenario's values do.
         """
         diffs = [diff_solutions(self.baseline, doc) for doc in self.docs]
         parts = [_diff_part(diff, section) for diff in diffs]
@@ -934,8 +952,15 @@ class Documents:
             if vec := self.display.entries[new].get("veckey_ref"):
                 spelled[vec] = self.display.entries[old]["veckey_ref"]
 
-        def rows(values):
-            return self._grouped({renamed.get(r, r): v for r, v in values.items()})
+        _, split = self._layout(source, self.docs[0], self.baseline)
+
+        def rows(values, fill=None):
+            def scenario_refs(vals):
+                return {renamed.get(r, r): v for r, v in vals.items()}
+
+            return self._grouped(
+                scenario_refs(values), scenario_refs(fill or {}), split
+            )
 
         def row(ref, rel, new, old):
             units = self.display.units  # the baseline's own, not the scenario's
@@ -945,7 +970,7 @@ class Documents:
             rows({r: self._moved(v) for r, v in p.get("matched", {}).items()})
             for p in parts
         ]
-        old_rows = rows(source(self.baseline))
+        old_rows = rows(source(self.baseline), self._layout(source, self.baseline)[0])
         nan = float("nan")
         out = [
             row(
@@ -954,7 +979,7 @@ class Documents:
                 value,
                 old_rows.pop(ref, None),
             )
-            for ref, value in self.items(source)
+            for ref, value in self.items(source, self.baseline)
         ]  # then what was dropped, not merely unchanged
         return out + [row(ref, nan, None, old) for ref, old in old_rows.items()]
 
@@ -977,9 +1002,15 @@ def _stack(per_doc: list[dict]) -> list[Item]:
 
 
 def _diff_part(diff: dict, section: str) -> dict:
-    "The part of a diff_solutions output that compares one section."
+    "The part of a diff_solutions output comparing one section; primal's has constants'."
     part = diff.get(section, {})
-    return part.get("variables", {}) if section == "sensitivities" else part
+    if section == "sensitivities":
+        return part.get("variables", {})
+    if section == "primal":
+        fixed = diff.get("constants", {})
+        keys = ("matched", "units_redeclared")
+        return {k: {**fixed.get(k, {}), **part.get(k, {})} for k in keys}
+    return part
 
 
 def _documents(obj, model=None, baseline=None, tol=0.0) -> Documents:

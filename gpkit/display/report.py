@@ -10,7 +10,7 @@ import numpy as np
 from ..units import Quantity
 from .naming import DisplayScope
 from .render import LATEX_ALIGNED, TEXT, render
-from .tables import _format_aligned_columns, _md_escape, _md_table
+from .tables import _format_aligned_columns, _md_escape, _md_table, fmt_sens
 
 # ── Text renderer ────────────────────────────────────────────────────────────
 
@@ -52,9 +52,6 @@ def _fmt_value(val, precision: int = 4, vecn: int = 6, col_widths=()) -> str:
         return str(mag)
 
 
-_SENS_NEARZERO_TOL = 1e-7
-
-
 def _fmt_sensitivity(sens, vecn: int = 6, col_widths=()) -> str:
     """Format a sensitivity value for display, handling scalars and arrays."""
 
@@ -64,10 +61,7 @@ def _fmt_sensitivity(sens, vecn: int = 6, col_widths=()) -> str:
         arr = np.asarray(sens)
         if arr.shape:
             flat = arr.ravel()
-            shown = [
-                "~0" if abs(x) < _SENS_NEARZERO_TOL else f"{x:+.2g}"
-                for x in flat[:vecn]
-            ]
+            shown = [fmt_sens(x, 2) for x in flat[:vecn]]
             body = "  ".join(
                 s.ljust(col_widths[i]) if i < len(col_widths) else s
                 for i, s in enumerate(shown)
@@ -75,7 +69,7 @@ def _fmt_sensitivity(sens, vecn: int = 6, col_widths=()) -> str:
             dots = " ..." if flat.size > vecn else ""
             return f"( {body}{dots} )"
         scalar = float(arr)
-        return "~0" if abs(scalar) < _SENS_NEARZERO_TOL else f"{scalar:+.2g}"
+        return fmt_sens(scalar, 2)
     except (TypeError, ValueError):
         return str(sens)
 
