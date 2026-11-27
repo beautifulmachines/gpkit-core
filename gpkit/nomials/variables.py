@@ -73,14 +73,16 @@ def _vector_values(name, shape, values):
     if values is None or callable(values):
         return values
     if Vectorize.vectorization:
-        if not hasattr(values, "shape"):
-            # keep each element's units for substitution to convert;
+        if isinstance(values, (list, tuple)):
+            values = np.array(values)
+        if hasattr(values, "shape"):
+            values = np.broadcast_to(values, reversed(shape)).T
+        else:  # one value for every element
+            # keep its units for substitution to convert;
             # not np.full, which pint intercepts and strips units in
             filled = np.empty(shape, dtype=object)
             filled.fill(values)
             values = filled
-        else:
-            values = np.broadcast_to(values, reversed(shape)).T
     elif not hasattr(values, "shape"):
         values = np.array(values)
     if values.shape != shape:
@@ -128,6 +130,7 @@ class Variable(Monomial):
                     not isinstance(arg, Strings)
                     and isinstance(arg, (Numbers, Iterable))
                     or callable(arg)
+                    or arg is None  # no value: free
                 ) and "value" not in descr:
                     descr["value"] = arg
                 elif isinstance(arg, Strings) and "units" not in descr:
@@ -234,10 +237,14 @@ class ArrayVariable(NomialArray):
             if isinstance(arg, Strings) and "name" not in descr:
                 descr["name"] = arg
             elif (
-                isinstance(arg, (Numbers, Iterable))
-                and not isinstance(arg, Strings)
-                and "value" not in descr
-            ) or callable(arg):
+                (
+                    isinstance(arg, (Numbers, Iterable))
+                    and not isinstance(arg, Strings)
+                    and "value" not in descr
+                )
+                or callable(arg)
+                or arg is None
+            ):  # None: no value, free
                 descr["value"] = arg
             elif isinstance(arg, Strings) and "units" not in descr:
                 descr["units"] = arg

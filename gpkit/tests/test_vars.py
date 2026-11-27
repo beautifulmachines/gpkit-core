@@ -461,6 +461,16 @@ class TestVectorVariable:
         m = gpkit.Model(d.sum(), [d >= Variable("c", 1, "m")])
         assert list(m.substitutions["d"]) == [2000, 2000]
 
+    def test_none_as_the_value_leaves_it_free(self):
+        assert Variable("x", None, "m").key.value is None
+        with Vectorize(2):
+            assert Variable("v", None, "m")[0].key.value is None
+
+    def test_list_value_under_vectorize_spreads_over_elements(self):
+        with Vectorize(2):
+            x = Variable("x", "m", value=[2.0, 3.0])
+        assert [e.key.value for e in x] == [2.0, 3.0]
+
     @pytest.mark.parametrize(
         "args", [("x", 2 * gpkit.units("km"), "m"), ("x", 1, [1, 2], "m")]
     )
