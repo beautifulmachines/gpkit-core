@@ -10,6 +10,7 @@ from gpkit import (
     SignomialsEnabled,
     Variable,
     VectorVariable,
+    units,
 )
 from gpkit.constraints.bounded import Bounded
 from gpkit.constraints.costed import CostedConstraintSet
@@ -69,6 +70,16 @@ class TestConstraint:
             _ = Model(x, [v <= ["A", "B"]])
         with pytest.raises(TypeError):
             _ = Model(x, [v >= ["A", "B"]])
+        with pytest.raises(ValueError, match="accidental equality"):
+            _ = Model(x, [x >= 1, True])
+
+    def test_value_in_wrong_units_is_not_blamed_on_the_constraint(self):
+        "A units error reaches the user as itself, not as a bad element"
+        c = Variable("c", 1, "m")
+        for value in (np.array([1, 2]) * units("s"), {0: 1 * units("s")}):
+            v = VectorVariable(2, "v", "m", value=value)
+            with pytest.raises(DimensionalityError):
+                Model(v.sum(), [v >= c])
 
     def test_computed_variable(self):
         x = Variable("x")

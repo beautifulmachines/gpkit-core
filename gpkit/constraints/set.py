@@ -251,10 +251,13 @@ class ConstraintSet(list, ReprMixin):
                 hasattr(constraint, "as_hmapslt1") or hasattr(constraint, "as_gpconstr")
             ):
                 try:
-                    for subconstraint in flatiter(constraint, "vks"):
-                        self._update(subconstraint)
+                    subconstraints = list(flatiter(constraint, "vks"))
                 except (TypeError, AttributeError) as e:
                     raise badelement(self, i, constraint) from e
+                for subconstraint in subconstraints:
+                    if not hasattr(subconstraint, "vks"):
+                        raise badelement(self, i, constraint)
+                    self._update(subconstraint)
             elif isinstance(constraint, ConstraintSet):
                 raise badelement(
                     self, i, constraint, " It had not yet been initialized!"

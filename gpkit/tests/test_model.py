@@ -39,6 +39,7 @@ from gpkit.exceptions import (
     UnnecessarySGP,
 )
 from gpkit.programs.gp import DEFAULT_SOLVER_KWARGS
+from gpkit.units import DimensionalityError
 from gpkit.util.small_classes import CootMatrix
 
 NDIGS = {"cvxopt": 5, "mosek_cli": 5, "mosek_conif": 3}
@@ -1060,6 +1061,22 @@ class TestVar:
         m = _Aero()
         assert m.e.key in m.substitutions
         assert m.substitutions[m.e.key] == pytest.approx(0.9)
+
+    def test_default_with_units_is_converted(self):
+        "A value made with units() is kept and converted, not dropped"
+
+        class _Leg(Model):
+            d = Var("m", "distance", value=2 * units("km"))
+
+        m = _Leg()
+        assert m.substitutions[m.d.key] == pytest.approx(2000)
+
+    def test_default_in_wrong_units_raises(self):
+        class _Leg(Model):
+            d = Var("m", "distance", value=2 * units("s"))
+
+        with pytest.raises(DimensionalityError):
+            _Leg()
 
     def test_subclass_inherits_var(self):
         "Child class inherits Var declarations from parent"

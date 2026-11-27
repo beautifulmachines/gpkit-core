@@ -78,11 +78,10 @@ class Var:
                 f"Variable '{self.name}' already initialized on {obj!r}. "
                 "Possible duplicate Var declarations in the MRO."
             )
-        args = [self.name]
-        if self.value is not None:
-            args.append(self.value)
-        args.extend([self.units, self.label])
+        args = [self.name, self.units, self.label]
         kwargs = {}
+        if self.value is not None:
+            kwargs["value"] = self.value
         if self.growth is not None:
             kwargs["growth"] = self.growth
         v = Variable(*args, **kwargs)
