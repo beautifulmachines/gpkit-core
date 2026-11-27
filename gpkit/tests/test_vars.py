@@ -426,6 +426,29 @@ class TestVectorVariable:
             assert x[1, 0].value == x[1, 1].value
             assert x[2, 0].value == x[2, 1].value
 
+    def test_value_map_fixes_only_its_elements(self):
+        v = VectorVariable(3, "v", "N", value={-1: 1 * gpkit.ureg.kN})
+        c = Variable("c", 0.5, "N")
+        m = gpkit.Model(v.sum(), [v >= c])
+        assert [e.key in m.substitutions for e in v] == [0, 0, 1]
+        assert m.solve(verbosity=0)["v"].magnitude.tolist() == pytest.approx(
+            [0.5, 0.5, 1000], rel=1e-3
+        )
+
+    def test_value_map_under_vectorize_fixes_the_vectors_own_index(self):
+        with Vectorize(2):
+            x = VectorVariable(3, "x", value={0: 7})
+        assert [x[0, j].key.value for j in range(2)] == [7, 7]
+        assert x[1, 0].key.value is None
+
+    def test_value_map_index_out_of_range_raises(self):
+        with pytest.raises(IndexError):
+            VectorVariable(3, "v", value={3: 0})
+
+    def test_value_map_on_a_scalar_raises(self):
+        with pytest.raises(TypeError, match="is a scalar"):
+            Variable("x", "m", value={0: 1})
+
     def test_vectorize_shapes(self):
         with gpkit.Vectorize(3):
             with gpkit.Vectorize(5):

@@ -1,5 +1,6 @@
 "Tests for the TOML model parser and loader."
 
+import numpy as np
 import pytest
 
 from gpkit import Model, Variable
@@ -101,6 +102,47 @@ q = "[1, 2] m"
 [model]
 objective = "min: sum(q)"
 constraints = ["sum(q) >= 1*units('m')"]
+""")
+
+    def test_value_map_with_units(self):
+        value, units, label = _parse_var_spec(["{0: 1, -1: 5} m", "ends fixed"])
+        assert value == {0: 1.0, -1: 5.0}
+        assert units == "m"
+        assert label == "ends fixed"
+
+    def test_value_map_dimensionless(self):
+        value, units, _ = _parse_var_spec("{0: 0}")
+        assert value == {0: 0.0}
+        assert units is None
+
+    @pytest.mark.parametrize("spec", ["{last: 0} m", "{0.5: 0} m", "{0: zero} m"])
+    def test_value_map_needs_integer_indices_and_numbers(self, spec):
+        with pytest.raises(TomlParseError, match="index: number"):
+            _parse_var_spec(spec)
+
+    def test_value_map_fixes_only_its_elements(self):
+        m = load_toml("""
+[dimensions]
+N = 4
+[vectors.N]
+q = "{-1: 2} m"
+[model]
+objective = "min: sum(q)"
+constraints = ["q >= 1*units('m')"]
+""")
+        assert np.isnan(m.substitutions["q"]).tolist() == [1, 1, 1, 0]
+        assert m.solve(verbosity=0)["q"].magnitude.tolist() == pytest.approx(
+            [1, 1, 1, 2], rel=1e-3
+        )
+
+    def test_value_map_on_a_scalar_is_refused(self):
+        with pytest.raises(TypeError, match="is a scalar"):
+            load_toml("""
+[vars]
+x = "{0: 1} m"
+[model]
+objective = "min: x"
+constraints = ["x >= 1*units('m')"]
 """)
 
     def test_array_number_with_desc(self):

@@ -53,8 +53,16 @@ element, or lists them all in index order.
 .. literalinclude:: examples/toml/vector_values.toml
    :language: toml
 
-A vector with *some* elements fixed and others free has no spelling, and ``to_toml`` refuses to
-write one rather than emit a document that would read back as a different model.
+A vector with some elements fixed and the rest free maps each fixed element's index to its value.
+A negative index counts from the end, so ``-1`` stays the last element when a named dimension
+changes the length. In Python the same map is the vector's ``value``, e.g.
+``VectorVariable(N, "V", "N", value={-1: 0})``.
+
+.. code-block:: toml
+
+    [vectors.N]
+    V = ["{-1: 0} N", "shear, zero at the free tip"]
+    w = ["{0: 0} m", "displacement, zero at the clamped base"]
 
 Named dimensions
 ================

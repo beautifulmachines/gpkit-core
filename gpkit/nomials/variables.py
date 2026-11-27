@@ -1,6 +1,6 @@
 "Implement Variable and ArrayVariable classes"
 
-from collections.abc import Iterable, MutableMapping
+from collections.abc import Iterable, Mapping, MutableMapping
 
 import numpy as np
 
@@ -20,6 +20,29 @@ def addmodelstodescr(descr, addtonamedvars=None):
         descr["lineage"] = NamedVariables.lineage
         if addtonamedvars:
             NamedVariables.namedvars[descr["lineage"]].append(addtonamedvars)
+
+
+def _check_scalar_value(descr):
+    "Refuse a value that is not one number, a quantity or a function."
+    value = descr.get("value")
+    if isinstance(value, Mapping):
+        raise TypeError(
+            f"a map of index to value fixes elements of a vector, but "
+            f"'{descr.get('name')}' is a scalar"
+        )
+    if isinstance(value, Iterable) and not isinstance(value, (Numbers, Strings)):
+        raise TypeError(
+            f"a Variable's value is one number, not {value!r}; "
+            "to sweep it, use Model.sweep"
+        )
+
+
+def _fixed_elements(shape, values):
+    "A vector's values from a map of index to value; the others stay free."
+    arr = np.full(shape, None, dtype=object)
+    for idx, value in values.items():
+        arr[idx] = value
+    return arr
 
 
 class Variable(Monomial):
@@ -57,18 +80,16 @@ class Variable(Monomial):
                 if isinstance(arg, Strings) and "name" not in descr:
                     descr["name"] = arg
                 elif (
-                    isinstance(arg, Numbers) or callable(arg)
+                    not isinstance(arg, Strings)
+                    and isinstance(arg, (Numbers, Iterable))
+                    or callable(arg)
                 ) and "value" not in descr:
                     descr["value"] = arg
-                elif isinstance(arg, Iterable) and not isinstance(arg, Strings):
-                    raise ValueError(
-                        f"a Variable's value is one number, not {arg!r}; "
-                        "to sweep it, use Model.sweep"
-                    )
                 elif isinstance(arg, Strings) and "units" not in descr:
                     descr["units"] = arg
                 elif isinstance(arg, Strings) and "label" not in descr:
                     descr["label"] = arg
+            _check_scalar_value(descr)
             addmodelstodescr(descr, addtonamedvars=self)
             self.key = VarKey(**descr)
         hmap = NomialMap({HashVector({self.key: 1}): 1.0})
@@ -139,7 +160,8 @@ class ArrayVariable(NomialArray):
         length or shape of resulting array
     *args :
         may contain "name" (Strings)
-                    "value" (Iterable)
+                    "value" (Iterable, or a map of index to value
+                             that fixes only those elements)
                     "units" (Strings)
              and/or "label" (Strings)
     **descr :
@@ -179,7 +201,9 @@ class ArrayVariable(NomialArray):
             descr["name"] = "\\fbox{%s}" % VarKey.unique_id()
 
         values = descr.pop("value", None)
-        if values is not None and not callable(values):
+        if isinstance(values, Mapping):
+            values = _fixed_elements(shape, values)
+        elif values is not None and not callable(values):
             if Vectorize.vectorization:
                 if not hasattr(values, "shape"):
                     values = np.full(shape, values, np.float64)

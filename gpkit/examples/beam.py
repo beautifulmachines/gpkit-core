@@ -8,9 +8,6 @@ import numpy as np
 from gpkit import Model, Var, Variable, Vectorize, ureg
 from gpkit.util.small_scripts import mag
 
-eps = 2e-4  # has to be quite large for consistent cvxopt printouts;
-#  normally you'd set this to something more like 1e-20
-
 
 class Beam(Model):
     """Discretization of the Euler beam equations for a distributed load."""
@@ -18,12 +15,6 @@ class Beam(Model):
     EI = Var("N*m^2", "Bending stiffness")
     dx = Var("m", "Length of an element")
     L = Var("m", "Overall beam length", value=5)
-
-    # Boundary condition variables (small nonzero to keep GP feasible)
-    V_tip = Var("N", "Tip loading", value=eps)
-    M_tip = Var("N*m", "Tip moment", value=eps)
-    th_base = Var("-", "Base angle", value=eps)
-    w_base = Var("m", "Base deflection", value=eps)
 
     @classmethod
     def default(cls):
@@ -34,23 +25,19 @@ class Beam(Model):
 
     def setup(self, N=4):
         # N-element distributed variables (N depends on setup arg, so use Vectorize)
+        # Boundary conditions: shear and moment are zero at the free tip (the
+        # last element), slope and displacement are zero at the clamped base.
         with Vectorize(N):
             q = Variable("q", 100, "N/m", "Distributed load")
-            V = Variable("V", "N", "Internal shear")
-            M = Variable("M", "N*m", "Internal moment")
-            th = Variable("th", "-", "Slope")
-            w = Variable("w", "m", "Displacement")
+            V = Variable("V", "N", "Internal shear", value={-1: 0})
+            M = Variable("M", "N*m", "Internal moment", value={-1: 0})
+            th = Variable("th", "-", "Slope", value={0: 0})
+            w = Variable("w", "m", "Displacement", value={0: 0})
 
         # minimize tip displacement (the last w)
         self.cost = self.w_tip = w[-1]
         return {
             "definition of dx": self.L == (N - 1) * self.dx,
-            "boundary_conditions": [
-                V[-1] >= self.V_tip,
-                M[-1] >= self.M_tip,
-                th[0] >= self.th_base,
-                w[0] >= self.w_base,
-            ],
             # below: trapezoidal integration to form a piecewise-linear
             #        approximation of loading, shear, and so on
             # shear and moment increase from tip to base (left > right)

@@ -264,7 +264,7 @@ class TestVarMap:
             vm[x] = ("sweep", [1, 2])
 
     def test_a_variable_with_a_list_value_says_so(self):
-        with pytest.raises(ValueError, match="one number"):
+        with pytest.raises(TypeError, match="one number"):
             Variable("x", [1, 2, 3])
 
     def test_setting_a_vector_element_rejects_an_array(self, vm):
