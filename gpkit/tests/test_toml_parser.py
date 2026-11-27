@@ -135,8 +135,18 @@ constraints = ["q >= 1*units('m')"]
             [1, 1, 1, 2], rel=1e-3
         )
 
+    def test_value_map_index_out_of_range_is_a_parse_error(self):
+        with pytest.raises(TomlParseError, match="out of range for 'q'"):
+            load_toml("""
+[vectors.3]
+q = "{3: 1} m"
+[model]
+objective = "min: sum(q)"
+constraints = ["q >= 1*units('m')"]
+""")
+
     def test_value_map_on_a_scalar_is_refused(self):
-        with pytest.raises(TypeError, match="is a scalar"):
+        with pytest.raises(TomlParseError, match="is a scalar"):
             load_toml("""
 [vars]
 x = "{0: 1} m"

@@ -37,12 +37,57 @@ def _check_scalar_value(descr):
         )
 
 
-def _fixed_elements(shape, values):
+def _unplaced(arg):
+    "The error for a positional argument that is not a name, value, units or label."
+    return TypeError(
+        f"cannot place argument {arg!r}: a variable takes a name, a value, "
+        "units and a label, each at most once; pass the value as value="
+    )
+
+
+def _fixed_elements(name, shape, values):
     "A vector's values from a map of index to value; the others stay free."
     arr = np.full(shape, None, dtype=object)
+    seen = {}
     for idx, value in values.items():
-        arr[idx] = value
+        try:
+            element = int(np.arange(shape[0])[idx])
+        except IndexError:
+            raise IndexError(
+                f"index {idx} is out of range for '{name}', of length {shape[0]}"
+            ) from None
+        if element in seen:
+            raise ValueError(
+                f"indices {seen[element]} and {idx} both name element "
+                f"{element} of '{name}'"
+            )
+        seen[element] = idx
+        arr[element] = value
     return arr
+
+
+def _vector_values(name, shape, values):
+    "A vector's value as one entry per element, or a function, or None."
+    if isinstance(values, Mapping):
+        return _fixed_elements(name, shape, values)
+    if values is None or callable(values):
+        return values
+    if Vectorize.vectorization:
+        if not hasattr(values, "shape"):
+            # keep each element's units for substitution to convert;
+            # not np.full, which pint intercepts and strips units in
+            filled = np.empty(shape, dtype=object)
+            filled.fill(values)
+            values = filled
+        else:
+            values = np.broadcast_to(values, reversed(shape)).T
+    elif not hasattr(values, "shape"):
+        values = np.array(values)
+    if values.shape != shape:
+        raise ValueError(
+            f"value's shape {values.shape} is different from the vector's {shape}."
+        )
+    return values
 
 
 class Variable(Monomial):
@@ -89,6 +134,8 @@ class Variable(Monomial):
                     descr["units"] = arg
                 elif isinstance(arg, Strings) and "label" not in descr:
                     descr["label"] = arg
+                else:
+                    raise _unplaced(arg)
             _check_scalar_value(descr)
             addmodelstodescr(descr, addtonamedvars=self)
             self.key = VarKey(**descr)
@@ -196,26 +243,13 @@ class ArrayVariable(NomialArray):
                 descr["units"] = arg
             elif isinstance(arg, Strings) and "label" not in descr:
                 descr["label"] = arg
+            else:
+                raise _unplaced(arg)
 
         if "name" not in descr:
             descr["name"] = "\\fbox{%s}" % VarKey.unique_id()
 
-        values = descr.pop("value", None)
-        if isinstance(values, Mapping):
-            values = _fixed_elements(shape, values)
-        elif values is not None and not callable(values):
-            if Vectorize.vectorization:
-                if not hasattr(values, "shape"):
-                    values = np.full(shape, values, np.float64)
-                else:
-                    values = np.broadcast_to(values, reversed(shape)).T
-            elif not hasattr(values, "shape"):
-                values = np.array(values)
-            if values.shape != shape:
-                raise ValueError(
-                    f"value's shape {values.shape} is different from the"
-                    f" vector's {shape}."
-                )
+        values = _vector_values(descr["name"], shape, descr.pop("value", None))
 
         veckeydescr = descr.copy()
         addmodelstodescr(veckeydescr)

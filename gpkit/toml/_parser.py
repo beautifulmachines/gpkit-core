@@ -139,7 +139,10 @@ def _make_variable(name, value, units, label):
         descr["units"] = units
     if label is not None:
         descr["label"] = label
-    return Variable(**descr)
+    try:
+        return Variable(**descr)
+    except TypeError as e:  # e.g. a value map on a scalar
+        raise TomlParseError(str(e)) from e
 
 
 def _make_vector_variable(name, shape, value, units, label):
@@ -159,7 +162,10 @@ def _make_vector_variable(name, shape, value, units, label):
         descr["units"] = units
     if label is not None:
         descr["label"] = label
-    return ArrayVariable(shape, **descr)
+    try:
+        return ArrayVariable(shape, **descr)
+    except (IndexError, ValueError) as e:  # e.g. a value map's bad index
+        raise TomlParseError(str(e)) from e
 
 
 # ---------------------------------------------------------------------------
