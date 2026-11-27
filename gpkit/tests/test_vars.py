@@ -426,6 +426,59 @@ class TestVectorVariable:
             assert x[1, 0].value == x[1, 1].value
             assert x[2, 0].value == x[2, 1].value
 
+    def test_value_map_fixes_only_its_elements(self):
+        v = VectorVariable(3, "v", "N", value={-1: 1 * gpkit.ureg.kN})
+        c = Variable("c", 0.5, "N")
+        m = gpkit.Model(v.sum(), [v >= c])
+        assert [e.key in m.substitutions for e in v] == [0, 0, 1]
+        assert m.solve(verbosity=0)["v"].magnitude.tolist() == pytest.approx(
+            [0.5, 0.5, 1000], rel=1e-3
+        )
+
+    def test_value_map_under_vectorize_fixes_the_vectors_own_index(self):
+        with Vectorize(2):
+            x = VectorVariable(3, "x", value={0: 7})
+        assert [x[0, j].key.value for j in range(2)] == [7, 7]
+        assert x[1, 0].key.value is None
+
+    def test_value_map_index_out_of_range_raises(self):
+        with pytest.raises(IndexError, match="out of range for 'v'"):
+            VectorVariable(3, "v", value={3: 0})
+
+    def test_value_map_refuses_two_indices_for_one_element(self):
+        with pytest.raises(ValueError, match="2 and -1 both name element 2"):
+            VectorVariable(3, "v", value={2: 1, -1: 5})
+
+    def test_value_map_on_a_scalar_raises(self):
+        with pytest.raises(TypeError, match="is a scalar"):
+            Variable("x", "m", value={0: 1})
+
+    @pytest.mark.parametrize("value", [2 * gpkit.ureg.km, 2 * gpkit.units("km")])
+    def test_value_with_units_under_vectorize_is_converted(self, value):
+        "Each element keeps the value's units, not just its number"
+        with Vectorize(2):
+            d = Variable("d", "m", value=value)
+        m = gpkit.Model(d.sum(), [d >= Variable("c", 1, "m")])
+        assert list(m.substitutions["d"]) == [2000, 2000]
+
+    def test_none_as_the_value_leaves_it_free(self):
+        assert Variable("x", None, "m").key.value is None
+        with Vectorize(2):
+            assert Variable("v", None, "m")[0].key.value is None
+
+    def test_list_value_under_vectorize_spreads_over_elements(self):
+        with Vectorize(2):
+            x = Variable("x", "m", value=[2.0, 3.0])
+        assert [e.key.value for e in x] == [2.0, 3.0]
+
+    @pytest.mark.parametrize(
+        "args", [("x", 2 * gpkit.units("km"), "m"), ("x", 1, [1, 2], "m")]
+    )
+    def test_an_argument_it_cannot_place_raises(self, args):
+        "Never dropped silently, which would leave a fixed variable free"
+        with pytest.raises(TypeError, match="cannot place argument"):
+            Variable(*args)
+
     def test_vectorize_shapes(self):
         with gpkit.Vectorize(3):
             with gpkit.Vectorize(5):

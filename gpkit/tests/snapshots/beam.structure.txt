@@ -1,21 +1,13 @@
 [Beam]
   free  dx
-  free  M[:]
-  free  th[:]
-  free  V[:]
-  free  w[:]
   fixed EI
   fixed L
-  fixed M_tip
+  fixed M[:]
   fixed q[:]
-  fixed th_base
-  fixed V_tip
-  fixed w_base
+  fixed th[:]
+  fixed V[:]
+  fixed w[:]
   cons (definition of dx)  L = 3⋅dx
-  cons (boundary_conditions)  V[3] ≥ V_tip
-  cons (boundary_conditions)  M[3] ≥ M_tip
-  cons (boundary_conditions)  th[0] ≥ th_base
-  cons (boundary_conditions)  w[0] ≥ w_base
   cons (shear integration)  V[:-1] ≥ V[1:] + 0.5⋅dx⋅(q[:-1] + q[1:])
   cons (moment integration)  M[:-1] ≥ M[1:] + 0.5⋅dx⋅(V[:-1] + V[1:])
   cons (theta integration)  th[1:] ≥ th[:-1] + 0.5⋅dx⋅(M[1:] + M[:-1])/EI

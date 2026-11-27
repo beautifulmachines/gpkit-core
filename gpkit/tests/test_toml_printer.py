@@ -3,6 +3,7 @@
 import tomllib
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from gpkit import Model, Variable, Vectorize, VectorVariable, guess, units
@@ -570,14 +571,20 @@ class TestVectorValues:
         m2 = load_toml(to_toml(self._model(values, n=12)))
         assert [float(v) for v in m2.substitutions["q"]] == values
 
-    def test_partially_fixed_vector_is_refused(self):
-        "Some elements fixed and others free has no TOML spelling."
+    def test_partly_fixed_vector_maps_its_fixed_elements(self):
         x = Variable("x", "m")
-        q = VectorVariable(3, "q", "m")
-        m = Model(x, [x >= q.sum()])
-        m.substitutions[q[0]] = 0.1
-        with pytest.raises(ValueError, match="partially fixed"):
-            to_toml(m)
+        q = VectorVariable(3, "q", "m", value={-1: 0.4})
+        m2 = load_toml(to_toml(Model(x, [x >= q.sum()])))
+        assert 'q = "{2: 0.4} m"' in to_toml(m2)
+        assert np.isnan(m2.substitutions["q"][:2]).all()
+        assert m2.substitutions["q"][2] == 0.4
+
+    def test_partly_fixed_2d_vector_is_refused(self):
+        "The map has no spelling for a tuple index."
+        x = Variable("x", "m")
+        q = VectorVariable((2, 2), "q", "m", value={0: 0.1})
+        with pytest.raises(ValueError, match="2 dimensions"):
+            to_toml(Model(x, [x >= q.sum()]))
 
 
 # ---------------------------------------------------------------------------

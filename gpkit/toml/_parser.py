@@ -43,6 +43,25 @@ def _parse_value_list(inner, raw):
         ) from None
 
 
+# Matches a leading braced map of element index to value, optionally then units
+_MAP_PREFIX = re.compile(r"^\{(.*)\}\s*(.*)$")
+
+
+def _parse_value_map(inner, raw):
+    "Parse the `index: number` entries inside a vector value map."
+    values = {}
+    for entry in inner.split(","):
+        try:
+            idx, value = entry.split(":")
+            values[int(idx)] = float(value)
+        except ValueError:
+            raise TomlParseError(
+                f"Vector value map must hold `index: number` entries, with an "
+                f"integer index such as 0 or -1: {raw!r}"
+            ) from None
+    return values
+
+
 def _parse_var_spec(raw):
     """Parse a variable declaration value from TOML.
 
@@ -63,6 +82,9 @@ def _parse_var_spec(raw):
     list:
         "[1, 2, 3] m"      -> ([1.0, 2.0, 3.0], "m", None)
         "[1, 2, 3]"        -> ([1.0, 2.0, 3.0], None, None)
+
+    A vector with some elements fixed and the rest free maps index to value:
+        "{0: 1, -1: 5} m"  -> ({0: 1.0, -1: 5.0}, "m", None)
     """
     if isinstance(raw, list):
         if len(raw) != 2:
@@ -85,9 +107,10 @@ def _parse_var_spec(raw):
     if isinstance(raw, str):
         if raw == "-":
             return None, None, None
-        m = _LIST_PREFIX.match(raw)
+        m = _LIST_PREFIX.match(raw) or _MAP_PREFIX.match(raw)
         if m:
-            return _parse_value_list(m.group(1), raw), m.group(2) or None, None
+            parse = _parse_value_list if m.re is _LIST_PREFIX else _parse_value_map
+            return parse(m.group(1), raw), m.group(2) or None, None
         m = _NUMERIC_PREFIX.match(raw)
         if m:
             return float(m.group(1)), m.group(2), None
@@ -116,14 +139,19 @@ def _make_variable(name, value, units, label):
         descr["units"] = units
     if label is not None:
         descr["label"] = label
-    return Variable(**descr)
+    try:
+        return Variable(**descr)
+    except TypeError as e:  # e.g. a value map on a scalar
+        raise TomlParseError(str(e)) from e
 
 
 def _make_vector_variable(name, shape, value, units, label):
     """Create a gpkit VectorVariable (ArrayVariable) from parsed spec."""
     _validate_var_name(name)
     descr = {"name": name}
-    if value is not None:
+    if isinstance(value, dict):
+        descr["value"] = value
+    elif value is not None:
         if isinstance(value, list) and np.shape(value) != np.shape(np.ones(shape)):
             raise TomlParseError(
                 f"Vector '{name}' has shape {np.shape(np.ones(shape))} but was "
@@ -134,7 +162,10 @@ def _make_vector_variable(name, shape, value, units, label):
         descr["units"] = units
     if label is not None:
         descr["label"] = label
-    return ArrayVariable(shape, **descr)
+    try:
+        return ArrayVariable(shape, **descr)
+    except (IndexError, ValueError) as e:  # e.g. a value map's bad index
+        raise TomlParseError(str(e)) from e
 
 
 # ---------------------------------------------------------------------------
@@ -253,9 +284,16 @@ def _build_scalar_vars(vars_section):
         value, units, label = _parse_var_spec(raw)
         var = _make_variable(var_name, value, units, label)
         namespace[var_name] = var
-        if value is not None:
+        if isinstance(value, dict):  # in a vectorized model, var is a vector
+            substitutions.update(_element_values(var))
+        elif value is not None:
             substitutions[var] = value
     return namespace, substitutions
+
+
+def _element_values(vec):
+    "The fixed elements of a vector, each with its value."
+    return {e: e.key.value for e in vec.flat if e.key.value is not None}
 
 
 def _build_vector_vars(vectors_section, dimensions, namespace, substitutions):
@@ -276,9 +314,7 @@ def _build_vector_vars(vectors_section, dimensions, namespace, substitutions):
             value, units, label = _parse_var_spec(raw)
             vec = _make_vector_variable(var_name, shape, value, units, label)
             namespace[var_name] = vec
-            if value is not None:
-                for elem in vec.flat:
-                    substitutions[elem] = elem.key.value
+            substitutions.update(_element_values(vec))
 
 
 def _build_model(model_id, model_def, dimension_overrides=None):

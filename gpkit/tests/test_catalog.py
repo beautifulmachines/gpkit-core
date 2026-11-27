@@ -34,7 +34,7 @@ from gpkit.util.small_scripts import mag
 # directly in their catalog.toml entries instead.
 _EXPECTED_COSTS = {
     "water_tank": (1.293, 0.01),
-    "beam": (0.7825, 0.001),
+    "beam": (0.78125, 0.001),  # the analytic tip deflection, qL^4/(8 EI)
     "pipeline": (234504.0, 0.01),
     "uav": (7105.40, 0.01),
     "wing": (35.64, 0.001),

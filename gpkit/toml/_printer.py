@@ -190,7 +190,8 @@ def _format_vector_line(group, substitutions):
     """Format one vector's declaration line.
 
     A vector whose elements share one value declares that value; one whose
-    elements differ declares them all, in the vector's own index order.
+    elements differ declares them all, in the vector's own index order; one
+    with only some elements fixed maps each fixed element's index to its value.
     """
     values = np.full(tuple(group["shape"]), None, dtype=object)
     for ref, info in group["elements"]:
@@ -200,10 +201,13 @@ def _format_vector_line(group, substitutions):
     if len(distinct) == 1:
         value = distinct.pop()  # one shared value, or None for a free vector
     elif None in distinct:
-        raise ValueError(
-            f"cannot write vector '{group['name']}' to TOML: it is partially "
-            f"fixed, which the format cannot express"
-        )
+        if values.ndim != 1:
+            raise ValueError(
+                f"cannot write vector '{group['name']}' to TOML: it is "
+                f"partially fixed and has {values.ndim} dimensions, but the "
+                f"format maps only a 1-D vector's indices to values"
+            )
+        value = {i: v for i, v in enumerate(values) if v is not None}
     else:
         value = values.tolist()
     return _format_var_line(group["name"], value, group["units"], group["label"])
@@ -492,24 +496,28 @@ def _emit_lines(lines, path):
 
 
 def _format_values(value):
-    "Render a number, or a vector's elements as a bracketed list."
+    """Render a number, a vector's elements as a bracketed list, or its fixed
+    elements as a braced map of index to value."""
     if isinstance(value, list):
         return "[" + ", ".join(_format_values(v) for v in value) + "]"
+    if isinstance(value, dict):
+        entries = (f"{i}: {_format_number(v)}" for i, v in value.items())
+        return "{" + ", ".join(entries) + "}"
     return _format_number(value)
 
 
 def _format_var_line(name, value, units, label):
     """Format a single variable line for TOML output.
 
-    `value` is a number, a list of them, or None for a free variable. A
-    dimensionless scalar constant is the one spec that reads as a bare TOML
-    number rather than a string.
+    `value` is a number, a list of them, a map of index to number, or None for
+    a free variable. A dimensionless scalar constant is the one spec that reads
+    as a bare TOML number rather than a string.
     """
     if value is None:
         spec = _quote(units if units is not None else "-")
     elif units is not None:
         spec = _quote(f"{_format_values(value)} {units}")
-    elif isinstance(value, list):
+    elif isinstance(value, (list, dict)):
         spec = _quote(_format_values(value))
     else:
         spec = _format_number(value)
