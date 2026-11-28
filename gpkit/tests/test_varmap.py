@@ -5,6 +5,7 @@ import pytest
 
 from gpkit import Model, Variable, VectorVariable, units, ureg
 from gpkit.display.naming import display_names
+from gpkit.units import DimensionalityError
 from gpkit.varkey import VarKey
 from gpkit.varmap import Substitutions, VarMap, VarSet
 
@@ -28,7 +29,7 @@ def fixture_y():
 
 
 class TestSubstitutions:
-    """Prescribed values accept two types a plain VarMap does not (#55)."""
+    """Prescribed values: finite numbers in each key's units, or linked functions."""
 
     def test_a_constant_monomial_is_stored_as_its_coefficient(self):
         "3*units('day') is a Monomial, so this is the everyday spelling."
@@ -37,12 +38,31 @@ class TestSubstitutions:
         subs[t.key] = 3 * units("day")
         assert subs[t.key] == pytest.approx(72.0)  # in the key's units
 
-    def test_a_monomial_carrying_variables_passes_through(self):
-        "Solving reports it; coercing here would hide which value was bad."
+    def test_a_monomial_carrying_variables_is_refused(self):
         x, y = Variable("x", "m"), Variable("y", "m")
         subs = Substitutions()
-        subs[y.key] = 2 * x
-        assert subs[y.key] is not None and hasattr(subs[y.key], "hmap")
+        with pytest.raises(ValueError, match="y must be fixed to a finite number"):
+            subs[y.key] = 2 * x
+
+    @pytest.mark.parametrize("value", [np.inf, -np.inf, np.nan, "2"])
+    def test_a_value_that_is_not_a_finite_number_is_refused(self, value):
+        t = Variable("t", "hr")
+        subs = Substitutions()
+        with pytest.raises(ValueError, match="t must be fixed to a finite number"):
+            subs[t.key] = value
+
+    def test_a_vector_is_refused_by_its_element(self):
+        q = VectorVariable(2, "q", "m")
+        subs = Substitutions()
+        subs.register_keys(VarSet([e.key for e in q]))
+        with pytest.raises(ValueError, match=r"q\[1\] must be fixed"):
+            subs[q.key] = [1.0, np.inf]
+
+    def test_incompatible_units_name_the_variable(self):
+        t = Variable("t", "hr")
+        subs = Substitutions()
+        with pytest.raises(DimensionalityError, match="while fixing t$"):
+            subs[t.key] = 3 * units("m")
 
     def test_a_linked_function_over_a_vector_becomes_one_per_element(self):
         q, a = VectorVariable(3, "q", "m"), Variable("a", "-")
@@ -52,12 +72,12 @@ class TestSubstitutions:
         for i, element in enumerate(q):
             assert subs[element.key]({a.key: 2.0}) == 2.0 * (i + 1)
 
-    def test_a_plain_varmap_handles_neither(self):
-        "They are substitution inputs; the container stores values."
+    def test_a_plain_varmap_converts_a_constant_monomial(self):
+        "Every map stores a value in its key's units, however it was written."
         t = Variable("t", "hr")
         vm = VarMap()
         vm[t.key] = 3 * units("day")
-        assert hasattr(vm[t.key], "hmap")  # stored as given, uncoerced
+        assert vm[t.key] == pytest.approx(72.0)
 
     def test_a_quantity_is_the_containers_business(self):
         "quantity() rebuilds from the key's units, so storing must match."

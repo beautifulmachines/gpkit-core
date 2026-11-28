@@ -30,9 +30,9 @@ from ..nomials.map import DIMLESS_QUANTITY
 from ..solutions import MarginSolution, Sensitivities, Solution, SolveStatus
 from ..solvers import default_solver
 from ..util.lineage import lineagestr
-from ..util.small_classes import CootMatrix, FixedScalar, Numbers, SolverLog
+from ..util.small_classes import CootMatrix, SolverLog
 from ..util.small_scripts import appendsolwarning
-from ..varmap import VarMap
+from ..varmap import Substitutions, VarMap
 
 DEFAULT_SOLVER_KWARGS = {"cvxopt": {"kktsolver": "ldl"}}
 SOLUTION_TOL = {"cvxopt": 1e-3, "mosek_cli": 1e-4, "mosek_conif": 1e-3}
@@ -294,18 +294,8 @@ class GeometricProgram:
         linked_derivs=None,
         **_,
     ):
-        self.cost, self.substitutions = cost, substitutions
+        self.cost, self.substitutions = cost, Substitutions(substitutions)
         self.linked_derivs = linked_derivs or {}
-        for key, sub in self.substitutions.items():
-            if isinstance(sub, FixedScalar):
-                sub = sub.value
-                if hasattr(sub, "units"):
-                    sub = sub.to(key.units or "dimensionless").magnitude
-                self.substitutions[key] = sub
-            if not isinstance(sub, Numbers):
-                raise TypeError(
-                    f"substitution {{{key}: {sub}}} has invalid value type {type(sub)}."
-                )
         cost_hmap = cost.hmap.sub(self.substitutions, cost.vks)
         if not all(0 < c < np.inf for c in cost_hmap.values()):
             raise InvalidPosynomial("a GP's cost needs positive, finite coefficients")

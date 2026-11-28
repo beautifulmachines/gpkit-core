@@ -4,8 +4,40 @@ from collections.abc import MutableMapping
 
 import numpy as np
 
-from .units import Quantity, qty
+from .units import DimensionalityError, Quantity
 from .util.small_scripts import veclinkedfn
+
+
+def _refuse(key, value):
+    return ValueError(f"{key} must be fixed to a finite number, not {value!r}")
+
+
+def to_magnitude(key, value):
+    "value in key's units, if it was written with units: a Quantity or constant nomial"
+    units = key.units or "dimensionless"
+    try:
+        if hasattr(value, "hmap"):
+            if any(value.hmap.keys()):
+                raise _refuse(key, value)
+            (value,) = value.hmap.to(units).values()
+        elif isinstance(value, Quantity):
+            value = value.to(units).magnitude
+    except DimensionalityError as err:
+        err.extra_msg += f" while fixing {key}"
+        raise
+    return value
+
+
+def scalar_value(key, value):
+    "value as one number in key's units; an array is refused, a 0-d one unwrapped"
+    value = to_magnitude(key, value)
+    if np.shape(value):
+        raise ValueError(
+            f"cannot set {key}, a scalar, from a value of shape {np.shape(value)}"
+        )
+    if isinstance(value, np.ndarray):
+        value = value.item()
+    return value
 
 
 def _nested_lookup(nested_keys, val_dict):
@@ -252,10 +284,8 @@ class VarMap(MutableMapping):
 
     def __setitem__(self, key, value):
         key = self._varset.resolve(key)
-        if isinstance(value, Quantity):
-            # stored in the key's units, which is what quantity() reads back
-            value = value.to(key.units or "dimensionless").magnitude
         if is_veckey(key):
+            value = to_magnitude(key, value)
             # Setting a whole vector writes its elements, so their keys have to
             # be registered first -- they carry idx and units this cannot invent.
             vks = {vk for vk in self._varset.by_vec(key).flat if vk is not None}
@@ -276,12 +306,7 @@ class VarMap(MutableMapping):
                 f"cannot set {key} of shape {key.shape} from a value of shape "
                 f"{np.shape(value)}"
             )
-        if np.shape(value):
-            raise ValueError(
-                f"cannot set {key}, a scalar, from a value of shape {np.shape(value)}"
-            )
-        if isinstance(value, np.ndarray):  # 0-d: store the number it holds
-            value = value.item()
+        value = scalar_value(key, value)  # in the key's units: what quantity() reads
         self._varset.add(key)
         self._data[key] = value
 
@@ -332,19 +357,16 @@ def _elementwise_linked(veckey, fn):
 
 
 class Substitutions(VarMap):
-    """The values prescribed for a problem's parameters.
-
-    Handles two value types a plain VarMap does not: a constant Monomial, such
-    as `3*units("day")`, stored as its coefficient; and a linked function, over
-    a vector stored as one function per element.
-    """
+    """The values prescribed for a problem's parameters: each a finite number in
+    its key's units, or a linked function, over a vector one per element."""
 
     def __setitem__(self, key, value):
         key = self._varset.resolve(key)
-        if hasattr(value, "hmap") and not any(value.hmap.keys()):
-            # A Monomial carrying variables passes through, so solve-time
-            # validation is what reports it.
-            (value,) = value.hmap.to(key.units or qty("dimensionless")).values()
-        elif callable(value) and is_veckey(key):
-            value = _elementwise_linked(key, value)
+        if is_veckey(key):  # VarMap splits it, and each element comes back here
+            if callable(value):
+                value = _elementwise_linked(key, value)
+        elif not callable(value):
+            value = scalar_value(key, value)
+            if not isinstance(value, (int, float, np.number)) or not np.isfinite(value):
+                raise _refuse(key, value)
         super().__setitem__(key, value)

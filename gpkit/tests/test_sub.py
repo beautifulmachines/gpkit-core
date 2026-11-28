@@ -114,9 +114,15 @@ class TestModelSubs:
     def test_bad_gp_sub(self):
         x = Variable("x")
         y = Variable("y")
-        m = Model(x, [y >= 1], {y: x})
-        with pytest.raises(TypeError):
-            m.solve()
+        with pytest.raises(ValueError, match="y must be fixed to a finite number"):
+            Model(x, [y >= 1], {y: x})
+
+    def test_a_value_in_other_units_is_the_same_value(self):
+        L, x = Variable("L", "m"), Variable("x", "m")
+        in_cm = Model(x, [x >= L], {L: 30 * gpkit.units.cm}).solve(verbosity=0)
+        in_m = Model(x, [x >= L], {L: 0.3}).solve(verbosity=0)
+        assert mag(in_cm.cost) == pytest.approx(mag(in_m.cost))
+        assert mag((2 * L).sub({L: 30 * gpkit.units.cm}).c) == pytest.approx(0.6)
 
     def test_quantity_sub(self):
         x = Variable("x", 1, "cm")
@@ -441,8 +447,6 @@ class TestModelSubs:
         x, z = Variable("x"), Variable("z")
         sol = Model(x, [x >= 1, z <= 5], {z: 0}).solve(verbosity=0)
         assert sol.cost == pytest.approx(1)
-        sol = Model(x, [x >= 1, z >= 2], {z: np.inf}).solve(verbosity=0)
-        assert sol.cost == pytest.approx(1)
 
 
 class TestNomialMapSubs:
@@ -452,7 +456,7 @@ class TestNomialMapSubs:
         z = Variable("z")
         w = Variable("w")
 
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             z.hmap.sub({z.key: w.key}, varkeys=z.vks)
 
     def test_sub_zero(self):
@@ -470,28 +474,39 @@ class TestNomialMapSubs:
             Model(1e200 * z * w, [w >= 1], {z: 1e200}).gp()
 
     @pytest.mark.parametrize(
-        ("a_val", "b_val"),
-        [(np.nan, 1), (lambda _: np.nan, 1), (np.inf, 0), (0, np.inf)],
+        ("a_val", "b_val", "refused"),
+        [
+            (np.nan, 1, "a"),
+            (lambda _: np.nan, 1, "a"),
+            (np.inf, 0, "a"),
+            (0, np.inf, "b"),
+        ],
     )
-    def test_undefined_term_is_refused(self, a_val, b_val):
-        x, y, a, b = Variable("x"), Variable("y"), Variable("a"), Variable("b")
-        with SignomialsEnabled():
-            lesser, greater = x + y >= a * b, x + y * a * b >= 2
-        for c in (lesser, greater, a * b <= 1):
-            m = Model(x, [c, x >= 1, y >= 1, y <= 2], {a: a_val, b: b_val})
-            with pytest.raises(ValueError, match="undefined"):
-                m.gp()
-            if c is lesser:
-                with pytest.raises(ValueError, match="undefined"):
-                    m.sp()
-
-    def test_merged_terms_undefined_is_refused(self):
-        "Terms that merge to inf - inf are undefined, not a cancellation"
+    def test_a_nonfinite_value_is_refused(self, a_val, b_val, refused):
+        "A fixed value is a finite number; a linked output is checked alike"
         x, a, b = Variable("x"), Variable("a"), Variable("b")
+        with pytest.raises(ValueError, match=f"{refused} must be fixed to a finite"):
+            Model(x, [x >= a * b, x >= 1], {a: a_val, b: b_val}).gp()
+
+    def test_an_undefined_coefficient_is_refused(self):
+        "Finite values can overflow to 0*inf; a nan term is never silently dropped"
+        x, y, a, b, z = (Variable(n) for n in "xyabz")
+        subs = {a: 1e200, b: 1e200, z: 0}
         with SignomialsEnabled():
-            p = a * x - b * x + 1
-        with pytest.raises(ValueError, match="undefined"):
-            p.sub({a: np.inf, b: np.inf})
+            sig, fixed_sig = x >= 1 - a * b * z * y, 1 >= 2 - a * b * z
+        for m in (
+            Model(x, [sig, y <= 2], subs),
+            Model(x, [x >= 1, fixed_sig], subs),
+            Model(x, [x >= 1, 1 >= a * b * z], subs),
+            Model(a * b * z * x, [x >= 1], subs),
+        ):
+            with pytest.raises(ValueError, match="substituting a, b, z is undefined"):
+                m.solve(verbosity=0)
+
+    def test_sub_takes_inf_as_a_value(self):
+        "A solution may hold inf; evaluating with it is arithmetic, not fixing"
+        x, y = Variable("x"), Variable("y")
+        assert (x * y).sub({x: 2, y: np.inf}).value == np.inf
 
     def test_log_sensitivity_at_zero(self):
         "d(cost)/dz is infinite here, but p*z**p, the log derivative of z**p, is 0"

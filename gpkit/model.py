@@ -24,7 +24,6 @@ from .exceptions import (
 from .ir import IR_VERSION
 from .model_view import model_view
 from .nomials import Monomial, Variable
-from .nomials.map import DIMLESS_QUANTITY
 from .nomials.substitution import is_linked
 from .programs.gp import GeometricProgram
 from .programs.prog_factories import progify, solvify
@@ -359,13 +358,6 @@ class Model(CostedConstraintSet):
             if is_linked(val):
                 subs_ir[vk.ref] = None
                 continue
-            if hasattr(
-                val, "hmap"
-            ):  # constant Monomial or future GPkitUnit wrapper (#156)
-                assert not any(val.hmap.keys()), (
-                    "substitution value should not contain variables"
-                )
-                (val,) = val.hmap.to(vk.units or DIMLESS_QUANTITY).values()
             subs_ir[vk.ref] = float(val)
 
         ir = {
