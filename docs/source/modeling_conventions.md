@@ -813,7 +813,7 @@ def setup(self, sp=False):
 # WRONG — latitude is a parameter, not a structural choice; set as substitution instead
 class Mission(Model):
     def setup(self, latitude=45):  # anti-pattern
-        self.lat = Variable("latitude", latitude, "deg", "latitude")
+        self.lat = Variable("latitude", "deg", "latitude", value=latitude)
 
 
 # CORRECT replacement: latitude as a substitution at the call site

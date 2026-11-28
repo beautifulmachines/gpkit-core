@@ -49,7 +49,7 @@ class BEMTHover(Model):
         # Per-bin variables (N-element vectors created inside Vectorize context)
         with Vectorize(N):
             # Thrust per bin: fixed to equal share of vehicle weight
-            xi = Variable("xi", W_vehicle / N, "N", "thrust per bin (fixed)")
+            xi = Variable("xi", "N", "thrust per bin (fixed)", value=W_vehicle / N)
             r = Variable("r", "-", "non-dimensional radius")
             dr = Variable("Delta_r", "-", "non-dimensional radius step")
             Vi = Variable("V_i", "m/s", "induced velocity")

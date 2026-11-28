@@ -89,14 +89,14 @@ class TestSubstitutions:
 
     def test_a_list_on_one_element_is_refused_before_solving(self):
         "It used to solve with the list's last value, silently (#386)"
-        y, x = VectorVariable(2, "y"), Variable("x")
+        y, x = VectorVariable(2, "y", "-"), Variable("x", "-")
         m = Model(x, [x >= y.prod()])
         with pytest.raises(ValueError, match="shape"):
             m.substitutions.update({y[0]: 2, y[1]: [3, 5]})
 
     def test_a_0d_array_is_a_scalar(self):
         "numpy's convention: ndim 0 is a scalar, so it is stored as its number"
-        x, y = Variable("x"), Variable("y")
+        x, y = Variable("x", "-"), Variable("y", "-")
         m = Model(y, [y >= x])
         m.substitutions[x] = np.array(3.0)
         assert m.substitutions[x] == 3.0
@@ -105,7 +105,7 @@ class TestSubstitutions:
 
     def test_a_linked_function_must_return_a_scalar(self):
         "Its output is stored like any other fixed value, so the same rule holds"
-        a, b, y = Variable("a", 2), Variable("b"), Variable("y")
+        a, b, y = Variable("a", "-", value=2), Variable("b", "-"), Variable("y", "-")
         m = Model(y, [y >= b, y >= a])
         m.substitutions[b] = lambda c: np.array(3 * c[a.key])
         assert m.solve(verbosity=0).cost == pytest.approx(6)
@@ -125,7 +125,7 @@ class TestSubstitutions:
         class Recorder(Model):
             def setup(self):
                 self.x = Variable("x", "m")
-                self.c = Variable("c", 1.0, "m")
+                self.c = Variable("c", "m", value=1.0)
                 self.cost = self.x
                 return [self.x >= self.c]
 
@@ -192,7 +192,7 @@ class TestVarMap:
         assert "y" not in vm
 
     def test_getitem(self, vm):
-        x = Variable("x", lineage=[("Motor", 0)])
+        x = Variable("x", "-", lineage=[("Motor", 0)])
         vm[x] = 52
         assert vm[x] == 52
         assert vm[x.key] == 52
@@ -205,7 +205,7 @@ class TestVarMap:
             _ = vm["waldo"]
             # issue 893: failed __getitem__ caused state change
         assert "waldo" not in vm
-        vm.update({Variable("waldo"): 5})
+        vm.update({Variable("waldo", "-"): 5})
         assert vm["waldo"] == 5
         assert "waldo" in vm
 
@@ -265,14 +265,14 @@ class TestVarMap:
         Two of three used to escape the count check and die on resolve(None):
         _by_vec pads with None, so the None made the length match.
         """
-        v = VectorVariable(3, "v")
+        v = VectorVariable(3, "v", "-")
         if registered:
             vm.register_keys(VarSet([v[i].key for i in range(registered)]))
         with pytest.raises(ValueError, match=f"{registered} of 3"):
             vm[v] = np.array([2, 3, 4])
 
     def test_setting_by_veckey_rejects_a_mismatched_shape(self, vm):
-        v = VectorVariable(3, "v")
+        v = VectorVariable(3, "v", "-")
         vm.register_keys(VarSet([e.key for e in v]))
         with pytest.raises(ValueError, match="shape"):
             vm[v] = np.array([1, 2])
@@ -285,11 +285,11 @@ class TestVarMap:
 
     def test_a_variable_with_a_list_value_says_so(self):
         with pytest.raises(TypeError, match="one number"):
-            Variable("x", [1, 2, 3])
+            Variable("x", "-", value=[1, 2, 3])
 
     def test_setting_a_vector_element_rejects_an_array(self, vm):
         "An element is a scalar; a list on it used to solve with its last value (#386)"
-        v = VectorVariable(2, "v")
+        v = VectorVariable(2, "v", "-")
         vm[v[0]] = 2
         vm[v[0]] = ureg.Quantity(3, "dimensionless")
         with pytest.raises(ValueError, match="shape"):
@@ -297,7 +297,7 @@ class TestVarMap:
         assert v[1].key not in vm
 
     def test_vector_partial(self, vm):
-        v = VectorVariable(3, "v")
+        v = VectorVariable(3, "v", "-")
         assert v[0].key.idx == (0,)  # legacy; belongs elsewhere
         vm[v[0]] = 6
         assert vm[v][0] == vm[v[0]]
@@ -352,13 +352,13 @@ class TestVarMap:
         assert y not in vm  # VarKey path
         assert "y_reg" not in vm  # str path
         # Variable wrapping a registered-but-valueless key
-        v = Variable("z_reg")
+        v = Variable("z_reg", "-")
         vm.register_keys({v.key})
         assert v not in vm  # Variable path (getattr .key)
 
     def test_contains_veckey_no_value(self):
         """veckey in VarMap must be False when no element has a value.  (issue #50)"""
-        v = VectorVariable(3, "v_novalue")
+        v = VectorVariable(3, "v_novalue", "-")
         vm = VarMap()
         vks = [v[i].key for i in range(3)]
         vm.register_keys(set(vks))
@@ -379,7 +379,7 @@ class TestVarMap:
         assert vm[veckey] == [10, 20, 30]
 
     def test_setitem_variable(self, vm):
-        x = Variable("x")
+        x = Variable("x", "-")
         vm[x] = 6
         assert x in vm
         assert x.key in vm
@@ -396,7 +396,7 @@ class TestVarMap:
         assert str(vm.quantity(x)) == "72.0 inch"
 
     def test_nonnumeric(self, vm):
-        x = VectorVariable(2, "x")
+        x = VectorVariable(2, "x", "-")
         vm[x[1]] = "2"
         assert np.isnan(vm[x][0])
         assert vm[x[1]] == "2"
@@ -404,7 +404,7 @@ class TestVarMap:
         assert x[1] in vm
 
     def test_setitem_lineage(self, vm):
-        x = Variable("x", lineage=(("test", 0),))
+        x = Variable("x", "-", lineage=(("test", 0),))
         vm[x] = 1
         assert x in vm
         assert set(vm) == {x.key}
@@ -414,12 +414,12 @@ class TestRefLookup:
     """Tests for VarMap/VarSet full-ref string lookups."""
 
     def test_varmap_lookup_by_full_ref(self):
-        x = Variable("x", lineage=[("Motor", 0)])
+        x = Variable("x", "-", lineage=[("Motor", 0)])
         vm = VarMap({x: 52})
         assert vm[x.key.ref] == 52
 
     def test_varmap_contains_full_ref(self):
-        x = Variable("x", lineage=[("Motor", 0)])
+        x = Variable("x", "-", lineage=[("Motor", 0)])
         vm = VarMap({x: 52})
         assert x.key.ref in vm
 
@@ -465,7 +465,7 @@ class TestDisplayNames:
         assert names[vk_b].endswith(".S")
 
     def test_vector_no_false_collision(self):
-        x = VectorVariable(3, "x")
+        x = VectorVariable(3, "x", "-")
         vks = [v.key for v in x]
         names = display_names(vks)
         for vk in vks:
@@ -474,7 +474,7 @@ class TestDisplayNames:
             )
 
     def test_vector_veckey_display_name(self):
-        x = VectorVariable(3, "x")
+        x = VectorVariable(3, "x", "-")
         veckey = x[0].key.veckey
         names = display_names([veckey])
         assert names[veckey] == "x[:]"
@@ -516,7 +516,7 @@ class TestShortestNames:
         Looking up a VarKey-keyed dict with the Variable wrapper instead of
         variable.key silently misses, rather than raising.
         """
-        x = Variable("x")
+        x = Variable("x", "-")
         assert hash(x) != hash(x.key)
         d = {x.key: 0}
         assert x.key in d

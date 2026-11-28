@@ -17,9 +17,9 @@ class Leg(Model):
     "a submodel holding a free and a fixed vector"
 
     def setup(self):
-        self.tau = Variable("tau", 2, "s", "leg time")
+        self.tau = Variable("tau", "s", "leg time", value=2)
         self.v = VectorVariable(3, "v", "m/s", "speed")
-        self.d = VectorVariable(3, "d", [1, 2, 3], "m", "distance")
+        self.d = VectorVariable(3, "d", "m", "distance", value=[1, 2, 3])
         return [self.v >= self.d / self.tau]
 
 
@@ -28,8 +28,8 @@ class Trip(Model):
 
     def setup(self):
         self.leg = Leg()
-        self.c = Variable("c", 2, "s", "slack bound")
-        self.w = Variable("w", 1, "s^2/m", "speed weight")
+        self.c = Variable("c", "s", "slack bound", value=2)
+        self.w = Variable("w", "s^2/m", "speed weight", value=1)
         self.x = Variable("x", "s", "free time")
         self.cost = self.x + self.w * self.leg.v.sum()
         return [self.leg, self.x >= self.leg.tau, self.x >= self.c / 10]
@@ -80,7 +80,7 @@ class TestSolutionSections:
     def test_an_element_without_a_value_shows_as_nan(self):
         "An element no constraint mentions is never solved for."
         v = VectorVariable(3, "v", "m")
-        L = Variable("L", 1, "m")
+        L = Variable("L", "m", value=1)
         sol = Model(v[0] + v[2], [v[0] >= L, v[2] >= 2 * L]).solve(verbosity=0)
         assert sol.table(tables=["freevariables"]).split("\n")[2:] == [
             "v[:] : [ 1    nan  2   ] [m]"
@@ -112,7 +112,7 @@ class TestSolutionSections:
 
     def test_one_never_written_as_a_vector_is_its_elements(self):
         "With no vector form to print, each element is a row, as TOML writes it."
-        q, x, y = VectorVariable(2, "q"), Variable("x"), Variable("y")
+        q, x, y = VectorVariable(2, "q", "-"), Variable("x", "-"), Variable("y", "-")
         m = Model(q.sum(), [q >= 2 * NomialArray([x**0.5, y**0.5]), x >= 1, y >= 1])
         text = m.table(m.solve(verbosity=0), tables=["tightest constraints"])
         assert text.split("\n")[2:4] == [
@@ -122,7 +122,7 @@ class TestSolutionSections:
 
     def test_scalar_and_vector_rows_align_separately(self):
         "A vector's sensitivities are far wider; scalar rows keep their own column."
-        x, y = VectorVariable(3, "x"), Variable("y")
+        x, y = VectorVariable(3, "x", "-"), Variable("y", "-")
         m = Model(y, [y >= x.sum(), x >= 1])
         lines = m.table(m.solve(verbosity=0), tables=["tightest constraints"])
         assert lines.split("\n")[2:] == [
@@ -132,7 +132,7 @@ class TestSolutionSections:
 
     def test_a_vanishing_sensitivity_reads_near_zero(self):
         "As in the fixed variables' column, and without widening its neighbours."
-        x = VectorVariable(3, "x")
+        x = VectorVariable(3, "x", "-")
         m = Model(x[0] + x[2], [x >= 1, x[1] <= 2])  # nothing presses on x[1]
         lines = m.table(m.solve(verbosity=0), tables=["tightest constraints"])
         assert lines.split("\n")[-1] == "[ +0.5  ~0    +0.5 ] : x[:] ≥ 1"
@@ -180,7 +180,7 @@ class TestDisplay:
         assert display.heading(ref) == "Trip.Leg"
 
     def test_a_constraint_with_no_written_form_shows_its_type(self):
-        x, y = Variable("x"), Variable("y")
+        x, y = Variable("x", "-"), Variable("y", "-")
         m = Model(y, [Opaque(x, y), x >= 1])
         text = m.table(m.localsolve(verbosity=0), tables=["tightest constraints"])
         assert "+1 : <Opaque>" in text.split("\n")
@@ -416,8 +416,8 @@ class TestDiffVectors:
     def test_a_redeclared_unit_is_one_row_in_each_unit(self):
         "The diff matches feet to metres, so the table pairs them too."
         x_m, x_ft = Variable("x", "m"), Variable("x", "ft")
-        baseline = Model(x_m, [x_m >= Variable("L", 1, "m")]).solve(verbosity=0)
-        scenario = Model(x_ft, [x_ft >= Variable("L", 2, "m")]).solve(verbosity=0)
+        baseline = Model(x_m, [x_m >= Variable("L", "m", value=1)]).solve(verbosity=0)
+        scenario = Model(x_ft, [x_ft >= Variable("L", "m", value=2)]).solve(verbosity=0)
         rows = scenario.diff(baseline, tables=["freevariables"]).split("\n")
         (row,) = [r for r in rows if r.startswith("x :")]
         assert "+100%" in row and "ft vs" in row and "m)" in row

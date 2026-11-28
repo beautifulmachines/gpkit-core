@@ -8,9 +8,9 @@ from gpkit.constraints.relax import (
     ConstraintsRelaxedEqually,
 )
 
-x = Variable("x")
-x_min = Variable("x_min", 2)
-x_max = Variable("x_max", 1)
+x = Variable("x", "-")
+x_min = Variable("x_min", "-", value=2)
+x_max = Variable("x_max", "-", value=1)
 m = Model(x, [x <= x_max, x >= x_min])
 print("Original model")
 print("==============")

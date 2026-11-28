@@ -91,7 +91,7 @@ class TestThetaSingleton:
 
     def test_doubling_theta_doubles_allowance(self):
         m = Variable("m", "kg", growth=0.25)
-        e = Variable("e", 100, "kg")
+        e = Variable("e", "kg", value=100)
         model = Model(m, m.grown_from(e))
         model.substitutions[theta().key] = 2.0
         sol = model.solve(verbosity=0)
@@ -114,7 +114,7 @@ class TestSiblingsInUniqueVarkeys:
 
             def setup(self):
                 self.m = Variable("m", "kg", "wing mass", growth=0.25)
-                e = Variable("e", 100, "kg")
+                e = Variable("e", "kg", value=100)
                 self.cost = self.m
                 return self.m.grown_from(e)
 
@@ -149,7 +149,7 @@ class TestVarDescriptorGrowth:
             m = Var("kg", "wing mass", growth=0.25)
 
             def setup(self):
-                e = Variable("e", 100, "kg")
+                e = Variable("e", "kg", value=100)
                 self.cost = self.m
                 return self.m.grown_from(e)
 
@@ -177,14 +177,14 @@ class TestGrownFromHelper:
 
     def test_returns_plain_two_constraint_list(self):
         m = Variable("m", "kg", growth=0.25)
-        e = Variable("e", 100, "kg")
+        e = Variable("e", "kg", value=100)
         cs = m.grown_from(e)
         assert isinstance(cs, list)
         assert len(cs) == 2
 
     def test_grown_from_without_growth_kwarg_raises(self):
         m = Variable("m", "kg")
-        e = Variable("e", 100, "kg")
+        e = Variable("e", "kg", value=100)
         with pytest.raises(ValueError, match="growth"):
             m.grown_from(e)
 
@@ -208,7 +208,7 @@ class TestSingleLevelSolve:
 
     def test_default_theta_yields_125_percent_total(self):
         m = Variable("m", "kg", growth=0.25)
-        e = Variable("e", 100, "kg")
+        e = Variable("e", "kg", value=100)
         sol = Model(m, m.grown_from(e)).solve(verbosity=0)
         assert sol[m].to("kg").magnitude == pytest.approx(125.0, rel=1e-4)
         assert sol[m.growth].to("kg").magnitude == pytest.approx(25.0, rel=1e-4)
@@ -217,13 +217,13 @@ class TestSingleLevelSolve:
 
     def test_matches_hand_rolled_equivalent(self):
         m_auto = Variable("m", "kg", growth=0.25)
-        e_auto = Variable("e", 100, "kg")
+        e_auto = Variable("e", "kg", value=100)
         sol_auto = Model(m_auto, m_auto.grown_from(e_auto)).solve(verbosity=0)
 
         m_hand = Variable("m_hand", "kg")
-        e_hand = Variable("e_hand", 100, "kg")
+        e_hand = Variable("e_hand", "kg", value=100)
         m_growth_hand = Variable("m_growth_hand", "kg")
-        f_hand = Variable("f_hand", 0.25)
+        f_hand = Variable("f_hand", "-", value=0.25)
         sol_hand = Model(
             m_hand,
             [m_growth_hand >= f_hand * e_hand, m_hand >= e_hand + m_growth_hand],

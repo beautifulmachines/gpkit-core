@@ -19,8 +19,8 @@ class Engine(Model):
 
     def setup(self):
         """Set up engine with thrust and efficiency constants."""
-        thrust = Variable("T", 2000, "N", "thrust")
-        eta = Variable("eta", 0.85, "-", "efficiency")
+        thrust = Variable("T", "N", "thrust", value=2000)
+        eta = Variable("eta", "-", "efficiency", value=0.85)
         self.cost = thrust
         return [thrust >= thrust, eta >= eta]  # noqa: PLR0124
 
@@ -30,7 +30,7 @@ class Aircraft(Model):
 
     def setup(self):
         """Set up aircraft with weight and engine."""
-        weight = Variable("W", 5000, "N", "weight")
+        weight = Variable("W", "N", "weight", value=5000)
         self.engine = Engine()
         self.cost = weight
         return [weight >= weight, self.engine]  # noqa: PLR0124
@@ -130,7 +130,7 @@ class TestSaveSubs:
 
             def setup(self):
                 """Set up with gravitational acceleration."""
-                g = Variable("g", 9.80665, "m/s^2", "gravitational acceleration")
+                g = Variable("g", "m/s^2", "gravitational acceleration", value=9.80665)
                 self.cost = g
                 return [g >= g]  # noqa: PLR0124
 
@@ -288,7 +288,7 @@ class TestApplySubs:
 
             def setup(self):
                 """Set up with weight only."""
-                weight = Variable("W", 5000, "N", "weight")
+                weight = Variable("W", "N", "weight", value=5000)
                 self.cost = weight
                 return [weight >= weight]  # noqa: PLR0124
 

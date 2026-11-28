@@ -16,9 +16,9 @@ class SimpleMarginModel(Model):
     """B >= c * A_allow, cost = B/A, margin = A_allow - B."""
 
     def setup(self):
-        a = Variable("A_allow", 100.0, "kg", "Allowable mass")
+        a = Variable("A_allow", "kg", "Allowable mass", value=100.0)
         b = Variable("B_mass", "kg", "System mass")
-        c = Variable("c_frac", 0.8, "", "Mass fraction")
+        c = Variable("c_frac", "", "Mass fraction", value=0.8)
         self.cost = b / a
         self.margin_objective = MarginObjective(
             name="mass margin",
@@ -34,9 +34,9 @@ class BothFreeModel(Model):
     def setup(self):
         a = Variable("A", "kg", "allowable")
         b = Variable("B", "kg", "actual")
-        a_max = Variable("A_max", 120.0, "kg", "A upper bound")
-        b_min = Variable("B_min", 50.0, "kg", "B lower bound")
-        alpha = Variable("alpha", 1.5, "", "A–B ratio floor")
+        a_max = Variable("A_max", "kg", "A upper bound", value=120.0)
+        b_min = Variable("B_min", "kg", "B lower bound", value=50.0)
+        alpha = Variable("alpha", "", "A–B ratio floor", value=1.5)
         self.cost = b / a
         self.margin_objective = MarginObjective("gap", plus_var=a, minus_var=b)
         return [a <= a_max, b >= b_min, a >= alpha * b]
@@ -53,8 +53,8 @@ class ConstMapModel(Model):
 
     def setup(self):
         p_prop = Variable("P_prop", "W", "propulsion power")
-        p_avionics = Variable("P_avionics", 50.0, "W", "avionics power (fixed)")
-        p_max = Variable("P_max", 200.0, "W", "total power limit")
+        p_avionics = Variable("P_avionics", "W", "avionics power (fixed)", value=50.0)
+        p_max = Variable("P_max", "W", "total power limit", value=200.0)
         self.cost = p_max / p_prop  # minimize budget/propulsion → p_prop at upper bound
         self.margin_objective = MarginObjective(
             "power margin",
@@ -72,9 +72,9 @@ class MonomialEqualityMarginModel(Model):
     """
 
     def setup(self):
-        a = Variable("A_allow", 100.0, "kg", "Allowable mass")
+        a = Variable("A_allow", "kg", "Allowable mass", value=100.0)
         b = Variable("B_mass", "kg", "System mass")
-        c = Variable("c_frac", 0.8, "", "Mass fraction")
+        c = Variable("c_frac", "", "Mass fraction", value=0.8)
         self.cost = b / a
         self.margin_objective = MarginObjective(
             name="mass margin", plus_var=a, minus_var=b
@@ -181,7 +181,7 @@ def test_no_margin_objective():
         """Minimal model with no margin_objective."""
 
         def setup(self):
-            x = Variable("x")
+            x = Variable("x", "-")
             self.cost = x
             return [x >= 1]
 
@@ -254,7 +254,7 @@ def test_to_ir_no_margin_objective():
         """Minimal model with no margin_objective."""
 
         def setup(self):
-            x = Variable("x")
+            x = Variable("x", "-")
             self.cost = x
             return [x >= 1]
 

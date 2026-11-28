@@ -4,7 +4,7 @@ from gpkit import Model, Variable, VectorVariable
 from gpkit.nomials import Monomial, Posynomial, PosynomialInequality
 
 # Declare a variable, x
-x = Variable("x")
+x = Variable("x", "-")
 
 # Declare a variable, y, with units of meters
 y = Variable("y", "m")
@@ -12,22 +12,22 @@ y = Variable("y", "m")
 # Declare a variable, z, with units of meters, and a description
 z = Variable("z", "m", "A variable called z with units of meters")
 
-rho = Variable("rho", 1.225, "kg/m^3", "Density of air at sea level")
+rho = Variable("rho", "kg/m^3", "Density of air at sea level", value=1.225)
 
 # Declare a 3-element vector variable "x" with units of "m"
 x = VectorVariable(3, "x", "m", "Cube corner coordinates")
-x_min = VectorVariable(3, "x", [1, 2, 3], "m", "Cube corner minimum")
+x_min = VectorVariable(3, "x", "m", "Cube corner minimum", value=[1, 2, 3])
 
 # create a Monomial term xy^2/z
-x = Variable("x")
-y = Variable("y")
-z = Variable("z")
+x = Variable("x", "-")
+y = Variable("y", "-")
+z = Variable("z", "-")
 m = x * y**2 / z
 assert isinstance(m, Monomial)
 
 # create a Posynomial expression x + xy^2
-x = Variable("x")
-y = Variable("y")
+x = Variable("x", "-")
+y = Variable("y", "-")
 p = x + x * y**2
 assert isinstance(p, Posynomial)
 
@@ -36,14 +36,14 @@ assert isinstance(p, Posynomial)
 x = Variable("x", "m")
 y = Variable("y", "m")
 z = Variable("z", "m")
-S = Variable("S", 1.0, "m^2")
+S = Variable("S", "m^2", value=1.0)
 c = 2 * x * y + 2 * x * z + 2 * y * z <= S
 assert isinstance(c, PosynomialInequality)
 
 # Formulate a Model
-x = Variable("x")
-y = Variable("y")
-z = Variable("z")
+x = Variable("x", "-")
+y = Variable("y", "-")
+z = Variable("z", "-")
 S = 200
 objective = 1 / (x * y * z)
 constraints = [2 * x * y + 2 * x * z + 2 * y * z <= S, x >= 2 * y]
@@ -59,12 +59,12 @@ print(m.table(sol))
 print(f"The optimal value is {sol.cost:~.4g}.")
 
 # Example variable sensitivity usage
-x = Variable("x")
-x_min = Variable("x_{min}", 2)
+x = Variable("x", "-")
+x_min = Variable("x_{min}", "-", value=2)
 sol = Model(x, [x_min <= x]).solve(verbosity=0)
 sens_x_min = sol.sens.variables[x_min]
 
-x = Variable("x")
-x_squared_min = Variable("x^2_{min}", 2)
+x = Variable("x", "-")
+x_squared_min = Variable("x^2_{min}", "-", value=2)
 sol = Model(x, [x_squared_min <= x**2]).solve(verbosity=0)
 sens_x_min = sol.sens.variables[x_squared_min]

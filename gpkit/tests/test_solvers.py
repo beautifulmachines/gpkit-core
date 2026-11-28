@@ -69,7 +69,7 @@ def test_bare_solve_uses_the_active_default():
         calls.append(1)
         return cvxopt_optimize(*args, **kwargs)
 
-    x = Variable("x")
+    x = Variable("x", "-")
     m = Model(x, [x >= 2])
     with DefaultSolver(spy):
         sol = m.solve(verbosity=0)
@@ -79,7 +79,7 @@ def test_bare_solve_uses_the_active_default():
 
 def test_named_solver_beats_the_default():
     "An explicit solver= argument wins over the contextual default."
-    x = Variable("x")
+    x = Variable("x", "-")
     m = Model(x, [x >= 2])
     with DefaultSolver("not_a_solver"):
         sol = m.solve(solver="cvxopt", verbosity=0)

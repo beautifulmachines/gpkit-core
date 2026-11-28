@@ -36,13 +36,13 @@ class TestMonomial:
         assert m == m2
 
         # default c and a
-        v = Variable("x")
+        v = Variable("x", "-")
         x = v.key
         assert v.exp == {x: 1}
         assert v.c == 1
 
         # single (string) var with non-default c
-        v = 0.1 * Variable("tau")
+        v = 0.1 * Variable("tau", "-")
         tau = VarKey("tau")
         assert v.exp == {tau: 1}
         assert v.c == 0.1
@@ -63,16 +63,12 @@ class TestMonomial:
         with pytest.raises(InvalidPosynomial):
             Monomial(0.0)
 
-        # can create nameless Variables
-        x1 = Variable()
-        x2 = Variable()
-        v = Variable("v")
-        vel = Variable("v")
-        assert x1 != x2
+        v = Variable("v", "-")
+        vel = Variable("v", "-")
         assert v == vel
 
         # test label kwarg
-        x = Variable("x", label="dummy variable")
+        x = Variable("x", "-", "dummy variable")
         assert next(iter(x.exp)).label == "dummy variable"
         _ = hash(m)
         _ = hash(x)
@@ -80,8 +76,8 @@ class TestMonomial:
 
     def test_repr(self):
         "Simple tests for __repr__, which prints more than str"
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         m = 5 * x**2 / y
         r = repr(m)
         assert isinstance(r, str)
@@ -90,7 +86,7 @@ class TestMonomial:
 
     def test_pow_ast_exponent(self):
         "Signomial.__pow__ should record the correct exponent in the AST"
-        x = Variable("x")
+        x = Variable("x", "-")
         p = x**3 + x + 5
         p2_str = str(p**2)
         assert "^0" not in p2_str
@@ -106,13 +102,13 @@ class TestMonomial:
         differences between environments (numpy/pandas versions) shouldn't
         leak into human-facing constraint strings.
         """
-        x = Variable("x")
+        x = Variable("x", "-")
         s = str(x**2.7130075007872931)
         assert s == "x^2.713"
 
     def test_latex(self):
         "Test latex string creation"
-        x = Variable("x")
+        x = Variable("x", "-")
         m = render(Monomial({"x": 2, "y": -1}, 5), LATEX)
         assert isinstance(m, str)
         assert render(5 * x, LATEX) == "5 x"
@@ -153,7 +149,7 @@ class TestMonomial:
         """
         power = Variable("P", "kW")
         weight = Variable("W", "N")
-        coeff = Variable("k", 1, "N")
+        coeff = Variable("k", "N", value=1)
         c = weight >= (power / (1 * units("W"))) ** 0.803 * coeff
         assert "W]" in str(c) or "W)" in str(c)  # the unit literal is shown
 
@@ -183,7 +179,7 @@ class TestMonomial:
         x = Variable("x", "m")
         power = Variable("P", "kW")
         weight = Variable("W", "N")
-        coeff = Variable("k", 1, "N")
+        coeff = Variable("k", "N", value=1)
         cases = [
             x >= 4 * gpkit.units("m"),
             x >= 1 * gpkit.units("m"),
@@ -216,7 +212,7 @@ class TestMonomial:
         assert "S" in xstr and "rho" in xstr
 
     def test_add(self):
-        x = Variable("x")
+        x = Variable("x", "-")
         y = Variable("y", units="ft")
         with pytest.raises(gpkit.DimensionalityError):
             _ = x + y
@@ -224,12 +220,12 @@ class TestMonomial:
     def test_eq_ne(self):
         "Test equality and inequality comparators"
         # simple one
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         assert x != y
         assert not x == y
 
-        xx = Variable("x")
+        xx = Variable("x", "-")
         assert x == xx
         assert not x != xx
 
@@ -253,15 +249,15 @@ class TestMonomial:
         assert Monomial(3) == 3
         assert Monomial(3) == Monomial(3)
         assert Monomial(3) != 2
-        assert Variable("x") != 3
-        assert Monomial(3) != Variable("x")
+        assert Variable("x", "-") != 3
+        assert Monomial(3) != Variable("x", "-")
 
     def test_div(self):
         "Test Monomial division"
-        x = Variable("x")
-        y = Variable("y")
-        z = Variable("z")
-        t = Variable("t")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
+        z = Variable("z", "-")
+        t = Variable("t", "-")
         a = 36 * x / y
         # sanity check
         assert a == Monomial({"x": 1, "y": -1}, 36)
@@ -284,7 +280,7 @@ class TestMonomial:
         # divide by scalar
         assert x * 9 == Monomial({"x": 1, "y": -1}, 36)
         # divide by Monomial
-        y = x * Variable("z")
+        y = x * Variable("z", "-")
         assert y == Monomial({"x": 1, "y": -1, "z": 1}, 4)
         # make sure x unchanged
         assert x == Monomial({"x": 1, "y": -1}, 4)
@@ -292,9 +288,9 @@ class TestMonomial:
         z = x * Monomial({"x": -1, "t": 2}, 0.5)
         assert z == Monomial({"x": 0, "y": -1, "t": 2}, 2)
 
-        x0 = Variable("x0")
+        x0 = Variable("x0", "-")
         assert 0.0 == 0.0 * x0
-        x1 = Variable("x1")
+        x1 = Variable("x1", "-")
         n_hat = [1, 0]
         p = n_hat[0] * x0 + n_hat[1] * x1
         assert p == x0
@@ -348,8 +344,8 @@ class TestSignomial:
 
     def test_init(self):
         "Test Signomial construction"
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         with SignomialsEnabled():
             if sys.platform[:3] != "win":
                 assert str(1 - x - y**2 - 1) == "1 - x - y² - 1"
@@ -360,8 +356,8 @@ class TestSignomial:
 
     def test_negation_raises_without_signomials(self):
         "Negating fails at the minus sign rather than returning NotImplemented"
-        x = Variable("x")
-        v = VectorVariable(3, "v")
+        x = Variable("x", "-")
+        v = VectorVariable(3, "v", "-")
         with pytest.raises(TypeError, match="other side of the constraint"):
             _ = -x
         with pytest.raises(TypeError, match="other side of the constraint"):
@@ -369,8 +365,8 @@ class TestSignomial:
 
     def test_chop(self):
         "Test Signomial deconstruction"
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         with SignomialsEnabled():
             c = x + 5 * y**2 - 0.2 * x * y**0.78
             monomials = c.chop()
@@ -381,13 +377,13 @@ class TestSignomial:
 
     def test_mult(self):
         "Test Signomial multiplication"
-        x = Variable("x")
+        x = Variable("x", "-")
         with SignomialsEnabled():
             assert (x + 1) * (x - 1) == x**2 - 1
 
     def test_eq_ne(self):
         "Test Signomial equality and inequality operators"
-        x = Variable("x")
+        x = Variable("x", "-")
         xu = Variable("x", units="ft")
         with SignomialsEnabled():
             assert x - x**2 == -(x**2) + x
@@ -417,13 +413,13 @@ class TestPi:
         assert float(gpkit.pi.c) == pytest.approx(np.pi)
 
     def test_pi_in_expression(self):
-        r = Variable("r")
+        r = Variable("r", "-")
         expr = gpkit.pi * r**2
         assert isinstance(expr, Monomial)
         assert float(expr.c) == pytest.approx(np.pi)
 
     def test_pi_expression_latex(self):
-        r = Variable("r")
+        r = Variable("r", "-")
         latex = render(gpkit.pi * r**2, LATEX, ["units"])
         assert r"\pi" in latex
 
@@ -440,11 +436,11 @@ class TestPosynomial:
 
     def test_init(self):
         "Test Posynomial construction"
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         ms = [
             Monomial({"x": 1, "y": 2}, 3.14),
-            0.5 * Variable("y"),
+            0.5 * Variable("y", "-"),
             Monomial({"x": 3, "y": 1}, 6),
             Monomial(2),
         ]
@@ -473,19 +469,19 @@ class TestPosynomial:
 
     def test_eq(self):
         """Test Posynomial __eq__"""
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         assert (1 + x) == (1 + x)
         assert not (1 + x) == 2 * (1 + x)
         assert not (1 + x) == 0.5 * (1 + x)
         assert not (1 + x) == (1 + y)
-        x = Variable("x", value=3)
-        y = Variable("y", value=2)
+        x = Variable("x", "-", value=3)
+        y = Variable("y", "-", value=2)
         assert (1 + x**2).value == (4 + y + y**2).value
 
     def test_eq_units(self):
-        p1 = Variable("x") + Variable("y")
-        p2 = Variable("x") + Variable("y")
+        p1 = Variable("x", "-") + Variable("y", "-")
+        p2 = Variable("x", "-") + Variable("y", "-")
         p1u = Variable("x", units="m") + Variable("y", units="m")
         p2u = Variable("x", units="m") + Variable("y", units="m")
         assert p1 == p2
@@ -495,8 +491,8 @@ class TestPosynomial:
 
     def test_simplification(self):
         "Make sure like monomial terms get automatically combined"
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         p1 = x + y + y + (x + y) + (y + x**2) + 3 * x
         p2 = 4 * y + x**2 + 5 * x
         # ps1 = [list(exp.keys())for exp in p1.exps]
@@ -506,8 +502,8 @@ class TestPosynomial:
 
     def test_posyposy_mult(self):
         "Test multiplication of Posynomial with Posynomial"
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         p1 = x**2 + 2 * y * x + y**2
         p2 = (x + y) ** 2
         # ps1 = [list(exp.keys())for exp in p1.exps]
@@ -523,16 +519,16 @@ class TestPosynomial:
 
     def test_constraint_gen(self):
         "Test creation of Constraints via operator overloading"
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         p = x**2 + 2 * y * x + y**2
         assert (p <= 1).as_hmapslt1({}) == [p.hmap]
         assert (p <= x).as_hmapslt1({}) == [(p / x).hmap]
 
     def test_integer_division(self):
         "Make sure division by integer doesn't use Python integer division"
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         p = 4 * x + y
         assert p / 3 == p / 3
         equiv1 = all((p / 3).cs == [1 / 3, 4 / 3])
@@ -541,8 +537,8 @@ class TestPosynomial:
 
     def test_diff(self):
         "Test differentiation (!!)"
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         assert x.diff(x) == 1
         assert x.diff(y) == 0
         assert (y**2).diff(y) == 2 * y
@@ -562,8 +558,8 @@ class TestPosynomial:
 
     def test_mono_lower_bound(self):
         "Test monomial approximation"
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         p = y**2 + 1
 
         def same(mon, expected):

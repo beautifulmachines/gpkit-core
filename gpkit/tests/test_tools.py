@@ -28,12 +28,12 @@ class TestTools:
         )
 
     def test_dual_objective(self):
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         eqns = [x >= 1, y >= 1, x * y == 10]
         n = 4
-        ws = Variable("w_{CO}")
-        w_s = Variable("v_{CO}", lambda c: 1 - c[ws], "-")
+        ws = Variable("w_{CO}", "-")
+        w_s = Variable("v_{CO}", "-", value=lambda c: 1 - c[ws])
         obj = ws * (x + y) + w_s * (y**-1 * x**-3)
         m = Model(obj, eqns)
         sols = m.sweep({ws: np.linspace(1 / n, 1 - 1 / n, n)}, verbosity=0)
@@ -43,54 +43,54 @@ class TestTools:
 
     def test_te_exp_minus1(self):
         """Test Taylor expansion of e^x - 1"""
-        x = Variable("x")
+        x = Variable("x", "-")
         assert te_exp_minus1(x, 1) == x
         assert te_exp_minus1(x, 3) == x + x**2 / 2 + x**3 / 6
         assert te_exp_minus1(x, 0) == 0
         # make sure x was not modified
-        assert x == Variable("x")
+        assert x == Variable("x", "-")
         # try for VectorVariable too
-        y = VectorVariable(3, "y")
+        y = VectorVariable(3, "y", "-")
         assert te_exp_minus1(y, 1) == y
         assert te_exp_minus1(y, 3) == y + y**2 / 2 + y**3 / 6
         assert te_exp_minus1(y, 0) == 0
         # make sure y was not modified
-        assert y == VectorVariable(3, "y")
+        assert y == VectorVariable(3, "y", "-")
 
     def test_te_secant(self):
         "Test Taylor expansion of secant(var)"
-        x = Variable("x")
+        x = Variable("x", "-")
         assert te_secant(x, 1) == 1 + x**2 / 2
         a = te_secant(x, 2)
         b = 1 + x**2 / 2 + 5 * x**4 / 24
         assert all(abs(val) <= 1e-10 for val in (a.hmap - b.hmap).values())
         assert te_secant(x, 0) == 1
         # make sure x was not modified
-        assert x == Variable("x")
+        assert x == Variable("x", "-")
         # try for VectorVariable too
-        y = VectorVariable(3, "y")
+        y = VectorVariable(3, "y", "-")
         assert te_secant(y, 0) == 1  # truthy bc monomial constraint
         assert all(te_secant(y, 1) == 1 + y**2 / 2)
         assert all(te_secant(y, 2) == 1 + y**2 / 2 + 5 * y**4 / 24)
         # make sure y was not modified
-        assert y == VectorVariable(3, "y")
+        assert y == VectorVariable(3, "y", "-")
         _ = te_secant(x, 13)  # to trigger the extension
 
     def test_te_tangent(self):
         "Test Taylor expansion of tangent(var)"
-        x = Variable("x")
+        x = Variable("x", "-")
         assert te_tangent(x, 1) == x
         assert te_tangent(x, 3) == x + x**3 / 3 + 2 * x**5 / 15
         assert te_tangent(x, 0) == 0
         # make sure x was not modified
-        assert x == Variable("x")
+        assert x == Variable("x", "-")
         # try for VectorVariable too
-        y = VectorVariable(3, "y")
+        y = VectorVariable(3, "y", "-")
         assert te_tangent(y, 1) == y
         assert te_tangent(y, 3) == y + y**3 / 3 + 2 * y**5 / 15
         assert te_tangent(y, 0) == 0
         # make sure y was not modified
-        assert y == VectorVariable(3, "y")
+        assert y == VectorVariable(3, "y", "-")
         with pytest.raises(NotImplementedError):
             _ = te_tangent(x, 16)
 
@@ -103,7 +103,7 @@ def test_autosweep_plot_labels_axes_with_units():
 
     x = Variable("x", "m", "swept variable")
     y = Variable("y", "m^2", "cost")
-    m = Model(y, [y >= x**2, y >= x * Variable("a", 1, "m")])
+    m = Model(y, [y >= x**2, y >= x * Variable("a", "m", value=1)])
     fig, ax = m.autosweep({x: (1, 3)}, tol=0.01, verbosity=0).plot(y)
     assert ax.get_xlabel() == "swept variable [m]"
     assert ax.get_ylabel() == "cost [m²]"

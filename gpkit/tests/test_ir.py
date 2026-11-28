@@ -64,8 +64,8 @@ class Wing(Model):
     """simple wing with weight proportional to area"""
 
     def setup(self):
-        S = Variable("S", 100, label="wing area")
-        W = Variable("W", label="wing weight")
+        S = Variable("S", "-", "wing area", value=100)
+        W = Variable("W", "-", "wing weight")
         self.cost = W
         return [W >= S * 0.1]
 
@@ -74,7 +74,7 @@ class Aircraft(Model):
     """Single-wing aircraft for IR nesting tests."""
 
     def setup(self):
-        W = Variable("W", label="total weight")
+        W = Variable("W", "-", "total weight")
         wing = Wing()
         self.cost = W
         return [W >= wing.cost * 1.2, wing]
@@ -84,7 +84,7 @@ class Sub(Model):
     """Minimal sub-model with one free variable."""
 
     def setup(self):
-        m = Variable("m")
+        m = Variable("m", "-")
         self.cost = m
         return [m >= 1]
 
@@ -103,7 +103,7 @@ class Spar(Model):
     """Simple spar with a thickness variable."""
 
     def setup(self):
-        t = Variable("t", label="spar thickness")
+        t = Variable("t", "-", "spar thickness")
         self.cost = t
         return [t >= 0.01]
 
@@ -112,7 +112,7 @@ class SparredWing(Model):
     """Wing sub-model containing a Spar child."""
 
     def setup(self):
-        S = Variable("S", label="wing area")
+        S = Variable("S", "-", "wing area")
         spar = Spar()
         self.cost = S + spar.cost
         return [S >= 1, spar]
@@ -122,7 +122,7 @@ class SparredAircraft(Model):
     """Aircraft with two-level nesting (wing + spar)."""
 
     def setup(self):
-        W = Variable("W", label="total weight")
+        W = Variable("W", "-", "total weight")
         wing = SparredWing()
         self.cost = W
         return [W >= wing.cost * 1.2, wing]
@@ -158,7 +158,7 @@ class MultiComponent(Model):
     """Model with sum() over sub-model variables (triggers Monomial AST child)."""
 
     def setup(self):
-        W = Variable("W", label="total weight")
+        W = Variable("W", "-", "total weight")
         sub1 = Sub()
         sub2 = Sub()
         components = [sub1, sub2]
@@ -170,12 +170,12 @@ class TestASTNodes:
     """Tests for AST node dataclass hierarchy."""
 
     def test_varnode_from_variable(self):
-        x = Variable("x")
+        x = Variable("x", "-")
         node = to_ast(x)
         assert node == VarNode(x.key.ref)
 
     def test_varnode_renders_its_name(self):
-        x = Variable("x")
+        x = Variable("x", "-")
         assert _text(VarNode(x.key.ref)) == "x"
 
     def test_constnode(self):
@@ -184,35 +184,35 @@ class TestASTNodes:
         assert _text(node) == "3.14"
 
     def test_exprnode_add(self):
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         result = x + y
         assert isinstance(result.ast, ExprNode)
         assert result.ast.op == "add"
         assert len(result.ast.children) == 2
 
     def test_exprnode_mul(self):
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         result = x * y
         assert isinstance(result.ast, ExprNode)
         assert result.ast.op == "mul"
 
     def test_exprnode_div(self):
-        x = Variable("x")
+        x = Variable("x", "-")
         result = x / 2
         assert isinstance(result.ast, ExprNode)
         assert result.ast.op == "div"
 
     def test_exprnode_pow(self):
-        x = Variable("x")
+        x = Variable("x", "-")
         result = x**3
         assert isinstance(result.ast, ExprNode)
         assert result.ast.op == "pow"
         assert result.ast.children[1] == 3
 
     def test_exprnode_neg(self):
-        x = Variable("x")
+        x = Variable("x", "-")
         with SignomialsEnabled():
             result = -x
         assert isinstance(result.ast, ExprNode)
@@ -221,7 +221,7 @@ class TestASTNodes:
 
     def test_signomial_pow_records_correct_exponent(self):
         """Regression: Signomial.__pow__ used to record expo=0 (bug fix)."""
-        x = Variable("x")
+        x = Variable("x", "-")
         p = x**3 + x + 5
         p2 = p**2
         assert isinstance(p2.ast, ExprNode)
@@ -233,13 +233,13 @@ class TestASTNodes:
         assert to_ast(3.14) == 3.14
 
     def test_to_ast_returns_existing_ast(self):
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         s = x + y
         assert to_ast(s) is s.ast
 
     def test_to_ast_idempotent(self):
-        x = Variable("x")
+        x = Variable("x", "-")
         node = VarNode(x.key.ref)
         assert to_ast(node) is node
 
@@ -253,8 +253,8 @@ class TestASTNodes:
 
     def test_nested_ast(self):
         """Compound expressions produce nested ExprNode trees."""
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         result = (x + y) * x
         assert isinstance(result.ast, ExprNode)
         assert result.ast.op == "mul"
@@ -332,7 +332,7 @@ class TestASTNodeIR:
     """
 
     def test_varnode(self):
-        x = Variable("x")
+        x = Variable("x", "-")
         node = VarNode(x.key.ref)
         ir = node.to_ir()
         assert ir == {"node": "var", "ref": "x"}
@@ -375,8 +375,8 @@ class TestASTNodeIR:
         assert isinstance(result, PiNode)
 
     def test_exprnode_add(self):
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         result = x + y
         ir = result.ast.to_ir()
         assert ir["node"] == "expr"
@@ -385,7 +385,7 @@ class TestASTNodeIR:
         assert ast_from_ir(ir) == result.ast
 
     def test_exprnode_pow_preserves_exponent(self):
-        x = Variable("x")
+        x = Variable("x", "-")
         result = x**3
         ir = result.ast.to_ir()
         assert ir["op"] == "pow"
@@ -394,14 +394,14 @@ class TestASTNodeIR:
         assert ast_from_ir(ir).children[1] == 3
 
     def test_nested_ast_roundtrip(self):
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         result = (x + y) * x
         assert ast_from_ir(result.ast.to_ir()) == result.ast
 
     def test_json_roundtrip(self):
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         result = x * y + x**2
         ir2 = json.loads(json.dumps(result.ast.to_ir()))
         assert ast_from_ir(ir2) == result.ast
@@ -412,7 +412,7 @@ class TestNomialMapIR:
 
     def test_monomial(self):
         """Single-term NomialMap (monomial)."""
-        x = Variable("x")
+        x = Variable("x", "-")
         hmap = NomialMap({HashVector({x.key: 2}): 3.0})
         ir = hmap.to_ir()
         assert len(ir["terms"]) == 1
@@ -421,8 +421,8 @@ class TestNomialMapIR:
 
     def test_posynomial(self):
         """Multi-term NomialMap (posynomial)."""
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         hmap = NomialMap(
             {
                 HashVector({x.key: 1}): 2.0,
@@ -447,7 +447,7 @@ class TestNomialMapIR:
 
     def test_json_serializable(self):
         """NomialMap IR is JSON-serializable."""
-        x = Variable("x")
+        x = Variable("x", "-")
         ir = NomialMap({HashVector({x.key: 1}): 2.5}).to_ir()
         assert json.loads(json.dumps(ir)) == ir
 
@@ -456,28 +456,28 @@ class TestNomialIR:
     """Tests for Signomial.to_ir()."""
 
     def test_monomial(self):
-        x = Variable("x")
+        x = Variable("x", "-")
         ir = (2 * x**3).to_ir()
         assert ir["type"] == "Monomial"
         assert ir["terms"] == [{"coeff": 2.0, "exps": {"x": 3}}]
 
     def test_posynomial(self):
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         ir = (x + 2 * y).to_ir()
         assert ir["type"] == "Posynomial"
         assert len(ir["terms"]) == 2
 
     def test_signomial(self):
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         with SignomialsEnabled():
             s = x - y
         assert s.to_ir()["type"] == "Signomial"
 
     def test_ast_is_serialized(self):
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         assert "ast" in (x + 2 * y).to_ir()
 
     def test_units_are_serialized(self):
@@ -486,8 +486,8 @@ class TestNomialIR:
         assert "units" in (x + y).to_ir()
 
     def test_json_serializable(self):
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         ir = (x + 2 * y).to_ir()
         assert json.loads(json.dumps(ir)) == ir
 
@@ -501,7 +501,7 @@ class TestConstraintIR:
 
     def test_a_constraint_with_no_written_form_states_its_type(self):
         "The model IR has an entry for every constraint, if only to name its type."
-        x, y = Variable("x"), Variable("y")
+        x, y = Variable("x", "-"), Variable("y", "-")
         ir = Model(y, [Opaque(x, y), x >= 1]).to_ir()
         (ref,) = [r for r, c in ir["constraints"].items() if c["type"] == "Opaque"]
         assert "oper" not in ir["constraints"][ref]
@@ -509,8 +509,8 @@ class TestConstraintIR:
 
     def test_posy_inequality(self):
         """PosynomialInequality: x >= y + 1"""
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         c = x >= y + 1
         assert isinstance(c, PosynomialInequality)
 
@@ -526,16 +526,16 @@ class TestConstraintIR:
         Note: x + y <= 2*x*y triggers Monomial.__ge__ (subclass reflected
         method) so the stored oper is '>=' with swapped left/right.
         """
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         c = x + y <= 2 * x * y
         assert isinstance(c, PosynomialInequality)
         assert c.to_ir()["oper"] in ("<=", ">=")
 
     def test_monomial_equality(self):
         """MonomialEquality: x == y"""
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         c = x == y
         assert isinstance(c, MonomialEquality)
 
@@ -549,8 +549,8 @@ class TestConstraintIR:
         Note: Monomial >= Signomial triggers Signomial.__le__ (subclass
         reflected method) so the stored oper may be '<=' with swapped sides.
         """
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         with SignomialsEnabled():
             c = x >= 1 - y
         assert isinstance(c, SignomialInequality)
@@ -563,7 +563,7 @@ class TestConstraintIR:
     @pytest.mark.parametrize("written_left", [True, False])
     def test_guessed_terms_carry_their_shares(self, written_left):
         "Normalized, zeros written out, whichever side the guess was written on"
-        x, y, z = Variable("x"), Variable("y", "m"), Variable("z", "m")
+        x, y, z = Variable("x", "-"), Variable("y", "m"), Variable("z", "m")
         shares = guess({z: 3, 2 * x * y: 0})
         c = shares >= y + x * z if written_left else y + x * z <= shares
         guesses = {
@@ -572,7 +572,7 @@ class TestConstraintIR:
         assert guesses == {(z.key.ref,): 1.0, (x.key.ref, y.key.ref): 0.0}
 
     def test_guess_reaches_the_model_ir(self):
-        x, y = Variable("x"), Variable("y")
+        x, y = Variable("x", "-"), Variable("y", "-")
         m = Model(1 / (x * y), [guess({x: 1, y: 3}) >= 1, x <= 2, y <= 2])
         ir = json.loads(json.dumps(m.to_ir()))
         (constraint,) = [
@@ -586,9 +586,9 @@ class TestConstraintIR:
         Constructed directly since Posynomial == Signomial doesn't produce
         a constraint via operator overloading.
         """
-        x = Variable("x")
-        y = Variable("y")
-        z = Variable("z")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
+        z = Variable("z", "-")
         with SignomialsEnabled():
             c = SingleSignomialEquality(x + y, 1 - z)
         assert isinstance(c, SingleSignomialEquality)
@@ -599,8 +599,8 @@ class TestConstraintIR:
 
     def test_array_constraint_to_ir(self):
         """ArrayConstraint serializes the relation as written, not its elements."""
-        x = VectorVariable(3, "x")
-        y = VectorVariable(3, "y")
+        x = VectorVariable(3, "x", "-")
+        y = VectorVariable(3, "y", "-")
         c = x >= y
         assert isinstance(c, ArrayConstraint)
 
@@ -632,16 +632,16 @@ class TestConstraintIR:
         assert json.loads(json.dumps(ir)) == ir
 
     def test_constraint_lineage(self):
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         c = x >= y + 1
         c.lineage = (("Aircraft", 0), ("Wing", 0))
         assert c.to_ir()["lineage"] == [["Aircraft", 0], ["Wing", 0]]
 
     def test_constraint_no_lineage(self):
         """Constraint without lineage omits lineage key."""
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         c = x >= y + 1
         c.lineage = ()
 
@@ -649,14 +649,14 @@ class TestConstraintIR:
         assert "lineage" not in ir
 
     def test_constraint_json_serializable(self):
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         ir = (x >= y + 1).to_ir()
         assert json.loads(json.dumps(ir)) == ir
 
     def test_signomial_json_serializable(self):
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         with SignomialsEnabled():
             c = x >= 1 - y
         ir = c.to_ir()
@@ -678,7 +678,7 @@ class TestIRVariableKind:
             c = Var("m", "fixed scalar", value=2.0)
 
             def setup(self):
-                self.q = VectorVariable(3, "q", [0.1, 0.2, 0.3], "m", "fixed vec")
+                self.q = VectorVariable(3, "q", "m", "fixed vec", value=[0.1, 0.2, 0.3])
                 self.v = VectorVariable(3, "v", "m", "free vec")
                 self.cost = self.x
                 return [self.x >= self.q.sum() + self.v.sum() + self.c]
@@ -719,7 +719,7 @@ class TestIRVariableKind:
 
     def test_a_linked_variable_is_linked(self):
         x, y = Variable("x", "m"), Variable("y", "m")
-        z = Variable("z", 2.0, "m")
+        z = Variable("z", "m", value=2.0)
         m = Model(x, [x >= y], substitutions={y: lambda c: 2 * c[z]})
         assert self._kinds(m.to_ir())["y"] == "linked"
 
@@ -736,7 +736,7 @@ class TestIRVersion:
         return {"gpkit_ir_version": version}
 
     def test_accepts_what_gpkit_writes(self):
-        m = Model(Variable("x"), [Variable("x") >= 1])
+        m = Model(Variable("x", "-"), [Variable("x", "-") >= 1])
         check_ir_version(m.to_ir())
         check_ir_version(m.solve(verbosity=0).to_ir())
 
@@ -758,7 +758,7 @@ class TestIRVersion:
 
     def test_to_toml_refuses_a_document_it_cannot_read(self):
         "to_toml is the one in-repo IR reader, so it is where the check has teeth."
-        ir = Model(Variable("x"), [Variable("x") >= 1]).to_ir()
+        ir = Model(Variable("x", "-"), [Variable("x", "-") >= 1]).to_ir()
         ir["gpkit_ir_version"] = "99.0"
         with pytest.raises(IRVersionError, match="gpkit_ir_version"):
             to_toml(ir)
@@ -769,8 +769,8 @@ class TestModelIR:
 
     def test_ir_document_structure(self):
         """IR document has required top-level keys."""
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
         ir = m.to_ir()
         check_ir_version(ir)  # what gpkit writes is what gpkit accepts
@@ -781,15 +781,15 @@ class TestModelIR:
         assert len(ir["constraints"]) == 2
 
     def test_substitutions(self):
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         m = Model(x, [x >= y], substitutions={y: 3})
         assert m.to_ir()["substitutions"]["y"] == 3.0
 
     def test_no_substitutions(self):
         """Model without substitutions omits substitutions key."""
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         m = Model(x + y, [x * y >= 1])
         ir = m.to_ir()
         assert "substitutions" not in ir
@@ -803,7 +803,7 @@ class TestModelIR:
         """
         x = Variable("x", "m")
         rho = Variable("rho", "kg/m^3", "declared, referenced by nothing")
-        m = Model(x, [x >= Variable("L", 2, "m")], substitutions={rho: 1600})
+        m = Model(x, [x >= Variable("L", "m", value=2)], substitutions={rho: 1600})
         ir = m.to_ir()
         assert set(ir["substitutions"]) <= set(ir["variables"])
         assert rho.key.ref in ir["variables"]
@@ -838,7 +838,7 @@ class TestModelIR:
 
     def test_vector_variable(self):
         """Vector elements appear individually, ref including #shape."""
-        x = VectorVariable(3, "x")
+        x = VectorVariable(3, "x", "-")
         ir = Model(x.prod(), [x >= 1]).to_ir()
         assert "x[0]#3" in ir["variables"]
         assert "x[1]#3" in ir["variables"]
@@ -846,8 +846,8 @@ class TestModelIR:
 
     def test_json_serialization(self):
         """json.dumps(model.to_ir()) succeeds."""
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         ir = Model(x + 2 * y, [x * y >= 1, y >= 0.5]).to_ir()
         assert json.loads(json.dumps(ir)) == ir
 
@@ -858,8 +858,8 @@ class _VecIR(Model):
     def setup(self):
         self.W = Variable("W", "m")
         self.q = VectorVariable(3, "q", "m")
-        self.c = VectorVariable(3, "c", [1, 2, 3], "m")
-        W_max = Variable("W_max", 100, "m")
+        self.c = VectorVariable(3, "c", "m", value=[1, 2, 3])
+        W_max = Variable("W_max", "m", value=100)
         return [self.W >= self.q.sum(), self.q >= self.c, self.W <= W_max]
 
 
@@ -908,8 +908,8 @@ class TestVectorConstraintIR:
 
     def test_a_broadcast_scalar_keeps_its_written_form(self):
         "2*q >= x wraps x to broadcast it; the written side is still just x."
-        q = VectorVariable(3, "q")
-        x = Variable("x", 1)
+        q = VectorVariable(3, "q", "-")
+        x = Variable("x", "-", value=1)
         ir = Model(q.sum(), [2 * q >= x]).to_ir()
         (parent,) = [c for c in ir["constraints"].values() if "veckey_ref" not in c]
         assert parent["right"]["ast"] == {"node": "var", "ref": x.key.ref}
@@ -920,7 +920,7 @@ class TestVectorConstraintIR:
         The expression has an AST, but part of it was never written as one, so
         only the elements' math is known -- as gassolar's gust loads have it.
         """
-        q, x, y = VectorVariable(2, "q"), Variable("x"), Variable("y")
+        q, x, y = VectorVariable(2, "q", "-"), Variable("x", "-"), Variable("y", "-")
         assembled = NomialArray([x**0.5, y**0.5])
         m = Model(q.sum(), [q >= 2 * assembled, x >= 1, y >= 1])
         (parent,) = [
@@ -938,7 +938,7 @@ class TestVectorConstraintIR:
 
     def test_a_scalar_variable_times_a_vector_is_written_as_itself(self):
         "rho*V promotes rho to an array to multiply; the written form is still rho."
-        rho, V = Variable("rho"), VectorVariable(3, "V")
+        rho, V = Variable("rho", "-"), VectorVariable(3, "V", "-")
         product = rho * V
         assert product.ast.children[0] == VarNode(rho.key.ref)
 
@@ -958,8 +958,8 @@ class TestModelTree:
 
     def test_flat_model(self):
         """Flat model with no sub-models: model_tree has no children."""
-        x = Variable("x")
-        y = Variable("y")
+        x = Variable("x", "-")
+        y = Variable("y", "-")
         m = Model(x + 2 * y, [x * y >= 1, y >= 0.5])
         ir = m.to_ir()
         tree = ir["model_tree"]
@@ -1038,7 +1038,7 @@ class TestModelTree:
             """Top-level model for constraint ownership tests."""
 
             def setup(self):
-                y = Variable("y")
+                y = Variable("y", "-")
                 sub = Sub()
                 self.cost = y + sub.cost
                 return [y >= 2, sub]
@@ -1094,7 +1094,7 @@ class TestModelTree:
 
         class _Wing(Model):
             def setup(self):
-                S = Variable("S")
+                S = Variable("S", "-")
                 self.cost = S
                 return [S >= 10]
 
@@ -1102,7 +1102,7 @@ class TestModelTree:
             wing: "_Wing"
 
             def setup(self):
-                W = Variable("W")
+                W = Variable("W", "-")
                 self.wing = _Wing()
                 self.cost = W
                 return [W >= self.wing.cost * 1.2, self.wing]
@@ -1148,7 +1148,7 @@ class _IRChild(Model):
 
     def setup(self):
         self.t = Variable("t", "mm", "thickness")
-        self.t_min = Variable("t_min", 2.0, "mm", "min thickness")
+        self.t_min = Variable("t_min", "mm", "min thickness", value=2.0)
         return [self.t >= self.t_min]
 
 
@@ -1194,7 +1194,7 @@ class TestSolutionIR:
 
     def test_a_money_objective_has_readable_cost_units(self):
         price = Variable("price_ir", "USD")
-        floor = Variable("price_min_ir", 40.0, "USD")
+        floor = Variable("price_min_ir", "USD", value=40.0)
         sol = Model(price, [price >= floor]).solve(verbosity=0)
         assert ureg(sol.to_ir()["cost"]["units"]).units == ureg("USD").units
 
@@ -1212,7 +1212,7 @@ class TestSolutionIR:
         }
 
     def test_dimensionless_omits_units(self):
-        x = Variable("x_dimless")
+        x = Variable("x_dimless", "-")
         sol = Model(x, [x >= 1]).solve(verbosity=0)
         assert sol.to_ir()["primal"][x.key.ref] == {"value": pytest.approx(1.0)}
         assert "units" not in sol.to_ir()["cost"]
@@ -1224,7 +1224,7 @@ class TestSolutionIR:
         unit registry parses -- so it cannot be what a joinable IR carries.
         """
         torque = Variable("tau_ir", "N*m", "torque")
-        f_min = Variable("tau_min_ir", 2.0, "N*m")
+        f_min = Variable("tau_min_ir", "N*m", value=2.0)
         m = Model(torque, [torque >= f_min])
         sol = m.solve(verbosity=0)
         declared = m.to_ir()["variables"][torque.key.ref]["units"]
@@ -1295,7 +1295,9 @@ class TestSolutionIR:
     def test_vectors_are_elements_only(self):
         "Model.to_ir() already carries the parent entry with its shape."
         xv = VectorVariable(3, "xv", "m")
-        sol = Model(sum(xv), [xv >= 2 * Variable("u_v", 1, "m")]).solve(verbosity=0)
+        sol = Model(sum(xv), [xv >= 2 * Variable("u_v", "m", value=1)]).solve(
+            verbosity=0
+        )
         refs = set(sol.to_ir()["primal"])
         assert len(refs) == 3
         assert all("[" in r for r in refs)  # elements, never the bare parent
@@ -1317,8 +1319,8 @@ class TestWarningSubjectsBecomeRefs:
     "A warning's subject is a live object in process and a ref in the IR."
 
     def test_a_constraint_subject_becomes_its_constraint_key(self):
-        x = Variable("x_w")
-        x_min = Variable("x_min_w", 2)
+        x = Variable("x_w", "-")
+        x_min = Variable("x_min_w", "-", value=2)
         m = Model(x, [Tight([x >= 1]), x >= x_min])
         sol = m.solve(verbosity=0)
         (warn,) = sol.to_ir()["meta"]["warnings"]["Unexpectedly Loose Constraints"]
@@ -1327,9 +1329,9 @@ class TestWarningSubjectsBecomeRefs:
         assert warn["value"] == pytest.approx(1, abs=1e-3)
 
     def test_a_variable_subject_becomes_its_varkey_ref(self):
-        x = Variable("x_r")
-        x_min = Variable("x_min_r", 2)
-        x_max = Variable("x_max_r", 1)
+        x = Variable("x_r", "-")
+        x_min = Variable("x_min_r", "-", value=2)
+        x_max = Variable("x_max_r", "-", value=1)
         inner = Model(x, [x <= x_max, x >= x_min])
         relaxed = ConstantsRelaxed(inner)
         sol = Model(relaxed.relaxvars.prod(), relaxed).solve(verbosity=0)
@@ -1339,7 +1341,7 @@ class TestWarningSubjectsBecomeRefs:
         assert warns and all(w["subject"] in known for w in warns)
 
     def test_a_subjectless_warning_omits_the_field(self):
-        x = Variable("x_b")
+        x = Variable("x_b", "-")
         sol = Model(1 / x, Bounded([x >= 1])).solve(verbosity=0)
         (warn,) = sol.to_ir()["meta"]["warnings"]["Arbitrarily Bounded Variables"][:1]
         assert "subject" not in warn

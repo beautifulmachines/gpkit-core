@@ -4,9 +4,9 @@ from gpkit import Variable, Vectorize, VectorVariable
 
 with Vectorize(3):
     with Vectorize(5):
-        y = Variable("y")
-        x = VectorVariable(2, "x")
-    z = VectorVariable(7, "z")
+        y = Variable("y", "-")
+        x = VectorVariable(2, "x", "-")
+    z = VectorVariable(7, "z", "-")
 
 assert y.key.shape == (5, 3)
 assert x.key.shape == (2, 5, 3)

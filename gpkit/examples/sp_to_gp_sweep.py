@@ -9,28 +9,28 @@ from gpkit.constraints.tight import Tight
 def SimPleAC():
     "Creates SimpleAC model"
     # Env. constants
-    g = Variable("g", 9.81, "m/s^2", "gravitational acceleration")
-    mu = Variable("\\mu", 1.775e-5, "kg/m/s", "viscosity of air")
-    rho = Variable("\\rho", 1.23, "kg/m^3", "density of air")
-    rho_f = Variable("\\rho_f", 817, "kg/m^3", "density of fuel")
+    g = Variable("g", "m/s^2", "gravitational acceleration", value=9.81)
+    mu = Variable("\\mu", "kg/m/s", "viscosity of air", value=1.775e-5)
+    rho = Variable("\\rho", "kg/m^3", "density of air", value=1.23)
+    rho_f = Variable("\\rho_f", "kg/m^3", "density of fuel", value=817)
 
     # Non-dimensional constants
-    C_Lmax = Variable("C_{L,max}", 1.6, "-", "max CL with flaps down")
-    e = Variable("e", 0.92, "-", "Oswald efficiency factor")
-    k = Variable("k", 1.17, "-", "form factor")
-    N_ult = Variable("N_{ult}", 3.3, "-", "ultimate load factor")
-    S_wetratio = Variable("(\\frac{S}{S_{wet}})", 2.075, "-", "wetted area ratio")
-    tau = Variable("\\tau", 0.12, "-", "airfoil thickness to chord ratio")
+    C_Lmax = Variable("C_{L,max}", "-", "max CL with flaps down", value=1.6)
+    e = Variable("e", "-", "Oswald efficiency factor", value=0.92)
+    k = Variable("k", "-", "form factor", value=1.17)
+    N_ult = Variable("N_{ult}", "-", "ultimate load factor", value=3.3)
+    S_wetratio = Variable("(\\frac{S}{S_{wet}})", "-", "wetted area ratio", value=2.075)
+    tau = Variable("\\tau", "-", "airfoil thickness to chord ratio", value=0.12)
     W_W_coeff1 = Variable(
-        "W_{W_{coeff1}}", 2e-5, "1/m", "wing weight coefficent 1"
+        "W_{W_{coeff1}}", "1/m", "wing weight coefficent 1", value=2e-5
     )  # 12e-5 originally
-    W_W_coeff2 = Variable("W_{W_{coeff2}}", 60, "Pa", "wing weight coefficent 2")
+    W_W_coeff2 = Variable("W_{W_{coeff2}}", "Pa", "wing weight coefficent 2", value=60)
 
     # Dimensional constants
-    Range = Variable("Range", 3000, "km", "aircraft range")
-    TSFC = Variable("TSFC", 0.6, "1/hr", "thrust specific fuel consumption")
-    V_min = Variable("V_{min}", 25, "m/s", "takeoff speed")
-    W_0 = Variable("W_0", 6250, "N", "aircraft weight excluding wing")
+    Range = Variable("Range", "km", "aircraft range", value=3000)
+    TSFC = Variable("TSFC", "1/hr", "thrust specific fuel consumption", value=0.6)
+    V_min = Variable("V_{min}", "m/s", "takeoff speed", value=25)
+    W_0 = Variable("W_0", "N", "aircraft weight excluding wing", value=6250)
 
     # Free Variables
     LoD = Variable("L/D", "-", "lift-to-drag ratio")

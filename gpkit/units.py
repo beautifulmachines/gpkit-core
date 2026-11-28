@@ -19,6 +19,27 @@ def qty(unit):
     return QTY_CACHE[unit]
 
 
+def refusal(key, value):
+    "The error for a value that can't fix key"
+    return ValueError(f"{key} must be fixed to a finite number, not {value!r}")
+
+
+def to_magnitude(key, value):
+    "value in key's units, if it was written with units: a Quantity or constant nomial"
+    units = key.units or "dimensionless"
+    try:
+        if hasattr(value, "hmap"):
+            if any(value.hmap.keys()):
+                raise refusal(key, value)
+            (value,) = value.hmap.to(units).values()
+        elif isinstance(value, Quantity):
+            value = value.to(units).magnitude
+    except DimensionalityError as err:
+        err.extra_msg += f" while fixing {key}"
+        raise
+    return value
+
+
 class GPkitUnits:
     "Return Monomials instead of Quantitites"
 

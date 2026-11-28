@@ -2,8 +2,8 @@
 
 from gpkit import Model, Variable
 
-x = Variable("x")
-y = Variable("y")
+x = Variable("x", "-")
+y = Variable("y", "-")
 
 m = Model(x * y, [x >= 1, y >= 2, x * y >= 0.5, x * y <= 1.5])
 

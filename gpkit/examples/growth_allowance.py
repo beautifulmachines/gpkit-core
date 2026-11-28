@@ -25,9 +25,9 @@ class Spar(Model):
     m: Variable
 
     def setup(self):
-        rho = Variable("rho", 2700, "kg/m^3", "spar density")
-        t = Variable("t", 0.005, "m", "spar wall thickness")
-        area = Variable("A", 1.0, "m^2", "spar wetted area")
+        rho = Variable("rho", "kg/m^3", "spar density", value=2700)
+        t = Variable("t", "m", "spar wall thickness", value=0.005)
+        area = Variable("A", "m^2", "spar wetted area", value=1.0)
         self.m = Variable("m", "kg", "spar mass", growth=0.20)
         self.cost = self.m
         return self.m.grown_from(rho * t * area)
@@ -49,7 +49,7 @@ class GrowthAllowance(Model):
         self.spar1 = Spar()
         self.spar2 = Spar()
         self.m = Variable("m", "kg", "wing mass", growth=0.10)
-        m_budget = Variable("m_budget", 40.0, "kg", "mass budget")
+        m_budget = Variable("m_budget", "kg", "mass budget", value=40.0)
         self.cost = self.m
         self.margin_objective = MarginObjective(
             "mass margin",

@@ -69,7 +69,7 @@ class _IdChild(Model):
 
 class _IdParent(Model):
     def setup(self):
-        x = Variable("x_id")
+        x = Variable("x_id", "-")
         self.child = _IdChild()
         return {
             "Sizing": [x >= self.child.y_id],
@@ -104,7 +104,9 @@ class TestVariableRowsAreJoinable:
         c = gpkit.Var("m", "fixed scalar", value=2.0)
 
         def setup(self):
-            self.q = gpkit.VectorVariable(3, "q", [0.1, 0.2, 0.3], "m", "fixed vec")
+            self.q = gpkit.VectorVariable(
+                3, "q", "m", "fixed vec", value=[0.1, 0.2, 0.3]
+            )
             self.v = gpkit.VectorVariable(3, "v", "m", "free vec")
             self.cost = self.x
             return [self.x >= self.q.sum() + self.v.sum() + self.c]
@@ -158,7 +160,7 @@ class TestReportDataclasses:
 
     def test_cgroup_in_report(self):
         """CGroup holds raw constraint objects, not pre-rendered strings."""
-        x = Variable("x_cg_test_raw")
+        x = Variable("x_cg_test_raw", "-")
         c = x >= 1
         cg = CGroup(label="Drag", constraints=[c], keys=[ConstraintKey(index=0)])
         assert cg.label == "Drag"
@@ -205,7 +207,7 @@ class TestReportDataclasses:
             units="m",
             label="span",
         )
-        x_test = Variable("x_to_dict_test")
+        x_test = Variable("x_to_dict_test", "-")
         cg = CGroup(
             label="Aero", constraints=[x_test >= 1], keys=[ConstraintKey(index=0)]
         )
@@ -256,7 +258,7 @@ class TestReportDataclasses:
 
         class _AbbrChild(Model):
             def setup(self):
-                x = Variable("x_abbr")
+                x = Variable("x_abbr", "-")
                 return {"group": [x >= 1]}
 
         m = _AbbrParent()
@@ -314,8 +316,8 @@ class TestConstraintEntries:
 
     def test_type_is_the_one_the_ir_records(self):
         "A constraint's type names its class, the vocabulary to_ir() already uses."
-        x, y = Variable("x_sig"), Variable("y_sig")
-        z = Variable("z_sig", 2)
+        x, y = Variable("x_sig", "-"), Variable("y_sig", "-")
+        z = Variable("z_sig", "-", value=2)
         with SignomialsEnabled():
             m = Model(x, [SignomialEquality(x + y, z), x * y >= 1])
         entries = _constraints(m.report(fmt="dict"))
@@ -355,7 +357,7 @@ class TestBuildReportIR:
             """A simple test model."""
 
             def setup(self):
-                x = Variable("x_rs_simple")
+                x = Variable("x_rs_simple", "-")
                 return [x >= 1]
 
         m = _RSSimple()
@@ -370,13 +372,13 @@ class TestBuildReportIR:
 
         class _RSChild(Model):
             def setup(self):
-                x = Variable("x_rs_child")
+                x = Variable("x_rs_child", "-")
                 return [x >= 1]
 
         class _RSParent(Model):
             def setup(self):
                 child = _RSChild()
-                y = Variable("y_rs_parent")
+                y = Variable("y_rs_parent", "-")
                 return [y >= 1, child]
 
         m = _RSParent()
@@ -391,8 +393,8 @@ class TestBuildReportIR:
 
         class _RSDict(Model):
             def setup(self):
-                x = Variable("x_rsd1")
-                y = Variable("y_rsd1")
+                x = Variable("x_rsd1", "-")
+                y = Variable("y_rsd1", "-")
                 return {"Drag": [x >= 1], "Lift": [y >= 1]}
 
         m = _RSDict()
@@ -406,8 +408,8 @@ class TestBuildReportIR:
 
         class _RSDictTight(Model):
             def setup(self):
-                x = Variable("x_rsdt")
-                y = Variable("y_rsdt")
+                x = Variable("x_rsdt", "-")
+                y = Variable("y_rsdt", "-")
                 return {"Structural": [Tight([x >= 1, y >= x])]}
 
         m = _RSDictTight()
@@ -424,8 +426,8 @@ class TestBuildReportIR:
 
         class _MDDictTight(Model):
             def setup(self):
-                x = Variable("x_mddt")
-                y = Variable("y_mddt")
+                x = Variable("x_mddt", "-")
+                y = Variable("y_mddt", "-")
                 return {"Structural": [Tight([x >= 1, y >= x])]}
 
         m = _MDDictTight()
@@ -441,7 +443,7 @@ class TestBuildReportIR:
         class _RSPrettyUnits(Model):
             def setup(self):
                 area = Variable("S_pu", "m^2")
-                area_min = Variable("S_min_pu", 1, "m^2")
+                area_min = Variable("S_min_pu", "m^2", value=1)
                 return [area >= area_min]
 
         m = _RSPrettyUnits()
@@ -464,7 +466,7 @@ class TestModelReport:
             """Test model for report()."""
 
             def setup(self):
-                x = Variable("x_rsrep")
+                x = Variable("x_rsrep", "-")
                 return [x >= 1]
 
         m = _RSReport()
@@ -482,7 +484,7 @@ class TestModelReport:
 
         class _AnonChild(Model):
             def setup(self):
-                return [Variable("span_anon") >= 1]
+                return [Variable("span_anon", "-") >= 1]
 
         child = _AnonChild()
         m = Model(child.cost, [child])
@@ -503,7 +505,7 @@ class TestModelReport:
 
         class _RSFmt(Model):
             def setup(self):
-                x = Variable("x_rsfmt")
+                x = Variable("x_rsfmt", "-")
                 return [x >= 1]
 
         m = _RSFmt()
@@ -533,7 +535,7 @@ class TestValueUnitsContract:
     def test_var_entry_value_is_plain_float_after_solve(self):
         """model_view stores plain floats in VarEntry.value, never Quantities."""
         x = Variable("x_plain", "m")
-        c = Variable("c_plain", 2.0, "m")
+        c = Variable("c_plain", "m", value=2.0)
         m = Model(x, [x >= c])
         sol = m.solve(verbosity=0)
         ir = model_view(m, solution=sol)
@@ -555,8 +557,8 @@ class TestRenderText:
             """A simple model for text rendering tests."""
 
             def setup(self):
-                x = Variable("x_txt")
-                y = Variable("y_txt")
+                x = Variable("x_txt", "-")
+                y = Variable("y_txt", "-")
                 return [x >= 1, y >= x]
 
         return _TxtSimple
@@ -579,13 +581,13 @@ class TestRenderText:
 
         class _TxtChild(Model):
             def setup(self):
-                c = Variable("c_txt_nested")
+                c = Variable("c_txt_nested", "-")
                 return [c >= 1]
 
         class _TxtParent(Model):
             def setup(self):
                 child = _TxtChild()
-                p = Variable("p_txt_nested")
+                p = Variable("p_txt_nested", "-")
                 return [p >= 1, child]
 
         m = _TxtParent()
@@ -605,8 +607,8 @@ class TestRenderText:
 
         class _TxtConstraints(Model):
             def setup(self):
-                x = Variable("x_ca")
-                y = Variable("y_ca")
+                x = Variable("x_ca", "-")
+                y = Variable("y_ca", "-")
                 return [x >= 1, y >= x]
 
         m = _TxtConstraints()
@@ -621,8 +623,8 @@ class TestRenderText:
 
         class _OrderM(Model):
             def setup(self):
-                x = Variable("x_ord_t")
-                x_max = Variable("x_ord_max", 10)
+                x = Variable("x_ord_t", "-")
+                x_max = Variable("x_ord_max", "-", value=10)
                 return [x >= 2, x <= x_max]
 
         m = _OrderM()
@@ -636,8 +638,8 @@ class TestRenderText:
 
         class _OrderMd(Model):
             def setup(self):
-                x = Variable("x_ord_md")
-                x_max = Variable("x_ord_md_max", 10)
+                x = Variable("x_ord_md", "-")
+                x_max = Variable("x_ord_md_max", "-", value=10)
                 return [x >= 2, x <= x_max]
 
         m = _OrderMd()
@@ -651,8 +653,8 @@ class TestRenderText:
 
         class _TxtSolM(Model):
             def setup(self):
-                x = Variable("x_tsol_t1")
-                x_max = Variable("x_tsol_max", 10)
+                x = Variable("x_tsol_t1", "-")
+                x_max = Variable("x_tsol_max", "-", value=10)
                 return [x >= 2, x <= x_max]
 
         m = _TxtSolM()
@@ -715,8 +717,8 @@ class TestRenderMarkdown:
             """A simple model for markdown rendering tests."""
 
             def setup(self):
-                x = Variable("x_md")
-                y = Variable("y_md")
+                x = Variable("x_md", "-")
+                y = Variable("y_md", "-")
                 return [x >= 1, y >= x]
 
         return _MdSimple
@@ -754,13 +756,13 @@ class TestRenderMarkdown:
 
         class _MdChild(Model):
             def setup(self):
-                c = Variable("c_md_nested")
+                c = Variable("c_md_nested", "-")
                 return [c >= 1]
 
         class _MdParent(Model):
             def setup(self):
                 child = _MdChild()
-                p = Variable("p_md_nested")
+                p = Variable("p_md_nested", "-")
                 return [p >= 1, child]
 
         m = _MdParent()
@@ -773,8 +775,8 @@ class TestRenderMarkdown:
 
         class _MdSolM(Model):
             def setup(self):
-                x = Variable("x_mdsol_t1")
-                x_max = Variable("x_mdsol_max", 10)
+                x = Variable("x_mdsol_t1", "-")
+                x_max = Variable("x_mdsol_max", "-", value=10)
                 return [x >= 3, x <= x_max]
 
         m = _MdSolM()
@@ -880,8 +882,8 @@ class TestCGroups:
 
         class _CGDictModel(Model):
             def setup(self):
-                x = Variable("x_cgd")
-                y = Variable("y_cgd")
+                x = Variable("x_cgd", "-")
+                y = Variable("y_cgd", "-")
                 c1 = x >= 1
                 c2 = y >= 1
                 c3 = x * y >= 2
@@ -898,7 +900,7 @@ class TestCGroups:
 
         class _CGListModel(Model):
             def setup(self):
-                x = Variable("x_cgl")
+                x = Variable("x_cgl", "-")
                 return [x >= 1]
 
         m = _CGListModel()
@@ -909,13 +911,13 @@ class TestCGroups:
 
         class _CGChild(Model):
             def setup(self):
-                x = Variable("x_cgchild")
+                x = Variable("x_cgchild", "-")
                 return [x >= 1]
 
         class _CGParent(Model):
             def setup(self):
                 child = _CGChild()
-                y = Variable("y_cgpar")
+                y = Variable("y_cgpar", "-")
                 return {"Group": [child, y >= 1]}
 
         m = _CGParent()
@@ -931,7 +933,7 @@ class TestModelDescription:
 
         class _DescExplicit(Model):
             def setup(self):
-                x = Variable("x_desc_exp")
+                x = Variable("x_desc_exp", "-")
                 return [x >= 1]
 
             @classmethod
@@ -954,7 +956,7 @@ class TestModelDescription:
             """Wing structural model with spar and skin."""
 
             def setup(self):
-                x = Variable("x_desc_doc")
+                x = Variable("x_desc_doc", "-")
                 return [x >= 1]
 
         d = _DescDocstring.description()
@@ -967,7 +969,7 @@ class TestModelDescription:
 
         class _DescNone(Model):
             def setup(self):
-                x = Variable("x_desc_none")
+                x = Variable("x_desc_none", "-")
                 return [x >= 1]
 
         d = _DescNone.description()
@@ -988,7 +990,7 @@ class TestModelDescription:
             references: ClassVar = ["Anderson 2001"]
 
             def setup(self):
-                x = Variable("x_desc_attrs")
+                x = Variable("x_desc_attrs", "-")
                 return [x >= 1]
 
         d = _DescAttrs.description()
@@ -1072,7 +1074,7 @@ class TestVectorConstraintRows:
     @pytest.fixture(name="m")
     def fixture_m(self):
         q = VectorVariable(3, "q", "m")
-        c = VectorVariable(3, "c", [1, 2, 3], "m")
+        c = VectorVariable(3, "c", "m", value=[1, 2, 3])
         W = Variable("W", "m")
         return Model(W, [W >= q.sum(), q >= c])
 
@@ -1093,7 +1095,7 @@ class TestVectorConstraintRows:
 
     def test_its_latex_is_the_relation_as_written(self):
         "Typeset from the written expression, as str is, not from each element."
-        q, x = VectorVariable(3, "q"), VectorVariable(3, "x")
+        q, x = VectorVariable(3, "q", "-"), VectorVariable(3, "x", "-")
         m = Model(q.sum(), [q >= x + x**2 / 2, x >= 1])
         (vector, _) = _constraints(m.report(fmt="dict"))
         assert vector["latex"] == (
@@ -1102,7 +1104,7 @@ class TestVectorConstraintRows:
 
     def test_one_never_written_as_a_vector_is_its_elements(self):
         "An array assembled element by element has no vector form to show."
-        q, x, y = VectorVariable(2, "q"), Variable("x"), Variable("y")
+        q, x, y = VectorVariable(2, "q", "-"), Variable("x", "-"), Variable("y", "-")
         m = Model(q.sum(), [q >= 2 * NomialArray([x**0.5, y**0.5]), x >= 1, y >= 1])
         rows = _constraints(m.report(fmt="dict"))[:2]
         assert [r["str"] for r in rows] == ["q[0] ≥ 2⋅x^0.5", "q[1] ≥ 2⋅y^0.5"]

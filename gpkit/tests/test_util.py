@@ -91,7 +91,7 @@ class TestSmallScripts:
         assert unitstr(Variable("n", "count")) == "count"
         assert unitstr(x) in footstrings
         assert unitstr(x.key) in footstrings
-        assert unitstr(Variable("y"), dimless="---") == "---"
+        assert unitstr(Variable("y", "-"), dimless="---") == "---"
         assert unitstr(None, dimless="--") == "--"
 
     def test_latexify_prefix_operators(self):
@@ -159,8 +159,8 @@ class TestSmallScripts:
         "17.2*(P/S)_min/(P/S)_ref^0.9187", which reads as though only the
         denominator were raised to the exponent.
         """
-        pmin = Variable("(P/S)_{min}")
-        pref = Variable("(P/S)_{ref}")
+        pmin = Variable("(P/S)_{min}", "-")
+        pref = Variable("(P/S)_{ref}", "-")
         assert (
             str(17.2 * (pmin / pref) ** 0.9187)
             == f"17.2{MUL}((P/S)_{{min}}/(P/S)_{{ref}})^0.9187"

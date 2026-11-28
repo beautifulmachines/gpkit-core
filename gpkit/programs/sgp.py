@@ -110,7 +110,7 @@ class SequentialGeometricProgram:
 
     gps = solver_outs = _results = result = model = None
     with NamedVariables("RelaxPCCP"):
-        slack = Variable("C")
+        slack = Variable("C", "-")
 
     def __init__(
         self, cost, model, substitutions, *, use_pccp=None, pccp_penalty=2e2, **kwargs

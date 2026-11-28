@@ -37,12 +37,18 @@ def _check_scalar_value(descr):
         )
 
 
-def _unplaced(arg):
-    "The error for a positional argument that is not a name, value, units or label."
-    return TypeError(
-        f"cannot place argument {arg!r}: a variable takes a name, a value, "
-        "units and a label, each at most once; pass the value as value="
-    )
+def _units(units):
+    "A variable's units: required, and a string."
+    if units is None:
+        raise TypeError(
+            'units are required; use "-" for dimensionless: Variable("x", "-")'
+        )
+    if not isinstance(units, Strings):
+        raise TypeError(
+            f"units must be a string, not {units!r}; "
+            'value is keyword-only: Variable("x", "m", value=5)'
+        )
+    return units
 
 
 def _fixed_elements(name, shape, values):
@@ -93,22 +99,11 @@ def _vector_values(name, shape, values):
 
 
 class Variable(Monomial):
-    """A described singlet Monomial.
+    """A described singlet Monomial: Variable(name, units, label, value=...).
 
-    Arguments
-    ---------
-    *args : list
-        may contain "name" (Strings)
-                    "value" (Numbers + Quantity)
-                    "units" (Strings)
-             and/or "label" (Strings)
-    **descr : dict
-        VarKey description
-
-    Returns
-    -------
-    Monomials containing a VarKey with the name '$name',
-    where $name is the vector's name and i is the VarKey's index.
+    units is "-" for dimensionless. value, if given, fixes the variable: a
+    number, a quantity (stored in the variable's units) or a linked function.
+    Other keywords are VarKey fields. Variable(varkey) rebuilds one from a key.
     """
 
     def __new__(cls, *args, **descr) -> "NomialArray | Variable":
@@ -119,26 +114,11 @@ class Variable(Monomial):
             return ArrayVariable.__new__(ArrayVariable, shape, *args, **descr)
         return object.__new__(cls)
 
-    def __init__(self, *args, **descr):
-        if len(args) == 1 and isinstance(args[0], VarKey):
-            (self.key,) = args
+    def __init__(self, name, units=None, label="", *, value=None, **descr):
+        if isinstance(name, VarKey):
+            self.key = name
         else:
-            for arg in args:
-                if isinstance(arg, Strings) and "name" not in descr:
-                    descr["name"] = arg
-                elif (
-                    not isinstance(arg, Strings)
-                    and isinstance(arg, (Numbers, Iterable))
-                    or callable(arg)
-                    or arg is None  # no value: free
-                ) and "value" not in descr:
-                    descr["value"] = arg
-                elif isinstance(arg, Strings) and "units" not in descr:
-                    descr["units"] = arg
-                elif isinstance(arg, Strings) and "label" not in descr:
-                    descr["label"] = arg
-                else:
-                    raise _unplaced(arg)
+            descr.update(name=name, units=_units(units), label=label, value=value)
             _check_scalar_value(descr)
             addmodelstodescr(descr, addtonamedvars=self)
             self.key = VarKey(**descr)
@@ -202,28 +182,15 @@ class Variable(Monomial):
 
 
 class ArrayVariable(NomialArray):
-    """A described vector of singlet Monomials.
+    """A described vector of singlet Monomials:
+    ArrayVariable(shape, name, units, label, value=...).
 
-    Arguments
-    ---------
-    shape : int or tuple
-        length or shape of resulting array
-    *args :
-        may contain "name" (Strings)
-                    "value" (Iterable, or a map of index to value
-                             that fixes only those elements)
-                    "units" (Strings)
-             and/or "label" (Strings)
-    **descr :
-        VarKey description
-
-    Returns
-    -------
-    NomialArray of Monomials, each containing a VarKey with name '$name_{i}',
-    where $name is the vector's name and i is the VarKey's index.
+    value, if given, is one entry per element, a map of index to value that
+    fixes only those elements, or a linked function. Each element is a Variable
+    whose key carries its index.
     """
 
-    def __new__(cls, shape, *args, **descr):  # noqa: PLR0912
+    def __new__(cls, shape, name, units=None, label="", *, value=None, **descr):
         if "idx" in descr:
             raise ValueError("the description field 'idx' is reserved")
 
@@ -231,32 +198,8 @@ class ArrayVariable(NomialArray):
         if Vectorize.vectorization:
             shape += Vectorize.vectorization
 
-        descr["shape"] = shape
-
-        for arg in args:
-            if isinstance(arg, Strings) and "name" not in descr:
-                descr["name"] = arg
-            elif (
-                (
-                    isinstance(arg, (Numbers, Iterable))
-                    and not isinstance(arg, Strings)
-                    and "value" not in descr
-                )
-                or callable(arg)
-                or arg is None
-            ):  # None: no value, free
-                descr["value"] = arg
-            elif isinstance(arg, Strings) and "units" not in descr:
-                descr["units"] = arg
-            elif isinstance(arg, Strings) and "label" not in descr:
-                descr["label"] = arg
-            else:
-                raise _unplaced(arg)
-
-        if "name" not in descr:
-            descr["name"] = "\\fbox{%s}" % VarKey.unique_id()
-
-        values = _vector_values(descr["name"], shape, descr.pop("value", None))
+        descr.update(shape=shape, name=name, units=_units(units), label=label)
+        values = _vector_values(name, shape, value)
 
         veckeydescr = descr.copy()
         addmodelstodescr(veckeydescr)

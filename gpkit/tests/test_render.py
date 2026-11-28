@@ -10,8 +10,8 @@ from gpkit.ast_nodes import VarNode, ast_from_ir, to_ast
 from gpkit.display.render import LATEX, LATEX_ALIGNED, TEXT, render
 from gpkit.toml._printer import constraint_to_expr
 
-x = Variable("x")
-y = Variable("y")
+x = Variable("x", "-")
+y = Variable("y", "-")
 m = Variable("m", "m")
 
 
@@ -32,7 +32,7 @@ class TestEntryPoint:
         assert render(x >= y, LATEX_ALIGNED) == r"x &\geq y"
 
     def test_vector(self):
-        assert render(VectorVariable(3, "v"), TEXT) == "v[:]"
+        assert render(VectorVariable(3, "v", "-"), TEXT) == "v[:]"
 
     def test_str_is_render(self):
         c = x >= 2 * y
@@ -130,8 +130,8 @@ class TestArrayLiterals:
     "A list operand is a numeric array, so the expression around it is unwritten."
 
     def test_vector_constraint_with_a_list_serializes(self):
-        a = VectorVariable(3, "a")
-        b = VectorVariable(3, "b")
+        a = VectorVariable(3, "a", "-")
+        b = VectorVariable(3, "b", "-")
         assert (a >= b * [1, 2, 3]).to_ir()["right"] == {}
 
 

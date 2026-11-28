@@ -3,7 +3,9 @@
 from dataclasses import dataclass, field, replace
 from typing import Any
 
-from .units import qty
+import numpy as np
+
+from .units import qty, to_magnitude
 from .util.lineage import lineagestr, segments
 from .util.small_classes import Count
 
@@ -110,6 +112,11 @@ class VarKey:
                 keys.add(path)
 
         object.__setattr__(self, "keys", frozenset(keys))
+
+        # A scalar value is stored in these units; a vector's elements store theirs
+        value = self.value
+        if value is not None and not callable(value) and not np.shape(value):
+            object.__setattr__(self, "value", to_magnitude(self, value))
 
     def __reduce__(self):
         """Pickle support: serialize unitrepr (string) not units (Quantity)."""

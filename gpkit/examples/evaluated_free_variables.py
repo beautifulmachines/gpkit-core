@@ -2,8 +2,8 @@
 
 from gpkit import Model, Variable
 
-x = Variable("x")
-x2 = Variable("x^2")
+x = Variable("x", "-")
+x2 = Variable("x^2", "-")
 m = Model(x, [x >= 2])
 m.computed[x2] = lambda sol: sol[x] ** 2
 sol = m.solve(verbosity=0)

@@ -19,8 +19,8 @@ from gpkit.util.globals import load_settings
 
 def test_signomials_enabled_is_reentrant():
     "Exiting an inner SignomialsEnabled block must not disable the outer one."
-    x = Variable("x")
-    y = Variable("y")
+    x = Variable("x", "-")
+    y = Variable("y", "-")
     with SignomialsEnabled():
         with SignomialsEnabled():
             pass
@@ -113,7 +113,7 @@ def test_concurrent_solves_dont_corrupt_stdout():
         time.sleep(0.05)
         return cvxopt_optimize(prob, meq_idxs, **kwargs)
 
-    x = Variable("x")
+    x = Variable("x", "-")
     barrier = threading.Barrier(4)
 
     def worker(_):
@@ -202,7 +202,7 @@ class Box(Model):
 
     def setup(self):
         x = Variable("x", "m")
-        x_min = Variable("x_min", 1, "m")
+        x_min = Variable("x_min", "m", value=1)
         self.cost = x
         return [x >= x_min]
 

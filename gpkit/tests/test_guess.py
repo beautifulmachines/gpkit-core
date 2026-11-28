@@ -24,13 +24,13 @@ def kg(mass):
 
 class TestLowerBound:
     def test_guessed_shares(self):
-        x, y = Variable("x"), Variable("y")
+        x, y = Variable("x", "-"), Variable("y", "-")
         bound = guess({x: 1, 2 * y: 3}).lower_bound()
         assert_same_monomial(bound, (x / 0.25) ** 0.25 * (2 * y / 0.75) ** 0.75)
 
     def test_shares_at_a_point(self):
         "At a point where the terms split 1:3, the bound is the same"
-        x, y = Variable("x"), Variable("y")
+        x, y = Variable("x", "-"), Variable("y", "-")
         assert_same_monomial(
             (x + 2 * y).shares_at({x: 1, y: 1.5}).lower_bound(),
             guess({x: 1, 2 * y: 3}).lower_bound(),
@@ -38,7 +38,7 @@ class TestLowerBound:
 
     def test_shares_at_partial_point(self):
         "Shares are numbers whenever the substituted terms share an exponent"
-        x, y = Variable("x"), Variable("y")
+        x, y = Variable("x", "-"), Variable("y", "-")
         p = x + 2 * x * y
         assert_same_monomial(
             p.shares_at({y: 1.5}).lower_bound(),
@@ -46,19 +46,19 @@ class TestLowerBound:
         )
 
     def test_shares_at_is_none_unless_terms_collapse(self):
-        x, y = Variable("x"), Variable("y")
+        x, y = Variable("x", "-"), Variable("y", "-")
         assert (x + 2 * y).shares_at({x: 1}) is None
         with pytest.raises(ValueError, match="monomial"):
             (x + 2 * y).mono_lower_bound({x: 1})
 
     def test_tiny_share_stays_finite(self):
         "(c/w)**w overflows for a tiny w unless computed in log space"
-        x, y = Variable("x"), Variable("y")
+        x, y = Variable("x", "-"), Variable("y", "-")
         bound = guess({x: 1, 1e300 * y: 1e-310}).lower_bound()
         assert np.isfinite(bound.c)
 
     def test_mono_lower_bound_is_bound_at_shares(self):
-        x, y = Variable("x"), Variable("y")
+        x, y = Variable("x", "-"), Variable("y", "-")
         p = x + 2 * y
         assert_same_monomial(
             p.mono_lower_bound({x: 1, y: 1.5}),
@@ -66,55 +66,55 @@ class TestLowerBound:
         )
 
     def test_zero_share_drops_term(self):
-        x, y = Variable("x"), Variable("y")
+        x, y = Variable("x", "-"), Variable("y", "-")
         assert_same_monomial(guess({x: 1, 2 * y: 0}).lower_bound(), x)
 
 
 class TestGuess:
     def test_builds_signomial_inequality(self):
         "Writing a guess is the opt-in; no SignomialsEnabled needed"
-        x, y, z = Variable("x"), Variable("y"), Variable("z")
+        x, y, z = Variable("x", "-"), Variable("y", "-"), Variable("z", "-")
         assert isinstance(guess({x: 1, y: 1}) >= z, SignomialInequality)
         assert isinstance(z <= guess({x: 1, y: 1}), SignomialInequality)
 
     def test_weights_normalize(self):
-        x, y, z = Variable("x"), Variable("y"), Variable("z")
+        x, y, z = Variable("x", "-"), Variable("y", "-"), Variable("z", "-")
         gpc = (guess({x: 2, y: 2}) >= z).as_gpconstr({})
         assert_same_monomial(gpc.right, (x / 0.5) ** 0.5 * (y / 0.5) ** 0.5)
 
     def test_terms_display_as_written(self):
-        x, y = Variable("x"), Variable("y")
+        x, y = Variable("x", "-"), Variable("y", "-")
         assert str(guess({x: 1, pi * y: 0}).posynomial) == "x + π⋅y"
 
     def test_arithmetic_raises(self):
-        x, y = Variable("x"), Variable("y")
+        x, y = Variable("x", "-"), Variable("y", "-")
         with pytest.raises(TypeError):
             guess({x: 1, y: 1}) + x
 
     @pytest.mark.parametrize("weights", [(1, -1), (0, 0)])
     def test_bad_weights_raise(self, weights):
-        x, y = Variable("x"), Variable("y")
+        x, y = Variable("x", "-"), Variable("y", "-")
         with pytest.raises(ValueError, match="weight"):
             guess(dict(zip([x, y], weights)))
 
     def test_term_on_both_sides_raises(self):
         "x + y >= 2y + z is really x >= y + z"
-        x, y, z = Variable("x"), Variable("y"), Variable("z")
+        x, y, z = Variable("x", "-"), Variable("y", "-"), Variable("z", "-")
         with pytest.raises(ValueError, match="both sides"):
             _ = guess({x: 1, y: 1}) >= 2 * y + z
 
     def test_keys_combining_into_one_term_raise(self):
-        x = Variable("x")
+        x = Variable("x", "-")
         with pytest.raises(ValueError, match="term"):
             guess({x: 1, 2 * x: 1})
 
     def test_non_monomial_key_raises(self):
-        x, y, z = Variable("x"), Variable("y"), Variable("z")
+        x, y, z = Variable("x", "-"), Variable("y", "-"), Variable("z", "-")
         with pytest.raises(ValueError, match="must be a monomial"):
             guess({x + y: 1, z: 1})
 
     def test_equality_takes_no_guess(self):
-        x, y, z = Variable("x"), Variable("y"), Variable("z")
+        x, y, z = Variable("x", "-"), Variable("y", "-"), Variable("z", "-")
         with pytest.raises(TypeError, match="inequality"):
             SignomialEquality(z, guess({x: 1, y: 1}))
 
@@ -129,13 +129,13 @@ def pressure_vessel(*, guessed=True):
     L = Variable("L", "m", "overall length, caps included")
     t = Variable("t", "m", "cylinder wall thickness")
     m = Variable("m", "kg", "mass")
-    P = Variable("P", 30e6, "Pa", "pressure")
-    V = Variable("V", 0.05, "m^3", "internal volume")
-    sf = Variable("sf", 2.25, "-", "safety factor")
-    sigma = Variable("sigma", 1.5e9, "Pa", "composite strength")
-    rho_c = Variable("rho_c", 1550, "kg/m^3", "composite density")
-    rho_l = Variable("rho_l", 2700, "kg/m^3", "liner density")
-    t_l = Variable("t_l", 1e-3, "m", "liner thickness")
+    P = Variable("P", "Pa", "pressure", value=30e6)
+    V = Variable("V", "m^3", "internal volume", value=0.05)
+    sf = Variable("sf", "-", "safety factor", value=2.25)
+    sigma = Variable("sigma", "Pa", "composite strength", value=1.5e9)
+    rho_c = Variable("rho_c", "kg/m^3", "composite density", value=1550)
+    rho_l = Variable("rho_l", "kg/m^3", "liner density", value=2700)
+    t_l = Variable("t_l", "m", "liner thickness", value=1e-3)
 
     cap = 2 * np.pi * rho_c * r**2 * t
     cyl = 2 * np.pi * rho_c * r * t * L
@@ -208,7 +208,7 @@ class TestPressureVessel:
         assert first == pytest.approx(CONSERVATIVE_KG, rel=1e-4)
 
     def test_local_gp_names_unguessed_constraint(self):
-        x, y, z = Variable("x"), Variable("y"), Variable("w_bare")
+        x, y, z = Variable("x", "-"), Variable("y", "-"), Variable("w_bare", "-")
         with SignomialsEnabled():
             bare = x + z >= 1
         m = Model(x * y * z, [guess({x: 1, y: 1}) >= 1, bare, x <= 0.9, z <= 0.9])
@@ -221,7 +221,7 @@ class TestInfeasibleConservativeGP:
 
     @staticmethod
     def model():
-        a, b = Variable("a"), Variable("b")
+        a, b = Variable("a", "-"), Variable("b", "-")
         return Model(1 / (a * b), [guess({a: 1, b: 0}) >= 1, a <= 0.5, b <= 0.75])
 
     def test_local_gp(self, solver):

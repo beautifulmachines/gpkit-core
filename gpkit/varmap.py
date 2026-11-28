@@ -4,28 +4,8 @@ from collections.abc import MutableMapping
 
 import numpy as np
 
-from .units import DimensionalityError, Quantity
+from .units import Quantity, refusal, to_magnitude
 from .util.small_scripts import veclinkedfn
-
-
-def _refuse(key, value):
-    return ValueError(f"{key} must be fixed to a finite number, not {value!r}")
-
-
-def to_magnitude(key, value):
-    "value in key's units, if it was written with units: a Quantity or constant nomial"
-    units = key.units or "dimensionless"
-    try:
-        if hasattr(value, "hmap"):
-            if any(value.hmap.keys()):
-                raise _refuse(key, value)
-            (value,) = value.hmap.to(units).values()
-        elif isinstance(value, Quantity):
-            value = value.to(units).magnitude
-    except DimensionalityError as err:
-        err.extra_msg += f" while fixing {key}"
-        raise
-    return value
 
 
 def scalar_value(key, value):
@@ -368,5 +348,5 @@ class Substitutions(VarMap):
         elif not callable(value):
             value = scalar_value(key, value)
             if not isinstance(value, (int, float, np.number)) or not np.isfinite(value):
-                raise _refuse(key, value)
+                raise refusal(key, value)
         super().__setitem__(key, value)

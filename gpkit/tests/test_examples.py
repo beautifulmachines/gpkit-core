@@ -114,7 +114,7 @@ class TestExamples:
 
     def test_freeing_fixed_variables(self, example):
         x = example.x
-        y = Variable("y", 3)
+        y = Variable("y", "-", value=3)
         m = Model(x, [x >= 1 + y, y >= 1])
         sol = m.solve(verbosity=0)
         assert abs(sol.cost - 4) <= 1e-4

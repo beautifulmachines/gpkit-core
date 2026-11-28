@@ -22,14 +22,14 @@ class TestModelGraph:
     """Tests for Model._children explicit graph (GRAPH-01)."""
 
     def test_flat_model_has_empty_children(self):
-        x = Variable("x")
+        x = Variable("x", "-")
         m = Model(x, [x >= 1])
         assert not m.submodels
 
     def test_single_child_in_children(self):
         class _MGWing(Model):
             def setup(self):
-                S = Variable("S")
+                S = Variable("S", "-")
                 self.cost = S
                 return [S >= 10]
 
@@ -37,7 +37,7 @@ class TestModelGraph:
             wing: "_MGWing"
 
             def setup(self):
-                W = Variable("W")
+                W = Variable("W", "-")
                 self.wing = _MGWing()
                 self.cost = W
                 return [W >= self.wing.cost * 1.2, self.wing]
@@ -51,13 +51,13 @@ class TestModelGraph:
     def test_two_children_order_preserved(self):
         class _MGSubA(Model):
             def setup(self):
-                x = Variable("x")
+                x = Variable("x", "-")
                 self.cost = x
                 return [x >= 1]
 
         class _MGSubB(Model):
             def setup(self):
-                y = Variable("y")
+                y = Variable("y", "-")
                 self.cost = y
                 return [y >= 2]
 
@@ -66,7 +66,7 @@ class TestModelGraph:
             b: "_MGSubB"
 
             def setup(self):
-                W = Variable("W")
+                W = Variable("W", "-")
                 self.a = _MGSubA()
                 self.b = _MGSubB()
                 self.cost = W
@@ -82,7 +82,7 @@ class TestModelGraph:
 
         class _MGInner(Model):
             def setup(self):
-                x = Variable("x")
+                x = Variable("x", "-")
                 self.cost = x
                 return [x >= 1]
 
@@ -90,7 +90,7 @@ class TestModelGraph:
             inner: "_MGInner"
 
             def setup(self):
-                W = Variable("W")
+                W = Variable("W", "-")
                 self.inner = _MGInner()
                 self.cost = W
                 return {"constraints": [self.inner, W >= self.inner.cost * 1.1]}
@@ -112,7 +112,7 @@ class TestModelGraph:
             def setup(self):
                 c1 = _EmptyChild()
                 c2 = _EmptyChild()
-                self.cost = Variable("W")
+                self.cost = Variable("W", "-")
                 return [self.cost >= 1, c1, c2]
 
         p = _Parent()
@@ -124,7 +124,7 @@ class TestModelGraph:
 
         class _MGSub(Model):
             def setup(self):
-                x = Variable("x")
+                x = Variable("x", "-")
                 self.cost = x
                 return [x >= 1]
 
@@ -133,7 +133,7 @@ class TestModelGraph:
             sub2: "_MGSub"
 
             def setup(self):
-                W = Variable("W")
+                W = Variable("W", "-")
                 self.sub1 = _MGSub()
                 self.sub2 = _MGSub()
                 self.cost = W
@@ -151,7 +151,7 @@ class TestSubmodels:
     def test_submodels_returns_list(self):
         class _SMWing(Model):
             def setup(self):
-                S = Variable("S")
+                S = Variable("S", "-")
                 self.cost = S
                 return [S >= 10]
 
@@ -159,7 +159,7 @@ class TestSubmodels:
             wing: "_SMWing"
 
             def setup(self):
-                W = Variable("W")
+                W = Variable("W", "-")
                 self.wing = _SMWing()
                 self.cost = W
                 return [W >= self.wing.cost * 1.2, self.wing]
@@ -172,7 +172,7 @@ class TestSubmodels:
 
         class _SMSpar(Model):
             def setup(self):
-                t = Variable("t")
+                t = Variable("t", "-")
                 self.cost = t
                 return [t >= 0.01]
 
@@ -180,7 +180,7 @@ class TestSubmodels:
             spar: "_SMSpar"
 
             def setup(self):
-                S = Variable("S")
+                S = Variable("S", "-")
                 self.spar = _SMSpar()
                 self.cost = S
                 return [S >= 10, self.spar]
@@ -189,7 +189,7 @@ class TestSubmodels:
             wing: "_SMWingWithSpar"
 
             def setup(self):
-                W = Variable("W")
+                W = Variable("W", "-")
                 self.wing = _SMWingWithSpar()
                 self.cost = W
                 return [W >= 1.2 * self.wing.cost, self.wing]
@@ -201,7 +201,7 @@ class TestSubmodels:
     def test_walk_yields_the_whole_subtree_depth_first(self):
         class _WalkSpar(Model):
             def setup(self):
-                t = Variable("t")
+                t = Variable("t", "-")
                 self.cost = t
                 return [t >= 0.01]
 
@@ -209,7 +209,7 @@ class TestSubmodels:
             spar: "_WalkSpar"
 
             def setup(self):
-                S = Variable("S")
+                S = Variable("S", "-")
                 self.spar = _WalkSpar()
                 self.cost = S
                 return [S >= 10, self.spar]
@@ -218,7 +218,7 @@ class TestSubmodels:
             wing: "_WalkWing"
 
             def setup(self):
-                W = Variable("W")
+                W = Variable("W", "-")
                 self.wing = _WalkWing()
                 self.cost = W
                 return [W >= 1.2 * self.wing.cost, self.wing]
@@ -235,7 +235,7 @@ class TestSubmodels:
 
         class _BudgetComp(Model):
             def setup(self, w_min):
-                self.W = Variable("W")
+                self.W = Variable("W", "-")
                 self.cost = self.W
                 return [self.W >= w_min]
 
@@ -244,7 +244,7 @@ class TestSubmodels:
             comp2: "_BudgetComp"
 
             def setup(self):
-                W_total = Variable("W_total")
+                W_total = Variable("W_total", "-")
                 self.comp1 = _BudgetComp(1.0)
                 self.comp2 = _BudgetComp(2.0)
                 self.cost = W_total
@@ -275,7 +275,7 @@ class _User(Model):
     "Uses a part's variables without including the part."
 
     def setup(self, part):
-        m = Variable("m")
+        m = Variable("m", "-")
         return [m >= part.m]
 
 
@@ -335,7 +335,7 @@ class TestGetVar:
 
         class _GVWing(Model):
             def setup(self):
-                S = Variable("S")
+                S = Variable("S", "-")
                 self.cost = S
                 return [S >= 10]
 
@@ -343,7 +343,7 @@ class TestGetVar:
             wing: "_GVWing"
 
             def setup(self):
-                W = Variable("W")
+                W = Variable("W", "-")
                 self.wing = _GVWing()
                 self.cost = W
                 return [W >= self.wing.cost * 1.2, self.wing]
@@ -379,7 +379,7 @@ class TestGetVar:
 
         class _GVSpar(Model):
             def setup(self):
-                t = Variable("t")
+                t = Variable("t", "-")
                 self.cost = t
                 return [t >= 0.01]
 
@@ -387,7 +387,7 @@ class TestGetVar:
             spar: "_GVSpar"
 
             def setup(self):
-                S = Variable("S")
+                S = Variable("S", "-")
                 self.spar = _GVSpar()
                 self.cost = S
                 return [S >= 10, self.spar]
@@ -396,7 +396,7 @@ class TestGetVar:
             wing: "_GVWingWithSpar"
 
             def setup(self):
-                W = Variable("W")
+                W = Variable("W", "-")
                 self.wing = _GVWingWithSpar()
                 self.cost = W
                 return [W >= 1.2 * self.wing.cost, self.wing]
@@ -415,7 +415,7 @@ class TestGetVar:
 
         class _GVSub(Model):
             def setup(self):
-                x = Variable("x")
+                x = Variable("x", "-")
                 self.cost = x
                 return [x >= 1]
 
@@ -424,7 +424,7 @@ class TestGetVar:
             sub2: "_GVSub"
 
             def setup(self):
-                W = Variable("W")
+                W = Variable("W", "-")
                 self.sub1 = _GVSub()
                 self.sub2 = _GVSub()
                 self.cost = W
@@ -440,7 +440,7 @@ class _WrappedSub(Model):
     "A submodel whose constraints sit inside wrappers."
 
     def setup(self):
-        a, b = Variable("a"), Variable("b")
+        a, b = Variable("a", "-"), Variable("b", "-")
         return [Tight([a >= b]), Bounded([b >= 0.1]), a <= 100]
 
 
@@ -450,8 +450,8 @@ class _WrappedTop(Model):
     sub: "_WrappedSub"
 
     def setup(self):
-        x, y = Variable("x"), Variable("y")
-        z = Variable("z", 2)
+        x, y = Variable("x", "-"), Variable("y", "-")
+        z = Variable("z", "-", value=2)
         self.sub = _WrappedSub()
         self.cost = x
         with SignomialsEnabled():
@@ -478,8 +478,8 @@ class TestConstraintWalk:
         constraints inside them belong to the model that holds them -- they go
         to the solver and carry sensitivities like any other.
         """
-        x, y = Variable("x"), Variable("y")
-        z = Variable("z", 2)
+        x, y = Variable("x", "-"), Variable("y", "-")
+        z = Variable("z", "-", value=2)
         with SignomialsEnabled():
             m = Model(
                 x,
