@@ -1,12 +1,16 @@
 [Beam]
   free  dx
+  free  M[:]
+  free  th[:]
+  free  V[:]
+  free  w[:]
   fixed EI
   fixed L
-  fixed M[:]
+  fixed M[3]
   fixed q[:]
-  fixed th[:]
-  fixed V[:]
-  fixed w[:]
+  fixed th[0]
+  fixed V[3]
+  fixed w[0]
   cons (definition of dx)  L = 3⋅dx
   cons (shear integration)  V[:-1] ≥ V[1:] + 0.5⋅dx⋅(q[:-1] + q[1:])
   cons (moment integration)  M[:-1] ≥ M[1:] + 0.5⋅dx⋅(V[:-1] + V[1:])

@@ -28,8 +28,8 @@ class VarInfo:
 
     `key` is what names the variable -- a veckey for a vector, the key itself for
     a scalar -- while `vks` is what the solver sees: the element keys in index
-    order, or the single key of a scalar. `values` and `sensitivities` are
-    positional against `vks`, with None where there is none.
+    order, or the single key of a scalar. `kinds`, `values` and `sensitivities`
+    are positional against `vks`, with None where there is no value.
 
     Carries no name, LaTeX or unit string: those depend on the output surface and
     belong to a renderer (#319). Spell `key` with a DisplayScope to get them.
@@ -37,9 +37,15 @@ class VarInfo:
 
     key: VarKey
     vks: tuple
-    kind: VarKind
+    kinds: tuple
     values: tuple
     sensitivities: tuple
+
+    @property
+    def kind(self) -> VarKind:
+        "The kind its elements share, or MIXED where they differ."
+        kinds = set(self.kinds)
+        return kinds.pop() if len(kinds) == 1 else VarKind.MIXED
 
 
 def _element_keys(vks, key):
@@ -50,19 +56,11 @@ def _element_keys(vks, key):
     return (key,)
 
 
-def _kind(elements, fixed, linked):
-    "One kind for the whole variable, or MIXED where its elements differ."
-    kinds = {
-        VarKind.FIXED
-        if vk in fixed
-        else VarKind.LINKED
-        if vk in linked
-        else VarKind.FREE
-        for vk in elements
-    }
-    if len(kinds) == 1:
-        return kinds.pop()
-    return VarKind.MIXED
+def _kind(vk, fixed, linked):
+    "One element's kind."
+    if vk in fixed:
+        return VarKind.FIXED
+    return VarKind.LINKED if vk in linked else VarKind.FREE
 
 
 def _lookup(mapping, key):
@@ -107,7 +105,7 @@ def classify_variables(vks, substitutions, solution=None) -> list:
             VarInfo(
                 key=key,
                 vks=elements,
-                kind=_kind(elements, fixed, linked),
+                kinds=tuple(_kind(vk, fixed, linked) for vk in elements),
                 values=tuple(_lookup(values, vk) for vk in elements),
                 sensitivities=tuple(_lookup(sens, vk) for vk in elements),
             )
