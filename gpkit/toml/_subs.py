@@ -4,7 +4,6 @@ import tomllib
 import warnings
 from pathlib import Path
 
-from ..nomials.map import DIMLESS_QUANTITY
 from ..units import qty
 from ._parser import TomlParseError, _parse_var_spec
 from ._printer import _emit_lines
@@ -30,16 +29,6 @@ def _format_subs_number(v):
 def _lineage_path(model):
     """Return the dotted class-name path for a model, e.g. 'Mission.Aircraft'."""
     return ".".join(name for (name, _) in model.lineage)
-
-
-def _val_to_float(val, vk):
-    """Convert a substitution value to a plain float in the variable's units."""
-    if hasattr(val, "hmap"):  # constant Monomial or future GPkitUnit wrapper (#156)
-        assert not any(val.hmap.keys()), (
-            "substitution value should not contain variables"
-        )
-        (val,) = val.hmap.to(vk.units or DIMLESS_QUANTITY).values()
-    return float(val)
 
 
 def save_subs(model, path=None):
@@ -80,10 +69,7 @@ def save_subs(model, path=None):
             val = m.substitutions[vk]
             if callable(val):
                 continue
-            try:
-                fval = _val_to_float(val, vk)
-            except (TypeError, ValueError, AssertionError):
-                continue
+            fval = float(val)
             unit_str = vk.unitrepr if vk.unitrepr and vk.unitrepr != "-" else None
             if unit_str:
                 spec = f"{_format_subs_number(fval)} {unit_str}"

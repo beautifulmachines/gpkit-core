@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from ..varmap import VarMap, VarSet
+from ..varmap import Substitutions, VarSet
 
 
 def is_linked(val):
@@ -12,7 +12,7 @@ def is_linked(val):
 
 def parse_subs(varkeys, substitutions):
     "Return constant mappings {VarKey: val} w/ broadcasting and shape checks."
-    out = VarMap()
+    out = Substitutions()
     if not isinstance(varkeys, VarSet):
         raise NotImplementedError
     for var, val in substitutions.items():

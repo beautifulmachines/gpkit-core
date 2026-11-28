@@ -1,11 +1,9 @@
 "Implements the NomialMap class"
 
-import numpy as np
-
 from .. import units
 from ..ir import ir_units
 from ..units import DimensionalityError, qty
-from ..util.small_classes import EMPTY_HV, FixedScalar, HashVector, Numbers, Strings
+from ..util.small_classes import EMPTY_HV, HashVector, Strings
 from .substitution import parse_subs
 
 DIMLESS_QUANTITY = qty("dimensionless")
@@ -129,17 +127,11 @@ class NomialMap(HashVector):
         cp = NomialMap()
         cp.units = self.units
         cp.expmap, cp.csmap = {}, {}
-        cvals = {}
         for exp, c in self.items():
-            new_exp, c = fold_fixed(exp, c, fixed, cvals)
+            new_exp, c = fold_fixed(exp, c, fixed)
             cp.expmap[exp], cp.csmap[exp] = new_exp, c
             cp[new_exp] = cp.get(new_exp, 0) + c  # merge terms with equal exps
         for exp, c in list(cp.items()):
-            if np.isnan(c):  # merged terms of inf - inf
-                raise ValueError(
-                    f"substituting {dict(fixed)} is undefined (nan): merged terms"
-                    " cancel as inf - inf"
-                )
             if c == 0:
                 del cp[exp]  # terms that vanished or cancelled
         if not cp:
@@ -173,31 +165,14 @@ class NomialMap(HashVector):
         return pmap
 
 
-def fold_fixed(exp, c, fixed, cvals):
+def fold_fixed(exp, c, fixed):
     """Fold a term's fixed factors into its coefficient, e.g. with a fixed,
     c * a**p * x**q becomes (c * a**p) * x**q. Returns the term's exps and
-    coefficient; cvals caches each fixed value as a number."""
+    coefficient; fixed holds finite numbers in each key's units."""
     new_exp = HashVector()
     for vk, x in exp.items():
         if vk not in fixed:
             new_exp[vk] = x
             continue
-        if vk not in cvals:
-            cvals[vk] = numeric_value(vk, fixed[vk])
-        c *= cvals[vk] ** float(x)  # not numpy's, where 0**-1 is inf
-        if np.isnan(c):  # e.g. 0*inf, which isn't ours to decide
-            raise ValueError(f"substituting {vk} = {cvals[vk]} is undefined (nan)")
+        c *= float(fixed[vk]) ** float(x)  # not numpy's, where 0**-1 is inf
     return new_exp, c
-
-
-def numeric_value(vk, cval: Numbers | FixedScalar) -> float:
-    "The number cval stands for, in vk's units"
-    if hasattr(cval, "hmap"):
-        if any(cval.hmap.keys()):
-            raise ValueError("Monomial substitutions are not supported.")
-        (cval,) = cval.hmap.to(vk.units or DIMLESS_QUANTITY).values()
-    elif hasattr(cval, "to"):
-        cval = cval.to(vk.units or DIMLESS_QUANTITY).magnitude
-    elif not isinstance(cval, (int, float, np.number)):
-        raise ValueError("Monomial substitutions are not supported.")
-    return float(cval)

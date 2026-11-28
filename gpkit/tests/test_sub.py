@@ -114,9 +114,24 @@ class TestModelSubs:
     def test_bad_gp_sub(self):
         x = Variable("x")
         y = Variable("y")
-        m = Model(x, [y >= 1], {y: x})
-        with pytest.raises(TypeError):
-            m.solve()
+        with pytest.raises(ValueError, match="y must be fixed to a finite number"):
+            Model(x, [y >= 1], {y: x})
+
+    def test_sub_and_solve_refuse_alike(self):
+        "One conversion serves both paths, so they refuse with one message"
+        x, a = Variable("x"), Variable("a")
+        with pytest.raises(ValueError, match="a must be fixed") as from_sub:
+            (x * a).sub({a: "abc"})
+        with pytest.raises(ValueError, match="a must be fixed") as from_solve:
+            Model(x, [x >= a], {a: "abc"}).solve(verbosity=0)
+        assert str(from_sub.value) == str(from_solve.value)
+
+    def test_a_value_in_other_units_is_the_same_value(self):
+        L, x = Variable("L", "m"), Variable("x", "m")
+        in_cm = Model(x, [x >= L], {L: 30 * gpkit.units.cm}).solve(verbosity=0)
+        in_m = Model(x, [x >= L], {L: 0.3}).solve(verbosity=0)
+        assert mag(in_cm.cost) == pytest.approx(mag(in_m.cost))
+        assert mag((2 * L).sub({L: 30 * gpkit.units.cm}).c) == pytest.approx(0.6)
 
     def test_quantity_sub(self):
         x = Variable("x", 1, "cm")
@@ -441,8 +456,6 @@ class TestModelSubs:
         x, z = Variable("x"), Variable("z")
         sol = Model(x, [x >= 1, z <= 5], {z: 0}).solve(verbosity=0)
         assert sol.cost == pytest.approx(1)
-        sol = Model(x, [x >= 1, z >= 2], {z: np.inf}).solve(verbosity=0)
-        assert sol.cost == pytest.approx(1)
 
 
 class TestNomialMapSubs:
@@ -470,27 +483,25 @@ class TestNomialMapSubs:
             Model(1e200 * z * w, [w >= 1], {z: 1e200}).gp()
 
     @pytest.mark.parametrize(
-        ("a_val", "b_val"),
-        [(np.nan, 1), (lambda _: np.nan, 1), (np.inf, 0), (0, np.inf)],
+        ("a_val", "b_val", "refused"),
+        [
+            (np.nan, 1, "a"),
+            (lambda _: np.nan, 1, "a"),
+            (np.inf, 0, "a"),
+            (0, np.inf, "b"),
+        ],
     )
-    def test_undefined_term_is_refused(self, a_val, b_val):
-        x, y, a, b = Variable("x"), Variable("y"), Variable("a"), Variable("b")
-        with SignomialsEnabled():
-            lesser, greater = x + y >= a * b, x + y * a * b >= 2
-        for c in (lesser, greater, a * b <= 1):
-            m = Model(x, [c, x >= 1, y >= 1, y <= 2], {a: a_val, b: b_val})
-            with pytest.raises(ValueError, match="undefined"):
-                m.gp()
-            if c is lesser:
-                with pytest.raises(ValueError, match="undefined"):
-                    m.sp()
+    def test_a_nonfinite_value_is_refused(self, a_val, b_val, refused):
+        "So no term can be 0*inf or inf - inf; a linked output is checked alike"
+        x, a, b = Variable("x"), Variable("a"), Variable("b")
+        with pytest.raises(ValueError, match=f"{refused} must be fixed to a finite"):
+            Model(x, [x >= a * b, x >= 1], {a: a_val, b: b_val}).gp()
 
-    def test_merged_terms_undefined_is_refused(self):
-        "Terms that merge to inf - inf are undefined, not a cancellation"
+    def test_a_nonfinite_value_is_refused_by_nomial_sub(self):
         x, a, b = Variable("x"), Variable("a"), Variable("b")
         with SignomialsEnabled():
             p = a * x - b * x + 1
-        with pytest.raises(ValueError, match="undefined"):
+        with pytest.raises(ValueError, match="must be fixed to a finite"):
             p.sub({a: np.inf, b: np.inf})
 
     def test_log_sensitivity_at_zero(self):

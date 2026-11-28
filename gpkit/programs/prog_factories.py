@@ -7,8 +7,7 @@ from ..constraints.set import audit_solution
 from ..nomials.substitution import parse_linked, parse_subs
 from ..solutions import SolveStatus
 from ..util.globals import SignomialsEnabled
-from ..util.small_classes import FixedScalar
-from ..varmap import VarMap
+from ..varmap import VarMap, scalar_value
 
 
 def evaluate_linked(constants, linked):
@@ -31,23 +30,19 @@ def evaluate_linked(constants, linked):
         else:
             with SignomialsEnabled():  # to allow use of gpkit.units
                 out = f(kdc)
-        if isinstance(out, FixedScalar):  # to allow use of gpkit.units
-            out = out.value
-        if hasattr(out, "units"):
-            out = out.to(v.units or "dimensionless").magnitude
-        elif out != 0 and v.units:
+        if v.units and getattr(out, "units", None) is None and out != 0:
             raise ValueError(
                 f"Linked function for {v} must return a value with units"
                 f" (compatible with '{v.units}'),"
                 f" e.g. `return value * gpkit.units('{v.units}')`."
             )
-        constants[v] = out  # refused unless a scalar; a 0-d array gives its item
-        out = constants[v]
+        out = scalar_value(v, out)  # unwraps a 0-d array, so .x can be read
         if hasattr(out, "x"):  # calculated from other constants: keep derivatives
-            constants[v] = out.x
             linked_derivs[v] = {
                 adn.tag: grad for adn, grad in out.d().items() if adn.tag
             }
+            out = out.x
+        constants[v] = out
     return linked_derivs
 
 
