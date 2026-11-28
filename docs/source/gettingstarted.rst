@@ -20,12 +20,12 @@ Free Variables
 
 Fixed Variables
 ---------------
-To declare a variable with a constant value, use the ``Variable`` class, as above, but put a number before the units:
+To declare a variable with a constant value, use the ``Variable`` class, as above, and pass the value as the ``value`` keyword:
 
 .. literalinclude:: examples/gettingstarted.py
     :lines: 16
 
-In the example above, the key name ``"\rho"`` is for LaTeX printing (described later). The unit and description arguments are optional.
+A value given as a quantity, such as ``2*units("km")``, is stored in the variable's units. The unit and description arguments are optional; a variable without units is dimensionless.
 
 .. literalinclude:: examples/gettingstarted.py
     :lines: 19-20

@@ -202,7 +202,7 @@ class Box(Model):
 
     def setup(self):
         x = Variable("x", "m")
-        x_min = Variable("x_min", 1, "m")
+        x_min = Variable("x_min", "m", value=1)
         self.cost = x
         return [x >= x_min]
 

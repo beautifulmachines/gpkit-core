@@ -257,7 +257,7 @@ class TestConstraints:
         h = Variable("h", "ft")
         w = Variable("w", "ft")
         d = Variable("d", "ft")
-        A = Variable("A_wall", 200, "ft^2")
+        A = Variable("A_wall", "ft^2", value=200)
         ns = {"A_wall": A, "h": h, "w": w, "d": d}
         c = parse_constraint("A_wall >= 2*h*w + 2*h*d", ns)
         assert isinstance(c, SingleEquationConstraint)

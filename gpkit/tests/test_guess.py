@@ -129,13 +129,13 @@ def pressure_vessel(*, guessed=True):
     L = Variable("L", "m", "overall length, caps included")
     t = Variable("t", "m", "cylinder wall thickness")
     m = Variable("m", "kg", "mass")
-    P = Variable("P", 30e6, "Pa", "pressure")
-    V = Variable("V", 0.05, "m^3", "internal volume")
-    sf = Variable("sf", 2.25, "-", "safety factor")
-    sigma = Variable("sigma", 1.5e9, "Pa", "composite strength")
-    rho_c = Variable("rho_c", 1550, "kg/m^3", "composite density")
-    rho_l = Variable("rho_l", 2700, "kg/m^3", "liner density")
-    t_l = Variable("t_l", 1e-3, "m", "liner thickness")
+    P = Variable("P", "Pa", "pressure", value=30e6)
+    V = Variable("V", "m^3", "internal volume", value=0.05)
+    sf = Variable("sf", "-", "safety factor", value=2.25)
+    sigma = Variable("sigma", "Pa", "composite strength", value=1.5e9)
+    rho_c = Variable("rho_c", "kg/m^3", "composite density", value=1550)
+    rho_l = Variable("rho_l", "kg/m^3", "liner density", value=2700)
+    t_l = Variable("t_l", "m", "liner thickness", value=1e-3)
 
     cap = 2 * np.pi * rho_c * r**2 * t
     cyl = 2 * np.pi * rho_c * r * t * L

@@ -63,12 +63,8 @@ class TestMonomial:
         with pytest.raises(InvalidPosynomial):
             Monomial(0.0)
 
-        # can create nameless Variables
-        x1 = Variable()
-        x2 = Variable()
         v = Variable("v")
         vel = Variable("v")
-        assert x1 != x2
         assert v == vel
 
         # test label kwarg
@@ -153,7 +149,7 @@ class TestMonomial:
         """
         power = Variable("P", "kW")
         weight = Variable("W", "N")
-        coeff = Variable("k", 1, "N")
+        coeff = Variable("k", "N", value=1)
         c = weight >= (power / (1 * units("W"))) ** 0.803 * coeff
         assert "W]" in str(c) or "W)" in str(c)  # the unit literal is shown
 
@@ -183,7 +179,7 @@ class TestMonomial:
         x = Variable("x", "m")
         power = Variable("P", "kW")
         weight = Variable("W", "N")
-        coeff = Variable("k", 1, "N")
+        coeff = Variable("k", "N", value=1)
         cases = [
             x >= 4 * gpkit.units("m"),
             x >= 1 * gpkit.units("m"),
@@ -208,8 +204,8 @@ class TestMonomial:
 
     def test_str_with_units(self):
         "Make sure __str__() works when units are involved"
-        S = Variable("S", units="m^2")
-        rho = Variable("rho", units="kg/m^3")
+        S = Variable("S", "m^2")
+        rho = Variable("rho", "kg/m^3")
         x = rho * S
         xstr = render(x, TEXT)
         assert isinstance(xstr, str)
@@ -217,7 +213,7 @@ class TestMonomial:
 
     def test_add(self):
         x = Variable("x")
-        y = Variable("y", units="ft")
+        y = Variable("y", "ft")
         with pytest.raises(gpkit.DimensionalityError):
             _ = x + y
 
@@ -388,7 +384,7 @@ class TestSignomial:
     def test_eq_ne(self):
         "Test Signomial equality and inequality operators"
         x = Variable("x")
-        xu = Variable("x", units="ft")
+        xu = Variable("x", "ft")
         with SignomialsEnabled():
             assert x - x**2 == -(x**2) + x
             assert -x != -xu
@@ -486,8 +482,8 @@ class TestPosynomial:
     def test_eq_units(self):
         p1 = Variable("x") + Variable("y")
         p2 = Variable("x") + Variable("y")
-        p1u = Variable("x", units="m") + Variable("y", units="m")
-        p2u = Variable("x", units="m") + Variable("y", units="m")
+        p1u = Variable("x", "m") + Variable("y", "m")
+        p2u = Variable("x", "m") + Variable("y", "m")
         assert p1 == p2
         assert p1u == p2u
         assert not p1 == p1u
@@ -551,7 +547,7 @@ class TestPosynomial:
         assert (x + x * y**2).diff(y) == 2 * x * y
         assert (2 * y).diff(y) == 2
         # test with units
-        x = Variable("x", units="ft")
+        x = Variable("x", "ft")
         d = (3 * x**2).diff(x)
         assert d == 6 * x
         # test negative exponent
@@ -575,8 +571,8 @@ class TestPosynomial:
         assert same(p.mono_lower_bound({y: 0}), 1)
         assert same((x * y**2 + 1).mono_lower_bound({y: 1, x: 1}), 2 * y * x**0.5)
         # test with units
-        d = Variable("d", units="ft")
-        h = Variable("h", units="ft")
+        d = Variable("d", "ft")
+        h = Variable("h", "ft")
         p = d * h**2 + h * d**2
         m = p.mono_lower_bound({d: 1, h: 1})
         assert same(m, 2 * (d * h) ** 1.5)

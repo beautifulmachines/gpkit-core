@@ -74,12 +74,10 @@ class TestConstraint:
             _ = Model(x, [x >= 1, True])
 
     def test_value_in_wrong_units_is_not_blamed_on_the_constraint(self):
-        "A units error reaches the user as itself, not as a bad element"
-        c = Variable("c", 1, "m")
+        "A units error reaches the user as itself, where the value is declared"
         for value in (np.array([1, 2]) * units("s"), {0: 1 * units("s")}):
-            v = VectorVariable(2, "v", "m", value=value)
             with pytest.raises(DimensionalityError):
-                Model(v.sum(), [v >= c])
+                VectorVariable(2, "v", "m", value=value)
 
     def test_computed_variable(self):
         x = Variable("x")
@@ -91,8 +89,8 @@ class TestConstraint:
 
     def test_relax_list(self):
         x = Variable("x")
-        x_max = Variable("x_max", 1)
-        x_min = Variable("x_min", 2)
+        x_max = Variable("x_max", value=1)
+        x_min = Variable("x_min", value=2)
         constraints = [x_min <= x, x <= x_max]
         ConstraintsRelaxed(constraints)
         ConstantsRelaxed(constraints)
@@ -100,9 +98,9 @@ class TestConstraint:
 
     def test_relax_linked(self):
         x = Variable("x")
-        x_max = Variable("x_max", 1)
-        x_min = Variable("x_min", lambda c: 2 * c[x_max])
-        zero = Variable("zero", lambda c: 0 * c[x_max])
+        x_max = Variable("x_max", value=1)
+        x_min = Variable("x_min", value=lambda c: 2 * c[x_max])
+        zero = Variable("zero", value=lambda c: 0 * c[x_max])
         constraints = ConstraintSet([x_min + zero <= x, x + zero <= x_max])
         _ = ConstantsRelaxed(constraints)
         NamedVariables.reset_modelnumbers()
@@ -133,7 +131,7 @@ class TestConstraint:
 
     def test_factored_constraint_equivalent_to_expanded(self):
         "Regression test for issue #138"
-        a = Variable("a", 0.15)
+        a = Variable("a", value=0.15)
         b = Variable("b")
         sol_expanded = Model(b, [a + a * b <= b]).solve(verbosity=0)
         sol_factored = Model(b, [a * (1 + b) <= b]).solve(verbosity=0)
@@ -226,8 +224,8 @@ class TestSensFromDualTerms:
 
     def test_a_merged_dual_is_distributed_by_share(self):
         W = Variable("W", "N")
-        W_a = Variable("W_a", 2.0, "N")
-        W_b = Variable("W_b", 3.0, "N")
+        W_a = Variable("W_a", "N", value=2.0)
+        W_b = Variable("W_b", "N", value=3.0)
         c = W >= W_a + W_b
         list(c.as_hmapslt1({W_a.key: 2.0, W_b.key: 3.0}))  # one merged monomial
         _, la, nu = c.sens_from_dual([1.0], [np.array([1.0])], None)
@@ -341,7 +339,7 @@ class TestMonomialEquality:
         a = Variable("a")
         b = Variable("b")
         c = Variable("c")
-        d = Variable("d", 2)
+        d = Variable("d", value=2)
         # 3 equalities but rank 2: a==b, b==c are independent; c==d is too,
         # but a==c is implied by a==b and b==c
         m = Model(a, [a == b, b == c, c == d])
@@ -352,8 +350,8 @@ class TestMonomialEquality:
         "Contradictory equalities (x==2 and x==3) should raise"
         x = Variable("x")
         y = Variable("y")
-        d1 = Variable("d1", 2)
-        d2 = Variable("d2", 3)
+        d1 = Variable("d1", value=2)
+        d2 = Variable("d2", value=3)
         m = Model(y, [x == d1, x == d2, y >= x])
         with pytest.raises(Infeasible):
             m.solve(verbosity=0)
@@ -363,11 +361,11 @@ class TestMonomialEquality:
         # Mimics JHO pattern: shared component returned by both parent and children
         w = Variable("w", "lbf", "component weight")
         s = Variable("s", "ft^2", "component area")
-        rho = Variable("rho", 0.5, "lbf/ft^2", "weight per area")
+        rho = Variable("rho", "lbf/ft^2", "weight per area", value=0.5)
         shared_constraint = w == rho * s
 
-        cl1 = Variable("C_{L1}", 1.0, "-", "cruise lift coeff")
-        cl2 = Variable("C_{L2}", 0.8, "-", "loiter lift coeff")
+        cl1 = Variable("C_{L1}", "-", "cruise lift coeff", value=1.0)
+        cl2 = Variable("C_{L2}", "-", "loiter lift coeff", value=0.8)
 
         # shared_constraint included three times: parent + two children
         m = Model(
@@ -391,14 +389,14 @@ class TestMonomialEquality:
             def setup(self):
                 w = Variable("w", "lbf", "weight")
                 s = Variable("s", "ft^2", "area")
-                rho = Variable("rho", 0.5, "lbf/ft^2", "density")
+                rho = Variable("rho", "lbf/ft^2", "density", value=0.5)
                 return [w == rho * s]
 
         class Segment(Model):
             "Child model that re-includes the shared component"
 
             def setup(self, comp):
-                cl = Variable("C_L", 1.0, "-", "lift coefficient")
+                cl = Variable("C_L", "-", "lift coefficient", value=1.0)
                 return [
                     comp.get_var("w") >= cl * comp.get_var("rho") * comp.get_var("s"),
                     comp,
@@ -424,10 +422,10 @@ class TestSignomialInequality:
         # model from #1165
         ujet = Variable("ujet")
         PK = Variable("PK")
-        Dp = Variable("Dp", 0.662)
-        fBLI = Variable("fBLI", 0.4)
-        fsurf = Variable("fsurf", 0.836)
-        mdot = Variable("mdot", 1 / 0.7376)
+        Dp = Variable("Dp", value=0.662)
+        fBLI = Variable("fBLI", value=0.4)
+        fsurf = Variable("fsurf", value=0.836)
+        mdot = Variable("mdot", value=1 / 0.7376)
         with SignomialsEnabled():
             m = Model(
                 PK,
@@ -443,11 +441,11 @@ class TestSignomialInequality:
         assert var_senss[mdot] == pytest.approx(-0.17, abs=1e-2)
 
         # Linked variable
-        Dp = Variable("Dp", 0.662)
-        mDp = Variable("-Dp", lambda c: -c[Dp])
-        fBLI = Variable("fBLI", 0.4)
-        fsurf = Variable("fsurf", 0.836)
-        mdot = Variable("mdot", 1 / 0.7376)
+        Dp = Variable("Dp", value=0.662)
+        mDp = Variable("-Dp", value=lambda c: -c[Dp])
+        fBLI = Variable("fBLI", value=0.4)
+        fsurf = Variable("fsurf", value=0.836)
+        mdot = Variable("mdot", value=1 / 0.7376)
         m = Model(
             PK,
             [
@@ -462,11 +460,11 @@ class TestSignomialInequality:
         assert var_senss[mdot] == pytest.approx(-0.17, abs=1e-2)
 
         # fixed negative variable
-        Dp = Variable("Dp", 0.662)
-        mDp = Variable("-Dp", -0.662)
-        fBLI = Variable("fBLI", 0.4)
-        fsurf = Variable("fsurf", 0.836)
-        mdot = Variable("mdot", 1 / 0.7376)
+        Dp = Variable("Dp", value=0.662)
+        mDp = Variable("-Dp", value=-0.662)
+        fBLI = Variable("fBLI", value=0.4)
+        fsurf = Variable("fsurf", value=0.836)
+        mdot = Variable("mdot", value=1 / 0.7376)
         m = Model(
             PK,
             [
@@ -482,8 +480,8 @@ class TestSignomialInequality:
 
     def test_init(self):
         "Test initialization and types"
-        drag = Variable("drag", units="N")
-        x1, x2, x3 = (Variable(f"x_{i}", units="N") for i in range(3))
+        drag = Variable("drag", "N")
+        x1, x2, x3 = (Variable(f"x_{i}", "N") for i in range(3))
         with pytest.raises(TypeError):
             sc = drag >= x1 + x2 - x3
         with SignomialsEnabled():
@@ -502,9 +500,9 @@ class TestSignomialInequality:
 
     def test_sp_with_units(self):
         "DimensionalityError for signomial constraints with units (issue 151)"
-        x = Variable("x", units="N")
-        y = Variable("y", units="N")
-        eps = Variable("eps", 1, units="N")
+        x = Variable("x", "N")
+        y = Variable("y", "N")
+        eps = Variable("eps", "N", value=1)
         with SignomialsEnabled():
             m = Model(x, [x >= y - eps, y >= 2 * eps])
         m.localsolve(verbosity=0)  # must not raise DimensionalityError
@@ -529,7 +527,7 @@ class TestLoose:
 
     def test_raiseerror(self):
         x = Variable("x")
-        x_min = Variable("x_{min}", 2)
+        x_min = Variable("x_{min}", value=2)
         m = Model(x, [Loose([x >= x_min]), x >= 1])
         Loose.raiseerror = True
         with pytest.raises(RuntimeWarning):
@@ -539,7 +537,7 @@ class TestLoose:
     def test_posyconstr_in_gp(self):
         "Tests loose constraint set with solve()"
         x = Variable("x")
-        x_min = Variable("x_{min}", 2)
+        x_min = Variable("x_{min}", value=2)
         m = Model(x, [Loose([x >= x_min]), x >= 1])
         sol = m.solve(verbosity=0)
         (warn,) = sol.meta["warnings"]["Unexpectedly Tight Constraints"]
@@ -552,8 +550,8 @@ class TestLoose:
     def test_posyconstr_in_sp(self):
         x = Variable("x")
         y = Variable("y")
-        x_min = Variable("x_min", 1)
-        y_min = Variable("y_min", 2)
+        x_min = Variable("x_min", value=1)
+        y_min = Variable("y_min", value=2)
         with SignomialsEnabled():
             sig_constraint = x + y >= 3.5
         m = Model(x * y, [Loose([x >= y]), x >= x_min, y >= y_min, sig_constraint])
@@ -580,7 +578,7 @@ class TestTight:
     def test_posyconstr_in_gp(self):
         "Tests tight constraint set with solve()"
         x = Variable("x")
-        x_min = Variable("x_{min}", 2)
+        x_min = Variable("x_{min}", value=2)
         m = Model(x, [Tight([x >= 1]), x >= x_min])
         sol = m.solve(verbosity=0)
         (warn,) = sol.meta["warnings"]["Unexpectedly Loose Constraints"]
@@ -606,8 +604,8 @@ class TestTight:
         "Tests tight constraint set with localsolve()"
         x = Variable("x")
         y = Variable("y")
-        x_min = Variable("x_{min}", 2)
-        y_max = Variable("y_{max}", 0.5)
+        x_min = Variable("x_{min}", value=2)
+        y_max = Variable("y_{max}", value=0.5)
         with SignomialsEnabled():
             m = Model(x, [Tight([x + y >= 1]), x >= x_min, y <= y_max])
         sol = m.localsolve(verbosity=0)
@@ -623,9 +621,9 @@ class TestTight:
         # an externally-substituted variable on one side of a Tight
         # constraint stayed as a Monomial while the other side evaluated
         # to a pint Quantity, causing DimensionalityError.
-        t = Variable("T", units="lbf")  # free variable, will be fixed by substitution
-        dt = Variable("dT", units="lbf")
-        m = Model(dt, [Tight([dt >= t]), dt >= 200 * Variable("u", 1, "lbf")])
+        t = Variable("T", "lbf")  # free variable, will be fixed by substitution
+        dt = Variable("dT", "lbf")
+        m = Model(dt, [Tight([dt >= t]), dt >= 200 * Variable("u", "lbf", value=1)])
         m.substitutions[t] = 100  # external substitution (not on VarKey.value)
         sol = m.solve(verbosity=0)
         # dt driven to 200 by dt >= 200; dt >= t (100) is loose

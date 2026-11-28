@@ -105,7 +105,7 @@ class TestSubstitutions:
 
     def test_a_linked_function_must_return_a_scalar(self):
         "Its output is stored like any other fixed value, so the same rule holds"
-        a, b, y = Variable("a", 2), Variable("b"), Variable("y")
+        a, b, y = Variable("a", value=2), Variable("b"), Variable("y")
         m = Model(y, [y >= b, y >= a])
         m.substitutions[b] = lambda c: np.array(3 * c[a.key])
         assert m.solve(verbosity=0).cost == pytest.approx(6)
@@ -125,7 +125,7 @@ class TestSubstitutions:
         class Recorder(Model):
             def setup(self):
                 self.x = Variable("x", "m")
-                self.c = Variable("c", 1.0, "m")
+                self.c = Variable("c", "m", value=1.0)
                 self.cost = self.x
                 return [self.x >= self.c]
 
@@ -285,7 +285,7 @@ class TestVarMap:
 
     def test_a_variable_with_a_list_value_says_so(self):
         with pytest.raises(TypeError, match="one number"):
-            Variable("x", [1, 2, 3])
+            Variable("x", value=[1, 2, 3])
 
     def test_setting_a_vector_element_rejects_an_array(self, vm):
         "An element is a scalar; a list on it used to solve with its last value (#386)"

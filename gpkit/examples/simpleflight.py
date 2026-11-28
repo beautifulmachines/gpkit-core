@@ -5,19 +5,21 @@ import pickle
 from gpkit import Model, Variable, pi
 
 # Constants
-k = Variable("k", 1.2, "-", "form factor")
-e = Variable("e", 0.95, "-", "Oswald efficiency factor")
-mu = Variable("\\mu", 1.78e-5, "kg/m/s", "viscosity of air")
-rho = Variable("\\rho", 1.23, "kg/m^3", "density of air")
-tau = Variable("\\tau", 0.12, "-", "airfoil thickness to chord ratio")
-N_ult = Variable("N_{ult}", 3.8, "-", "ultimate load factor")
-V_min = Variable("V_{min}", 22, "m/s", "takeoff speed")
-C_Lmax = Variable("C_{L,max}", 1.5, "-", "max CL with flaps down")
-S_wetratio = Variable("(\\frac{S}{S_{wet}})", 2.05, "-", "wetted area ratio")
-W_W_coeff1 = Variable("W_{W_{coeff1}}", 8.71e-5, "1/m", "Wing Weight Coefficent 1")
-W_W_coeff2 = Variable("W_{W_{coeff2}}", 45.24, "Pa", "Wing Weight Coefficent 2")
-CDA0 = Variable("(CDA0)", 0.031, "m^2", "fuselage drag area")
-W_0 = Variable("W_0", 4940.0, "N", "aircraft weight excluding wing")
+k = Variable("k", "-", "form factor", value=1.2)
+e = Variable("e", "-", "Oswald efficiency factor", value=0.95)
+mu = Variable("\\mu", "kg/m/s", "viscosity of air", value=1.78e-5)
+rho = Variable("\\rho", "kg/m^3", "density of air", value=1.23)
+tau = Variable("\\tau", "-", "airfoil thickness to chord ratio", value=0.12)
+N_ult = Variable("N_{ult}", "-", "ultimate load factor", value=3.8)
+V_min = Variable("V_{min}", "m/s", "takeoff speed", value=22)
+C_Lmax = Variable("C_{L,max}", "-", "max CL with flaps down", value=1.5)
+S_wetratio = Variable("(\\frac{S}{S_{wet}})", "-", "wetted area ratio", value=2.05)
+W_W_coeff1 = Variable(
+    "W_{W_{coeff1}}", "1/m", "Wing Weight Coefficent 1", value=8.71e-5
+)
+W_W_coeff2 = Variable("W_{W_{coeff2}}", "Pa", "Wing Weight Coefficent 2", value=45.24)
+CDA0 = Variable("(CDA0)", "m^2", "fuselage drag area", value=0.031)
+W_0 = Variable("W_0", "N", "aircraft weight excluding wing", value=4940.0)
 
 # Free Variables
 D = Variable("D", "N", "total drag force")

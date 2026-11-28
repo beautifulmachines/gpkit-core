@@ -29,7 +29,7 @@ class TestNomialSubs:
             "simple vectorized link"
 
             def setup(self):
-                self.y = y = Variable("y", 1)
+                self.y = y = Variable("y", value=1)
 
                 def vectorlink(c):
                     "linked vector function"
@@ -55,8 +55,8 @@ class TestNomialSubs:
         assert p.sub({"x": 3}) == 9
 
     def test_dimensionless_units(self):
-        x = Variable("x", 3, "ft")
-        y = Variable("y", 1, "m")
+        x = Variable("x", "ft", value=3)
+        y = Variable("y", "m", value=1)
         if x.units is not None:
             # units are enabled
             assert (x / y).value == pytest.approx(0.9144)
@@ -93,9 +93,9 @@ class TestNomialSubs:
 
     def test_signomial(self):
         """Test Signomial substitution"""
-        D = Variable("D", units="N")
-        x = Variable("x", units="N")
-        y = Variable("y", units="N")
+        D = Variable("D", "N")
+        x = Variable("x", "N")
+        y = Variable("y", "N")
         a = Variable("a")
         with SignomialsEnabled():
             sc = a * x + (1 - a) * y - D
@@ -125,8 +125,8 @@ class TestModelSubs:
         assert mag((2 * L).sub({L: 30 * gpkit.units.cm}).c) == pytest.approx(0.6)
 
     def test_quantity_sub(self):
-        x = Variable("x", 1, "cm")
-        y = Variable("y", 1)
+        x = Variable("x", "cm", value=1)
+        y = Variable("y", value=1)
         assert x.sub({x: 1 * gpkit.units.m}).c.magnitude == 100
         # NOTE: uncomment the below if requiring Quantity substitutions
         # with pytest.raises(ValueError): x.sub(x, 1)
@@ -148,8 +148,8 @@ class TestModelSubs:
 
     def test_phantoms(self):
         x = Variable("x")
-        x_ = Variable("x", 1, lineage=[("test", 0)])
-        xv = VectorVariable(2, "x", [1, 1], lineage=[("vec", 0)])
+        x_ = Variable("x", value=1, lineage=[("test", 0)])
+        xv = VectorVariable(2, "x", value=[1, 1], lineage=[("vec", 0)])
         m = Model(x, [x >= x_, x_ == xv.prod()])
         m.solve(verbosity=0)
         with pytest.raises(KeyError):
@@ -164,7 +164,7 @@ class TestModelSubs:
     def test_persistence(self):
         x = gpkit.Variable("x")
         y = gpkit.Variable("y")
-        ymax = gpkit.Variable("y_{max}", 0.1)
+        ymax = gpkit.Variable("y_{max}", value=0.1)
 
         with gpkit.SignomialsEnabled():
             m = gpkit.Model(x, [x >= 1 - y, y <= ymax])
@@ -195,7 +195,7 @@ class TestModelSubs:
 
     def test_skipfailures(self):
         x = Variable("x")
-        x_min = Variable("x_{min}", 1)
+        x_min = Variable("x_{min}", value=1)
         m = Model(x, [x <= 1, x >= x_min])
         sweep = {x_min: [1, 2]}
         sol = m.sweep(sweep, verbosity=0, skipfailures=True)
@@ -214,14 +214,14 @@ class TestModelSubs:
     def test_vector_sweep(self):
         """Test sweep involving VectorVariables"""
         x = Variable("x")
-        x_min = Variable("x_min", 1)
+        x_min = Variable("x_min", value=1)
         y = VectorVariable(2, "y")
         m = Model(x, [x >= y.prod()])
         sweep = {y: np.reshape(np.meshgrid([2, 5, 9], [3, 7, 11]), (2, 9)).T}
         a = [sol.cost for sol in m.sweep(sweep, verbosity=0)]
         b = [6, 15, 27, 14, 35, 63, 22, 55, 99]
         npt.assert_allclose(a, b)
-        x_min = Variable("x_min", 1)  # constant to check array indexing
+        x_min = Variable("x_min", value=1)  # constant to check array indexing
         m = Model(x, [x >= y.prod(), x >= x_min])
         sweep = {"y": [[2, 5], [3, 5], [2, 7], [3, 7], [2, 11], [3, 11]]}
         sol = m.sweep(sweep, verbosity=0)
@@ -253,9 +253,9 @@ class TestModelSubs:
 
     def test_calcconst(self):
         x = Variable("x", "hours")
-        t_day = Variable("t_{day}", 12, "hours")
+        t_day = Variable("t_{day}", "hours", value=12)
         t_night = Variable(
-            "t_{night}", lambda c: 1 * gpkit.ureg.day - c.quantity(t_day), "hours"
+            "t_{night}", "hours", value=lambda c: 1 * gpkit.ureg.day - c.quantity(t_day)
         )
         _ = pickle.dumps(t_night)
         m = Model(x, [x >= t_day, x >= t_night])
@@ -282,7 +282,7 @@ class TestModelSubs:
             )
         )
 
-        xi = VectorVariable(N, "xi", xi_dist, "N", "Constant Thrust per Bin")
+        xi = VectorVariable(N, "xi", "N", "Constant Thrust per Bin", value=xi_dist)
         P = Variable("P", "N", "Total Power")
         phys_constraints = [P >= xi.sum()]
         objective = P
@@ -303,7 +303,7 @@ class TestModelSubs:
 
             def setup(self):
                 x = self.x = Variable("x", "ft")
-                x_max = Variable("x_{max}", 1, "yard")
+                x_max = Variable("x_{max}", "yard", value=1)
                 self.cost = 1 / x
                 return [x <= x_max]
 
@@ -317,7 +317,7 @@ class TestModelSubs:
 
             def setup(self):
                 x = self.x = Variable("x", "m")
-                x_min = Variable("x_{min}", 1, "cm")
+                x_min = Variable("x_{min}", "cm", value=1)
                 self.cost = x
                 return [x >= x_min]
 
@@ -430,8 +430,8 @@ class TestModelSubs:
         m.localsolve(verbosity=0)
 
     def test_spsubs(self):
-        x = Variable("x", 5)
-        y = Variable("y", lambda c: 2 * c[x])
+        x = Variable("x", value=5)
+        y = Variable("y", value=lambda c: 2 * c[x])
         z = Variable("z")
         w = Variable("w")
 

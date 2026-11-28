@@ -187,13 +187,13 @@ class TestToToml:
         (P/P_ref)**0.803.
         """
         P = Variable("P", "kW", "power")
-        P_min = Variable("P_min", 3, "kW")
+        P_min = Variable("P_min", "kW", value=3)
         P_ref = 1 * units("W")
         W = Variable("W", "N", "weight")
         m = Model(
             W,
             [
-                W >= (P / P_ref) ** 0.803 * Variable("W_coeff", 1, "N"),
+                W >= (P / P_ref) ** 0.803 * Variable("W_coeff", "N", value=1),
                 P >= P_min,
             ],
         )
@@ -211,7 +211,7 @@ class TestToToml:
         """A Python Model produces TOML that loads and solves identically."""
         x = Variable("x", "m", "length")
         y = Variable("y", "m", "width")
-        a_min = Variable("A_min", 100, "m^2", "minimum area")
+        a_min = Variable("A_min", "m^2", "minimum area", value=100)
 
         py_model = Model(x + y, [x * y >= a_min])
         py_sol = py_model.solve(verbosity=0)
@@ -286,7 +286,7 @@ class TestRoundTrip:
         is around 1e-9 and would hide a loss this size.
         """
         x = Variable("x", "m")
-        c = Variable("c", 1.23456789, "m")
+        c = Variable("c", "m", value=1.23456789)
         m2 = load_toml(to_toml(Model(x, [x >= c])))
         assert {k.ref: v for k, v in m2.substitutions.items()} == {"c|m": 1.23456789}
 
@@ -358,7 +358,7 @@ class TestMultiInstanceModels:
         class Leg(Model):
             def setup(self):
                 self.x = Variable("x", "m")
-                xmin = Variable("xmin", 1, "m")
+                xmin = Variable("xmin", "m", value=1)
                 return [self.x >= xmin]
 
         class Top(Model):
@@ -391,13 +391,13 @@ class TestMultiInstanceModels:
         class Engine(Model):
             def setup(self):
                 self.W = Variable("W", "N", "engine weight")
-                w_min = Variable("Wmin", 5, "N")
+                w_min = Variable("Wmin", "N", value=5)
                 return [self.W >= w_min]
 
         class Wing(Model):
             def setup(self):
                 self.W = Variable("W", "N", "wing weight")
-                w_min = Variable("Wmin", 3, "N")
+                w_min = Variable("Wmin", "N", value=3)
                 return [self.W >= w_min]
 
         class Aircraft(Model):
@@ -449,8 +449,8 @@ class TestVectorizedSubmodel:
         class Condition(Model):
             def setup(self):
                 self.P = Variable("P", "W")
-                self.Q = Variable("Q", 2, "m^3/s")
-                return [self.P >= self.Q * Variable("k", 3, "Pa")]
+                self.Q = Variable("Q", "m^3/s", value=2)
+                return [self.P >= self.Q * Variable("k", "Pa", value=3)]
 
         class Duty(Model):
             def setup(self, n=3):
@@ -496,7 +496,7 @@ class TestVectorConstraints:
 
     def _model(self):
         q = VectorVariable(3, "q", "m")
-        c = VectorVariable(3, "c", [1, 2, 3], "m")
+        c = VectorVariable(3, "c", "m", value=[1, 2, 3])
         W = Variable("W", "m")
         return Model(W, [W >= q.sum(), q >= c])
 

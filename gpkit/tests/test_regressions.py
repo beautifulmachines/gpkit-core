@@ -35,7 +35,7 @@ def test_linked_functions_and_subs_in_vectorization():
                 return [np.array(c[x]) - 1, np.ones(x.key.shape)]
 
             with Vectorize(2):
-                y = Variable("y", myfun)
+                y = Variable("y", value=myfun)
                 self.Vehicle = Vehicle()
 
             self.z = z = Variable("z")
@@ -68,8 +68,8 @@ def test_linked_functions_and_subs_in_vectorization():
 
         def setup(self):
             self.x = x = Variable("x")
-            y = Variable("y", 1)
-            z = Variable("z", 2)
+            y = Variable("y", value=1)
+            z = Variable("z", value=2)
             return [x >= y + z]
 
     class Cake(Model):

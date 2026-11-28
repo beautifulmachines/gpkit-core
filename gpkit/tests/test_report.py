@@ -104,7 +104,9 @@ class TestVariableRowsAreJoinable:
         c = gpkit.Var("m", "fixed scalar", value=2.0)
 
         def setup(self):
-            self.q = gpkit.VectorVariable(3, "q", [0.1, 0.2, 0.3], "m", "fixed vec")
+            self.q = gpkit.VectorVariable(
+                3, "q", "m", "fixed vec", value=[0.1, 0.2, 0.3]
+            )
             self.v = gpkit.VectorVariable(3, "v", "m", "free vec")
             self.cost = self.x
             return [self.x >= self.q.sum() + self.v.sum() + self.c]
@@ -315,7 +317,7 @@ class TestConstraintEntries:
     def test_type_is_the_one_the_ir_records(self):
         "A constraint's type names its class, the vocabulary to_ir() already uses."
         x, y = Variable("x_sig"), Variable("y_sig")
-        z = Variable("z_sig", 2)
+        z = Variable("z_sig", value=2)
         with SignomialsEnabled():
             m = Model(x, [SignomialEquality(x + y, z), x * y >= 1])
         entries = _constraints(m.report(fmt="dict"))
@@ -441,7 +443,7 @@ class TestBuildReportIR:
         class _RSPrettyUnits(Model):
             def setup(self):
                 area = Variable("S_pu", "m^2")
-                area_min = Variable("S_min_pu", 1, "m^2")
+                area_min = Variable("S_min_pu", "m^2", value=1)
                 return [area >= area_min]
 
         m = _RSPrettyUnits()
@@ -533,7 +535,7 @@ class TestValueUnitsContract:
     def test_var_entry_value_is_plain_float_after_solve(self):
         """model_view stores plain floats in VarEntry.value, never Quantities."""
         x = Variable("x_plain", "m")
-        c = Variable("c_plain", 2.0, "m")
+        c = Variable("c_plain", "m", value=2.0)
         m = Model(x, [x >= c])
         sol = m.solve(verbosity=0)
         ir = model_view(m, solution=sol)
@@ -622,7 +624,7 @@ class TestRenderText:
         class _OrderM(Model):
             def setup(self):
                 x = Variable("x_ord_t")
-                x_max = Variable("x_ord_max", 10)
+                x_max = Variable("x_ord_max", value=10)
                 return [x >= 2, x <= x_max]
 
         m = _OrderM()
@@ -637,7 +639,7 @@ class TestRenderText:
         class _OrderMd(Model):
             def setup(self):
                 x = Variable("x_ord_md")
-                x_max = Variable("x_ord_md_max", 10)
+                x_max = Variable("x_ord_md_max", value=10)
                 return [x >= 2, x <= x_max]
 
         m = _OrderMd()
@@ -652,7 +654,7 @@ class TestRenderText:
         class _TxtSolM(Model):
             def setup(self):
                 x = Variable("x_tsol_t1")
-                x_max = Variable("x_tsol_max", 10)
+                x_max = Variable("x_tsol_max", value=10)
                 return [x >= 2, x <= x_max]
 
         m = _TxtSolM()
@@ -774,7 +776,7 @@ class TestRenderMarkdown:
         class _MdSolM(Model):
             def setup(self):
                 x = Variable("x_mdsol_t1")
-                x_max = Variable("x_mdsol_max", 10)
+                x_max = Variable("x_mdsol_max", value=10)
                 return [x >= 3, x <= x_max]
 
         m = _MdSolM()
@@ -1072,7 +1074,7 @@ class TestVectorConstraintRows:
     @pytest.fixture(name="m")
     def fixture_m(self):
         q = VectorVariable(3, "q", "m")
-        c = VectorVariable(3, "c", [1, 2, 3], "m")
+        c = VectorVariable(3, "c", "m", value=[1, 2, 3])
         W = Variable("W", "m")
         return Model(W, [W >= q.sum(), q >= c])
 

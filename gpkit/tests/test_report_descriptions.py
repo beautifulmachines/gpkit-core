@@ -392,7 +392,7 @@ class TestObjective:
         class Leg(Model):
             def setup(self):
                 self.fuel = Variable("fuel", "kg")
-                return [self.fuel >= Variable("need", 1, "kg")]
+                return [self.fuel >= Variable("need", "kg", value=1)]
 
         class Trip(Model):
             def setup(self):
@@ -415,14 +415,14 @@ class TestObjective:
         class Wing(Model):
             def setup(self):
                 self.W = Variable("W", "N")
-                return [self.W >= Variable("W0", 10, "N")]
+                return [self.W >= Variable("W0", "N", value=10)]
 
         class AC(Model):
             def setup(self):
                 self.wing = Wing()
                 W = Variable("W", "N")
                 self.cost = self.wing.W
-                return [self.wing, W >= self.wing.W + Variable("W_pay", 5, "N")]
+                return [self.wing, W >= self.wing.W + Variable("W_pay", "N", value=5)]
 
         ir = model_view(AC())
         assert ir.objective_str == "Wing.W"

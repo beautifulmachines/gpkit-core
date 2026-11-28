@@ -3,7 +3,7 @@
 from gpkit import Model, Variable
 
 x = Variable("x")
-y = Variable("y", 2)
+y = Variable("y", value=2)
 
 constraints = [x >= 1, 0.5 <= x * y, x * y <= 1.5]
 

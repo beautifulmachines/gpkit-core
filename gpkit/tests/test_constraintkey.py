@@ -58,8 +58,8 @@ class _VecTop(Model):
     def setup(self):
         self.W = Variable("W", "m")
         self.q = VectorVariable(3, "q", "m")
-        self.c = VectorVariable(3, "c", [1, 2, 3], "m")
-        W_max = Variable("W_max", 100, "m")
+        self.c = VectorVariable(3, "c", "m", value=[1, 2, 3])
+        W_max = Variable("W_max", "m", value=100)
         return [self.W >= self.q.sum(), self.q >= self.c, self.W <= W_max]
 
 

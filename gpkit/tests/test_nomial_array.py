@@ -29,9 +29,9 @@ class TestNomialArray:
 
     def test_array_mult(self):
         x = VectorVariable(3, "x", label="dummy variable")
-        x_0 = Variable("x", idx=(0,), shape=(3,), label="dummy variable")
-        x_1 = Variable("x", idx=(1,), shape=(3,), label="dummy variable")
-        x_2 = Variable("x", idx=(2,), shape=(3,), label="dummy variable")
+        x_0 = Variable("x", label="dummy variable", idx=(0,), shape=(3,))
+        x_1 = Variable("x", label="dummy variable", idx=(1,), shape=(3,))
+        x_2 = Variable("x", label="dummy variable", idx=(2,), shape=(3,))
         p = x_0**2 + x_1**2 + x_2**2
         assert x.dot(x) == p
         m = NomialArray(
@@ -46,9 +46,9 @@ class TestNomialArray:
     def test_elementwise_mult(self):
         m = Variable("m")
         x = VectorVariable(3, "x", label="dummy variable")
-        x_0 = Variable("x", idx=(0,), shape=(3,), label="dummy variable")
-        x_1 = Variable("x", idx=(1,), shape=(3,), label="dummy variable")
-        x_2 = Variable("x", idx=(2,), shape=(3,), label="dummy variable")
+        x_0 = Variable("x", label="dummy variable", idx=(0,), shape=(3,))
+        x_1 = Variable("x", label="dummy variable", idx=(1,), shape=(3,))
+        x_2 = Variable("x", label="dummy variable", idx=(2,), shape=(3,))
         # multiplication with numbers
         v = NomialArray([2, 2, 3]).T
         p = NomialArray([2 * x_0, 2 * x_1, 3 * x_2]).T
@@ -71,9 +71,9 @@ class TestNomialArray:
 
     def test_constraint_gen(self):
         x = VectorVariable(3, "x", label="dummy variable")
-        x_0 = Variable("x", idx=(0,), shape=(3,), label="dummy variable")
-        x_1 = Variable("x", idx=(1,), shape=(3,), label="dummy variable")
-        x_2 = Variable("x", idx=(2,), shape=(3,), label="dummy variable")
+        x_0 = Variable("x", label="dummy variable", idx=(0,), shape=(3,))
+        x_1 = Variable("x", label="dummy variable", idx=(1,), shape=(3,))
+        x_2 = Variable("x", label="dummy variable", idx=(2,), shape=(3,))
         v = NomialArray([1, 2, 3]).T
         p = [x_0, x_1 / 2, x_2 / 3]
         constraint = ConstraintSet([x <= v])

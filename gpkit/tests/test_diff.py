@@ -217,7 +217,7 @@ class TestRenderedDiff:
 
     def test_a_moved_value_is_reported_as_a_percentage(self):
         x = Variable("x_rend")
-        c = Variable("c_rend", 2.0)
+        c = Variable("c_rend", value=2.0)
         m = Model(x, [x >= c])
         baseline = m.solve(verbosity=0)
         m.substitutions[c] = 4.0
@@ -241,7 +241,7 @@ class TestRenderedDiff:
 
     def test_elements_fixed_on_one_side_only_pair_up_either_way(self):
         "Baseline fixes v[2]; scenario fixes all three, so v[0] and v[1] are new."
-        v, c = VectorVariable(3, "v", "N"), Variable("c", 0.5, "N")
+        v, c = VectorVariable(3, "v", "N"), Variable("c", "N", value=0.5)
         x = Variable("x", "N")  # leaves the all-fixed solve something to solve
         m = Model(x + v.sum(), [v >= c, x >= c], {v[2]: 1})
         partly = m.solve(verbosity=0)
@@ -299,10 +299,10 @@ class TestRenderedDiff:
         percentage, which is why no explanatory field is carried.
         """
         mass = Variable("m_obj", "kg")
-        m_min = Variable("m_obj_min", 100.0, "kg")
+        m_min = Variable("m_obj_min", "kg", value=100.0)
         baseline = Model(mass, [mass >= m_min]).solve(verbosity=0)
         price = Variable("p_obj", "USD")
-        p_min = Variable("p_obj_min", 40.0, "USD")
+        p_min = Variable("p_obj_min", "USD", value=40.0)
         scenario = Model(price, [price >= p_min]).solve(verbosity=0)
 
         d = diff_solutions(baseline.to_ir(), scenario.to_ir())
@@ -316,7 +316,7 @@ class TestRenderedDiff:
 
     def test_a_sweep_diffs_against_one_baseline_per_point(self):
         x = Variable("x_sw")
-        c = Variable("c_sw", 2.0)
+        c = Variable("c_sw", value=2.0)
         m = Model(x, [x >= c])
         baseline = m.solve(verbosity=0)
         sweep = m.sweep({c: [2.0, 4.0]}, verbosity=0)
@@ -327,7 +327,7 @@ class TestRenderedDiff:
 def test_changed_agrees_with_almost_equal():
     "almost_equal is this same comparison collapsed to a boolean."
     x = Variable("x_cmp")
-    c = Variable("c_cmp", 2.0)
+    c = Variable("c_cmp", value=2.0)
     m = Model(x, [x >= c])
     sol = m.solve(verbosity=0)
     m.substitutions[c] = 2.5

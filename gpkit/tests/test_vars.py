@@ -21,6 +21,7 @@ from gpkit.display.naming import DisplayScope
 from gpkit.display.spelling import latex_unitstr
 from gpkit.nomials import Variable as PlainVariable
 from gpkit.tools import te_exp_minus1
+from gpkit.units import DimensionalityError
 
 _FULL = DisplayScope()  # names every variable by its full path
 
@@ -30,11 +31,9 @@ class TestVarKey:
 
     def test_init(self):
         """Test VarKey initialization"""
-        # test no-name init
-        _ = ArrayVariable(1)
         # test protected field
         with pytest.raises(ValueError):
-            _ = ArrayVariable(1, idx=5)
+            _ = ArrayVariable(1, "x", idx=5)
         # test type
         x = VarKey("x")
         assert isinstance(x, VarKey)
@@ -126,9 +125,9 @@ class TestVarKey:
         assert v == vel
         assert not v != vel
         assert vel == vel  # noqa: PLR0124
-        x1 = Variable("x", 3, "m")
-        x2 = Variable("x", 2, "ft")
-        x3 = Variable("x", 2, "m")
+        x1 = Variable("x", "m", value=3)
+        x2 = Variable("x", "ft", value=2)
+        x3 = Variable("x", "m", value=2)
         assert x2.key != x3.key
         assert x1.key == x3.key
 
@@ -355,6 +354,25 @@ class TestVariable:
         assert p1 == p2
         assert a.value == a
 
+    def test_without_units_it_is_dimensionless(self):
+        assert Variable("x").key.units is None
+        assert Variable("x", "-").key == Variable("x").key
+        assert VectorVariable(3, "v").key.units is None
+
+    @pytest.mark.parametrize("value", [5, 2 * gpkit.units("km")])
+    def test_a_value_in_the_units_slot_shows_the_keyword(self, value):
+        "An old-style positional value lands where units go; say how to write it"
+        with pytest.raises(TypeError, match="value is keyword-only"):
+            Variable("x", value, "m")
+
+    @pytest.mark.parametrize("value", [2 * gpkit.units("km"), 2 * gpkit.ureg.km])
+    def test_a_value_is_stored_in_the_variables_units(self, value):
+        assert Variable("x", "m", value=value).key.value == 2000
+
+    def test_a_value_in_incompatible_units_raises_at_declaration(self):
+        with pytest.raises(DimensionalityError, match="while fixing x$"):
+            Variable("x", "m", value=2 * gpkit.units("s"))
+
     def test_hash(self):
         x1 = Variable("x", "-", "first x")
         x2 = Variable("x", "-", "second x")
@@ -376,7 +394,7 @@ class TestVariable:
 
     def test_eq_ne(self):
         # test for #1138
-        w = Variable("W", 5, "lbf", "weight of 1 bag of sugar")
+        w = Variable("W", "lbf", "weight of 1 bag of sugar", value=5)
         assert w != w.key
         assert w.key != w
         assert not w == w.key
@@ -403,22 +421,22 @@ class TestVectorVariable:
 
     def test_nomial_array_comp(self):
         x = VectorVariable(3, "x", label="dummy variable")
-        x_0 = Variable("x", idx=(0,), shape=(3,), label="dummy variable")
-        x_1 = Variable("x", idx=(1,), shape=(3,), label="dummy variable")
-        x_2 = Variable("x", idx=(2,), shape=(3,), label="dummy variable")
+        x_0 = Variable("x", label="dummy variable", idx=(0,), shape=(3,))
+        x_1 = Variable("x", label="dummy variable", idx=(1,), shape=(3,))
+        x_2 = Variable("x", label="dummy variable", idx=(2,), shape=(3,))
         x2 = NomialArray([x_0, x_1, x_2])
         assert x == x2
 
     def test_issue_137(self):
         n = 20
         x_arr = np.arange(0, 5, 5 / n) + 1e-6
-        x = VectorVariable(n, "x", x_arr, "m", "Beam Location")
+        x = VectorVariable(n, "x", "m", "Beam Location", value=x_arr)
 
         with pytest.raises(ValueError):
-            _ = VectorVariable(2, "x", [1, 2, 3])
+            _ = VectorVariable(2, "x", value=[1, 2, 3])
 
         with Vectorize(2):
-            x = VectorVariable(3, "x", np.array([13, 15, 17]))
+            x = VectorVariable(3, "x", value=np.array([13, 15, 17]))
             assert x[0, 0].value == 13
             assert x[1, 0].value == 15
             assert x[2, 0].value == 17
@@ -428,7 +446,7 @@ class TestVectorVariable:
 
     def test_value_map_fixes_only_its_elements(self):
         v = VectorVariable(3, "v", "N", value={-1: 1 * gpkit.ureg.kN})
-        c = Variable("c", 0.5, "N")
+        c = Variable("c", "N", value=0.5)
         m = gpkit.Model(v.sum(), [v >= c])
         assert [e.key in m.substitutions for e in v] == [0, 0, 1]
         assert m.solve(verbosity=0)["v"].magnitude.tolist() == pytest.approx(
@@ -458,26 +476,27 @@ class TestVectorVariable:
         "Each element keeps the value's units, not just its number"
         with Vectorize(2):
             d = Variable("d", "m", value=value)
-        m = gpkit.Model(d.sum(), [d >= Variable("c", 1, "m")])
+        m = gpkit.Model(d.sum(), [d >= Variable("c", "m", value=1)])
         assert list(m.substitutions["d"]) == [2000, 2000]
-
-    def test_none_as_the_value_leaves_it_free(self):
-        assert Variable("x", None, "m").key.value is None
-        with Vectorize(2):
-            assert Variable("v", None, "m")[0].key.value is None
 
     def test_list_value_under_vectorize_spreads_over_elements(self):
         with Vectorize(2):
             x = Variable("x", "m", value=[2.0, 3.0])
         assert [e.key.value for e in x] == [2.0, 3.0]
 
-    @pytest.mark.parametrize(
-        "args", [("x", 2 * gpkit.units("km"), "m"), ("x", 1, [1, 2], "m")]
-    )
-    def test_an_argument_it_cannot_place_raises(self, args):
-        "Never dropped silently, which would leave a fixed variable free"
-        with pytest.raises(TypeError, match="cannot place argument"):
-            Variable(*args)
+    def test_vector_values_are_stored_in_its_units(self):
+        v = VectorVariable(2, "v", "m", value=[1, 2] * gpkit.ureg.km)
+        assert [e.key.value for e in v] == [1000, 2000]
+        w = VectorVariable(3, "w", "m", value={0: 2 * gpkit.units("km")})
+        assert [e.key.value for e in w] == [2000, None, None]
+
+    def test_a_vector_value_in_incompatible_units_raises(self):
+        with pytest.raises(DimensionalityError, match=r"while fixing v\[0\]$"):
+            VectorVariable(2, "v", "m", value={0: 1 * gpkit.ureg.s})
+
+    def test_a_vectors_value_in_the_units_slot_shows_the_keyword(self):
+        with pytest.raises(TypeError, match="value is keyword-only"):
+            VectorVariable(3, "v", [1, 2, 3], "m")
 
     def test_vectorize_shapes(self):
         with gpkit.Vectorize(3):

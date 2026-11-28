@@ -196,7 +196,7 @@ class TestData:
 
     def test_substitutions_beat_a_stale_key_value(self):
         "VarKey.value is a declaration-time carrier and goes stale (#321)."
-        a = Variable("a", 3, "m")
+        a = Variable("a", "m", value=3)
         vks = VarSet([a.key])
         (info,) = classify_variables(vks, {a.key: 5.0})
         assert info.values == (5.0,)
@@ -237,7 +237,7 @@ class ClassifyMe(Model):
     c = Var("m", "fixed scalar", value=2.0)
 
     def setup(self):
-        self.q = VectorVariable(3, "q", [0.1, 0.2, 0.3], "m", "fixed vector")
+        self.q = VectorVariable(3, "q", "m", "fixed vector", value=[0.1, 0.2, 0.3])
         self.v = VectorVariable(3, "v", "m", "free vector")
         self.cost = self.x
         return [

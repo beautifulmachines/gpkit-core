@@ -3,8 +3,8 @@
 from gpkit import Model, Variable, units
 
 x = Variable("x", "ft")
-x_min = Variable("x_min", 2, "ft")
-x_max = Variable("x_max", 1, "ft")
+x_min = Variable("x_min", "ft", value=2)
+x_max = Variable("x_max", "ft", value=1)
 y = Variable("y", "volts")
 
 m = Model(x / y, [x <= x_max, x >= x_min])

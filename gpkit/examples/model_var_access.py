@@ -17,7 +17,7 @@ class Battery(Model):
     """
 
     def setup(self):
-        h = Variable("h", 200, "Wh/kg", "specific energy")
+        h = Variable("h", "Wh/kg", "specific energy", value=200)
         E = self.E = Variable("E", "MJ", "stored energy")
         m = self.m = Variable("m", "lb", "battery mass")
         return [E <= m * h]
@@ -38,7 +38,7 @@ class Motor(Model):
 
     def setup(self):
         m = self.m = Variable("m", "lb", "motor mass")
-        f = Variable("f", 20, "lb/hp", "mass per unit power")
+        f = Variable("f", "lb/hp", "mass per unit power", value=20)
         Pmax = self.Pmax = Variable("P_{max}", "hp", "max output power")
         return [m >= f * Pmax]
 

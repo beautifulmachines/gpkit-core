@@ -451,7 +451,7 @@ class _WrappedTop(Model):
 
     def setup(self):
         x, y = Variable("x"), Variable("y")
-        z = Variable("z", 2)
+        z = Variable("z", value=2)
         self.sub = _WrappedSub()
         self.cost = x
         with SignomialsEnabled():
@@ -479,7 +479,7 @@ class TestConstraintWalk:
         to the solver and carry sensitivities like any other.
         """
         x, y = Variable("x"), Variable("y")
-        z = Variable("z", 2)
+        z = Variable("z", value=2)
         with SignomialsEnabled():
             m = Model(
                 x,

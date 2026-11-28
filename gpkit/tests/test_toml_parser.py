@@ -202,8 +202,8 @@ class TestLoadSimpleBox:
         h = Variable("h", "m", "height")
         w = Variable("w", "m", "width")
         d = Variable("d", "m", "depth")
-        a_wall = Variable("A_wall", 200, "m^2", "upper limit, wall area")
-        a_floor = Variable("A_floor", 50, "m^2", "upper limit, floor area")
+        a_wall = Variable("A_wall", "m^2", "upper limit, wall area", value=200)
+        a_floor = Variable("A_floor", "m^2", "upper limit, floor area", value=50)
         py_model = Model(
             1 / (h * w * d),
             [

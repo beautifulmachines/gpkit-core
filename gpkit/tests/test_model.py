@@ -89,11 +89,11 @@ class TestGP:
 
     def test_dup_eq_constraint(self, solver):
         # regression test for issue #1551
-        a = Variable("a", 1)
+        a = Variable("a", value=1)
         b = Variable("b")
-        c = Variable("c", 2)
+        c = Variable("c", value=2)
         d = Variable("d")
-        z = Variable("z", 0.5)
+        z = Variable("z", value=0.5)
 
         # create a simple GP with equality constraints
         const = [
@@ -166,7 +166,7 @@ class TestGP:
     def test_601(self, solver):
         # tautological monomials should solve but not pass to the solver
         x = Variable("x")
-        y = Variable("y", 2)
+        y = Variable("y", value=2)
         m = Model(x, [x >= 1, y == 2])
         m.solve(solver=solver, verbosity=0)
         assert len(list(m.as_hmapslt1({}))) == 3
@@ -174,14 +174,14 @@ class TestGP:
 
     def test_cost_freeing(self, solver):
         "Test freeing a variable that's in the cost."
-        x = Variable("x", 1)
-        x_min = Variable("x_{min}", 2)
+        x = Variable("x", value=1)
+        x_min = Variable("x_{min}", value=2)
         intermediary = Variable("intermediary")
         m = Model(x, [x >= intermediary, intermediary >= x_min])
         with pytest.raises((PrimalInfeasible, UnknownInfeasible)):
             m.solve(solver=solver, verbosity=0)
-        x = Variable("x", 1)
-        x_min = Variable("x_{min}", 2)
+        x = Variable("x", value=1)
+        x_min = Variable("x_{min}", value=2)
         m = Model(x, [x >= x_min])
         with pytest.raises(PrimalInfeasible):
             m.solve(solver=solver, verbosity=0)
@@ -202,8 +202,8 @@ class TestGP:
         a Solution for a *different*, relaxed problem -- instead of raising.
         Callers who want a debug breakdown should call .debug() themselves.
         """
-        x = Variable("x", 1)
-        x_min = Variable("x_{min}", 2)
+        x = Variable("x", value=1)
+        x_min = Variable("x_{min}", value=2)
         intermediary = Variable("intermediary")
         m = Model(x, [x >= intermediary, intermediary >= x_min])
         with pytest.raises((PrimalInfeasible, UnknownInfeasible)):
@@ -211,11 +211,11 @@ class TestGP:
 
     def test_simple_united_gp(self, solver):
         R = Variable("R", "nautical_miles")
-        a0 = Variable("a0", 340.29, "m/s")
-        theta = Variable("\\theta", 0.7598)
-        t = Variable("t", 10, "hr")
-        T_loiter = Variable("T_{loiter}", 1, "hr")
-        T_reserve = Variable("T_{reserve}", 45, "min")
+        a0 = Variable("a0", "m/s", value=340.29)
+        theta = Variable("\\theta", value=0.7598)
+        t = Variable("t", "hr", value=10)
+        T_loiter = Variable("T_{loiter}", "hr", value=1)
+        T_reserve = Variable("T_{reserve}", "min", value=45)
         M = VectorVariable(2, "M")
 
         prob = Model(
@@ -254,7 +254,7 @@ class TestGP:
         )
 
     def test_mdd_example(self, solver):
-        Cl = Variable("Cl", 0.5, "-", "Lift Coefficient")
+        Cl = Variable("Cl", "-", "Lift Coefficient", value=0.5)
         Mdd = Variable("Mdd", "-", "Drag Divergence Mach Number")
         m1 = Model(1 / Mdd, [1 >= 5 * Mdd + 0.5, Mdd >= 0.00001])
         m2 = Model(1 / Mdd, [1 >= 5 * Mdd + 0.5])
@@ -281,7 +281,7 @@ class TestGP:
 
     def test_zeroing(self, solver):
         L = Variable("L")
-        k = Variable("k", 0)
+        k = Variable("k", value=0)
         with SignomialsEnabled():
             constr = [L - 5 * k <= 10]
         sol = Model(1 / L, constr).solve(solver, verbosity=0)
@@ -336,7 +336,7 @@ class TestGP:
     def test_sweep_not_modify_subs(self, solver):
         "make sure sweeping does not modify substitutions"
         A = Variable("A", "ft^2")
-        d = Variable("d", 6, "in")
+        d = Variable("d", "in", value=6)
         m = Model(A, [A >= np.pi / 4 * d**2])
         assert m.substitutions == {d.key: 6}
         sol = m.sweep({d: [3, 12, 36]}, solver=solver, verbosity=0)
@@ -391,10 +391,10 @@ class TestGPSensitivities:
     "test cases for GP sensitivity output -- run for each installed solver"
 
     def test_sensitivities(self, solver):
-        W_payload = Variable("W_{payload}", 175 * (195 + 30), "lbf")
-        f_oew = Variable("f_{oew}", 0.53, "-", "OEW/MTOW")
-        fuel_per_nm = Variable("\\theta_{fuel}", 13.75, "lbf/nautical_mile")
-        R = Variable("R", 3000, "nautical_miles", "range")
+        W_payload = Variable("W_{payload}", "lbf", value=175 * (195 + 30))
+        f_oew = Variable("f_{oew}", "-", "OEW/MTOW", value=0.53)
+        fuel_per_nm = Variable("\\theta_{fuel}", "lbf/nautical_mile", value=13.75)
+        R = Variable("R", "nautical_miles", "range", value=3000)
         mtow = Variable("MTOW", "lbf", "max take off weight")
 
         m = Model(
@@ -415,8 +415,8 @@ class TestGPSensitivities:
         so the solved nu is shorter than the written hmap (#329). Each written
         term's share is its coefficient over the merged total: 2/5 and 3/5.
         """
-        a = Variable("a", 2.0, "-")
-        b = Variable("b", 3.0, "-")
+        a = Variable("a", "-", value=2.0)
+        b = Variable("b", "-", value=3.0)
         x = Variable("x", "-")
         m = Model(a * x + b * x, [x >= 1])
         sol = m.solve(solver=solver, verbosity=0)
@@ -431,7 +431,7 @@ class TestGPSensitivities:
 
     def test_cost_senss_survive_a_merge_against_a_constant(self, solver):
         "A written term whose variables all vanish still owns its share."
-        a = Variable("a", 1.5, "-")
+        a = Variable("a", "-", value=1.5)
         x = Variable("x", "-")
         m = Model(a * x + x, [x >= 2])  # a*x and x merge into 2.5*x
         sol = m.solve(solver=solver, verbosity=0)
@@ -446,7 +446,7 @@ class TestGPSensitivities:
         """
         W = Variable("W", "N")
         W_s, W_f = Variable("W_s", "N"), Variable("W_f", "N")
-        W_p = Variable("W_p", 20.0, "N")
+        W_p = Variable("W_p", "N", value=20.0)
         m = Model(W, [W >= W_s + W_f + W_p, W_s >= 0.3 * W, W_f >= 0.2 * W])
         sol = m.solve(solver=solver, verbosity=0)
         assert sol.cost.magnitude == pytest.approx(40.0)
@@ -471,7 +471,7 @@ class TestGPSensitivities:
 
     def test_a_monomial_equality_has_one_signed_term(self, solver):
         x, y = Variable("x", "-"), Variable("y", "-")
-        c = Variable("c", 2.0, "-")
+        c = Variable("c", "-", value=2.0)
         m = Model(x, [x == y, y >= c])
         sol = m.solve(solver=solver, verbosity=0)
         eq = next(k for k, con in keyed_constraints(m) if "=" in str(con))
@@ -488,7 +488,7 @@ class TestGPSensitivities:
         substituted form, not the signomial as written, so it reports no per-term
         duals; the variable sensitivities are still exact.
         """
-        x, y, z = Variable("x"), Variable("y", 1), Variable("z", 4)
+        x, y, z = Variable("x"), Variable("y", value=1), Variable("z", value=4)
         with SignomialsEnabled():
             m = Model(x, [x + y >= z])
         sol = m.solve(solver=solver, verbosity=0)
@@ -501,7 +501,7 @@ class TestGPSensitivities:
     def test_fixed_and_free_keys_share_one_sensitivity_map(self, solver):
         "sens.variables covers both, so a filtered copy would be a second encoding."
         x = Variable("x")
-        c = Variable("c", 2.0, "-")
+        c = Variable("c", "-", value=2.0)
         sol = Model(x, [x >= c]).solve(solver=solver, verbosity=0)
         assert sol.sens.variables[c.key] == pytest.approx(1)
         assert x.key in sol.sens.variables
@@ -511,7 +511,7 @@ class TestGPSensitivities:
         # sens.models[lineage] should equal sum(|lambda_i|) for constraints
         # owned by that lineage — not inflated by fixed-variable sensitivities.
         x = Variable("x")
-        c = Variable("c", 2.0, "-")
+        c = Variable("c", "-", value=2.0)
         m = Model(x, [x >= c])
         sol = m.solve(solver=solver, verbosity=0)
         sum_lambdas = sum(abs(v) for v in sol.sens.constraints_by_key.values())
@@ -596,7 +596,7 @@ class TestSP:
         assert sol.cost == pytest.approx(13, abs=10 ** (-get_ndig(solver)))
 
         # Constant variable declaration method
-        z = Variable("z", 5)
+        z = Variable("z", value=5)
         with SignomialsEnabled():
             constraints = [x + y >= z, y >= x - 1]
         m = Model(x + y * z, constraints)
@@ -619,8 +619,8 @@ class TestSP:
 
     def test_sp_substitutions(self, solver):
         x = Variable("x")
-        y = Variable("y", 1)
-        z = Variable("z", 4)
+        y = Variable("y", value=1)
+        z = Variable("z", value=4)
 
         old_stdout = sys.stdout
         sys.stdout = stringout = StringIO()
@@ -700,7 +700,7 @@ class TestSP:
     def test_tautological_spconstraint(self, solver):
         x = Variable("x")
         y = Variable("y")
-        z = Variable("z", 0)
+        z = Variable("z", value=0)
         with SignomialsEnabled():
             m = Model(x, [x >= 1 - y, y <= 0.1, y >= z])
         with pytest.raises(InvalidGPConstraint):
@@ -730,13 +730,13 @@ class TestSP:
 
     def test_issue180(self, solver):
         L = Variable("L")
-        Lmax = Variable("L_{max}", 10)
+        Lmax = Variable("L_{max}", value=10)
         W = Variable("W")
-        Wmax = Variable("W_{max}", 10)
-        A = Variable("A", 10)
+        Wmax = Variable("W_{max}", value=10)
+        A = Variable("A", value=10)
         Obj = Variable("Obj")
         a_val = 0.01
-        a = Variable("a", a_val)
+        a = Variable("a", value=a_val)
         with SignomialsEnabled():
             eqns = [
                 L <= Lmax,
@@ -840,7 +840,7 @@ class TestSP:
     def test_reassigned_constant_cost(self, solver):
         # for issue 1131
         x = Variable("x")
-        x_min = Variable("x_min", 1)
+        x_min = Variable("x_min", value=1)
         y = Variable("y")
         with SignomialsEnabled():
             m = Model(y, [y + 0.5 >= x, x >= x_min, 6 >= y])
@@ -879,7 +879,7 @@ class Thing(Model):
     def setup(self, length):
         a = self.a = VectorVariable(length, "a", "g/m")
         b = self.b = VectorVariable(length, "b", "m")
-        c = self.c = Variable("c", 17 / 4.0, "g")
+        c = self.c = Variable("c", "g", value=17 / 4.0)
         return [a >= c / b]
 
 
@@ -912,8 +912,8 @@ class BoxAreaBounds(Model):
     """
 
     def setup(self, box):
-        A_wall = Variable("A_{wall}", 100, "m^2", "Upper limit, wall area")
-        A_floor = Variable("A_{floor}", 50, "m^2", "Upper limit, floor area")
+        A_wall = Variable("A_{wall}", "m^2", "Upper limit, wall area", value=100)
+        A_floor = Variable("A_{floor}", "m^2", "Upper limit, floor area", value=50)
 
         self.h, self.d, self.w = box.h, box.d, box.w
 
@@ -946,7 +946,7 @@ class TestModelNoSolve:
     def test_subclass_without_setup_refuses_arguments(self):
         "A subclass with no setup() has nothing to pass arguments to, so it says so"
         x = Variable("x", "m")
-        c = Variable("c", 1.0, "m")
+        c = Variable("c", "m", value=1.0)
 
         class NoSetup(Model):
             pass
@@ -1004,7 +1004,7 @@ class TestModelNoSolve:
         "issue 525"
         D = Variable("D")
         mi = Variable("m_i")
-        V = Variable("V", 1)
+        V = Variable("V", value=1)
         m1 = Model(D + V, [V >= mi + 0.4, mi >= 0.1, D >= mi**2])
         m2 = Model(D + 1, [1 >= mi + 0.4, mi >= 0.1, D >= mi**2])
         gp1 = m1.gp()
@@ -1183,7 +1183,7 @@ def test_n_free_with_unreferenced_constant():
     """n_free counts free variables when a constant appears in no constraint."""
     x = Variable("x", "m")
     rho = Variable("rho", "kg/m^3")
-    m = Model(x, [x >= Variable("L", 2, "m")], substitutions={rho: 1600})
+    m = Model(x, [x >= Variable("L", "m", value=2)], substitutions={rho: 1600})
     assert m.n_free == 1  # x; L and rho are both fixed
 
 
@@ -1193,7 +1193,7 @@ def test_percentages_read_as_percentages():
     %% escapes a literal % for %-style formatting only; inside an f-string it
     is two characters, so these messages used to read "infeasible by 1e+02%%".
     """
-    c = Variable("c_pct", 2)
+    c = Variable("c_pct", value=2)
     with pytest.raises(PrimalInfeasible) as excinfo:
         Model(Variable("x_pct"), [c <= 1]).solve(verbosity=0)
     assert "infeasible by 100%" in str(excinfo.value)

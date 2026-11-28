@@ -28,7 +28,7 @@ class Beam(Model):
         # Boundary conditions: shear and moment are zero at the free tip (the
         # last element), slope and displacement are zero at the clamped base.
         with Vectorize(N):
-            q = Variable("q", 100, "N/m", "Distributed load")
+            q = Variable("q", "N/m", "Distributed load", value=100)
             V = Variable("V", "N", "Internal shear", value={-1: 0})
             M = Variable("M", "N*m", "Internal moment", value={-1: 0})
             th = Variable("th", "-", "Slope", value={0: 0})

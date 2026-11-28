@@ -64,7 +64,7 @@ class Wing(Model):
     """simple wing with weight proportional to area"""
 
     def setup(self):
-        S = Variable("S", 100, label="wing area")
+        S = Variable("S", label="wing area", value=100)
         W = Variable("W", label="wing weight")
         self.cost = W
         return [W >= S * 0.1]
@@ -440,7 +440,7 @@ class TestNomialMapIR:
         assert ir["terms"][0]["coeff"] == 5.0
 
     def test_with_units(self):
-        x = Variable("x", units="m")
+        x = Variable("x", "m")
         hmap = NomialMap({HashVector({x.key: 1}): 1.0})
         hmap.units = qty("m")
         assert "units" in hmap.to_ir()
@@ -481,8 +481,8 @@ class TestNomialIR:
         assert "ast" in (x + 2 * y).to_ir()
 
     def test_units_are_serialized(self):
-        x = Variable("x", units="m")
-        y = Variable("y", units="m")
+        x = Variable("x", "m")
+        y = Variable("y", "m")
         assert "units" in (x + y).to_ir()
 
     def test_json_serializable(self):
@@ -678,7 +678,7 @@ class TestIRVariableKind:
             c = Var("m", "fixed scalar", value=2.0)
 
             def setup(self):
-                self.q = VectorVariable(3, "q", [0.1, 0.2, 0.3], "m", "fixed vec")
+                self.q = VectorVariable(3, "q", "m", "fixed vec", value=[0.1, 0.2, 0.3])
                 self.v = VectorVariable(3, "v", "m", "free vec")
                 self.cost = self.x
                 return [self.x >= self.q.sum() + self.v.sum() + self.c]
@@ -719,7 +719,7 @@ class TestIRVariableKind:
 
     def test_a_linked_variable_is_linked(self):
         x, y = Variable("x", "m"), Variable("y", "m")
-        z = Variable("z", 2.0, "m")
+        z = Variable("z", "m", value=2.0)
         m = Model(x, [x >= y], substitutions={y: lambda c: 2 * c[z]})
         assert self._kinds(m.to_ir())["y"] == "linked"
 
@@ -803,7 +803,7 @@ class TestModelIR:
         """
         x = Variable("x", "m")
         rho = Variable("rho", "kg/m^3", "declared, referenced by nothing")
-        m = Model(x, [x >= Variable("L", 2, "m")], substitutions={rho: 1600})
+        m = Model(x, [x >= Variable("L", "m", value=2)], substitutions={rho: 1600})
         ir = m.to_ir()
         assert set(ir["substitutions"]) <= set(ir["variables"])
         assert rho.key.ref in ir["variables"]
@@ -858,8 +858,8 @@ class _VecIR(Model):
     def setup(self):
         self.W = Variable("W", "m")
         self.q = VectorVariable(3, "q", "m")
-        self.c = VectorVariable(3, "c", [1, 2, 3], "m")
-        W_max = Variable("W_max", 100, "m")
+        self.c = VectorVariable(3, "c", "m", value=[1, 2, 3])
+        W_max = Variable("W_max", "m", value=100)
         return [self.W >= self.q.sum(), self.q >= self.c, self.W <= W_max]
 
 
@@ -909,7 +909,7 @@ class TestVectorConstraintIR:
     def test_a_broadcast_scalar_keeps_its_written_form(self):
         "2*q >= x wraps x to broadcast it; the written side is still just x."
         q = VectorVariable(3, "q")
-        x = Variable("x", 1)
+        x = Variable("x", value=1)
         ir = Model(q.sum(), [2 * q >= x]).to_ir()
         (parent,) = [c for c in ir["constraints"].values() if "veckey_ref" not in c]
         assert parent["right"]["ast"] == {"node": "var", "ref": x.key.ref}
@@ -1148,7 +1148,7 @@ class _IRChild(Model):
 
     def setup(self):
         self.t = Variable("t", "mm", "thickness")
-        self.t_min = Variable("t_min", 2.0, "mm", "min thickness")
+        self.t_min = Variable("t_min", "mm", "min thickness", value=2.0)
         return [self.t >= self.t_min]
 
 
@@ -1194,7 +1194,7 @@ class TestSolutionIR:
 
     def test_a_money_objective_has_readable_cost_units(self):
         price = Variable("price_ir", "USD")
-        floor = Variable("price_min_ir", 40.0, "USD")
+        floor = Variable("price_min_ir", "USD", value=40.0)
         sol = Model(price, [price >= floor]).solve(verbosity=0)
         assert ureg(sol.to_ir()["cost"]["units"]).units == ureg("USD").units
 
@@ -1224,7 +1224,7 @@ class TestSolutionIR:
         unit registry parses -- so it cannot be what a joinable IR carries.
         """
         torque = Variable("tau_ir", "N*m", "torque")
-        f_min = Variable("tau_min_ir", 2.0, "N*m")
+        f_min = Variable("tau_min_ir", "N*m", value=2.0)
         m = Model(torque, [torque >= f_min])
         sol = m.solve(verbosity=0)
         declared = m.to_ir()["variables"][torque.key.ref]["units"]
@@ -1295,7 +1295,9 @@ class TestSolutionIR:
     def test_vectors_are_elements_only(self):
         "Model.to_ir() already carries the parent entry with its shape."
         xv = VectorVariable(3, "xv", "m")
-        sol = Model(sum(xv), [xv >= 2 * Variable("u_v", 1, "m")]).solve(verbosity=0)
+        sol = Model(sum(xv), [xv >= 2 * Variable("u_v", "m", value=1)]).solve(
+            verbosity=0
+        )
         refs = set(sol.to_ir()["primal"])
         assert len(refs) == 3
         assert all("[" in r for r in refs)  # elements, never the bare parent
@@ -1318,7 +1320,7 @@ class TestWarningSubjectsBecomeRefs:
 
     def test_a_constraint_subject_becomes_its_constraint_key(self):
         x = Variable("x_w")
-        x_min = Variable("x_min_w", 2)
+        x_min = Variable("x_min_w", value=2)
         m = Model(x, [Tight([x >= 1]), x >= x_min])
         sol = m.solve(verbosity=0)
         (warn,) = sol.to_ir()["meta"]["warnings"]["Unexpectedly Loose Constraints"]
@@ -1328,8 +1330,8 @@ class TestWarningSubjectsBecomeRefs:
 
     def test_a_variable_subject_becomes_its_varkey_ref(self):
         x = Variable("x_r")
-        x_min = Variable("x_min_r", 2)
-        x_max = Variable("x_max_r", 1)
+        x_min = Variable("x_min_r", value=2)
+        x_max = Variable("x_max_r", value=1)
         inner = Model(x, [x <= x_max, x >= x_min])
         relaxed = ConstantsRelaxed(inner)
         sol = Model(relaxed.relaxvars.prod(), relaxed).solve(verbosity=0)

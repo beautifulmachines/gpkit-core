@@ -24,7 +24,7 @@ class Spar(Model):
     m: Variable
 
     def setup(self):
-        m_min = Variable("m_min", 10, "kg", "spar minimum mass")
+        m_min = Variable("m_min", "kg", "spar minimum mass", value=10)
         self.m = Variable("m", "kg", "spar mass")
         self.cost = self.m
         return [self.m >= m_min]
@@ -36,7 +36,7 @@ class Skin(Model):
     m: Variable
 
     def setup(self):
-        m_min = Variable("m_min", 5, "kg", "skin minimum mass")
+        m_min = Variable("m_min", "kg", "skin minimum mass", value=5)
         self.m = Variable("m", "kg", "skin mass")
         self.cost = self.m
         return [self.m >= m_min]
@@ -81,9 +81,9 @@ class SlackModel(Model):
     m_total: Variable
 
     def setup(self):
-        m_wing_min = Variable("m_wing_min", 60, "kg", "wing mass lower bound")
+        m_wing_min = Variable("m_wing_min", "kg", "wing mass lower bound", value=60)
         self.m_wing = Variable("m_wing", "kg", "wing mass")
-        self.m_total = Variable("m_total", 100, "kg", "total mass (fixed)")
+        self.m_total = Variable("m_total", "kg", "total mass (fixed)", value=100)
         self.cost = self.m_wing
         return [
             self.m_total >= self.m_wing,  # budget constraint (slack: 100 > 60)
@@ -100,13 +100,13 @@ class ZeroTermBudgetModel(Model):
     """
 
     def setup(self):
-        m_pay = Variable("m_pay", 0, "kg", "zero-valued term")
+        m_pay = Variable("m_pay", "kg", "zero-valued term", value=0)
         self.m_struct = Variable("m_struct", "kg", "structural mass")
         self.m = Variable("m", "kg", "total mass")
         self.cost = self.m
         return [
             self.m >= self.m_struct + m_pay,
-            self.m_struct >= Variable("m_struct_min", 10, "kg"),
+            self.m_struct >= Variable("m_struct_min", "kg", value=10),
         ]
 
 
@@ -374,9 +374,9 @@ class TestBudgetErrors:
             m: Variable
 
             def setup(self):
-                rho = Variable("rho", 7800, "kg/m^3")
-                length = Variable("L", 0.1, "m")
-                area = Variable("A", 1e-4, "m^2")
+                rho = Variable("rho", "kg/m^3", value=7800)
+                length = Variable("L", "m", value=0.1)
+                area = Variable("A", "m^2", value=1e-4)
                 self.m = Variable("m", "kg")
                 self.cost = self.m
                 return [self.m >= rho * length * area]
@@ -406,7 +406,7 @@ class GrowthSpar(Model):
     m: Variable
 
     def setup(self):
-        e = Variable("e", 50, "kg", "spar nominal estimate")
+        e = Variable("e", "kg", "spar nominal estimate", value=50)
         self.m = Variable("m", "kg", "spar mass", growth=0.20)
         self.cost = self.m
         return self.m.grown_from(e)
@@ -418,7 +418,7 @@ class GrowthSkin(Model):
     m: Variable
 
     def setup(self):
-        e = Variable("e", 30, "kg", "skin nominal estimate")
+        e = Variable("e", "kg", "skin nominal estimate", value=30)
         self.m = Variable("m", "kg", "skin mass")
         self.cost = self.m
         return [self.m >= e]
@@ -557,9 +557,9 @@ class TestBudgetWithGrowth:
             m: Variable
 
             def setup(self):
-                rho = Variable("rho", 7800, "kg/m^3")
-                length = Variable("L", 0.1, "m")
-                area = Variable("A", 1e-4, "m^2")
+                rho = Variable("rho", "kg/m^3", value=7800)
+                length = Variable("L", "m", value=0.1)
+                area = Variable("A", "m^2", value=1e-4)
                 self.m = Variable("m", "kg", growth=0.20)
                 self.cost = self.m
                 return self.m.grown_from(rho * length * area)
@@ -782,8 +782,8 @@ class MixedUnitMass(Model):
     def setup(self):
         self.m = Variable("m", "kg", "total mass")
         self.m_struct = Variable("m_struct", "g", "structural mass (in grams)")
-        m_pay = Variable("m_pay", 100, "kg", "payload")
-        f = Variable("f", 0.03, "-", "structural fraction")
+        m_pay = Variable("m_pay", "kg", "payload", value=100)
+        f = Variable("f", "-", "structural fraction", value=0.03)
         self.cost = self.m
         return [
             self.m >= m_pay + self.m_struct,
@@ -833,7 +833,7 @@ class TestBudgetUnitMismatchCoeff:
 
             def setup(self):
                 self.m = Variable("m", "g", "part mass", growth=0.20)
-                return self.m.grown_from(Variable("e", 5000, "g", "estimate"))
+                return self.m.grown_from(Variable("e", "g", "estimate", value=5000))
 
         class Assembly(Model):
             "A kg total over a kg payload and a gram part."
@@ -842,7 +842,7 @@ class TestBudgetUnitMismatchCoeff:
                 self.part = Part()
                 self.m = Variable("m", "kg", "total mass")
                 self.cost = self.m
-                payload = Variable("m_pay", 10, "kg", "payload")
+                payload = Variable("m_pay", "kg", "payload", value=10)
                 return [self.part, self.m >= payload + self.part.m]
 
         model = Assembly()
@@ -869,8 +869,8 @@ class Cylinder(Model):
     def setup(self):
         self.m = Variable("m", "kg", "mass")
         vol = Variable("V", "m^3", "volume")
-        rho = Variable("rho", 7800, "kg/m^3", "density")
-        length = Variable("L", 1, "m", "length")
+        rho = Variable("rho", "kg/m^3", "density", value=7800)
+        length = Variable("L", "m", "length", value=1)
         area = Variable("A", "m^2", "cross-sectional area")
         self.cost = self.m
         return [
@@ -928,8 +928,8 @@ class MixedUnitCoeffModel(Model):
 
     def setup(self):
         self.m = Variable("m", "kg", "total mass")
-        m_a = Variable("m_a", 1, "lbs", "component A (1 lb ≈ 0.4536 kg)")
-        m_b = Variable("m_b", 1, "kg", "component B (1 kg)")
+        m_a = Variable("m_a", "lbs", "component A (1 lb ≈ 0.4536 kg)", value=1)
+        m_b = Variable("m_b", "kg", "component B (1 kg)", value=1)
         self.cost = self.m
         return [self.m >= m_a + m_b]
 
@@ -981,8 +981,8 @@ class PhysCoeffModel(Model):
 
     def setup(self):
         self.m = Variable("m", "kg", "total mass")
-        m_a = Variable("m_a", 4, "kg", "component A")
-        m_b = Variable("m_b", 1, "kg", "component B")
+        m_a = Variable("m_a", "kg", "component A", value=4)
+        m_b = Variable("m_b", "kg", "component B", value=1)
         self.cost = self.m
         # 0.25 is a real physical factor, not a unit artifact
         return [self.m >= 0.25 * m_a + m_b]
@@ -1165,9 +1165,9 @@ class TestBudgetDepth:
             m: Variable
 
             def setup(self):
-                rho = Variable("rho", 7800, "kg/m^3")
-                length = Variable("L", 0.1, "m")
-                area = Variable("A", 1e-4, "m^2")
+                rho = Variable("rho", "kg/m^3", value=7800)
+                length = Variable("L", "m", value=0.1)
+                area = Variable("A", "m^2", value=1e-4)
                 self.m = Variable("m", "kg")
                 self.cost = self.m
                 return [self.m >= rho * length * area]
@@ -1231,8 +1231,8 @@ class DimensionlessBudgetModel(Model):
         self.cost = self.f
         return [
             self.f >= f_a + f_b,
-            f_a >= Variable("f_a_min", 0.3, "-"),
-            f_b >= Variable("f_b_min", 0.4, "-"),
+            f_a >= Variable("f_a_min", "-", value=0.3),
+            f_b >= Variable("f_b_min", "-", value=0.4),
         ]
 
 
@@ -1272,9 +1272,9 @@ class ScaledTermModel(Model):
     """
 
     def setup(self):
-        f_scale = Variable("f_scale", 0.5, "-", "scaling factor")
+        f_scale = Variable("f_scale", "-", "scaling factor", value=0.5)
         self.m_sub = Variable("m_sub", "kg", "sub mass")
-        m_sub_min = Variable("m_sub_min", 10, "kg")
+        m_sub_min = Variable("m_sub_min", "kg", value=10)
         self.m = Variable("m", "kg", "total mass")
         self.cost = self.m
         return [
@@ -1323,7 +1323,7 @@ class TightAndSlackBoundsOnSub(Model):
         self.skin = Skin()
         self.m = Variable("m", "kg", "wing mass")
         self.cost = self.m
-        slack_floor = Variable("m_floor", 1, "kg", "non-binding floor")
+        slack_floor = Variable("m_floor", "kg", "non-binding floor", value=1)
         return [
             self.m >= self.spar.m + self.skin.m,  # tight rollup, m = 15
             self.m >= slack_floor,  # slack at optimum, sens ≈ 0
@@ -1345,9 +1345,9 @@ class TwoTightBoundsOnSub(Model):
     m: Variable
 
     def setup(self):
-        a = Variable("a", 5, "kg")
-        b = Variable("b", 5, "kg")
-        c = Variable("c", 10, "kg")
+        a = Variable("a", "kg", value=5)
+        b = Variable("b", "kg", value=5)
+        c = Variable("c", "kg", value=10)
         self.m = Variable("m", "kg", "ambiguous mass")
         self.cost = self.m
         return [

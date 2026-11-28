@@ -33,7 +33,7 @@ class TestTools:
         eqns = [x >= 1, y >= 1, x * y == 10]
         n = 4
         ws = Variable("w_{CO}")
-        w_s = Variable("v_{CO}", lambda c: 1 - c[ws], "-")
+        w_s = Variable("v_{CO}", "-", value=lambda c: 1 - c[ws])
         obj = ws * (x + y) + w_s * (y**-1 * x**-3)
         m = Model(obj, eqns)
         sols = m.sweep({ws: np.linspace(1 / n, 1 - 1 / n, n)}, verbosity=0)
@@ -103,7 +103,7 @@ def test_autosweep_plot_labels_axes_with_units():
 
     x = Variable("x", "m", "swept variable")
     y = Variable("y", "m^2", "cost")
-    m = Model(y, [y >= x**2, y >= x * Variable("a", 1, "m")])
+    m = Model(y, [y >= x**2, y >= x * Variable("a", "m", value=1)])
     fig, ax = m.autosweep({x: (1, 3)}, tol=0.01, verbosity=0).plot(y)
     assert ax.get_xlabel() == "swept variable [m]"
     assert ax.get_ylabel() == "cost [m²]"
