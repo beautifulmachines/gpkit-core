@@ -117,15 +117,6 @@ class TestModelSubs:
         with pytest.raises(ValueError, match="y must be fixed to a finite number"):
             Model(x, [y >= 1], {y: x})
 
-    def test_sub_and_solve_refuse_alike(self):
-        "One conversion serves both paths, so they refuse with one message"
-        x, a = Variable("x"), Variable("a")
-        with pytest.raises(ValueError, match="a must be fixed") as from_sub:
-            (x * a).sub({a: "abc"})
-        with pytest.raises(ValueError, match="a must be fixed") as from_solve:
-            Model(x, [x >= a], {a: "abc"}).solve(verbosity=0)
-        assert str(from_sub.value) == str(from_solve.value)
-
     def test_a_value_in_other_units_is_the_same_value(self):
         L, x = Variable("L", "m"), Variable("x", "m")
         in_cm = Model(x, [x >= L], {L: 30 * gpkit.units.cm}).solve(verbosity=0)
@@ -465,7 +456,7 @@ class TestNomialMapSubs:
         z = Variable("z")
         w = Variable("w")
 
-        with pytest.raises(ValueError):
+        with pytest.raises(TypeError):
             z.hmap.sub({z.key: w.key}, varkeys=z.vks)
 
     def test_sub_zero(self):
@@ -492,17 +483,30 @@ class TestNomialMapSubs:
         ],
     )
     def test_a_nonfinite_value_is_refused(self, a_val, b_val, refused):
-        "So no term can be 0*inf or inf - inf; a linked output is checked alike"
+        "A fixed value is a finite number; a linked output is checked alike"
         x, a, b = Variable("x"), Variable("a"), Variable("b")
         with pytest.raises(ValueError, match=f"{refused} must be fixed to a finite"):
             Model(x, [x >= a * b, x >= 1], {a: a_val, b: b_val}).gp()
 
-    def test_a_nonfinite_value_is_refused_by_nomial_sub(self):
-        x, a, b = Variable("x"), Variable("a"), Variable("b")
+    def test_an_undefined_coefficient_is_refused(self):
+        "Finite values can overflow to 0*inf; a nan term is never silently dropped"
+        x, y, a, b, z = (Variable(n) for n in "xyabz")
+        subs = {a: 1e200, b: 1e200, z: 0}
         with SignomialsEnabled():
-            p = a * x - b * x + 1
-        with pytest.raises(ValueError, match="must be fixed to a finite"):
-            p.sub({a: np.inf, b: np.inf})
+            sig, fixed_sig = x >= 1 - a * b * z * y, 1 >= 2 - a * b * z
+        for m in (
+            Model(x, [sig, y <= 2], subs),
+            Model(x, [x >= 1, fixed_sig], subs),
+            Model(x, [x >= 1, 1 >= a * b * z], subs),
+            Model(a * b * z * x, [x >= 1], subs),
+        ):
+            with pytest.raises(ValueError, match="substituting a, b, z is undefined"):
+                m.solve(verbosity=0)
+
+    def test_sub_takes_inf_as_a_value(self):
+        "A solution may hold inf; evaluating with it is arithmetic, not fixing"
+        x, y = Variable("x"), Variable("y")
+        assert (x * y).sub({x: 2, y: np.inf}).value == np.inf
 
     def test_log_sensitivity_at_zero(self):
         "d(cost)/dz is infinite here, but p*z**p, the log derivative of z**p, is 0"

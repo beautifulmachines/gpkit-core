@@ -1,5 +1,7 @@
 "Implements the NomialMap class"
 
+import numpy as np
+
 from .. import units
 from ..ir import ir_units
 from ..units import DimensionalityError, qty
@@ -132,6 +134,9 @@ class NomialMap(HashVector):
             cp.expmap[exp], cp.csmap[exp] = new_exp, c
             cp[new_exp] = cp.get(new_exp, 0) + c  # merge terms with equal exps
         for exp, c in list(cp.items()):
+            if np.isnan(c):  # 0*inf or inf - inf, after finite values overflow
+                names = sorted({str(vk) for e in self for vk in e if vk in fixed})
+                raise ValueError(f"substituting {', '.join(names)} is undefined (nan)")
             if c == 0:
                 del cp[exp]  # terms that vanished or cancelled
         if not cp:
