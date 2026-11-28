@@ -57,14 +57,14 @@ class TestSolution:
 
     def test_dimensionless_cost_is_a_quantity_too(self):
         "One type, whatever the objective's units."
-        x = Variable("x", "-")
+        x = Variable("x")
         sol = Model(x, [x >= 2]).solve(verbosity=0)
         assert isinstance(sol.cost, Quantity)
         assert sol.cost == pytest.approx(2)
 
     def test_call_vector(self):
         n = 5
-        x = VectorVariable(n, "x", "-")
+        x = VectorVariable(n, "x")
         prob = Model(sum(x), [x >= 2.5])
         sol = prob.solve(verbosity=0)
         solx = sol[x]
@@ -112,7 +112,7 @@ class TestSolution:
             assert 0 * gpkit.ureg.m == pytest.approx(pv * gpkit.ureg.m - ps)
 
     def test_table(self):
-        x = Variable("x", "-")
+        x = Variable("x")
         gp = Model(x, [x >= 12])
         sol = gp.solve(verbosity=0)
         tab = sol.table()
@@ -133,8 +133,8 @@ class TestSolution:
 
     def test_key_options(self):
         # issue 993
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
         with SignomialsEnabled():
             m = Model(y, [y + 6 * x >= 13 + x**2])
         msol = m.localsolve(verbosity=0)
@@ -162,8 +162,8 @@ class TestSolution:
 
     def test_result_access(self):
         """Test result table access from SP solution"""
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
         with SignomialsEnabled():
             sig = y + 6 * x >= 13 + x**2
         m = Model(y, [sig])
@@ -206,18 +206,14 @@ class TestSolutionHoldsNoModel:
         assert "+1 : x ≥ x_{min}" in table
 
     def test_model_table_of_a_sweep(self):
-        x = Variable("x", "-")
-        x_min = Variable("x_{min}", "-", value=1)
+        x = Variable("x")
+        x_min = Variable("x_{min}", value=1)
         m = Model(x, [x >= x_min])
         sols = m.sweep({x_min: [1, 2]}, verbosity=0)
         assert "x ≥ x_{min}" in m.table(sols)
 
     def test_model_budget(self):
-        total, a, b = (
-            Variable("total", "-"),
-            Variable("a", "-", value=1),
-            Variable("b", "-", value=2),
-        )
+        total, a, b = Variable("total"), Variable("a", value=1), Variable("b", value=2)
         m = Model(total, [total >= a + b])
         sol = m.solve(verbosity=0)
         assert m.budget(sol, total).to_dict()
@@ -235,7 +231,7 @@ class TestSweep:
     """
 
     def test_a_sweep_names_what_it_swept(self):
-        x, c = Variable("x", "-"), Variable("c", "-", value=1)
+        x, c = Variable("x"), Variable("c", value=1)
         m = Model(x, [x >= c])
         sweep = m.sweep({c: [1, 2]}, verbosity=0)
         assert isinstance(sweep, Sweep)
@@ -244,20 +240,20 @@ class TestSweep:
         assert all("sweep_point" not in sol.meta for sol in sweep)
 
     def test_a_swept_vector_names_its_elements(self):
-        x, y = Variable("x", "-"), VectorVariable(2, "y", "-")
+        x, y = Variable("x"), VectorVariable(2, "y")
         m = Model(x, [x >= y.prod()])
         sweep = m.sweep({"y": [[1, 2], [3, 4]]}, verbosity=0)
         assert set(sweep.swept) == {y[0].key, y[1].key}
 
     def test_skipped_failures_leave_what_was_swept(self):
-        x, x_min = Variable("x", "-"), Variable("x_{min}", "-", value=1)
+        x, x_min = Variable("x"), Variable("x_{min}", value=1)
         m = Model(x, [x <= 1, x >= x_min])
         sweep = m.sweep({x_min: [1, 2]}, verbosity=0, skipfailures=True)
         assert len(sweep) == 1
         assert "x_{min} : [ 1 ]" in sweep.table()
 
     def test_an_autosweep_names_what_it_swept(self):
-        x, c = Variable("x", "-"), Variable("c", "-", value=1)
+        x, c = Variable("x"), Variable("c", value=1)
         m = Model(x, [x >= c])
         sweep = m.autosweep({c: (1, 4)}, verbosity=0).bst.solarray
         assert sweep.swept == (c.key,)
@@ -268,7 +264,7 @@ def test_tables_for_a_model_with_no_constraints():
     """Unconstrained posynomial minimization is a classical GP, and its
     solution must print: with no constraints there are no sensitivities to
     attribute, so the model-sensitivity breakdown has nothing to lay out."""
-    x, y = Variable("x", "-"), Variable("y", "-")
+    x, y = Variable("x"), Variable("y")
     m = Model(x + 1 / x + y + 1 / y, [])
     sol = m.solve(verbosity=0)
     assert sol.cost == pytest.approx(4, rel=1e-4)
@@ -288,7 +284,7 @@ def test_concurrent_tables_dont_corrupt_stdout(monkeypatch):
     thread still mid-capture read .lines() off whatever was there. Syncing once
     inside the breakdown puts all four threads there at the same moment.
     """
-    x, y = Variable("x", "-"), Variable("y", "-")
+    x, y = Variable("x"), Variable("y")
     m = Model(x + y, [x >= 2, y >= 3 * x])
     sol = m.solve(verbosity=0)
 
@@ -323,7 +319,7 @@ def test_solving_leaves_the_model_picklable():
     capture made every solved model unpicklable -- and is why a Solution refers
     to its model weakly.
     """
-    x = Variable("x_pkl", "-")
+    x = Variable("x_pkl")
     m = Model(x, [x >= 2])
     assert pickle.dumps(m)  # unsolved
     m.solve(verbosity=0)
@@ -348,7 +344,7 @@ def test_every_solution_has_a_status():
     The status used to be assigned only by solvify, so a Solution from a
     GeometricProgram solved directly carried no status at all.
     """
-    x = Variable("x_gp", "-")
+    x = Variable("x_gp")
     m = Model(x, [x >= 1])
     assert m.gp().solve(verbosity=0).meta["status"] == SolveStatus.OPTIMAL
     assert m.solve(verbosity=0).meta["status"] == SolveStatus.OPTIMAL
@@ -384,26 +380,26 @@ class TestSolutionWarnings:
 
     def test_a_category_with_nothing_to_report_is_absent(self):
         "A Tight constraint that is tight is not a warning."
-        x = Variable("x", "-")
+        x = Variable("x")
         sol = Model(x, [Tight([x >= 1])]).solve(verbosity=0)
         assert sol.meta["warnings"] == {}
         assert sol.meta["status"] == SolveStatus.OPTIMAL
 
 
 def _tight_warning_sol():
-    x = Variable("x", "-")
-    x_min = Variable("x_{min}", "-", value=2)
+    x = Variable("x")
+    x_min = Variable("x_{min}", value=2)
     return Model(x, [Tight([x >= 1]), x >= x_min]).solve(verbosity=0)
 
 
 def _loose_warning_sol():
-    x = Variable("x", "-")
-    x_min = Variable("x_{min}", "-", value=2)
+    x = Variable("x")
+    x_min = Variable("x_{min}", value=2)
     return Model(x, [Loose([x >= x_min]), x >= 1]).solve(verbosity=0)
 
 
 def _bounded_sol():
-    x = Variable("x", "-")
+    x = Variable("x")
     return Model(1 / x, Bounded([x >= 1])).solve(verbosity=0)
 
 
@@ -420,8 +416,8 @@ class TestAuditsReadByKey:
         return dataclasses.replace(sol, meta={"warnings": {}})
 
     def test_loose(self):
-        x = Variable("x", "-")
-        x_min = Variable("x_{min}", "-", value=2)
+        x = Variable("x")
+        x_min = Variable("x_{min}", value=2)
         m = Model(x, [Loose([x >= x_min]), x >= 1])
         sol = self._unaudited(m.solve(verbosity=0))
         audit_solution(m, sol)
@@ -430,8 +426,8 @@ class TestAuditsReadByKey:
         assert w["subject"] == constraint_keys(m)[m[0][0]]
 
     def test_bounded(self):
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
         m = Model(x * y, Bounded([x * y**1.01 >= 100], lower=0.001))
         sol = self._unaudited(m.solve(verbosity=0))
         audit_solution(m, sol)
@@ -443,8 +439,8 @@ class TestAuditsReadByKey:
 
         class _Part(Model):
             def setup(self):
-                self.x = x = Variable("x", "-")
-                x_min = Variable("x_{min}", "-", value=2)
+                self.x = x = Variable("x")
+                x_min = Variable("x_{min}", value=2)
                 return [Loose([x >= x_min]), x >= 1]
 
         class _Whole(Model):
@@ -475,8 +471,8 @@ class TestModelSensitivities:
 
     def test_sp_slack_is_not_a_model(self):
         "PCCP's slack constraint belongs to no model the user wrote."
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
         with SignomialsEnabled():
             m = Model(x, [x >= 1 - y, y <= 0.5])
         sol = m.localsolve(verbosity=0)
@@ -521,7 +517,7 @@ class TestConstraintSensitivitiesByKey:
 
     def test_duplicate_constraints_stay_distinct(self):
         "Two identical constraints are two constraints; position tells them apart."
-        x = Variable("x_dup", "-")
+        x = Variable("x_dup")
         m = Model(x, [x >= 1, x >= 1, x >= 2])
         sol = m.solve(verbosity=0)
         assert len(sol.sens.constraints_by_key) == 3
@@ -539,7 +535,7 @@ def _sens_model():
 
     class _SensTop(Model):
         def setup(self):
-            x = Variable("x_sens", "-")
+            x = Variable("x_sens")
             self.child = _SensChild()
             return [x >= self.child.y, x <= 10, self.child]
 

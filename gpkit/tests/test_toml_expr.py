@@ -63,68 +63,68 @@ class TestVariables:
     """Variable lookups and gpkit type production."""
 
     def test_variable_lookup(self):
-        x = Variable("x", "-")
+        x = Variable("x")
         result = eval_expr("x", {"x": x})
         assert result is x
 
     def test_variable_times_constant(self):
-        x = Variable("x", "-")
+        x = Variable("x")
         result = eval_expr("2*x", {"x": x})
         assert isinstance(result, Monomial)
         assert result.c == pytest.approx(2.0)
         assert dict(result.exp) == {x.key: 1}
 
     def test_monomial_product(self):
-        h = Variable("h", "-")
-        w = Variable("w", "-")
+        h = Variable("h")
+        w = Variable("w")
         result = eval_expr("h*w", {"h": h, "w": w})
         assert isinstance(result, Monomial)
         assert result.c == pytest.approx(1.0)
         assert dict(result.exp) == {h.key: 1, w.key: 1}
 
     def test_posynomial_sum(self):
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
         result = eval_expr("2*x + 3*y", {"x": x, "y": y})
         assert isinstance(result, Posynomial)
         assert len(result.hmap) == 2
 
     def test_compound_expression(self):
-        h = Variable("h", "-")
-        w = Variable("w", "-")
-        d = Variable("d", "-")
+        h = Variable("h")
+        w = Variable("w")
+        d = Variable("d")
         result = eval_expr("2*h*w + 2*h*d", {"h": h, "w": w, "d": d})
         assert isinstance(result, Posynomial)
         assert len(result.hmap) == 2
 
     def test_power_variable(self):
-        x = Variable("x", "-")
+        x = Variable("x")
         result = eval_expr("x**2", {"x": x})
         assert isinstance(result, Monomial)
         assert result.c == pytest.approx(1.0)
         assert dict(result.exp) == {x.key: 2}
 
     def test_fractional_power(self):
-        x = Variable("x", "-")
+        x = Variable("x")
         result = eval_expr("x**0.5", {"x": x})
         assert isinstance(result, Monomial)
         assert dict(result.exp) == {x.key: 0.5}
 
     def test_reciprocal(self):
-        x = Variable("x", "-")
+        x = Variable("x")
         result = eval_expr("1/x", {"x": x})
         assert isinstance(result, Monomial)
         assert dict(result.exp) == {x.key: -1}
 
     def test_division_of_variables(self):
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
         result = eval_expr("x/y", {"x": x, "y": y})
         assert isinstance(result, Monomial)
         assert dict(result.exp) == {x.key: 1, y.key: -1}
 
     def test_unknown_variable_error(self):
-        x = Variable("x", "-")
+        x = Variable("x")
         with pytest.raises(TomlExpressionError, match="Unknown variable 'y'"):
             eval_expr("x + y", {"x": x})
 
@@ -133,7 +133,7 @@ class TestVariables:
         assert eval_expr("N - 1", {"N": 6}) == 5
 
     def test_dimension_times_variable(self):
-        dx = Variable("dx", "-")
+        dx = Variable("dx")
         result = eval_expr("(N-1)*dx", {"N": 6, "dx": dx})
         assert isinstance(result, Monomial)
         assert result.c == pytest.approx(5.0)
@@ -149,37 +149,37 @@ class TestSubscript:
     """Subscript indexing and slicing on VectorVariables."""
 
     def test_integer_index(self):
-        d = VectorVariable(3, "d", "-")
+        d = VectorVariable(3, "d")
         result = eval_expr("d[0]", {"d": d})
         assert isinstance(result, Monomial)
         assert result.key.idx == (0,)
 
     def test_computed_index(self):
-        shear = VectorVariable(6, "V", "-")
+        shear = VectorVariable(6, "V")
         result = eval_expr("V[N-1]", {"V": shear, "N": 6})
         assert isinstance(result, Monomial)
         assert result.key.idx == (5,)
 
     def test_negative_index(self):
-        d = VectorVariable(3, "d", "-")
+        d = VectorVariable(3, "d")
         result = eval_expr("d[-1]", {"d": d})
         assert isinstance(result, Monomial)
         assert result.key.idx == (2,)
 
     def test_slice_upper(self):
-        shear = VectorVariable(6, "V", "-")
+        shear = VectorVariable(6, "V")
         result = eval_expr("V[:-1]", {"V": shear})
         assert len(result) == 5
         assert result[0].key.idx == (0,)
 
     def test_slice_lower(self):
-        shear = VectorVariable(6, "V", "-")
+        shear = VectorVariable(6, "V")
         result = eval_expr("V[1:]", {"V": shear})
         assert len(result) == 5
         assert result[0].key.idx == (1,)
 
     def test_indexed_product(self):
-        d = VectorVariable(3, "d", "-")
+        d = VectorVariable(3, "d")
         result = eval_expr("d[0]*d[1]*d[2]", {"d": d})
         assert isinstance(result, Monomial)
         assert result.c == pytest.approx(1.0)
@@ -196,28 +196,28 @@ class TestSumProd:
     """sum() and prod() function calls on VectorVariables."""
 
     def test_sum_vector(self):
-        x = VectorVariable(3, "x", "-")
+        x = VectorVariable(3, "x")
         result = eval_expr("sum(x)", {"x": x})
         assert isinstance(result, Posynomial)
 
     def test_prod_vector(self):
-        x = VectorVariable(3, "x", "-")
+        x = VectorVariable(3, "x")
         result = eval_expr("prod(x)", {"x": x})
         assert isinstance(result, Monomial)
 
     def test_sum_in_constraint(self):
-        x = VectorVariable(3, "x", "-")
-        y = Variable("y", "-")
+        x = VectorVariable(3, "x")
+        y = Variable("y")
         constraint = parse_constraint("y >= sum(x)", {"x": x, "y": y})
         assert isinstance(constraint, SingleEquationConstraint)
 
     def test_sum_of_slice(self):
-        x = VectorVariable(5, "x", "-")
+        x = VectorVariable(5, "x")
         result = eval_expr("sum(x[1:])", {"x": x})
         assert isinstance(result, Posynomial)
 
     def test_disallowed_function(self):
-        x = Variable("x", "-")
+        x = Variable("x")
         with pytest.raises(TomlExpressionError, match="not allowed"):
             eval_expr("abs(x)", {"x": x})
 
@@ -235,20 +235,20 @@ class TestConstraints:
     """Constraint parsing (>=, <=, ==)."""
 
     def test_ge_constraint(self):
-        x = Variable("x", "-")
+        x = Variable("x")
         c = parse_constraint("x >= 1", {"x": x})
         assert isinstance(c, SingleEquationConstraint)
         assert c.oper == ">="
 
     def test_le_constraint(self):
-        x = Variable("x", "-")
+        x = Variable("x")
         c = parse_constraint("x <= 10", {"x": x})
         assert isinstance(c, SingleEquationConstraint)
         assert c.oper == "<="
 
     def test_eq_constraint(self):
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
         c = parse_constraint("x == y", {"x": x, "y": y})
         assert isinstance(c, SingleEquationConstraint)
         assert c.oper == "="
@@ -266,18 +266,18 @@ class TestConstraints:
         assert len(c.right.hmap) == 2
 
     def test_not_a_constraint_error(self):
-        x = Variable("x", "-")
+        x = Variable("x")
         with pytest.raises(TomlExpressionError, match="Expected a constraint"):
             parse_constraint("2*x", {"x": x})
 
     def test_chained_comparison_error(self):
-        x = Variable("x", "-")
+        x = Variable("x")
         with pytest.raises(TomlExpressionError, match="Chained"):
             parse_constraint("1 <= x <= 10", {"x": x})
 
     def test_slice_constraint_produces_multiple(self):
         """Slice-based vector constraints expand to element-wise constraints."""
-        shear = VectorVariable(6, "V", "-")
+        shear = VectorVariable(6, "V")
         c = parse_constraint("V[:-1] >= V[1:]", {"V": shear})
         # ArrayConstraint wraps 5 element-wise constraints
         assert len(list(c)) == 5
@@ -292,23 +292,23 @@ class TestObjective:
     """Objective string parsing (min/max)."""
 
     def test_min_passthrough(self):
-        x = Variable("x", "-")
+        x = Variable("x")
         cost = parse_objective("min: x", {"x": x})
         assert cost is x
 
     def test_min_reciprocal(self):
-        h = Variable("h", "-")
-        w = Variable("w", "-")
-        d = Variable("d", "-")
+        h = Variable("h")
+        w = Variable("w")
+        d = Variable("d")
         ns = {"h": h, "w": w, "d": d}
         cost = parse_objective("min: 1/(h*w*d)", ns)
         assert isinstance(cost, Monomial)
         assert dict(cost.exp) == {h.key: -1, w.key: -1, d.key: -1}
 
     def test_max_inverts_to_reciprocal(self):
-        h = Variable("h", "-")
-        w = Variable("w", "-")
-        d = Variable("d", "-")
+        h = Variable("h")
+        w = Variable("w")
+        d = Variable("d")
         ns = {"h": h, "w": w, "d": d}
         min_cost = parse_objective("min: h*w*d", ns)
         max_cost = parse_objective("max: h*w*d", ns)
@@ -319,7 +319,7 @@ class TestObjective:
 
     def test_bad_objective(self):
         with pytest.raises(TomlExpressionError, match="min.*max"):
-            parse_objective("h*w*d", {"h": Variable("h", "-")})
+            parse_objective("h*w*d", {"h": Variable("h")})
 
 
 # ---------------------------------------------------------------------------
@@ -354,7 +354,7 @@ class TestSafety:
         ],
     )
     def test_rejects_dangerous_expression(self, expr):
-        ns = {"x": Variable("x", "-")}
+        ns = {"x": Variable("x")}
         with pytest.raises((TomlExpressionError, SyntaxError)):
             eval_expr(expr, ns)
 

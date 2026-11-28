@@ -33,7 +33,7 @@ class TestVarKey:
         """Test VarKey initialization"""
         # test protected field
         with pytest.raises(ValueError):
-            _ = ArrayVariable(1, "x", "-", idx=5)
+            _ = ArrayVariable(1, "x", idx=5)
         # test type
         x = VarKey("x")
         assert isinstance(x, VarKey)
@@ -50,7 +50,7 @@ class TestVarKey:
         assert isinstance(_FULL.latex(x), str)
         assert isinstance(latex_unitstr(x), str)
         # an element is a scalar: its index, not bold
-        y = VectorVariable(2, "y", "-")
+        y = VectorVariable(2, "y")
         assert _FULL.latex(y.key) == r"\boldsymbol{y}"
         assert _FULL.latex(y[0].key) == "{y}_{0}"
 
@@ -58,14 +58,14 @@ class TestVarKey:
         if sys.platform[:3] == "win":  # pragma: no cover
             return
 
-        t = Variable("t", "-")
-        u = Variable("u", "-")
-        v = Variable("v", "-")
-        w = Variable("w", "-")
-        x = VectorVariable(3, "x", "-")
-        y = VectorVariable(3, "y", "-")
-        z = VectorVariable(3, "z", "-")
-        a = VectorVariable((3, 2), "a", "-")
+        t = Variable("t")
+        u = Variable("u")
+        v = Variable("v")
+        w = Variable("w")
+        x = VectorVariable(3, "x")
+        y = VectorVariable(3, "y")
+        z = VectorVariable(3, "z")
+        a = VectorVariable((3, 2), "a")
 
         assert str(3 * (x + y) * z) == "3⋅(x[:] + y[:])⋅z[:]"
         # a numeric array was never written as one expression, so an expression
@@ -228,7 +228,7 @@ class TestRef:
         assert vk3.unitrepr == "m*m"
 
     def test_indexed(self):
-        x = VectorVariable(3, "x", "-")
+        x = VectorVariable(3, "x")
         assert x[0].key.ref == "x[0]#3"
         assert x[2].key.ref == "x[2]#3"
 
@@ -315,7 +315,7 @@ class TestVariable:
 
     def test_init(self):
         """Test Variable initialization"""
-        v = Variable("v", "-")
+        v = Variable("v")
         assert isinstance(v, PlainVariable)
         assert isinstance(v, Monomial)
         # test that operations on Variable cast to Monomial
@@ -324,7 +324,7 @@ class TestVariable:
 
     def test_isinstance_public_variable(self):
         """Variable() should be isinstance of the public Variable (issue #114)"""
-        v = Variable("v", "-")
+        v = Variable("v")
         assert isinstance(v, Variable)
 
     def test_variable_reconstruction_not_vectorized(self):
@@ -334,7 +334,7 @@ class TestVariable:
         The VarKey already encodes shape and lineage, so re-vectorizing is wrong.
         Regression test for issue #156 (broken by #153 / commit 76625c4).
         """
-        v = Variable("v", "-")
+        v = Variable("v")
         with Vectorize(3):
             reconstructed = Variable(v.key)
         assert reconstructed.key is v.key, (
@@ -344,8 +344,8 @@ class TestVariable:
 
     def test_value(self):
         """Detailed tests for value kwarg of __init__"""
-        a = Variable("a", "-")
-        b = Variable("b", "-", value=4)
+        a = Variable("a")
+        b = Variable("b", value=4)
         c = a**2 + b
         assert b.value == 4
         assert isinstance(b.value, float)
@@ -354,9 +354,10 @@ class TestVariable:
         assert p1 == p2
         assert a.value == a
 
-    def test_units_are_required(self):
-        with pytest.raises(TypeError, match='use "-" for dimensionless'):
-            Variable("x")
+    def test_without_units_it_is_dimensionless(self):
+        assert Variable("x").key.units is None
+        assert Variable("x", "-").key == Variable("x").key
+        assert VectorVariable(3, "v").key.units is None
 
     @pytest.mark.parametrize("value", [5, 2 * gpkit.units("km")])
     def test_a_value_in_the_units_slot_shows_the_keyword(self, value):
@@ -408,7 +409,7 @@ class TestVectorVariable:
         """Test VectorVariable initialization"""
         # test 1
         n = 3
-        v = VectorVariable(n, "v", "-", "dummy variable")
+        v = VectorVariable(n, "v", label="dummy variable")
         assert isinstance(v, NomialArray)
         v_mult = 3 * v
         for i in range(n):
@@ -419,10 +420,10 @@ class TestVectorVariable:
             assert not isinstance(v_mult[i], PlainVariable)
 
     def test_nomial_array_comp(self):
-        x = VectorVariable(3, "x", "-", "dummy variable")
-        x_0 = Variable("x", "-", "dummy variable", idx=(0,), shape=(3,))
-        x_1 = Variable("x", "-", "dummy variable", idx=(1,), shape=(3,))
-        x_2 = Variable("x", "-", "dummy variable", idx=(2,), shape=(3,))
+        x = VectorVariable(3, "x", label="dummy variable")
+        x_0 = Variable("x", label="dummy variable", idx=(0,), shape=(3,))
+        x_1 = Variable("x", label="dummy variable", idx=(1,), shape=(3,))
+        x_2 = Variable("x", label="dummy variable", idx=(2,), shape=(3,))
         x2 = NomialArray([x_0, x_1, x_2])
         assert x == x2
 
@@ -432,10 +433,10 @@ class TestVectorVariable:
         x = VectorVariable(n, "x", "m", "Beam Location", value=x_arr)
 
         with pytest.raises(ValueError):
-            _ = VectorVariable(2, "x", "-", value=[1, 2, 3])
+            _ = VectorVariable(2, "x", value=[1, 2, 3])
 
         with Vectorize(2):
-            x = VectorVariable(3, "x", "-", value=np.array([13, 15, 17]))
+            x = VectorVariable(3, "x", value=np.array([13, 15, 17]))
             assert x[0, 0].value == 13
             assert x[1, 0].value == 15
             assert x[2, 0].value == 17
@@ -454,17 +455,17 @@ class TestVectorVariable:
 
     def test_value_map_under_vectorize_fixes_the_vectors_own_index(self):
         with Vectorize(2):
-            x = VectorVariable(3, "x", "-", value={0: 7})
+            x = VectorVariable(3, "x", value={0: 7})
         assert [x[0, j].key.value for j in range(2)] == [7, 7]
         assert x[1, 0].key.value is None
 
     def test_value_map_index_out_of_range_raises(self):
         with pytest.raises(IndexError, match="out of range for 'v'"):
-            VectorVariable(3, "v", "-", value={3: 0})
+            VectorVariable(3, "v", value={3: 0})
 
     def test_value_map_refuses_two_indices_for_one_element(self):
         with pytest.raises(ValueError, match="2 and -1 both name element 2"):
-            VectorVariable(3, "v", "-", value={2: 1, -1: 5})
+            VectorVariable(3, "v", value={2: 1, -1: 5})
 
     def test_value_map_on_a_scalar_raises(self):
         with pytest.raises(TypeError, match="is a scalar"):
@@ -493,18 +494,16 @@ class TestVectorVariable:
         with pytest.raises(DimensionalityError, match=r"while fixing v\[0\]$"):
             VectorVariable(2, "v", "m", value={0: 1 * gpkit.ureg.s})
 
-    def test_a_vectors_units_are_required(self):
-        with pytest.raises(TypeError, match='use "-" for dimensionless'):
-            VectorVariable(3, "v")
+    def test_a_vectors_value_in_the_units_slot_shows_the_keyword(self):
         with pytest.raises(TypeError, match="value is keyword-only"):
             VectorVariable(3, "v", [1, 2, 3], "m")
 
     def test_vectorize_shapes(self):
         with gpkit.Vectorize(3):
             with gpkit.Vectorize(5):
-                y = gpkit.Variable("y", "-")
-                x = gpkit.VectorVariable(2, "x", "-")
-            z = gpkit.VectorVariable(7, "z", "-")
+                y = gpkit.Variable("y")
+                x = gpkit.VectorVariable(2, "x")
+            z = gpkit.VectorVariable(7, "z")
 
         assert y.key.shape == (5, 3)
         assert x.key.shape == (2, 5, 3)
@@ -523,7 +522,7 @@ class TestArrayVariable:
 
     def test_str(self):
         """Make sure string looks something like a numpy array"""
-        x = ArrayVariable((2, 4), "x", "-")
+        x = ArrayVariable((2, 4), "x")
         assert str(x) == "x[:]"
 
 
@@ -531,7 +530,7 @@ class TestArrayArithmeticAsWritten:
     """An array expression records what was written, as a scalar one does."""
 
     def test_in_place_ops_record_the_whole_expression(self):
-        q, r = VectorVariable(3, "q", "-"), VectorVariable(3, "r", "-")
+        q, r = VectorVariable(3, "q"), VectorVariable(3, "r")
         res = 2 * q
         res += r
         assert res.ast == (2 * q + r).ast
@@ -545,7 +544,7 @@ class TestArrayArithmeticAsWritten:
 
     def test_in_place_ops_leave_the_original_alone(self):
         "res = q; res += r rebinds res, as for scalars, rather than rewriting q."
-        q, r = VectorVariable(3, "q", "-"), VectorVariable(3, "r", "-")
+        q, r = VectorVariable(3, "q"), VectorVariable(3, "r")
         res = q
         res += r
         assert str(q) == "q[:]"
@@ -553,17 +552,17 @@ class TestArrayArithmeticAsWritten:
 
     def test_a_taylor_expansion_keeps_every_term(self):
         "te_exp_minus1 starts from 0 and adds with +=: both used to lose terms."
-        z = VectorVariable(3, "z", "-")
+        z = VectorVariable(3, "z")
         assert te_exp_minus1(z, 3).ast == (z**1 / 1 + z**2 / 2 + z**3 / 6).ast
 
     def test_adding_zero_adds_nothing(self):
         "As Signomial does, so sum() over an array's rows has no leading 0."
-        q, a = VectorVariable(3, "q", "-"), VectorVariable((2, 3), "a", "-")
+        q, a = VectorVariable(3, "q"), VectorVariable((2, 3), "a")
         assert str(0 + q) == "q[:]"
         assert str(sum(a)) == "a[0] + a[1]"
 
     def test_reflected_ops_build_elements_in_written_order(self):
-        q = VectorVariable(3, "q", "-")
+        q = VectorVariable(3, "q")
         assert str((2 * q)[0]) == "2⋅q[0]"
         assert str((1 + q)[0]) == "1 + q[0]"
 

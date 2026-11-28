@@ -4,8 +4,8 @@ import numpy as np
 
 from gpkit import Model, Variable
 
-x = Variable("x", "-")
-y = Variable("y", "-")
+x = Variable("x")
+y = Variable("y")
 
 objective = y
 

@@ -3,7 +3,7 @@
 from gpkit import Model, Variable
 from gpkit.constraints.bounded import Bounded
 
-x = Variable("x", "-")
+x = Variable("x")
 
 constraints = [x >= 1]
 

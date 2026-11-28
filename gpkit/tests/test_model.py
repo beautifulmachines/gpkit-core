@@ -58,7 +58,7 @@ class TestGP:
     """
 
     def test_no_monomial_constraints(self, solver):
-        x = Variable("x", "-")
+        x = Variable("x")
         ndig = get_ndig(solver)
         sol = Model(x, [x + 1 / x <= 3]).solve(solver=solver, verbosity=0)
         assert sol.cost == pytest.approx(0.381966, abs=10 ** (-ndig))
@@ -71,8 +71,8 @@ class TestGP:
 
         The global optimum is (x, y) = (sqrt(2), 1/sqrt(2)).
         """
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
         prob = Model(cost=(x + 2 * y), constraints=[x * y >= 1])
         assert prob.is_gp()
         sol = prob.solve(solver=solver, verbosity=0)
@@ -89,11 +89,11 @@ class TestGP:
 
     def test_dup_eq_constraint(self, solver):
         # regression test for issue #1551
-        a = Variable("a", "-", value=1)
-        b = Variable("b", "-")
-        c = Variable("c", "-", value=2)
-        d = Variable("d", "-")
-        z = Variable("z", "-", value=0.5)
+        a = Variable("a", value=1)
+        b = Variable("b")
+        c = Variable("c", value=2)
+        d = Variable("d")
+        z = Variable("z", value=0.5)
 
         # create a simple GP with equality constraints
         const = [
@@ -118,18 +118,18 @@ class TestGP:
 
     def test_same_exponents_different_coefficients(self, solver):
         "x >= 2 and x >= 5 share exponents but are not duplicates"
-        x = Variable("x", "-")
-        y = Variable("y", "-")
-        z = Variable("z", "-")
+        x = Variable("x")
+        y = Variable("y")
+        z = Variable("z")
         m = Model(x / (y * z), [x >= 2, 2 * y + 2 * z <= 1, x >= 5])
         sol = m.solve(verbosity=0, solver=solver)
         assert sol[x] == pytest.approx(5, abs=10 ** (-get_ndig(solver)))
         assert sol.cost == pytest.approx(80, abs=10 ** (-get_ndig(solver)))
 
     def test_sigeq(self, solver):
-        x = Variable("x", "-")
-        y = VectorVariable(1, "y", "-")
-        c = Variable("c", "-")
+        x = Variable("x")
+        y = VectorVariable(1, "y")
+        c = Variable("c")
         # test left vector input to sigeq
         with SignomialsEnabled():
             m = Model(
@@ -152,7 +152,7 @@ class TestGP:
         assert sol["y"][0] == pytest.approx(0.1908254, abs=10 ** (-get_ndig(solver)))
         assert sol["c"] == pytest.approx(0.2669448, abs=10 ** (-get_ndig(solver)))
         # test scalar input to sigeq
-        z = Variable("z", "-")
+        z = Variable("z")
         with SignomialsEnabled():
             m = Model(
                 c,
@@ -165,8 +165,8 @@ class TestGP:
 
     def test_601(self, solver):
         # tautological monomials should solve but not pass to the solver
-        x = Variable("x", "-")
-        y = Variable("y", "-", value=2)
+        x = Variable("x")
+        y = Variable("y", value=2)
         m = Model(x, [x >= 1, y == 2])
         m.solve(solver=solver, verbosity=0)
         assert len(list(m.as_hmapslt1({}))) == 3
@@ -174,14 +174,14 @@ class TestGP:
 
     def test_cost_freeing(self, solver):
         "Test freeing a variable that's in the cost."
-        x = Variable("x", "-", value=1)
-        x_min = Variable("x_{min}", "-", value=2)
-        intermediary = Variable("intermediary", "-")
+        x = Variable("x", value=1)
+        x_min = Variable("x_{min}", value=2)
+        intermediary = Variable("intermediary")
         m = Model(x, [x >= intermediary, intermediary >= x_min])
         with pytest.raises((PrimalInfeasible, UnknownInfeasible)):
             m.solve(solver=solver, verbosity=0)
-        x = Variable("x", "-", value=1)
-        x_min = Variable("x_{min}", "-", value=2)
+        x = Variable("x", value=1)
+        x_min = Variable("x_{min}", value=2)
         m = Model(x, [x >= x_min])
         with pytest.raises(PrimalInfeasible):
             m.solve(solver=solver, verbosity=0)
@@ -202,9 +202,9 @@ class TestGP:
         a Solution for a *different*, relaxed problem -- instead of raising.
         Callers who want a debug breakdown should call .debug() themselves.
         """
-        x = Variable("x", "-", value=1)
-        x_min = Variable("x_{min}", "-", value=2)
-        intermediary = Variable("intermediary", "-")
+        x = Variable("x", value=1)
+        x_min = Variable("x_{min}", value=2)
+        intermediary = Variable("intermediary")
         m = Model(x, [x >= intermediary, intermediary >= x_min])
         with pytest.raises((PrimalInfeasible, UnknownInfeasible)):
             m.solve(solver=solver, verbosity=1)
@@ -212,11 +212,11 @@ class TestGP:
     def test_simple_united_gp(self, solver):
         R = Variable("R", "nautical_miles")
         a0 = Variable("a0", "m/s", value=340.29)
-        theta = Variable("\\theta", "-", value=0.7598)
+        theta = Variable("\\theta", value=0.7598)
         t = Variable("t", "hr", value=10)
         T_loiter = Variable("T_{loiter}", "hr", value=1)
         T_reserve = Variable("T_{reserve}", "min", value=45)
-        M = VectorVariable(2, "M", "-")
+        M = VectorVariable(2, "M")
 
         prob = Model(
             1 / R, [t >= sum(R / a0 / M / theta**0.5) + T_loiter + T_reserve, M <= 0.76]
@@ -240,8 +240,8 @@ class TestGP:
 
     def test_trivial_vector_gp(self, solver):
         "Create and solve a trivial GP with VectorVariables"
-        x = VectorVariable(2, "x", "-")
-        y = VectorVariable(2, "y", "-")
+        x = VectorVariable(2, "x")
+        y = VectorVariable(2, "y")
         prob = Model(cost=(sum(x) + 2 * sum(y)), constraints=[x * y >= 1])
         sol = prob.solve(solver=solver, verbosity=0)
         assert sol["x"].shape == (2,)
@@ -272,7 +272,7 @@ class TestGP:
         assert sol2[Mdd] == pytest.approx(sol3[Mdd])
 
     def test_additive_constants(self, solver):
-        x = Variable("x", "-")
+        x = Variable("x")
         m = Model(1 / x, [1 >= 5 * x + 0.5, 1 >= 5 * x])
         m.solve(solver=solver, verbosity=0)
         gp = m.program  # created by solve()
@@ -280,8 +280,8 @@ class TestGP:
         assert gp.data.A.data[1] == gp.data.A.data[2]
 
     def test_zeroing(self, solver):
-        L = Variable("L", "-")
-        k = Variable("k", "-", value=0)
+        L = Variable("L")
+        k = Variable("k", value=0)
         with SignomialsEnabled():
             constr = [L - 5 * k <= 10]
         sol = Model(1 / L, constr).solve(solver, verbosity=0)
@@ -297,38 +297,38 @@ class TestGP:
 
         cvxopt cannot solve singular problems.
         """
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
         m = Model(y * x, [y * x >= 12])
         sol = m.solve(solver=solver, verbosity=0)
         assert sol.cost == pytest.approx(12, abs=10 ** (-get_ndig(solver)))
 
     def test_constants_in_objective_1(self, solver):
         "Issue 296"
-        x1 = Variable("x1", "-")
-        x2 = Variable("x2", "-")
+        x1 = Variable("x1")
+        x2 = Variable("x2")
         m = Model(1.0 + x1 + x2, [x1 >= 1.0, x2 >= 1.0])
         sol = m.solve(solver=solver, verbosity=0)
         assert sol.cost == pytest.approx(3, abs=10 ** (-get_ndig(solver)))
 
     def test_constants_in_objective_2(self, solver):
         "Issue 296"
-        x1 = Variable("x1", "-")
-        x2 = Variable("x2", "-")
+        x1 = Variable("x1")
+        x2 = Variable("x2")
         m = Model(x1**2 + 100 + 3 * x2, [x1 >= 10.0, x2 >= 15.0])
         sol = m.solve(solver=solver, verbosity=0)
         assert sol.cost / 245.0 == pytest.approx(1, abs=10 ** (-get_ndig(solver)))
 
     def test_terminating_constant_(self, solver):
-        x = Variable("x", "-")
-        y = Variable("y", "-", value=0.5)
+        x = Variable("x")
+        y = Variable("y", value=0.5)
         prob = Model(1 / x, [x + y <= 4])
         sol = prob.solve(verbosity=0)
         assert sol.cost == pytest.approx(1 / 3.5, abs=10 ** (-get_ndig(solver)))
 
     def test_exps_is_tuple(self, solver):
         "issue 407"
-        x = Variable("x", "-")
+        x = Variable("x")
         m = Model(x, [x >= 1])
         m.solve(solver=solver, verbosity=0)
         assert isinstance(m.program.cost.exps, tuple)
@@ -348,7 +348,7 @@ class TestGP:
     )
     def test_cvxopt_kwargs(self, solver):
         """Test that kwargs can be passed to cvxopt solver."""
-        x = Variable("x", "-")
+        x = Variable("x")
         m = Model(x, [x >= 12])
         sol = m.solve(solver=solver, verbosity=0, kktsolver="ldl")
         assert sol.cost == pytest.approx(12.0, abs=10 ** (-get_ndig(solver)))
@@ -368,7 +368,7 @@ class TestGP:
 
         class _Inner(Model):
             def setup(self):
-                v = self.v = Variable("v", "-")
+                v = self.v = Variable("v")
                 return [v >= 1]
 
         class _Outer(Model):
@@ -488,11 +488,7 @@ class TestGPSensitivities:
         substituted form, not the signomial as written, so it reports no per-term
         duals; the variable sensitivities are still exact.
         """
-        x, y, z = (
-            Variable("x", "-"),
-            Variable("y", "-", value=1),
-            Variable("z", "-", value=4),
-        )
+        x, y, z = Variable("x"), Variable("y", value=1), Variable("z", value=4)
         with SignomialsEnabled():
             m = Model(x, [x + y >= z])
         sol = m.solve(solver=solver, verbosity=0)
@@ -504,7 +500,7 @@ class TestGPSensitivities:
 
     def test_fixed_and_free_keys_share_one_sensitivity_map(self, solver):
         "sens.variables covers both, so a filtered copy would be a second encoding."
-        x = Variable("x", "-")
+        x = Variable("x")
         c = Variable("c", "-", value=2.0)
         sol = Model(x, [x >= c]).solve(solver=solver, verbosity=0)
         assert sol.sens.variables[c.key] == pytest.approx(1)
@@ -514,7 +510,7 @@ class TestGPSensitivities:
     def test_model_sens_is_sum_of_lambdas(self, solver):
         # sens.models[lineage] should equal sum(|lambda_i|) for constraints
         # owned by that lineage — not inflated by fixed-variable sensitivities.
-        x = Variable("x", "-")
+        x = Variable("x")
         c = Variable("c", "-", value=2.0)
         m = Model(x, [x >= c])
         sol = m.solve(solver=solver, verbosity=0)
@@ -526,10 +522,10 @@ class TestSP:
     "test case for SP class -- run for each installed solver via solver fixture"
 
     def test_sp_relaxation(self, solver):
-        w = Variable("w", "-")
-        x = Variable("x", "-")
-        y = Variable("y", "-")
-        z = Variable("z", "-")
+        w = Variable("w")
+        x = Variable("x")
+        y = Variable("y")
+        z = Variable("z")
         with SignomialsEnabled():
             m = Model(x, [x + y >= w, x + y <= z / 2, y <= x, y >= 1], {z: 3, w: 3})
         r1 = ConstantsRelaxed(m)
@@ -560,8 +556,8 @@ class TestSP:
         )
 
     def test_sp_bounded(self, solver):
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
 
         with SignomialsEnabled():
             m = Model(x, [x + y >= 1, y <= 0.1])  # solves
@@ -588,9 +584,9 @@ class TestSP:
 
     def test_values_vs_subs(self, solver):
         # Substitutions update method
-        x = Variable("x", "-")
-        y = Variable("y", "-")
-        z = Variable("z", "-")
+        x = Variable("x")
+        y = Variable("y")
+        z = Variable("z")
 
         with SignomialsEnabled():
             constraints = [x + y >= z, y >= x - 1]
@@ -600,7 +596,7 @@ class TestSP:
         assert sol.cost == pytest.approx(13, abs=10 ** (-get_ndig(solver)))
 
         # Constant variable declaration method
-        z = Variable("z", "-", value=5)
+        z = Variable("z", value=5)
         with SignomialsEnabled():
             constraints = [x + y >= z, y >= x - 1]
         m = Model(x + y * z, constraints)
@@ -608,8 +604,8 @@ class TestSP:
         assert sol.cost == pytest.approx(13, abs=10 ** (-get_ndig(solver)))
 
     def test_initially_infeasible(self, solver):
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
 
         with SignomialsEnabled():
             sigc = x >= y + y**2 - y**3
@@ -622,9 +618,9 @@ class TestSP:
         assert sol[y] == pytest.approx(0.5, abs=10 ** (-get_ndig(solver)))
 
     def test_sp_substitutions(self, solver):
-        x = Variable("x", "-")
-        y = Variable("y", "-", value=1)
-        z = Variable("z", "-", value=4)
+        x = Variable("x")
+        y = Variable("y", value=1)
+        z = Variable("z", value=4)
 
         old_stdout = sys.stdout
         sys.stdout = stringout = StringIO()
@@ -652,9 +648,9 @@ class TestSP:
         )
 
     def test_tautological(self, solver):
-        x = Variable("x", "-")
-        y = Variable("y", "-")
-        z = Variable("z", "-")
+        x = Variable("x")
+        y = Variable("y")
+        z = Variable("z")
 
         old_stdout = sys.stdout
         sys.stdout = stringout = StringIO()
@@ -677,9 +673,9 @@ class TestSP:
         )
 
     def test_impossible(self, solver):
-        x = Variable("x", "-")
-        y = Variable("y", "-")
-        z = Variable("z", "-")
+        x = Variable("x")
+        y = Variable("y")
+        z = Variable("z")
 
         with SignomialsEnabled():
             m1 = Model(x, [x + y >= z, x >= y])
@@ -688,8 +684,8 @@ class TestSP:
             _ = m1.localsolve(solver=solver)
 
     def test_trivial_sp(self, solver):
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
         with SignomialsEnabled():
             m = Model(x, [x >= 1 - y, y <= 0.1])
         with pytest.raises(InvalidGPConstraint):
@@ -702,9 +698,9 @@ class TestSP:
         assert sol.primal["x"] == pytest.approx(0.9, abs=10 ** (-get_ndig(solver)))
 
     def test_tautological_spconstraint(self, solver):
-        x = Variable("x", "-")
-        y = Variable("y", "-")
-        z = Variable("z", "-", value=0)
+        x = Variable("x")
+        y = Variable("y")
+        z = Variable("z", value=0)
         with SignomialsEnabled():
             m = Model(x, [x >= 1 - y, y <= 0.1, y >= z])
         with pytest.raises(InvalidGPConstraint):
@@ -713,8 +709,8 @@ class TestSP:
         assert sol.primal["x"] == pytest.approx(0.9, abs=10 ** (-get_ndig(solver)))
 
     def test_relaxation(self, solver):
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
         with SignomialsEnabled():
             constraints = [y + x >= 2, y <= x]
         objective = x
@@ -723,9 +719,9 @@ class TestSP:
 
         # issue #257
 
-        A = VectorVariable(2, "A", "-")
-        B = ArrayVariable([2, 2], "B", "-")
-        C = VectorVariable(2, "C", "-")
+        A = VectorVariable(2, "A")
+        B = ArrayVariable([2, 2], "B")
+        C = VectorVariable(2, "C")
         with SignomialsEnabled():
             constraints = [A <= B.dot(C), B <= 1, C <= 1]
         obj = 1 / A[0] + 1 / A[1]
@@ -733,14 +729,14 @@ class TestSP:
         m.localsolve(verbosity=0, solver=solver)
 
     def test_issue180(self, solver):
-        L = Variable("L", "-")
-        Lmax = Variable("L_{max}", "-", value=10)
-        W = Variable("W", "-")
-        Wmax = Variable("W_{max}", "-", value=10)
-        A = Variable("A", "-", value=10)
-        Obj = Variable("Obj", "-")
+        L = Variable("L")
+        Lmax = Variable("L_{max}", value=10)
+        W = Variable("W")
+        Wmax = Variable("W_{max}", value=10)
+        A = Variable("A", value=10)
+        Obj = Variable("Obj")
         a_val = 0.01
-        a = Variable("a", "-", value=a_val)
+        a = Variable("a", value=a_val)
         with SignomialsEnabled():
             eqns = [
                 L <= Lmax,
@@ -757,8 +753,8 @@ class TestSP:
         assert spsol.cost == pytest.approx(gpsol.cost)
 
     def test_trivial_sp2(self, solver):
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
 
         # converging from above
         with SignomialsEnabled():
@@ -786,8 +782,8 @@ class TestSP:
         )
 
     def test_sp_initial_guess_sub(self, solver):
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
         x0 = 3
         y0 = 2
         with SignomialsEnabled():
@@ -809,8 +805,8 @@ class TestSP:
         assert sol.cost == pytest.approx(2, abs=10 ** (-get_ndig(solver)))
 
     def test_small_named_signomial(self, solver):
-        x = Variable("x", "-")
-        z = Variable("z", "-")
+        x = Variable("x")
+        z = Variable("z")
         local_ndig = 4
         nonzero_adder = 0.1
         with SignomialsEnabled():
@@ -823,8 +819,8 @@ class TestSP:
 
     def test_sigs_not_allowed_in_cost(self, solver):
         with SignomialsEnabled():
-            x = Variable("x", "-")
-            y = Variable("y", "-")
+            x = Variable("x")
+            y = Variable("y")
             J = 0.01 * ((x - 1) ** 2 + (y - 1) ** 2) + (x * y - 1) ** 2
             m = Model(J)
             with pytest.raises(InvalidPosynomial):
@@ -832,9 +828,9 @@ class TestSP:
 
     def test_becomes_signomial(self, solver):
         "Test that a GP does not become an SP after substitutions"
-        x = Variable("x", "-")
-        c = Variable("c", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        c = Variable("c")
+        y = Variable("y")
         m = Model(x, [y >= 1 + c * x, y <= 0.5], {c: -1})
         with pytest.raises(InvalidGPConstraint), SignomialsEnabled():
             m.gp()
@@ -843,9 +839,9 @@ class TestSP:
 
     def test_reassigned_constant_cost(self, solver):
         # for issue 1131
-        x = Variable("x", "-")
-        x_min = Variable("x_min", "-", value=1)
-        y = Variable("y", "-")
+        x = Variable("x")
+        x_min = Variable("x_min", value=1)
+        y = Variable("y")
         with SignomialsEnabled():
             m = Model(y, [y + 0.5 >= x, x >= x_min, 6 >= y])
         m.localsolve(verbosity=0, solver=solver)
@@ -855,8 +851,8 @@ class TestSP:
 
     def test_unbounded_debugging(self, solver):
         "Test nearly-dual-feasible problems"
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
         m = Model(x * y, [x * y**1.01 >= 100])
         with pytest.raises((DualInfeasible, UnknownInfeasible)):
             m.solve(solver, verbosity=0)
@@ -1006,9 +1002,9 @@ class TestModelNoSolve:
 
     def test_posy_simplification(self):
         "issue 525"
-        D = Variable("D", "-")
-        mi = Variable("m_i", "-")
-        V = Variable("V", "-", value=1)
+        D = Variable("D")
+        mi = Variable("m_i")
+        V = Variable("V", value=1)
         m1 = Model(D + V, [V >= mi + 0.4, mi >= 0.1, D >= mi**2])
         m2 = Model(D + 1, [1 >= mi + 0.4, mi >= 0.1, D >= mi**2])
         gp1 = m1.gp()
@@ -1018,8 +1014,8 @@ class TestModelNoSolve:
 
     def test_partial_sub_signomial(self):
         "Test SP partial x0 initialization"
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
         with SignomialsEnabled():
             m = Model(x, [x + y >= 1, y <= 0.5])
         gp = m.sp().gp(x0={x: 0.5})
@@ -1137,14 +1133,14 @@ def test_vectorized_block_marker():
 
     class _VBLeaf(Model):
         def setup(self):
-            x = Variable("x_vb", "-")
+            x = Variable("x_vb")
             return [x >= 1]
 
     class _VBParent(Model):
         def setup(self):
             with Vectorize(5):
                 leaf = _VBLeaf()
-            y = Variable("y_vb", "-")
+            y = Variable("y_vb")
             return [y >= 1, leaf]
 
     m = _VBParent()
@@ -1161,8 +1157,8 @@ def test_n_free_and_n_constraints():
 
     class _M(Model):
         def setup(self):
-            x = Variable("x", "-")
-            y = Variable("y", "-")
+            x = Variable("x")
+            y = Variable("y")
             return [x >= 1, y >= x, x * y <= 10]
 
     m = _M()
@@ -1174,7 +1170,7 @@ def test_n_free_and_n_constraints():
 
     class _Nested(Model):
         def setup(self):
-            a = Variable("a", "-")
+            a = Variable("a")
             child = _M()
             return [a >= 1, child]
 
@@ -1197,15 +1193,15 @@ def test_percentages_read_as_percentages():
     %% escapes a literal % for %-style formatting only; inside an f-string it
     is two characters, so these messages used to read "infeasible by 1e+02%%".
     """
-    c = Variable("c_pct", "-", value=2)
+    c = Variable("c_pct", value=2)
     with pytest.raises(PrimalInfeasible) as excinfo:
-        Model(Variable("x_pct", "-"), [c <= 1]).solve(verbosity=0)
+        Model(Variable("x_pct"), [c <= 1]).solve(verbosity=0)
     assert "infeasible by 100%" in str(excinfo.value)
 
 
 def test_verbose_solve_percentages_read_as_percentages(capsys):
     "The timing breakdown a verbose solve prints is user-facing too."
-    x = Variable("x_vrb", "-")
+    x = Variable("x_vrb")
     Model(x, [x >= 1]).solve(verbosity=3)
     printed = capsys.readouterr().out
     assert "Result packing took" in printed
@@ -1240,7 +1236,7 @@ def test_solver_input_independent_of_hash_seed():
 
 def test_solver_kwargs_do_not_outlive_their_solve():
     "Options passed to one solve never become defaults for the next"
-    x = Variable("x", "-")
+    x = Variable("x")
     before = copy.deepcopy(DEFAULT_SOLVER_KWARGS)
     Model(x, [x >= 1]).solve(solver="cvxopt", verbosity=0, use_leqs=False)
     assert DEFAULT_SOLVER_KWARGS == before

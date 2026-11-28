@@ -6,8 +6,8 @@ from gpkit import Model, Variable
 
 # build model (dummy)
 # decision variable
-x = Variable("x", "-")
-y = Variable("y", "-")
+x = Variable("x")
+y = Variable("y")
 
 # objective and constraints
 objective = 0.23 + x / y  # minimize x and y

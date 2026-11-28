@@ -216,8 +216,8 @@ class TestRenderedDiff:
     """
 
     def test_a_moved_value_is_reported_as_a_percentage(self):
-        x = Variable("x_rend", "-")
-        c = Variable("c_rend", "-", value=2.0)
+        x = Variable("x_rend")
+        c = Variable("c_rend", value=2.0)
         m = Model(x, [x >= c])
         baseline = m.solve(verbosity=0)
         m.substitutions[c] = 4.0
@@ -227,7 +227,7 @@ class TestRenderedDiff:
 
     def test_an_unchanged_cost_still_reports(self):
         "A diff that found nothing should say so, not render empty."
-        x = Variable("x_same", "-")
+        x = Variable("x_same")
         sol = Model(x, [x >= 1]).solve(verbosity=0)
         assert "+0%" in sol.diff(sol)
 
@@ -279,7 +279,7 @@ class TestRenderedDiff:
 
     def test_a_variable_absent_from_the_baseline_renders(self):
         "This raised TypeError in the renderer's filter before the rewrite."
-        x, y = Variable("x_add", "-"), Variable("y_add", "-")
+        x, y = Variable("x_add"), Variable("y_add")
         baseline = Model(x, [x >= 1]).solve(verbosity=0)
         scenario = Model(x + y, [x >= 1, y >= 2]).solve(verbosity=0)
         text = scenario.diff(baseline)
@@ -287,7 +287,7 @@ class TestRenderedDiff:
 
     def test_a_variable_absent_from_the_scenario_renders(self):
         "Baseline-only keys used to be dropped without a word."
-        x, y = Variable("x_rm", "-"), Variable("y_rm", "-")
+        x, y = Variable("x_rm"), Variable("y_rm")
         baseline = Model(x + y, [x >= 1, y >= 2]).solve(verbosity=0)
         scenario = Model(x, [x >= 1]).solve(verbosity=0)
         assert "(only in baseline)" in scenario.diff(baseline)
@@ -315,8 +315,8 @@ class TestRenderedDiff:
         assert "%" not in text.split("Free Variable")[0]  # no bogus percentage
 
     def test_a_sweep_diffs_against_one_baseline_per_point(self):
-        x = Variable("x_sw", "-")
-        c = Variable("c_sw", "-", value=2.0)
+        x = Variable("x_sw")
+        c = Variable("c_sw", value=2.0)
         m = Model(x, [x >= c])
         baseline = m.solve(verbosity=0)
         sweep = m.sweep({c: [2.0, 4.0]}, verbosity=0)
@@ -326,8 +326,8 @@ class TestRenderedDiff:
 
 def test_changed_agrees_with_almost_equal():
     "almost_equal is this same comparison collapsed to a boolean."
-    x = Variable("x_cmp", "-")
-    c = Variable("c_cmp", "-", value=2.0)
+    x = Variable("x_cmp")
+    c = Variable("c_cmp", value=2.0)
     m = Model(x, [x >= c])
     sol = m.solve(verbosity=0)
     m.substitutions[c] = 2.5

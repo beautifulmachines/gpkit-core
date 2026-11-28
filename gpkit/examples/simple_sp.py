@@ -3,8 +3,8 @@
 from gpkit import Model, SignomialsEnabled, Variable
 
 # Decision variables
-x = Variable("x", "-")
-y = Variable("y", "-")
+x = Variable("x")
+y = Variable("y")
 
 # must enable signomials for subtraction
 with SignomialsEnabled():

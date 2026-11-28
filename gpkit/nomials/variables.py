@@ -38,12 +38,8 @@ def _check_scalar_value(descr):
 
 
 def _units(units):
-    "A variable's units: required, and a string."
-    if units is None:
-        raise TypeError(
-            'units are required; use "-" for dimensionless: Variable("x", "-")'
-        )
-    if not isinstance(units, Strings):
+    "A variable's units: a string, or None for dimensionless."
+    if units is not None and not isinstance(units, Strings):
         raise TypeError(
             f"units must be a string, not {units!r}; "
             'value is keyword-only: Variable("x", "m", value=5)'
@@ -101,7 +97,7 @@ def _vector_values(name, shape, values):
 class Variable(Monomial):
     """A described singlet Monomial: Variable(name, units, label, value=...).
 
-    units is "-" for dimensionless. value, if given, fixes the variable: a
+    Without units (or with "-") it is dimensionless. value, if given, fixes it: a
     number, a quantity (stored in the variable's units) or a linked function.
     Other keywords are VarKey fields. Variable(varkey) rebuilds one from a key.
     """

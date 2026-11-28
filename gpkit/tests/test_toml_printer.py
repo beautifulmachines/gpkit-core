@@ -164,7 +164,7 @@ class TestToToml:
         assert 'd = ["m", "dimensions"]' in toml_str
 
     def test_write_to_file(self, tmp_path):
-        x = Variable("x", "-")
+        x = Variable("x")
         m = Model(x, [x >= 1])
         path = tmp_path / "test.toml"
         to_toml(m, path=path)
@@ -257,7 +257,7 @@ class TestRoundTrip:
         toml_str = to_toml(m1)
         assert "guess({m: 1, 6.2832*rho_c*r**2*t: 0}) >= " in toml_str
         assert to_toml(load_toml(toml_str)) == toml_str
-        x, y, z = Variable("x", "-"), Variable("y", "-"), Variable("z", "-")
+        x, y, z = Variable("x"), Variable("y"), Variable("z")
         m = Model(1 / (x * y), [guess({x: 1, 2 * y: 3}) >= z + 1, x <= 2, y <= 2])
         assert "guess({x: 0.25, 2*y: 0.75}) >= " in to_toml(m)
 
@@ -525,7 +525,7 @@ class TestUnwritableConstraints:
     "A constraint with no written form has no TOML spelling, and says so."
 
     def test_raises_naming_its_type(self):
-        x, y = Variable("x", "-"), Variable("y", "-")
+        x, y = Variable("x"), Variable("y")
         m = Model(y, [Opaque(x, y), x >= 1])
         with pytest.raises(ValueError, match="Opaque"):
             to_toml(m)

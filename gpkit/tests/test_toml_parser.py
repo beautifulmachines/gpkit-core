@@ -380,7 +380,7 @@ class TestGuess:
     )
     def test_either_side(self, constraint):
         (c, *_) = load_toml(_with_constraint(constraint)).flat()
-        x, y = Variable("x", "-"), Variable("y", "-")
+        x, y = Variable("x"), Variable("y")
         assert {str(t): w for t, w in c.guess.weights.items()} == {
             str(x): 0.25,
             str(2 * y): 0.75,

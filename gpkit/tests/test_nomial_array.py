@@ -18,20 +18,20 @@ class TestNomialArray:
     """
 
     def test_shape(self):
-        x = VectorVariable((2, 3), "x", "-")
+        x = VectorVariable((2, 3), "x")
         assert x.shape == (2, 3)
         assert isinstance(render(x, TEXT), str)
         assert isinstance(render(x, LATEX), str)
 
     def test_ndim(self):
-        x = VectorVariable((3, 4), "x", "-")
+        x = VectorVariable((3, 4), "x")
         assert x.ndim == 2
 
     def test_array_mult(self):
-        x = VectorVariable(3, "x", "-", "dummy variable")
-        x_0 = Variable("x", "-", "dummy variable", idx=(0,), shape=(3,))
-        x_1 = Variable("x", "-", "dummy variable", idx=(1,), shape=(3,))
-        x_2 = Variable("x", "-", "dummy variable", idx=(2,), shape=(3,))
+        x = VectorVariable(3, "x", label="dummy variable")
+        x_0 = Variable("x", label="dummy variable", idx=(0,), shape=(3,))
+        x_1 = Variable("x", label="dummy variable", idx=(1,), shape=(3,))
+        x_2 = Variable("x", label="dummy variable", idx=(2,), shape=(3,))
         p = x_0**2 + x_1**2 + x_2**2
         assert x.dot(x) == p
         m = NomialArray(
@@ -44,11 +44,11 @@ class TestNomialArray:
         assert x.outer(x) == m
 
     def test_elementwise_mult(self):
-        m = Variable("m", "-")
-        x = VectorVariable(3, "x", "-", "dummy variable")
-        x_0 = Variable("x", "-", "dummy variable", idx=(0,), shape=(3,))
-        x_1 = Variable("x", "-", "dummy variable", idx=(1,), shape=(3,))
-        x_2 = Variable("x", "-", "dummy variable", idx=(2,), shape=(3,))
+        m = Variable("m")
+        x = VectorVariable(3, "x", label="dummy variable")
+        x_0 = Variable("x", label="dummy variable", idx=(0,), shape=(3,))
+        x_1 = Variable("x", label="dummy variable", idx=(1,), shape=(3,))
+        x_2 = Variable("x", label="dummy variable", idx=(2,), shape=(3,))
         # multiplication with numbers
         v = NomialArray([2, 2, 3]).T
         p = NomialArray([2 * x_0, 2 * x_1, 3 * x_2]).T
@@ -70,17 +70,17 @@ class TestNomialArray:
             assert isinstance(render(array, LATEX), str)
 
     def test_constraint_gen(self):
-        x = VectorVariable(3, "x", "-", "dummy variable")
-        x_0 = Variable("x", "-", "dummy variable", idx=(0,), shape=(3,))
-        x_1 = Variable("x", "-", "dummy variable", idx=(1,), shape=(3,))
-        x_2 = Variable("x", "-", "dummy variable", idx=(2,), shape=(3,))
+        x = VectorVariable(3, "x", label="dummy variable")
+        x_0 = Variable("x", label="dummy variable", idx=(0,), shape=(3,))
+        x_1 = Variable("x", label="dummy variable", idx=(1,), shape=(3,))
+        x_2 = Variable("x", label="dummy variable", idx=(2,), shape=(3,))
         v = NomialArray([1, 2, 3]).T
         p = [x_0, x_1 / 2, x_2 / 3]
         constraint = ConstraintSet([x <= v])
         assert list(constraint.as_hmapslt1({})) == [e.hmap for e in p]
 
     def test_substition(self):
-        x = VectorVariable(3, "x", "-", "dummy variable")
+        x = VectorVariable(3, "x", label="dummy variable")
         c = {x: [1, 2, 3]}
         assert x.sub(c) == [Monomial({}, e) for e in [1, 2, 3]]
         p = x**2
@@ -103,12 +103,12 @@ class TestNomialArray:
         assert mismatch.prod().c == 1 * gpkit.ureg.m * gpkit.ureg.ft
 
     def test_sum(self):
-        x = VectorVariable(5, "x", "-")
+        x = VectorVariable(5, "x")
         p = x.sum()
         assert isinstance(p, Posynomial)
         assert p == sum(x)
 
-        x = VectorVariable((2, 3), "x", "-")
+        x = VectorVariable((2, 3), "x")
         rowsum = x.sum(axis=1)
         colsum = x.sum(axis=0)
         assert isinstance(rowsum, NomialArray)
@@ -119,12 +119,12 @@ class TestNomialArray:
         assert len(colsum) == 3
 
     def test_getitem(self):
-        x = VectorVariable((2, 4), "x", "-")
+        x = VectorVariable((2, 4), "x")
         assert isinstance(x[0][0], Monomial)
         assert isinstance(x[0, 0], Monomial)
 
     def test_prod(self):
-        x = VectorVariable(3, "x", "-")
+        x = VectorVariable(3, "x")
         m = x.prod()
         assert isinstance(m, Monomial)
         assert m == x[0] * x[1] * x[2]
@@ -133,14 +133,14 @@ class TestNomialArray:
         assert pows.prod() == x[0] ** 6
 
     def test_outer(self):
-        x = VectorVariable(3, "x", "-")
-        y = VectorVariable(3, "y", "-")
+        x = VectorVariable(3, "x")
+        y = VectorVariable(3, "y")
         assert np.outer(x, y) == x.outer(y)
         assert np.outer(y, x) == y.outer(x)
         assert isinstance(x.outer(y), NomialArray)
 
     def test_empty(self):
-        x = VectorVariable(3, "x", "-")
+        x = VectorVariable(3, "x")
         # have to create this using slicing, to get object dtype
         empty_posy_array = x[:0]
         with pytest.raises(ValueError):

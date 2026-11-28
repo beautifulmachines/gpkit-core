@@ -2,7 +2,7 @@
 
 from gpkit import Variable
 
-x = Variable("x", "-")
+x = Variable("x")
 p = x**2
 assert p.sub({x: 3}) == 9
 assert p.sub({x.key: 3}) == 9

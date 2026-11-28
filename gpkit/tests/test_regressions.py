@@ -22,23 +22,23 @@ def test_linked_functions_and_subs_in_vectorization():
         "Vehicle model"
 
         def setup(self):
-            self.a = a = Variable("a", "-")
+            self.a = a = Variable("a")
             return [a >= 1]
 
     class Fleet2(Model):
         "Fleet model (composed of multiple Vehicles)"
 
         def setup(self):
-            x = Variable("x", "-")
+            x = Variable("x")
 
             def myfun(c):
                 return [np.array(c[x]) - 1, np.ones(x.key.shape)]
 
             with Vectorize(2):
-                y = Variable("y", "-", value=myfun)
+                y = Variable("y", value=myfun)
                 self.Vehicle = Vehicle()
 
-            self.z = z = Variable("z", "-")
+            self.z = z = Variable("z")
             constraints = [z >= sum(y / x * self.Vehicle.a), self.Vehicle]
             return constraints, {"x": 4}
 
@@ -67,9 +67,9 @@ def test_linked_functions_and_subs_in_vectorization():
         "Simple model"
 
         def setup(self):
-            self.x = x = Variable("x", "-")
-            y = Variable("y", "-", value=1)
-            z = Variable("z", "-", value=2)
+            self.x = x = Variable("x")
+            y = Variable("y", value=1)
+            z = Variable("z", value=2)
             return [x >= y + z]
 
     class Cake(Model):
@@ -98,15 +98,15 @@ def test_returned_substitutions_broadcast_over_vectorized_submodels():
         "Pie model"
 
         def setup(self):
-            self.x = x = Variable("x", "-")
-            z = Variable("z", "-")
+            self.x = x = Variable("x")
+            z = Variable("z")
             return [x >= z], {"z": 1}
 
     class Cake(Model):
         "Cake model, containing a vector of Pies"
 
         def setup(self):
-            self.y = y = Variable("y", "-")
+            self.y = y = Variable("y")
             with Vectorize(2):
                 s = Pie()
             constraints = [y >= s.x, s]

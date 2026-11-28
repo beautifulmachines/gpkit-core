@@ -25,7 +25,7 @@ To declare a variable with a constant value, use the ``Variable`` class, as abov
 .. literalinclude:: examples/gettingstarted.py
     :lines: 16
 
-A value given as a quantity, such as ``2*units("km")``, is stored in the variable's units. Units are required; write ``"-"`` for a dimensionless variable. The description is optional.
+A value given as a quantity, such as ``2*units("km")``, is stored in the variable's units. The unit and description arguments are optional; a variable without units is dimensionless.
 
 .. literalinclude:: examples/gettingstarted.py
     :lines: 19-20

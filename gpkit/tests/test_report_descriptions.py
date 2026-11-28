@@ -96,7 +96,7 @@ class TestBuildReportIRDescription:
             """Aerodynamics submodel."""
 
             def setup(self):
-                x = Variable("x_ir_aero", "-")
+                x = Variable("x_ir_aero")
                 return [x >= 1]
 
         ir = model_view(_IRAero())
@@ -107,7 +107,7 @@ class TestBuildReportIRDescription:
 
         class _IRAss(Model):
             def setup(self):
-                x = Variable("x_ir_ass", "-")
+                x = Variable("x_ir_ass")
                 return [x >= 1]
 
             @classmethod
@@ -126,7 +126,7 @@ class TestBuildReportIRDescription:
 
         class _IRRef(Model):
             def setup(self):
-                x = Variable("x_ir_ref", "-")
+                x = Variable("x_ir_ref")
                 return [x >= 1]
 
             @classmethod
@@ -150,7 +150,7 @@ class TestBuildReportIRDescription:
             references: ClassVar = ["Raymer 2018"]
 
             def setup(self):
-                x = Variable("x_ir_cls", "-")
+                x = Variable("x_ir_cls")
                 return [x >= 1]
 
         ir = model_view(_IRClassAttr())
@@ -160,7 +160,7 @@ class TestBuildReportIRDescription:
 
     def test_build_ir_anonymous_no_description(self):
         """Anonymous model sections have empty description, assumptions, references."""
-        x = Variable("x_ir_anon", "-")
+        x = Variable("x_ir_anon")
         m = Model(1 / x, [x >= 1])
         ir = model_view(m)
         assert ir.description == ""
@@ -172,7 +172,7 @@ class TestBuildReportIRDescription:
 
         class _IRFM(Model):
             def setup(self):
-                x = Variable("x_ir_fm", "-")
+                x = Variable("x_ir_fm")
                 return [x >= 1]
 
         params = inspect.signature(model_view).parameters
@@ -188,7 +188,7 @@ class TestBuildReportIRDescription:
                 return "Child notes."
 
             def setup(self):
-                self.y = Variable("y_ir_pre", "-")
+                self.y = Variable("y_ir_pre")
                 return [self.y >= 1]
 
         class _Parent(Model):
@@ -448,7 +448,7 @@ class TestObjective:
 
         class _ConstCost(Model):
             def setup(self):
-                x = Variable("x_cc", "-")
+                x = Variable("x_cc")
                 return [x >= 1]
 
         m = _ConstCost()
@@ -461,7 +461,7 @@ class TestObjective:
 
         class _Child(Model):
             def setup(self):
-                x = Variable("x_child_obj", "-")
+                x = Variable("x_child_obj")
                 return [x >= 1]
 
         class _Parent(Model):
@@ -469,8 +469,8 @@ class TestObjective:
 
             def setup(self):
                 self.child = _Child()
-                x = Variable("x_child_obj2", "-")
-                y = Variable("y_parent_obj", "-")
+                x = Variable("x_child_obj2")
+                y = Variable("y_parent_obj")
                 self.cost = y
                 return [self.child, y >= x, x >= 1]
 
@@ -496,7 +496,7 @@ class TestObjective:
 
         class _NoObj(Model):
             def setup(self):
-                x = Variable("x_noobj", "-")
+                x = Variable("x_noobj")
                 return [x >= 1]
 
         m = _NoObj()
@@ -508,7 +508,7 @@ class TestObjective:
 
         class _NoObjMd(Model):
             def setup(self):
-                x = Variable("x_noobjmd", "-")
+                x = Variable("x_noobjmd")
                 return [x >= 1]
 
         m = _NoObjMd()

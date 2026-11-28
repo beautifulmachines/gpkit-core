@@ -57,8 +57,8 @@ class TestSiblingDedup:
 
     def test_sibling_construction_idempotent(self):
         m = Variable("m", "kg", growth=0.25)
-        a = Variable("m_growth", units="kg", lineage=m.key.lineage)
-        b = Variable("m_growth", units="kg", lineage=m.key.lineage)
+        a = Variable("m_growth", "kg", lineage=m.key.lineage)
+        b = Variable("m_growth", "kg", lineage=m.key.lineage)
         assert a.key == b.key
         assert hash(a.key) == hash(b.key)
         assert a.key.ref == b.key.ref
@@ -66,8 +66,8 @@ class TestSiblingDedup:
     def test_distinct_parents_yield_distinct_siblings(self):
         m = Variable("m", "kg", growth=0.25)
         p = Variable("P", "W", growth=0.10)
-        m_growth = Variable("m_growth", units="kg", lineage=m.key.lineage)
-        p_growth = Variable("P_growth", units="W", lineage=p.key.lineage)
+        m_growth = Variable("m_growth", "kg", lineage=m.key.lineage)
+        p_growth = Variable("P_growth", "W", lineage=p.key.lineage)
         assert m_growth.key != p_growth.key
 
 
@@ -223,7 +223,7 @@ class TestSingleLevelSolve:
         m_hand = Variable("m_hand", "kg")
         e_hand = Variable("e_hand", "kg", value=100)
         m_growth_hand = Variable("m_growth_hand", "kg")
-        f_hand = Variable("f_hand", "-", value=0.25)
+        f_hand = Variable("f_hand", value=0.25)
         sol_hand = Model(
             m_hand,
             [m_growth_hand >= f_hand * e_hand, m_hand >= e_hand + m_growth_hand],

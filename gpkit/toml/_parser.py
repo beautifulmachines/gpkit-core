@@ -132,9 +132,11 @@ def _make_variable(name, value, units, label):
     Vectorize context automatically become ArrayVariables.
     """
     _validate_var_name(name)
-    descr = {"name": name, "units": units or "-"}  # a spec without units is "-"
+    descr = {"name": name}
     if value is not None:
         descr["value"] = value
+    if units is not None:
+        descr["units"] = units
     if label is not None:
         descr["label"] = label
     try:
@@ -146,7 +148,7 @@ def _make_variable(name, value, units, label):
 def _make_vector_variable(name, shape, value, units, label):
     """Create a gpkit VectorVariable (ArrayVariable) from parsed spec."""
     _validate_var_name(name)
-    descr = {"name": name, "units": units or "-"}  # a spec without units is "-"
+    descr = {"name": name}
     if isinstance(value, dict):
         descr["value"] = value
     elif value is not None:
@@ -156,6 +158,8 @@ def _make_vector_variable(name, shape, value, units, label):
                 f"given {np.shape(value)} values"
             )
         descr["value"] = np.ones(shape) * value
+    if units is not None:
+        descr["units"] = units
     if label is not None:
         descr["label"] = label
     try:

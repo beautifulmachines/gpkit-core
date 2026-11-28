@@ -29,7 +29,7 @@ class TestNomialSubs:
             "simple vectorized link"
 
             def setup(self):
-                self.y = y = Variable("y", "-", value=1)
+                self.y = y = Variable("y", value=1)
 
                 def vectorlink(c):
                     "linked vector function"
@@ -37,7 +37,7 @@ class TestNomialSubs:
                         return np.array(c[y]) + adnumber([1, 2, 3])
                     return c[y] + np.array([1, 2, 3])
 
-                self.x = x = VectorVariable(3, "x", "-")
+                self.x = x = VectorVariable(3, "x")
                 return [], {x: vectorlink}
 
         m = VectorLinked()
@@ -48,7 +48,7 @@ class TestNomialSubs:
 
     def test_numeric(self):
         """Basic substitution of numeric value"""
-        x = Variable("x", "-")
+        x = Variable("x")
         p = x**2
         assert p.sub({x: 3}) == 9
         assert p.sub({x.key: 3}) == 9
@@ -62,9 +62,9 @@ class TestNomialSubs:
             assert (x / y).value == pytest.approx(0.9144)
 
     def test_vector(self):
-        x = Variable("x", "-")
-        y = Variable("y", "-")
-        z = VectorVariable(2, "z", "-")
+        x = Variable("x")
+        y = Variable("y")
+        z = VectorVariable(2, "z")
         p = x * y * z
         assert all(p.sub({x: 1, "y": 2}) == 2 * z)
         assert all(p.sub({x: 1, y: 2, "z": [1, 2]}) == z.sub({z: [2, 4]}))
@@ -78,25 +78,25 @@ class TestNomialSubs:
 
     def test_variable(self):
         """Test special single-argument substitution for Variable"""
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
         _ = x * y**2
         assert x.sub(3) == 3
         # make sure x was not mutated
-        assert x == Variable("x", "-")
-        assert x.sub(3) != Variable("x", "-")
+        assert x == Variable("x")
+        assert x.sub(3) != Variable("x")
         # also make sure the old way works
         assert x.sub({x: 3}) == 3
         # and for vectors
-        xvec = VectorVariable(3, "x", "-")
+        xvec = VectorVariable(3, "x")
         assert xvec[1].sub(3) == 3
 
     def test_signomial(self):
         """Test Signomial substitution"""
-        D = Variable("D", units="N")
-        x = Variable("x", units="N")
-        y = Variable("y", units="N")
-        a = Variable("a", "-")
+        D = Variable("D", "N")
+        x = Variable("x", "N")
+        y = Variable("y", "N")
+        a = Variable("a")
         with SignomialsEnabled():
             sc = a * x + (1 - a) * y - D
             subbed = sc.sub({a: 0.1})
@@ -112,8 +112,8 @@ class TestModelSubs:
     """Test substitution for Model objects"""
 
     def test_bad_gp_sub(self):
-        x = Variable("x", "-")
-        y = Variable("y", "-")
+        x = Variable("x")
+        y = Variable("y")
         with pytest.raises(ValueError, match="y must be fixed to a finite number"):
             Model(x, [y >= 1], {y: x})
 
@@ -126,7 +126,7 @@ class TestModelSubs:
 
     def test_quantity_sub(self):
         x = Variable("x", "cm", value=1)
-        y = Variable("y", "-", value=1)
+        y = Variable("y", value=1)
         assert x.sub({x: 1 * gpkit.units.m}).c.magnitude == 100
         # NOTE: uncomment the below if requiring Quantity substitutions
         # with pytest.raises(ValueError): x.sub(x, 1)
@@ -147,9 +147,9 @@ class TestModelSubs:
         assert cost / (2 * gpkit.ureg.nmi) == pytest.approx(1.0)
 
     def test_phantoms(self):
-        x = Variable("x", "-")
-        x_ = Variable("x", "-", value=1, lineage=[("test", 0)])
-        xv = VectorVariable(2, "x", "-", value=[1, 1], lineage=[("vec", 0)])
+        x = Variable("x")
+        x_ = Variable("x", value=1, lineage=[("test", 0)])
+        xv = VectorVariable(2, "x", value=[1, 1], lineage=[("vec", 0)])
         m = Model(x, [x >= x_, x_ == xv.prod()])
         m.solve(verbosity=0)
         with pytest.raises(KeyError):
@@ -162,9 +162,9 @@ class TestModelSubs:
         assert x_.key in m.varkeys.by_name("x")
 
     def test_persistence(self):
-        x = gpkit.Variable("x", "-")
-        y = gpkit.Variable("y", "-")
-        ymax = gpkit.Variable("y_{max}", "-", value=0.1)
+        x = gpkit.Variable("x")
+        y = gpkit.Variable("y")
+        ymax = gpkit.Variable("y_{max}", value=0.1)
 
         with gpkit.SignomialsEnabled():
             m = gpkit.Model(x, [x >= 1 - y, y <= ymax])
@@ -194,8 +194,8 @@ class TestModelSubs:
         npt.assert_allclose(cost, [1760, 3505, 17501])
 
     def test_skipfailures(self):
-        x = Variable("x", "-")
-        x_min = Variable("x_{min}", "-", value=1)
+        x = Variable("x")
+        x_min = Variable("x_{min}", value=1)
         m = Model(x, [x <= 1, x >= x_min])
         sweep = {x_min: [1, 2]}
         sol = m.sweep(sweep, verbosity=0, skipfailures=True)
@@ -213,15 +213,15 @@ class TestModelSubs:
 
     def test_vector_sweep(self):
         """Test sweep involving VectorVariables"""
-        x = Variable("x", "-")
-        x_min = Variable("x_min", "-", value=1)
-        y = VectorVariable(2, "y", "-")
+        x = Variable("x")
+        x_min = Variable("x_min", value=1)
+        y = VectorVariable(2, "y")
         m = Model(x, [x >= y.prod()])
         sweep = {y: np.reshape(np.meshgrid([2, 5, 9], [3, 7, 11]), (2, 9)).T}
         a = [sol.cost for sol in m.sweep(sweep, verbosity=0)]
         b = [6, 15, 27, 14, 35, 63, 22, 55, 99]
         npt.assert_allclose(a, b)
-        x_min = Variable("x_min", "-", value=1)  # constant to check array indexing
+        x_min = Variable("x_min", value=1)  # constant to check array indexing
         m = Model(x, [x >= y.prod(), x >= x_min])
         sweep = {"y": [[2, 5], [3, 5], [2, 7], [3, 7], [2, 11], [3, 11]]}
         sol = m.sweep(sweep, verbosity=0)
@@ -362,7 +362,7 @@ class TestModelSubs:
             """
 
             def setup(self):
-                y = self.y = Variable("y", "-")
+                y = self.y = Variable("y")
                 s = Sub()
                 sy = s.y
                 self.cost = y
@@ -377,7 +377,7 @@ class TestModelSubs:
             """
 
             def setup(self):
-                y = self.y = Variable("y", "-")
+                y = self.y = Variable("y")
                 self.cost = y
                 return [y >= 2]
 
@@ -396,7 +396,7 @@ class TestModelSubs:
 
             def setup(self):
                 sub = Sub()
-                x = self.x = Variable("x", "-")
+                x = self.x = Variable("x")
                 self.cost = x
                 return sub, [x >= sub.y, sub.y >= 1]
 
@@ -410,7 +410,7 @@ class TestModelSubs:
             """
 
             def setup(self):
-                y = self.y = Variable("y", "-")
+                y = self.y = Variable("y")
                 self.cost = y
                 return [y >= 2]
 
@@ -418,9 +418,9 @@ class TestModelSubs:
         assert sol.cost == pytest.approx(2)
 
     def test_vector_sub(self):
-        x = VectorVariable(3, "x", "-")
-        y = VectorVariable(3, "y", "-")
-        ymax = VectorVariable(3, "ymax", "-")
+        x = VectorVariable(3, "x")
+        y = VectorVariable(3, "y")
+        ymax = VectorVariable(3, "ymax")
 
         with SignomialsEnabled():
             # issue1077 links to a case that failed for SPs only
@@ -430,10 +430,10 @@ class TestModelSubs:
         m.localsolve(verbosity=0)
 
     def test_spsubs(self):
-        x = Variable("x", "-", value=5)
-        y = Variable("y", "-", value=lambda c: 2 * c[x])
-        z = Variable("z", "-")
-        w = Variable("w", "-")
+        x = Variable("x", value=5)
+        y = Variable("y", value=lambda c: 2 * c[x])
+        z = Variable("z")
+        w = Variable("w")
 
         with SignomialsEnabled():
             cnstr = [z + w >= y * x, w <= y]
@@ -444,7 +444,7 @@ class TestModelSubs:
 
     def test_true_limit_with_vanishing_terms(self):
         "A true limit on a constant drops out, even if substitution leaves 0 <= 1"
-        x, z = Variable("x", "-"), Variable("z", "-")
+        x, z = Variable("x"), Variable("z")
         sol = Model(x, [x >= 1, z <= 5], {z: 0}).solve(verbosity=0)
         assert sol.cost == pytest.approx(1)
 
@@ -453,15 +453,15 @@ class TestNomialMapSubs:
     "Tests substitutions of nomialmaps"
 
     def test_monomial_sub(self):
-        z = Variable("z", "-")
-        w = Variable("w", "-")
+        z = Variable("z")
+        w = Variable("w")
 
         with pytest.raises(TypeError):
             z.hmap.sub({z.key: w.key}, varkeys=z.vks)
 
     def test_sub_zero(self):
-        z = Variable("z", "-")
-        w = Variable("w", "-")
+        z = Variable("z")
+        w = Variable("w")
 
         p = 2 * w + z * w + 2
 
@@ -484,13 +484,13 @@ class TestNomialMapSubs:
     )
     def test_a_nonfinite_value_is_refused(self, a_val, b_val, refused):
         "A fixed value is a finite number; a linked output is checked alike"
-        x, a, b = Variable("x", "-"), Variable("a", "-"), Variable("b", "-")
+        x, a, b = Variable("x"), Variable("a"), Variable("b")
         with pytest.raises(ValueError, match=f"{refused} must be fixed to a finite"):
             Model(x, [x >= a * b, x >= 1], {a: a_val, b: b_val}).gp()
 
     def test_an_undefined_coefficient_is_refused(self):
         "Finite values can overflow to 0*inf; a nan term is never silently dropped"
-        x, y, a, b, z = (Variable(n, "-") for n in "xyabz")
+        x, y, a, b, z = (Variable(n) for n in "xyabz")
         subs = {a: 1e200, b: 1e200, z: 0}
         with SignomialsEnabled():
             sig, fixed_sig = x >= 1 - a * b * z * y, 1 >= 2 - a * b * z
@@ -505,17 +505,12 @@ class TestNomialMapSubs:
 
     def test_sub_takes_inf_as_a_value(self):
         "A solution may hold inf; evaluating with it is arithmetic, not fixing"
-        x, y = Variable("x", "-"), Variable("y", "-")
+        x, y = Variable("x"), Variable("y")
         assert (x * y).sub({x: 2, y: np.inf}).value == np.inf
 
     def test_log_sensitivity_at_zero(self):
         "d(cost)/dz is infinite here, but p*z**p, the log derivative of z**p, is 0"
-        x, y, a, z = (
-            Variable("x", "-"),
-            Variable("y", "-"),
-            Variable("a", "-"),
-            Variable("z", "-"),
-        )
+        x, y, a, z = Variable("x"), Variable("y"), Variable("a"), Variable("z")
         with SignomialsEnabled():
             c = x + y * a >= 1 + z**0.5
         sol = Model(x, [c, x >= 0.1], {a: 0, z: 0}).solve(verbosity=0)
@@ -523,7 +518,7 @@ class TestNomialMapSubs:
         assert sol.sens.variables[z] == 0
 
     def test_sensitivity_to_constant_on_both_sides(self):
-        x, p, q = Variable("x", "-"), Variable("p", "-"), Variable("q", "-")
+        x, p, q = Variable("x"), Variable("p"), Variable("q")
         with SignomialsEnabled():
             c = x * q + x * p >= 1 + 3 * q
         sol = Model(x, [c, x >= 0.01], {p: 1, q: 2}).solve(verbosity=0)
@@ -536,7 +531,7 @@ class TestMergeDuringSubstitution:
 
     @pytest.fixture
     def xabc(self):
-        return tuple(Variable(n, "-") for n in "xabc")
+        return tuple(Variable(n) for n in "xabc")
 
     def test_constraint_sensitivities(self, xabc):
         x, a, b, c = xabc
@@ -557,7 +552,7 @@ class TestMergeDuringSubstitution:
 
     def test_signomial_sensitivities(self, xabc):
         x, a, b, c = xabc
-        y = Variable("y", "-")
+        y = Variable("y")
         with SignomialsEnabled():
             sig = a * b * c * x + b * c * x >= y + 1
         sol = Model(x, [sig, y >= 1], {a: 2, b: 3, c: 5}).solve(verbosity=0)

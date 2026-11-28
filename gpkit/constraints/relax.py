@@ -38,7 +38,7 @@ class ConstraintsRelaxedEqually(ConstraintSet):
         original_substitutions = original_constraints.substitutions
 
         with NamedVariables("Relax"):
-            self.relaxvar = Variable("C", "-")
+            self.relaxvar = Variable("C")
         with SignomialsEnabled():
             relaxed_constraints = [
                 c.relaxed(self.relaxvar) for c in original_constraints.flat()
@@ -99,7 +99,7 @@ class ConstraintsRelaxed(ConstraintSet):
         self.original_constraints = original_constraints
         original_substitutions = original_constraints.substitutions
         with NamedVariables("Relax"):
-            self.relaxvars = VectorVariable(len(original_constraints), "C", "-")
+            self.relaxvars = VectorVariable(len(original_constraints), "C")
 
         with SignomialsEnabled():
             relaxed_constraints = [

@@ -46,7 +46,7 @@ class _GroupedTop(Model):
 
 class _KeyTop(Model):
     def setup(self):
-        x = Variable("x_key", "-")
+        x = Variable("x_key")
         self.a = _KeyChild()
         self.b = _KeyChild()
         return [x >= self.a.y, x <= 10, self.a, self.b]

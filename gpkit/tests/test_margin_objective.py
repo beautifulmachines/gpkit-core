@@ -181,7 +181,7 @@ def test_no_margin_objective():
         """Minimal model with no margin_objective."""
 
         def setup(self):
-            x = Variable("x", "-")
+            x = Variable("x")
             self.cost = x
             return [x >= 1]
 
@@ -254,7 +254,7 @@ def test_to_ir_no_margin_objective():
         """Minimal model with no margin_objective."""
 
         def setup(self):
-            x = Variable("x", "-")
+            x = Variable("x")
             self.cost = x
             return [x >= 1]
 

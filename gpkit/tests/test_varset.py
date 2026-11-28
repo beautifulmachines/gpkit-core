@@ -16,7 +16,7 @@ def test_empty_initialisation():
 
 
 def test_add_and_membership():
-    x = Variable("x", "-")
+    x = Variable("x")
     vs = VarSet()
     vs.add(x.key)
     assert len(vs) == 1
@@ -29,9 +29,9 @@ def test_add_and_membership():
 
 
 def test_keys():
-    x = Variable("x", "-")
-    y = Variable("y", "-")
-    vv = VectorVariable(3, "x", "-")
+    x = Variable("x")
+    y = Variable("y")
+    vv = VectorVariable(3, "x")
     vs = VarSet({x.key, y.key})
     vs.add(vv[1].key)
     assert vs.keys("x") == {x.key, vv[1].key}
@@ -44,8 +44,8 @@ def test_keys():
 def test_resolve():
     x = Variable("x", "m")
     x2 = Variable("x", "ft")
-    z = Variable("z", "-")
-    vv = VectorVariable(4, "t", "-")
+    z = Variable("z")
+    vv = VectorVariable(4, "t")
     vs = VarSet({x.key, x2.key, z.key, vv.key})
     assert vs.resolve(vv) == vv.key
     assert vs.resolve(vv.key) == vv.key
@@ -58,15 +58,15 @@ def test_resolve():
 
 
 def test_clean():
-    x = Variable("x", "-")
-    y = Variable("y", "-")
+    x = Variable("x")
+    y = Variable("y")
     vs = VarSet({x.key, y.key})
     assert vs.clean({"x": 5, "y": 2}) == {x.key: 5, y.key: 2}
 
 
 # ---------- vector handling --------------------------------------------------
 def test_register_vector():
-    vecx = VectorVariable(3, "X", "-")
+    vecx = VectorVariable(3, "X")
     vs = VarSet()
     # update with vector elements (scalar VarKeys)
     vs.update([xx.key for xx in vecx])
@@ -89,8 +89,8 @@ def test_register_vector():
 
 # ---------- mutating behaviour ----------------------------------------------
 def test_discard_and_len():
-    x = Variable("x", "-")
-    vecx = VectorVariable(3, "X", "-")
+    x = Variable("x")
+    vecx = VectorVariable(3, "X")
     vs = VarSet([x.key, vecx[0].key, vecx[1].key])  # create with an iterable
     assert len(vs) == 3
     vs.discard(vecx[0].key)
@@ -99,12 +99,12 @@ def test_discard_and_len():
     assert vecx[0].key not in vs
     # discarding a key that isn’t present should be silent
     vs.discard(vecx[2].key)
-    vs.discard(Variable("y", "-").key)
+    vs.discard(Variable("y").key)
     assert len(vs) == 2
 
 
 def test_varkeys_only():
-    x = Variable("x", "-")
+    x = Variable("x")
     vs = VarSet()
     with pytest.raises(TypeError):
         vs.add(x)

@@ -12,7 +12,7 @@ class Test(Model):
     """
 
     def setup(self):
-        x = self.x = Variable("x", "-")
+        x = self.x = Variable("x")
         return [x >= 1]
 
 
