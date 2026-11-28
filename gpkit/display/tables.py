@@ -156,8 +156,9 @@ SENS_NEARZERO_TOL = 1e-7  # sensitivities are dimensionless, so one tolerance fi
 
 
 def fmt_sens(x, digits: int) -> str:
-    "A sensitivity, signed: 0 if exactly zero, ~0 if within solver noise of it."
-    if x == 0:
+    """A sensitivity, signed: 0 if below machine epsilon, the resolution of a
+    unit-scale sensitivity; ~0 if within solver noise of zero."""
+    if abs(x) < np.finfo(float).eps:
         return "0"
     if abs(x) < SENS_NEARZERO_TOL:
         return "~0"

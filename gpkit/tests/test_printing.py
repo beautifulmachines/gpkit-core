@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 
 from gpkit import Model, NomialArray, Variable, VectorVariable
-from gpkit.display.tables import Display
+from gpkit.display.tables import Display, fmt_sens
 
 
 class Leg(Model):
@@ -386,6 +386,14 @@ class TestDiffTolerance:
     def test_tol_decides_what_moved(self, farther):
         new, baseline = farther
         assert "v[:]" not in new.diff(baseline, tol=0.5)
+
+
+@pytest.mark.parametrize(
+    ("sens", "shown"), [(0.0, "0"), (1.7e-18, "0"), (-1e-17, "0"), (1e-9, "~0")]
+)
+def test_a_sensitivity_below_machine_epsilon_is_zero(sens, shown):
+    "A cancelling sum leaves rounding, whose exact bits differ between machines"
+    assert fmt_sens(sens, 2) == shown
 
 
 class TestDiffVectors:
