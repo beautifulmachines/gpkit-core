@@ -278,7 +278,7 @@ def test_varinfo_carries_no_rendered_fields():
     assert {f.name for f in dataclasses.fields(VarInfo)} == {
         "key",
         "vks",
-        "kind",
+        "kinds",
         "values",
         "sensitivities",
     }
@@ -288,4 +288,4 @@ def test_varinfo_is_immutable():
     x = VarKey(name="x")
     (info,) = classify_variables(VarSet([x]), {})
     with pytest.raises(dataclasses.FrozenInstanceError):
-        info.kind = VarKind.FIXED
+        info.kinds = (VarKind.FIXED,)

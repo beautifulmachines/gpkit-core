@@ -136,6 +136,33 @@ class TestVariableRowsAreJoinable:
         assert {e.key.name for e in ir.fixed_variables} == {"c", "q"}
         assert {e.key.name for e in ir.free_variables} == {"x", "v"}
 
+    class PartlyFixed(gpkit.Model):
+        "A vector with its last element fixed and the others free."
+
+        def setup(self):
+            self.v = gpkit.VectorVariable(3, "v", "N", "load", value={-1: 1})
+            self.cost = self.v.sum()
+            return [self.v >= gpkit.Variable("c", "N", value=0.5)]
+
+    def test_a_partly_fixed_vector_is_free_with_its_fixed_elements_listed(self):
+        "Its free elements are solved, so a fixed row would read their ~0 as data"
+        model = self.PartlyFixed()
+        view = model_view(model, model.solve(verbosity=0))
+        (free,) = [e for e in view.free_variables if e.key.name == "v"]
+        assert free.value.tolist() == pytest.approx([0.5, 0.5, 1])
+        assert free.sensitivity is None
+        (fixed,) = [e for e in view.fixed_variables if e.key.name == "v"]
+        assert fixed.key == model.v[2].key
+        assert fixed.value == 1
+        assert fixed.sensitivity == pytest.approx(0.5, rel=1e-3)  # v[2]/cost
+
+    def test_a_fixed_elements_row_joins_the_model_ir(self):
+        model = self.PartlyFixed()
+        variables = model.to_ir()["variables"]
+        rows = model.report(fmt="dict")["fixed_variables"]
+        assert model.v[2].key.ref in [r["ref"] for r in rows]
+        assert all(r["ref"] in variables for r in rows)
+
 
 class TestReportDataclasses:
     """Tests for VarEntry, CGroup, and ModelView dataclasses."""

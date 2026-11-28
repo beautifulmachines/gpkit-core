@@ -7,7 +7,7 @@ format renders from it -- the report documents in display.report, and the dict
 consumers read.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from typing import Any
 
 import numpy as np
@@ -23,7 +23,7 @@ from .display.render import LATEX, TEXT, render
 from .display.spelling import unitstr
 from .nomials.constraints import ArrayConstraint
 from .util.small_classes import Quantity
-from .varinfo import VarKind, classify_variables
+from .varinfo import VarInfo, VarKind, classify_variables
 from .varmap import VarSet
 
 
@@ -219,7 +219,8 @@ def _build_split_var_entries(
 
     Names come from scope, so a variable this model owns shows only the context
     below it and one owned elsewhere shows its path relative to here. A vector is
-    one entry, under its veckey.
+    one entry, under its veckey; one with free elements is a free entry, and each
+    element it fixes is also a fixed entry of its own, with its sensitivity.
 
     Cross-model variables (extra_vks) additionally store their absolute dotted
     name in VarEntry.source, for display in brackets.
@@ -234,10 +235,15 @@ def _build_split_var_entries(
             # its path already, so a source column would only repeat it.
             source = "" if scope.owns(info.key) else info.key.lineagestr()
             entry = _make_var_entry(info, scope, source)
-            if info.kind is VarKind.FREE:
-                free_entries.append(entry)
-            else:
+            if VarKind.FREE not in info.kinds:
                 fixed_entries.append(entry)
+                continue
+            free_entries.append(replace(entry, sensitivity=None))
+            for element in zip(info.vks, info.kinds, info.values, info.sensitivities):
+                vk, kind, value, sens = element
+                if kind is not VarKind.FREE:  # a fixed element of a free vector
+                    elem = VarInfo(vk, (vk,), (kind,), (value,), (sens,))
+                    fixed_entries.append(_make_var_entry(elem, scope, source))
 
     collect(model.own_varkeys)
     if extra_vks:
